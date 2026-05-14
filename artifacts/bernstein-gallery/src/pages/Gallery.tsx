@@ -28,7 +28,7 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
         <motion.img
           src={artwork.image}
           alt={artwork.title}
-          className="object-contain max-h-72 w-auto select-none artwork-shadow"
+          className="object-contain max-h-72 w-auto select-none artwork-shadow transition-[filter] duration-500 group-hover:artwork-shadow-hover"
           style={{ maxWidth: "80%" }}
           whileHover={{ scale: 1.03 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
