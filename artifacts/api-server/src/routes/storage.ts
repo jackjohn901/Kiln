@@ -31,9 +31,9 @@ router.post(
   },
 );
 
-router.get("/storage/objects/*", async (req: Request, res: Response) => {
+router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
-    const relPath = req.path.replace(/^\/storage\/objects/, "");
+    const relPath = "/" + (req.params as Record<string, string>)["path"];
     const objectPath = `/objects${relPath}`;
     const file = await storage.getObjectEntityFile(objectPath);
     const response = await storage.downloadObject(file, 31536000);
