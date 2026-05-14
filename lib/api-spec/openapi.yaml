@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: instagram
+    description: Instagram media feed
 paths:
   /healthz:
     get:
@@ -24,6 +26,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /instagram/feed:
+    get:
+      operationId: getInstagramFeed
+      tags: [instagram]
+      summary: Get Instagram video feed
+      description: Returns recent video posts from the connected Instagram account
+      responses:
+        "200":
+          description: Video feed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstagramFeed"
+        "503":
+          description: Instagram not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +54,41 @@ components:
           type: string
       required:
         - status
-
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    InstagramVideo:
+      type: object
+      properties:
+        id:
+          type: string
+        media_type:
+          type: string
+        media_url:
+          type: ["string", "null"]
+        thumbnail_url:
+          type: ["string", "null"]
+        permalink:
+          type: string
+        timestamp:
+          type: string
+        caption:
+          type: ["string", "null"]
+      required:
+        - id
+        - media_type
+        - permalink
+        - timestamp
+    InstagramFeed:
+      type: object
+      properties:
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstagramVideo"
+      required:
+        - videos

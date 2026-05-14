@@ -1,0 +1,52 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+}
+
+:root {
+  --background: 0 0% 4%;
+  --foreground: 0 0% 96%;
+  --border: 0 0% 14%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 48%;
+  --accent: 0 0% 16%;
+  --accent-foreground: 0 0% 90%;
+  --app-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --app-font-serif: Georgia, 'Times New Roman', serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+  ::selection {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: var(--app-font-serif);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}

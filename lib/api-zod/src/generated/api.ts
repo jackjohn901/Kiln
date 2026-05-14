@@ -14,3 +14,21 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns recent video posts from the connected Instagram account
+ * @summary Get Instagram video feed
+ */
+export const GetInstagramFeedResponse = zod.object({
+  videos: zod.array(
+    zod.object({
+      id: zod.string(),
+      media_type: zod.string(),
+      media_url: zod.string().nullish(),
+      thumbnail_url: zod.string().nullish(),
+      permalink: zod.string(),
+      timestamp: zod.string(),
+      caption: zod.string().nullish(),
+    }),
+  ),
+});

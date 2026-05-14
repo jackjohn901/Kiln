@@ -5,8 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InstagramVideo } from "./instagramVideo";
 
-export * from "./apiError";
-export * from "./healthStatus";
-export * from "./instagramFeed";
-export * from "./instagramVideo";
+export interface InstagramFeed {
+  videos: InstagramVideo[];
+}

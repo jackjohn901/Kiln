@@ -5,13 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface ApiError {
-  error: string;
-}
 
 export interface InstagramVideo {
   id: string;
@@ -24,8 +17,4 @@ export interface InstagramVideo {
   timestamp: string;
   /** @nullable */
   caption?: string | null;
-}
-
-export interface InstagramFeed {
-  videos: InstagramVideo[];
 }

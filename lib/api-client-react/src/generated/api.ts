@@ -13,7 +13,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type { ApiError, HealthStatus, InstagramFeed } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -92,6 +92,82 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns recent video posts from the connected Instagram account
+ * @summary Get Instagram video feed
+ */
+export const getGetInstagramFeedUrl = () => {
+  return `/api/instagram/feed`;
+};
+
+export const getInstagramFeed = async (
+  options?: RequestInit,
+): Promise<InstagramFeed> => {
+  return customFetch<InstagramFeed>(getGetInstagramFeedUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetInstagramFeedQueryKey = () => {
+  return [`/api/instagram/feed`] as const;
+};
+
+export const getGetInstagramFeedQueryOptions = <
+  TData = Awaited<ReturnType<typeof getInstagramFeed>>,
+  TError = ErrorType<ApiError>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getInstagramFeed>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetInstagramFeedQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getInstagramFeed>>
+  > = ({ signal }) => getInstagramFeed({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getInstagramFeed>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetInstagramFeedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getInstagramFeed>>
+>;
+export type GetInstagramFeedQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get Instagram video feed
+ */
+
+export function useGetInstagramFeed<
+  TData = Awaited<ReturnType<typeof getInstagramFeed>>,
+  TError = ErrorType<ApiError>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getInstagramFeed>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetInstagramFeedQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
