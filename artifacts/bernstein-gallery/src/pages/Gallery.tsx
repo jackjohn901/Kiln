@@ -27,6 +27,7 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
       <div className="relative w-full flex flex-col items-center justify-end" style={{ minHeight: 360 }}>
         <motion.div
           className="flex flex-col items-center"
+          style={{ lineHeight: 0 }}
           whileHover={{ scale: 1.03 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           animate={revealed ? { scale: 1.02 } : { scale: 1 }}
@@ -34,25 +35,29 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
           <img
             src={artwork.image}
             alt={artwork.title}
-            className="object-contain max-h-64 w-auto select-none artwork-shadow transition-[filter] duration-500 group-hover:artwork-shadow-hover"
-            style={{ maxWidth: "80%", display: "block" }}
+            className="select-none artwork-shadow transition-[filter] duration-500 group-hover:artwork-shadow-hover"
+            style={{ display: "block", height: "220px", width: "auto", maxWidth: "100%" }}
           />
-          <img
-            src={artwork.image}
-            alt=""
+          <div
             aria-hidden="true"
-            className="object-contain w-auto select-none pointer-events-none"
             style={{
-              maxWidth: "80%",
-              maxHeight: "5rem",
               display: "block",
+              height: "48px",
+              overflow: "hidden",
               transform: "scaleY(-1)",
-              opacity: 0.28,
-              WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
-              maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
-              marginTop: "1px",
+              transformOrigin: "top center",
+              opacity: 0.18,
+              WebkitMaskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
+              maskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
+              lineHeight: 0,
             }}
-          />
+          >
+            <img
+              src={artwork.image}
+              alt=""
+              style={{ display: "block", height: "220px", width: "auto", maxWidth: "100%" }}
+            />
+          </div>
         </motion.div>
 
         <AnimatePresence>
