@@ -24,16 +24,36 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
     >
-      <div className="relative w-full flex items-end justify-center pb-6" style={{ minHeight: 320 }}>
-        <motion.img
-          src={artwork.image}
-          alt={artwork.title}
-          className="object-contain max-h-72 w-auto select-none artwork-shadow transition-[filter] duration-500 group-hover:artwork-shadow-hover"
-          style={{ maxWidth: "80%" }}
+      <div className="relative w-full flex flex-col items-center justify-end" style={{ minHeight: 360 }}>
+        <motion.div
+          className="flex flex-col items-center"
           whileHover={{ scale: 1.03 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           animate={revealed ? { scale: 1.02 } : { scale: 1 }}
-        />
+        >
+          <img
+            src={artwork.image}
+            alt={artwork.title}
+            className="object-contain max-h-64 w-auto select-none artwork-shadow transition-[filter] duration-500 group-hover:artwork-shadow-hover"
+            style={{ maxWidth: "80%", display: "block" }}
+          />
+          <img
+            src={artwork.image}
+            alt=""
+            aria-hidden="true"
+            className="object-contain w-auto select-none pointer-events-none"
+            style={{
+              maxWidth: "80%",
+              maxHeight: "5rem",
+              display: "block",
+              transform: "scaleY(-1)",
+              opacity: 0.28,
+              WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
+              maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
+              marginTop: "1px",
+            }}
+          />
+        </motion.div>
 
         <AnimatePresence>
           {revealed && (
