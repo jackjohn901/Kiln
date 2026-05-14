@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/kiln/"
+title = "Kiln — Artist Creator Platform"
+version = "1.0.0"
+id = "artifacts/kiln"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/kiln/" ]
+localPort = 23594
+
+[services.development]
+run = "pnpm --filter @workspace/kiln run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kiln", "run", "build" ]
+publicDir = "artifacts/kiln/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23594"
+BASE_PATH = "/kiln/"
