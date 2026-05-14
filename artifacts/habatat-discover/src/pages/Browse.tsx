@@ -72,8 +72,14 @@ export default function Browse() {
           >
             Featured
           </button>
+          <button
+            onClick={() => navigate("/artists")}
+            className="text-[10px] uppercase tracking-[0.2em] text-white/25 hover:text-white/60 transition-colors"
+          >
+            Artists
+          </button>
           <span className="text-[10px] uppercase tracking-[0.2em] text-white/50 border-b border-white/30 pb-0.5">
-            Browse All
+            Videos
           </span>
         </nav>
       </header>

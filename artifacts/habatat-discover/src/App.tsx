@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import Discover from "@/pages/Discover";
 import Browse from "@/pages/Browse";
+import Artists from "@/pages/Artists";
+import ArtistPage from "@/pages/ArtistPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,6 +19,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Discover} />
       <Route path="/browse" component={Browse} />
+      <Route path="/artists" component={Artists} />
+      <Route path="/artists/:id" component={ArtistPage} />
       <Route>
         <div className="min-h-screen flex items-center justify-center">
           <p className="text-muted-foreground text-sm">Page not found.</p>

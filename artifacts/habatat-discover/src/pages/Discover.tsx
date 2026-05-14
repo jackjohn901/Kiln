@@ -159,10 +159,16 @@ export default function Discover() {
             Featured
           </span>
           <button
+            onClick={() => navigate("/artists")}
+            className="text-[10px] uppercase tracking-[0.2em] text-white/25 hover:text-white/60 transition-colors"
+          >
+            Artists
+          </button>
+          <button
             onClick={() => navigate("/browse")}
             className="text-[10px] uppercase tracking-[0.2em] text-white/25 hover:text-white/60 transition-colors"
           >
-            Browse All
+            Videos
           </button>
         </nav>
       </header>
@@ -217,11 +223,21 @@ export default function Discover() {
                 .filter((a) => a.id !== featuredArtist.id)
                 .slice(0, 4)
                 .map((a) => (
-                  <span key={a.id} className="text-[10px] text-white/25 hover:text-white/50 cursor-default transition-colors">
+                  <button
+                    key={a.id}
+                    onClick={() => navigate(`/artists/${a.id}`)}
+                    className="text-[10px] text-white/25 hover:text-white/60 transition-colors underline-offset-2 hover:underline"
+                  >
                     {a.name}
-                  </span>
+                  </button>
                 ))}
             </div>
+            <button
+              onClick={() => navigate("/artists")}
+              className="mt-4 text-[9px] uppercase tracking-[0.15em] text-white/15 hover:text-white/40 transition-colors"
+            >
+              View all artists →
+            </button>
           </div>
         </div>
       </main>
