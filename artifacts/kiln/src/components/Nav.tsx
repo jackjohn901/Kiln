@@ -1,68 +1,77 @@
 import { Link, useLocation } from "wouter";
-import { Search, Bell, User } from "lucide-react";
+import { Plus, User, Flame } from "lucide-react";
+import { useProfile } from "@/contexts/ProfileContext";
 
 export default function Nav() {
   const [location] = useLocation();
+  const { profile } = useProfile();
 
   const links = [
-    { href: "/", label: "Feed" },
+    { href: "/", label: "Discover" },
     { href: "/artists", label: "Artists" },
     { href: "/shop", label: "Shop" },
   ];
 
   return (
-    <header
+    <nav
       data-testid="nav-header"
-      className="sticky top-0 z-50 w-full border-b border-border/50"
-      style={{ background: "hsl(20 8% 8% / 0.92)", backdropFilter: "blur(16px)" }}
+      className="sticky top-0 z-50 border-b border-white/10 bg-[#1a1209]/90 backdrop-blur-md"
     >
-      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" data-testid="nav-logo">
-          <span className="font-serif text-xl tracking-wide text-foreground hover:text-primary transition-colors cursor-pointer">
-            Kiln
-          </span>
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+        <Link href="/" data-testid="nav-logo" className="flex items-center gap-2 select-none">
+          <Flame size={18} className="text-amber-400" />
+          <span className="font-serif text-xl font-bold tracking-tight text-amber-100">Kiln</span>
         </Link>
 
-        <nav className="flex items-center gap-1">
-          {links.map((l) => {
-            const active = location === l.href || (l.href !== "/" && location.startsWith(l.href));
+        <div className="hidden items-center gap-1 sm:flex">
+          {links.map(({ href, label }) => {
+            const active = href === "/" ? location === "/" : location.startsWith(href);
             return (
-              <Link key={l.href} href={l.href} data-testid={`nav-link-${l.label.toLowerCase()}`}>
-                <span
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
-                    active
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                  }`}
-                >
-                  {l.label}
-                </span>
+              <Link
+                key={href}
+                href={href}
+                data-testid={`nav-link-${label.toLowerCase()}`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  active ? "bg-amber-500/20 text-amber-300" : "text-stone-400 hover:text-amber-200"
+                }`}
+              >
+                {label}
               </Link>
             );
           })}
-        </nav>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            data-testid="nav-search"
-            className="w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/create"
+            className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-sm font-semibold text-stone-950 transition-all hover:bg-amber-400 active:scale-95"
           >
-            <Search size={16} />
-          </button>
-          <button
-            data-testid="nav-notifications"
-            className="w-8 h-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
-          >
-            <Bell size={16} />
-          </button>
-          <button
-            data-testid="nav-profile"
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-primary/20 text-primary hover:bg-primary/30 transition-all"
-          >
-            <User size={15} />
-          </button>
+            <Plus size={15} />
+            <span className="hidden sm:inline">Post</span>
+          </Link>
+
+          {profile ? (
+            <Link
+              href={`/artists/${profile.id}`}
+              className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-amber-500/40 bg-stone-800 text-xs font-bold text-amber-300 transition-colors hover:border-amber-400"
+            >
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt={profile.name} className="h-full w-full object-cover" />
+              ) : (
+                profile.name.charAt(0).toUpperCase()
+              )}
+            </Link>
+          ) : (
+            <Link
+              href="/setup"
+              data-testid="nav-profile"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-600 text-stone-400 transition-colors hover:border-amber-400 hover:text-amber-300"
+            >
+              <User size={16} />
+            </Link>
+          )}
         </div>
       </div>
-    </header>
+    </nav>
   );
 }

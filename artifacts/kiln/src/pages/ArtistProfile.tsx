@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useParams, useLocation, Link } from "wouter";
+import { useParams, Link } from "wouter";
 import {
-  ChevronLeft, ExternalLink, Heart, Share2, Play, Flame, MapPin, Building2
+  ChevronLeft, ExternalLink, Heart, Bookmark, Share2,
+  Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
+  BookOpen, X, Plus,
 } from "lucide-react";
 import Nav from "@/components/Nav";
-import { artists, getArtistById, getAllImages, Artist } from "@/data/artists";
+import { artists, getArtistById, type Artist } from "@/data/artists";
 import { getListingsByArtist, formatPrice } from "@/data/listings";
+import { useProfile } from "@/contexts/ProfileContext";
+import { getPosts } from "@/data/posts";
 
-type Tab = "bio" | "works" | "videos" | "shop";
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function hash(s: string): number {
   let h = 0;
@@ -16,434 +20,486 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 
-function getCraftScore(artist: Artist): number {
-  return 78 + (hash(artist.id) % 20);
+function craftScore(id: string): number {
+  return 78 + (hash(id) % 20);
 }
 
-function getStats(artist: Artist) {
-  const h = hash(artist.id);
-  const views = 12000 + (h % 88000);
-  const followers = 3000 + (h % 47000);
-  return { views, followers };
+function getStats(id: string) {
+  const h = hash(id);
+  return {
+    followers: 3000 + (h % 47000),
+    following: 80 + (h % 400),
+  };
 }
 
-function VideoCard({ videoId, title }: { videoId: string; title: string }) {
-  const [playing, setPlaying] = useState(false);
+// ─── Grid item types ──────────────────────────────────────────────────────────
+
+interface GridItem {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  isVideo: boolean;
+  videoId?: string;
+  isProcess: boolean;
+  technique?: string;
+}
+
+function buildGrid(artist: Artist, includeUserPosts = false): GridItem[] {
+  const items: GridItem[] = [];
+
+  // Process videos first (primary content)
+  for (const v of artist.videos) {
+    items.push({
+      id: `v-${v.id}`,
+      imageUrl: `https://img.youtube.com/vi/${v.id}/hqdefault.jpg`,
+      caption: v.title,
+      isVideo: true,
+      videoId: v.id,
+      isProcess: true,
+    });
+  }
+
+  // Artwork images
+  for (const img of artist.images) {
+    items.push({
+      id: `img-${img.url.slice(-16)}`,
+      imageUrl: img.url,
+      caption: img.caption,
+      isVideo: false,
+      isProcess: false,
+    });
+  }
+
+  if (includeUserPosts) {
+    const posts = getPosts().filter((p) => p.artistId === artist.id);
+    for (const p of posts) {
+      items.push({
+        id: p.id,
+        imageUrl: p.mediaUrl,
+        caption: p.caption,
+        isVideo: p.type === "video",
+        isProcess: true,
+      });
+    }
+  }
+
+  return items;
+}
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+
+function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
   return (
-    <div
-      data-testid={`video-card-${videoId}`}
-      className="relative aspect-video bg-card rounded-lg overflow-hidden border border-card-border"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
+      onClick={onClose}
     >
-      {playing ? (
-        <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
-          className="w-full h-full"
-          allow="autoplay; encrypted-media"
-          allowFullScreen
-          title={title}
-        />
-      ) : (
-        <button className="group w-full h-full relative" onClick={() => setPlaying(true)}>
-          <img
-            src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
-            alt={title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-black/30 group-hover:bg-black/50 transition-colors flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-white/10 group-hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-all">
-              <Play size={18} fill="white" className="text-white ml-0.5" />
-            </div>
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-3 py-3">
-            <p className="text-[10px] text-white/70 leading-snug line-clamp-2">{title}</p>
-          </div>
+      <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+        >
+          <X size={15} />
         </button>
-      )}
-    </div>
+
+        {item.isVideo && item.videoId ? (
+          <div className="aspect-video overflow-hidden rounded-2xl">
+            <iframe
+              src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&rel=0&modestbranding=1`}
+              className="h-full w-full"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl bg-stone-900">
+            <img
+              src={item.imageUrl}
+              alt={item.caption}
+              className="max-h-[75vh] w-full object-contain"
+            />
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center justify-between px-1">
+          <p className="text-sm text-stone-300 line-clamp-2 flex-1">{item.caption}</p>
+          <div className="flex items-center gap-3 ml-4 shrink-0">
+            <button className="text-stone-400 hover:text-red-400 transition-colors"><Heart size={18} /></button>
+            <button className="text-stone-400 hover:text-amber-400 transition-colors"><Bookmark size={18} /></button>
+            <button className="text-stone-400 hover:text-stone-200 transition-colors"><Share2 size={18} /></button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
-export default function ArtistProfile() {
-  const params = useParams<{ id: string }>();
-  const [, navigate] = useLocation();
-  const [tab, setTab] = useState<Tab>("bio");
-  const [followed, setFollowed] = useState(false);
+// ─── Main Component ────────────────────────────────────────────────────────────
 
-  const artist = getArtistById(params.id);
+type Tab = "posts" | "process" | "shop" | "bio";
+
+export default function ArtistProfile() {
+  const { id } = useParams<{ id: string }>();
+  const { profile } = useProfile();
+  const artist = getArtistById(id ?? "");
+  const isOwn = profile?.id === id;
+
+  const [tab, setTab] = useState<Tab>("posts");
+  const [lightbox, setLightbox] = useState<GridItem | null>(null);
+  const [following, setFollowing] = useState(false);
+
   if (!artist) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <p className="text-muted-foreground text-sm">Artist not found.</p>
-          <button onClick={() => navigate("/artists")} className="text-xs text-primary underline">
-            Back to Artists
-          </button>
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+          <p className="text-stone-400 mb-4">Artist not found.</p>
+          <Link href="/" className="text-amber-400 hover:text-amber-300 text-sm">← Back to Discover</Link>
         </div>
       </div>
     );
   }
 
-  const allImages = getAllImages(artist);
-  const heroImage = allImages[0];
-  const score = getCraftScore(artist);
-  const stats = getStats(artist);
-  const artistListings = getListingsByArtist(artist.id);
-  const currentIndex = artists.findIndex((a) => a.id === artist.id);
-  const prevArtist = currentIndex > 0 ? artists[currentIndex - 1] : null;
-  const nextArtist = currentIndex < artists.length - 1 ? artists[currentIndex + 1] : null;
+  const allGridItems = buildGrid(artist, isOwn);
+  const processItems = allGridItems.filter((g) => g.isVideo);
+  const artworkItems = allGridItems.filter((g) => !g.isVideo);
+  const listings = getListingsByArtist(artist.id);
+  const stats = getStats(artist.id);
+  const score = craftScore(artist.id);
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "bio", label: "Biography" },
-    { id: "works", label: "Bodies of Work" },
-    { id: "videos", label: "Videos" },
-    { id: "shop", label: `Shop (${artistListings.length})` },
-  ];
+  const coverImg = artist.images[0]?.url
+    ?? (artist.videos[0] ? `https://img.youtube.com/vi/${artist.videos[0].id}/hqdefault.jpg` : "");
+
+  const tabItems = tab === "posts" ? allGridItems
+    : tab === "process" ? processItems
+    : [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#12100e]">
       <Nav />
 
-      <div
-        className="relative h-[50vh] overflow-hidden"
-        data-testid="artist-hero"
-      >
-        {heroImage && (
-          <img src={heroImage.url} alt={artist.name} className="w-full h-full object-cover" />
+      {/* Cover strip */}
+      <div className="relative h-44 w-full overflow-hidden bg-stone-900">
+        {coverImg && (
+          <img
+            src={coverImg}
+            alt=""
+            className="h-full w-full object-cover opacity-60"
+            style={{ filter: "blur(2px)", transform: "scale(1.06)" }}
+          />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-background" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#12100e]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#12100e]/40 to-transparent" />
 
-        <div className="absolute top-4 left-6 flex items-center gap-4">
-          <button
-            data-testid="back-btn"
-            onClick={() => navigate("/artists")}
-            className="flex items-center gap-1 text-[10px] uppercase tracking-[0.15em] text-white/60 hover:text-white transition-colors"
-          >
-            <ChevronLeft size={12} /> Artists
-          </button>
-        </div>
-
-        <div className="absolute top-4 right-6 flex items-center gap-3">
-          {prevArtist && (
-            <Link href={`/artists/${prevArtist.id}`}>
-              <span className="text-[10px] text-white/40 hover:text-white/70 transition-colors cursor-pointer">← Prev</span>
-            </Link>
-          )}
-          {nextArtist && (
-            <Link href={`/artists/${nextArtist.id}`}>
-              <span className="text-[10px] text-white/40 hover:text-white/70 transition-colors cursor-pointer">Next →</span>
-            </Link>
-          )}
-        </div>
+        {/* Back button */}
+        <Link
+          href="/"
+          className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 transition-colors"
+        >
+          <ChevronLeft size={16} />
+        </Link>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6">
-        <div className="relative -mt-16 mb-8">
-          <div className="flex items-end justify-between gap-4 flex-wrap">
-            <div>
-              <p className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-1">
-                {artist.nationality}{artist.born ? ` · Born ${artist.born}` : ""}
-              </p>
-              <h1 className="font-serif text-4xl font-normal text-foreground mb-1" data-testid="artist-name">
-                {artist.name}
-              </h1>
-              <p className="text-sm text-muted-foreground">{artist.medium}</p>
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                data-testid="craft-score-badge"
-                style={{ background: "hsl(28 68% 52% / 0.15)", border: "1px solid hsl(28 68% 52% / 0.4)", color: "hsl(28 68% 65%)" }}
-              >
-                <Flame size={12} />
-                Craft Score {score}
+      {/* Profile section */}
+      <div className="mx-auto max-w-3xl px-4">
+        <div className="relative -mt-12 flex items-end gap-4">
+          {/* Avatar */}
+          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-[#12100e] bg-stone-800 shadow-xl">
+            {coverImg ? (
+              <img src={coverImg} alt={artist.name} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-2xl font-serif text-stone-500">
+                {artist.name.charAt(0)}
               </div>
-              <button
-                data-testid="follow-btn"
-                onClick={() => setFollowed((v) => !v)}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  followed
-                    ? "bg-primary/20 text-primary border border-primary/40"
-                    : "border border-border text-foreground hover:border-primary/40 hover:text-primary"
-                }`}
-              >
-                <Heart size={12} fill={followed ? "currentColor" : "none"} />
-                {followed ? "Following" : "Follow"}
-              </button>
-              {artist.website && (
-                <a
-                  href={artist.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-testid="website-link"
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-white/20 transition-all"
-                >
-                  Website <ExternalLink size={10} />
-                </a>
-              )}
-              <a
-                href={artist.habatat}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="habatat-link"
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-white/20 transition-all"
-              >
-                Habatat <ExternalLink size={10} />
-              </a>
-            </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-6 mt-4">
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <MapPin size={11} />
-              {artist.location}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              {(stats.followers / 1000).toFixed(1).replace(/\.0$/, "")}k followers
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              {artist.series.length} series
-            </div>
+          {/* Action buttons (top-right) */}
+          <div className="ml-auto flex items-center gap-2 pb-1">
+            {isOwn ? (
+              <>
+                <Link
+                  href="/create"
+                  className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                >
+                  <Plus size={14} /> Post
+                </Link>
+                <Link
+                  href="/setup"
+                  className="rounded-full border border-white/15 px-3 py-1.5 text-sm text-stone-300 hover:border-amber-400/40 transition-colors"
+                >
+                  Edit
+                </Link>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setFollowing(!following)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+                    following
+                      ? "border border-white/15 bg-transparent text-stone-300 hover:border-red-400/40 hover:text-red-400"
+                      : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                  }`}
+                >
+                  {following ? "Following" : "Follow"}
+                </button>
+                <button className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-stone-400 hover:border-white/30 transition-colors">
+                  <Share2 size={14} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {artist.quote && (
-          <blockquote className="border-l-2 pl-5 mb-8" style={{ borderColor: "hsl(28 68% 52%)" }}>
-            <p className="font-serif text-lg italic text-foreground/80 leading-relaxed">"{artist.quote}"</p>
-          </blockquote>
+        {/* Name + handle */}
+        <div className="mt-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-serif text-2xl font-bold text-amber-100">{artist.name}</h1>
+            <div className="flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/25 px-2.5 py-0.5">
+              <Flame size={11} className="text-amber-400" />
+              <span className="text-xs font-bold text-amber-300">{score}</span>
+            </div>
+          </div>
+          <p className="text-sm text-stone-500">@{artist.id}</p>
+        </div>
+
+        {/* Bio */}
+        <p className="mt-2 text-sm text-stone-400 leading-relaxed max-w-xl">
+          {artist.bio.length > 220 ? artist.bio.slice(0, 220) + "…" : artist.bio}
+        </p>
+
+        {/* Location + medium */}
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-stone-600">
+          <span className="flex items-center gap-1">
+            <MapPin size={11} /> {artist.location}
+          </span>
+          <span>{artist.medium}</span>
+          {artist.website && (
+            <a href={artist.website} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-amber-600 hover:text-amber-400 transition-colors"
+            >
+              <ExternalLink size={10} /> Website
+            </a>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="mt-4 flex gap-6 border-t border-white/8 pt-4">
+          {[
+            { label: "posts", value: allGridItems.length },
+            { label: "followers", value: stats.followers.toLocaleString() },
+            { label: "following", value: stats.following },
+          ].map(({ label, value }) => (
+            <div key={label} className="text-center">
+              <p className="font-bold text-white">{value}</p>
+              <p className="text-xs text-stone-500">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Story highlights (series) */}
+        {artist.series.length > 0 && (
+          <div className="mt-5 overflow-x-auto pb-1">
+            <div className="flex gap-4" style={{ width: "max-content" }}>
+              {artist.series.map((s) => (
+                <div key={s.name} className="flex flex-col items-center gap-1.5 w-16">
+                  <div className="h-14 w-14 overflow-hidden rounded-full border-2 border-amber-500/50 bg-stone-800 p-0.5">
+                    <div className="h-full w-full overflow-hidden rounded-full bg-stone-700">
+                      {coverImg && (
+                        <img src={coverImg} alt={s.name} className="h-full w-full object-cover opacity-80" />
+                      )}
+                    </div>
+                  </div>
+                  <p className="line-clamp-1 text-center text-[10px] text-stone-400">{s.name.split(" ")[0]}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
-        <div className="flex border-b border-border/50 mb-8" data-testid="profile-tabs">
-          {tabs.map((t) => (
+        {/* Tab bar */}
+        <div className="mt-5 flex border-b border-white/10">
+          {(
+            [
+              { key: "posts", icon: Grid3x3, label: "Posts" },
+              { key: "process", icon: Video, label: "Process" },
+              { key: "shop", icon: ShoppingBag, label: "Shop" },
+              { key: "bio", icon: BookOpen, label: "Bio" },
+            ] as { key: Tab; icon: React.ElementType; label: string }[]
+          ).map(({ key, icon: Icon, label }) => (
             <button
-              key={t.id}
-              data-testid={`tab-${t.id}`}
-              onClick={() => setTab(t.id)}
-              className={`px-5 py-2.5 text-[11px] uppercase tracking-[0.12em] font-medium transition-all border-b-2 -mb-px ${
-                tab === t.id
-                  ? "text-primary border-primary"
-                  : "text-muted-foreground border-transparent hover:text-foreground hover:border-white/20"
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px ${
+                tab === key
+                  ? "border-amber-400 text-amber-300"
+                  : "border-transparent text-stone-500 hover:text-stone-300"
               }`}
             >
-              {t.label}
+              <Icon size={13} />
+              <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
-          {tab === "bio" && (
-            <motion.div
-              key="bio"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="pb-16"
-              data-testid="tab-content-bio"
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                <div className="lg:col-span-2 space-y-6">
-                  <p className="text-sm text-foreground/70 leading-relaxed font-light">{artist.bio}</p>
-
-                  {artist.artistStatement && (
-                    <div className="pt-5 border-t border-border/40">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Artist Statement</p>
-                      <p className="text-sm text-foreground/60 leading-relaxed italic font-light">{artist.artistStatement}</p>
+        {/* Content area */}
+        <div className="py-4">
+          {/* Posts / Process grid */}
+          {(tab === "posts" || tab === "process") && (
+            <>
+              {tabItems.length === 0 ? (
+                <div className="py-16 text-center text-stone-600 text-sm">
+                  {tab === "process" ? "No process videos yet." : "No posts yet."}
+                  {isOwn && (
+                    <div className="mt-4">
+                      <Link href="/create" className="text-amber-400 hover:text-amber-300 text-sm">
+                        Share your first process →
+                      </Link>
                     </div>
                   )}
                 </div>
-
-                <div className="space-y-6">
-                  {artist.collections.length > 0 && (
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3 flex items-center gap-1.5">
-                        <Building2 size={10} /> Public Collections
-                      </p>
-                      <ul className="space-y-2">
-                        {artist.collections.map((c) => (
-                          <li key={c} className="text-[11px] text-foreground/50 font-light flex items-start gap-2">
-                            <span className="text-primary/40 mt-0.5">—</span>{c}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Concepts</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {artist.concepts.map((c) => (
-                        <span
-                          key={c}
-                          className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground border border-border/60 rounded-full px-2.5 py-1"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {artist.tagline && (
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">Tagline</p>
-                      <p className="text-xs text-foreground/60 italic">{artist.tagline}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {tab === "works" && (
-            <motion.div
-              key="works"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-6 pb-16"
-              data-testid="tab-content-works"
-            >
-              {artist.series.map((s, i) => (
-                <motion.div
-                  key={s.name}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.07 }}
-                  className="border-l-2 border-border pl-5 hover:border-primary/50 transition-colors"
-                >
-                  <div className="flex items-baseline gap-3 mb-2">
-                    <h3 className="text-sm font-medium text-foreground">{s.name}</h3>
-                    <span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{s.years}</span>
-                  </div>
-                  <p className="text-[13px] text-foreground/55 leading-relaxed font-light">{s.description}</p>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {tab === "videos" && (
-            <motion.div
-              key="videos"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="pb-16"
-              data-testid="tab-content-videos"
-            >
-              {artist.videos.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No videos available.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {artist.videos.map((v) => (
-                    <VideoCard key={v.id} videoId={v.id} title={v.title} />
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {tab === "shop" && (
-            <motion.div
-              key="shop"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="pb-16"
-              data-testid="tab-content-shop"
-            >
-              {artistListings.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No works currently listed.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {artistListings.map((listing, i) => (
-                    <motion.div
-                      key={listing.id}
-                      data-testid={`shop-listing-${listing.id}`}
-                      initial={{ opacity: 0, y: 16 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.06 }}
-                      className={`bg-card rounded-lg overflow-hidden border border-card-border hover:border-primary/30 transition-all ${
-                        !listing.available ? "opacity-60" : ""
-                      }`}
+                <div className="grid grid-cols-3 gap-0.5">
+                  {tabItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setLightbox(item)}
+                      className="group relative aspect-square overflow-hidden bg-stone-900"
                     >
-                      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-                        {listing.imageUrl && (
-                          <img src={listing.imageUrl} alt={listing.title} className="w-full h-full object-cover" />
-                        )}
-                        {!listing.available && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <span className="px-3 py-1 rounded-full bg-black/60 text-white/70 text-[10px] uppercase tracking-wider">Sold</span>
-                          </div>
+                      <img
+                        src={item.imageUrl}
+                        alt={item.caption}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      {/* Overlay on hover */}
+                      <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/30 flex items-center justify-center">
+                        {item.isVideo && (
+                          <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
                         )}
                       </div>
-                      <div className="p-4">
-                        <p className="text-sm font-medium text-foreground mb-1">{listing.title}</p>
-                        <p className="text-[11px] text-muted-foreground mb-0.5">{listing.year} · {listing.medium.split(",")[0]}</p>
-                        <p className="text-[10px] text-muted-foreground mb-3">{listing.dimensions}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-base font-semibold text-foreground">{formatPrice(listing.price)}</span>
-                          {listing.available && (
-                            <a
-                              href={artist.habatat}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              data-testid={`inquire-${listing.id}`}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-medium transition-all"
-                              style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}
-                            >
-                              Inquire <ExternalLink size={9} />
-                            </a>
-                          )}
+                      {/* Video badge */}
+                      {item.isVideo && (
+                        <div className="absolute right-1.5 top-1.5">
+                          <Video size={11} className="text-white drop-shadow" />
                         </div>
-                      </div>
-                    </motion.div>
+                      )}
+                      {/* Process badge */}
+                      {item.isProcess && !item.isVideo && (
+                        <div className="absolute left-1.5 top-1.5 rounded-sm bg-amber-500/80 px-1 py-0.5">
+                          <span className="text-[8px] font-bold text-stone-950">WIP</span>
+                        </div>
+                      )}
+                    </button>
                   ))}
                 </div>
               )}
-
-              <div className="mt-8 pt-6 border-t border-border/40">
-                <p className="text-[11px] text-muted-foreground leading-relaxed max-w-lg">
-                  Inquiries are handled directly with the artist or their gallery representative.
-                  All works come with certificates of authenticity. Payment plans available for works over $25,000.
-                </p>
-              </div>
-            </motion.div>
+            </>
           )}
-        </AnimatePresence>
 
-        <section className="border-t border-border/40 py-12 mb-8">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-6">More Artists</p>
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {artists.filter((a) => a.id !== artist.id).slice(0, 6).map((a) => {
-              const img = getAllImages(a)[0]?.url ?? null;
-              return (
-                <Link key={a.id} href={`/artists/${a.id}`}>
-                  <div
-                    data-testid={`related-artist-${a.id}`}
-                    className="group flex-shrink-0 text-left w-32 cursor-pointer"
-                  >
-                    <div className="aspect-[4/3] bg-card overflow-hidden rounded-md mb-2">
-                      {img && (
+          {/* Shop */}
+          {tab === "shop" && (
+            <div>
+              {listings.length === 0 ? (
+                <div className="py-16 text-center text-stone-600 text-sm">No works available in the shop.</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {listings.map((l) => (
+                    <div key={l.id} className="group overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
+                      <div className="aspect-square overflow-hidden">
                         <img
-                          src={img}
-                          alt={a.name}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          src={l.imageUrl}
+                          alt={l.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
-                      )}
+                      </div>
+                      <div className="p-3">
+                        <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
+                        <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
+                        <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-foreground/60 group-hover:text-foreground transition-colors leading-tight">{a.name}</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">{a.medium.split(" &")[0].split(",")[0]}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bio */}
+          {tab === "bio" && (
+            <div className="max-w-2xl space-y-6 py-2">
+              <div>
+                <h3 className="mb-2 font-serif text-lg text-amber-100">About</h3>
+                <p className="text-sm text-stone-400 leading-relaxed">{artist.bio}</p>
+              </div>
+
+              {artist.artistStatement && (
+                <div>
+                  <h3 className="mb-2 font-serif text-lg text-amber-100">Artist Statement</h3>
+                  <blockquote className="border-l-2 border-amber-500/40 pl-4 italic text-sm text-stone-400 leading-relaxed">
+                    {artist.artistStatement}
+                  </blockquote>
+                </div>
+              )}
+
+              {artist.series.length > 0 && (
+                <div>
+                  <h3 className="mb-3 font-serif text-lg text-amber-100">Series</h3>
+                  <div className="space-y-3">
+                    {artist.series.map((s) => (
+                      <div key={s.name} className="rounded-xl border border-white/8 bg-stone-900/40 p-4">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium text-stone-200">{s.name}</p>
+                          <span className="text-xs text-stone-600">{s.years}</span>
+                        </div>
+                        <p className="text-xs text-stone-500 leading-relaxed">{s.description}</p>
+                      </div>
+                    ))}
                   </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+                </div>
+              )}
+
+              {artist.collections.length > 0 && (
+                <div>
+                  <h3 className="mb-2 font-serif text-lg text-amber-100">Collections</h3>
+                  <ul className="space-y-1">
+                    {artist.collections.map((c) => (
+                      <li key={c} className="text-sm text-stone-400 flex items-start gap-2">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500/60" />
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* External links */}
+              <div className="flex gap-3 flex-wrap">
+                {artist.website && (
+                  <a href={artist.website} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-1.5 text-sm text-stone-300 hover:border-amber-500/30 hover:text-amber-300 transition-colors"
+                  >
+                    <ExternalLink size={13} /> Website
+                  </a>
+                )}
+                <a href={artist.habatat} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-1.5 text-sm text-stone-300 hover:border-amber-500/30 hover:text-amber-300 transition-colors"
+                >
+                  <ExternalLink size={13} /> Habatat Gallery
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
