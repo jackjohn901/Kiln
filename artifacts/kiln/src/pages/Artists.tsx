@@ -2,7 +2,10 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { MapPin, Flame } from "lucide-react";
 import Nav from "@/components/Nav";
-import { artists, Artist, getAllImages } from "@/data/artists";
+import { artists, Artist } from "@/data/artists";
+import { seedArtists } from "@/data/seedArtists";
+
+const allArtists = [...artists, ...seedArtists];
 
 function hash(s: string): number {
   let h = 0;
@@ -20,6 +23,10 @@ function getFollowers(artist: Artist): string {
   return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
 }
 
+function getCardImage(artist: Artist): string {
+  return artist.images[0]?.url ?? `https://picsum.photos/seed/${artist.id}-cover/600/800`;
+}
+
 export default function Artists() {
   return (
     <div className="min-h-screen bg-background">
@@ -32,14 +39,13 @@ export default function Artists() {
           </p>
           <h1 className="font-serif text-3xl font-normal text-foreground">Artists</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {artists.length} world-class artists working in glass, metal, and sculpture.
+            {allArtists.length} artists working in glass, metal, ceramics, fiber, wood, and more.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {artists.map((artist, i) => {
-            const images = getAllImages(artist);
-            const img = images[0]?.url ?? null;
+          {allArtists.map((artist, i) => {
+            const img = getCardImage(artist);
             const score = getCraftScore(artist);
             const followers = getFollowers(artist);
 
@@ -49,18 +55,19 @@ export default function Artists() {
                 data-testid={`artist-card-${artist.id}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.04 }}
+                transition={{ duration: 0.4, delay: Math.min(i * 0.03, 0.6) }}
               >
                 <Link href={`/artists/${artist.id}`}>
                   <div className="group cursor-pointer">
                     <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-card mb-3">
-                      {img && (
-                        <img
-                          src={img}
-                          alt={artist.name}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      )}
+                      <img
+                        src={img}
+                        alt={artist.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist.id}/600/800`;
+                        }}
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                       <div className="absolute top-3 right-3">
                         <div

@@ -207,7 +207,7 @@ export default function Create() {
               <div
                 key={s}
                 className={`h-1.5 rounded-full transition-all ${
-                  s === step ? "w-4 bg-amber-400" : step === "done" || ["upload", "edit", "details"].indexOf(s) < ["upload", "edit", "details"].indexOf(step) ? "w-1.5 bg-amber-500/50" : "w-1.5 bg-stone-700"
+                  s === step ? "w-4 bg-amber-400" : (["upload", "edit", "details"] as string[]).indexOf(s) < (["upload", "edit", "details"] as string[]).indexOf(step as string) ? "w-1.5 bg-amber-500/50" : "w-1.5 bg-stone-700"
                 }`}
               />
             ))}

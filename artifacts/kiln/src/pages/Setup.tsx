@@ -43,7 +43,10 @@ export default function Setup() {
       mediums: [a.medium],
       location: a.location,
       website: a.website ?? "",
+      instagram: a.instagram ?? "",
       avatarUrl: a.images[0]?.url ?? "",
+      coverUrl: a.images[0]?.url ?? "",
+      isCustom: false,
     });
     navigate(`/artists/${a.id}`);
   }
@@ -74,7 +77,10 @@ export default function Setup() {
       mediums: form.mediums,
       location: form.location,
       website: form.website,
+      instagram: "",
       avatarUrl: avatarPreview || "",
+      coverUrl: avatarPreview || "",
+      isCustom: true,
     });
     setStep("done");
   }

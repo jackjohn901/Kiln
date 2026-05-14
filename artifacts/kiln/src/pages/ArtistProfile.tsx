@@ -8,9 +8,13 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { artists, getArtistById, type Artist } from "@/data/artists";
+import { seedArtists } from "@/data/seedArtists";
 import { getListingsByArtist, formatPrice } from "@/data/listings";
 import { useProfile } from "@/contexts/ProfileContext";
-import { getPosts } from "@/data/posts";
+
+function findArtist(id: string): Artist | undefined {
+  return getArtistById(id) ?? seedArtists.find((a) => a.id === id);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,7 +48,7 @@ interface GridItem {
   technique?: string;
 }
 
-function buildGrid(artist: Artist, includeUserPosts = false): GridItem[] {
+function buildGrid(artist: Artist): GridItem[] {
   const items: GridItem[] = [];
 
   // Process videos first (primary content)
@@ -68,19 +72,6 @@ function buildGrid(artist: Artist, includeUserPosts = false): GridItem[] {
       isVideo: false,
       isProcess: false,
     });
-  }
-
-  if (includeUserPosts) {
-    const posts = getPosts().filter((p) => p.artistId === artist.id);
-    for (const p of posts) {
-      items.push({
-        id: p.id,
-        imageUrl: p.mediaUrl,
-        caption: p.caption,
-        isVideo: p.type === "video",
-        isProcess: true,
-      });
-    }
   }
 
   return items;
@@ -144,7 +135,7 @@ type Tab = "posts" | "process" | "shop" | "bio";
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
   const { profile } = useProfile();
-  const artist = getArtistById(id ?? "");
+  const artist = findArtist(id ?? "");
   const isOwn = profile?.id === id;
 
   const [tab, setTab] = useState<Tab>("posts");
@@ -163,7 +154,7 @@ export default function ArtistProfile() {
     );
   }
 
-  const allGridItems = buildGrid(artist, isOwn);
+  const allGridItems = buildGrid(artist);
   const processItems = allGridItems.filter((g) => g.isVideo);
   const artworkItems = allGridItems.filter((g) => !g.isVideo);
   const listings = getListingsByArtist(artist.id);
@@ -411,7 +402,7 @@ export default function ArtistProfile() {
                     <div key={l.id} className="group overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
                       <div className="aspect-square overflow-hidden">
                         <img
-                          src={l.imageUrl}
+                          src={l.imageUrl ?? undefined}
                           alt={l.title}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
