@@ -191,8 +191,31 @@ export default function ArtistPage() {
             <AnimatePresence mode="wait">
               {activeTab === "bio" && (
                 <motion.div key="bio" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                  {artist.quote && (
+                    <blockquote className="border-l-2 border-white/20 pl-4 mb-6">
+                      <p className="text-sm text-white/60 leading-relaxed font-light italic">"{artist.quote}"</p>
+                    </blockquote>
+                  )}
                   <p className="text-[13px] text-white/45 leading-relaxed font-light">{artist.bio}</p>
-                  <div className="mt-6">
+                  {artist.artistStatement && (
+                    <div className="mt-6 pt-5 border-t border-white/5">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/20 mb-3">Artist Statement</p>
+                      <p className="text-[12px] text-white/35 leading-relaxed font-light italic">{artist.artistStatement}</p>
+                    </div>
+                  )}
+                  {artist.collections.length > 0 && (
+                    <div className="mt-6 pt-5 border-t border-white/5">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/20 mb-3">Public Collections</p>
+                      <ul className="space-y-1.5">
+                        {artist.collections.map((c) => (
+                          <li key={c} className="text-[11px] text-white/30 font-light flex items-start gap-2">
+                            <span className="text-white/15 mt-0.5">—</span>{c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="mt-6 pt-5 border-t border-white/5">
                     <p className="text-[9px] uppercase tracking-[0.2em] text-white/20 mb-3">Concepts &amp; Inspiration</p>
                     <div className="flex flex-wrap gap-2">
                       {artist.concepts.map((c) => (
