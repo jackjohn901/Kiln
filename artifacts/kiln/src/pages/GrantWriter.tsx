@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Sparkles, Copy, Check, RefreshCw, FileText, ChevronDown, ChevronUp, Download } from "lucide-react";
 import Nav from "@/components/Nav";
+import { generateDoc } from "@/data/grantTemplates";
 
 type DocType = "artist_statement" | "project_narrative" | "bio" | "budget_justification" | "work_samples_desc";
 
@@ -77,23 +78,11 @@ export default function GrantWriter() {
     setError("");
     setSelectedDoc(docType);
     setShowForm(false);
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/craft-assistant`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: buildPrompt(profile, docType) }],
-        }),
-      });
-      if (!res.ok) throw new Error("API error");
-      const data = await res.json() as { reply: string };
-      setGenerated((prev) => ({ ...prev, [docType]: data.reply }));
-    } catch {
-      setError("Could not generate text. Please try again.");
-      setShowForm(true);
-    } finally {
-      setLoading(false);
-    }
+    // Generate locally using templates — simulated async delay for UX
+    await new Promise(r => setTimeout(r, 900 + Math.random() * 600));
+    const text = generateDoc(profile, docType);
+    setGenerated((prev) => ({ ...prev, [docType]: text }));
+    setLoading(false);
   }
 
   useEffect(() => {

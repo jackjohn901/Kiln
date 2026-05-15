@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Send, Flame, Sparkles, RefreshCw, Copy, Check } from "lucide-react";
 import Nav from "@/components/Nav";
+import { findAnswer } from "@/data/craftKnowledge";
 
 interface Message {
   id: string;
@@ -63,42 +64,17 @@ export default function CraftAssistant() {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
-    try {
-      const history = messages
-        .filter(m => m.id !== "welcome")
-        .map(m => ({ role: m.role, content: m.content }));
-
-      const response = await fetch(`${import.meta.env.BASE_URL}api/craft-assistant`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            ...history,
-            { role: "user", content },
-          ],
-        }),
-      });
-
-      if (!response.ok) throw new Error("API error");
-      const data = await response.json() as { reply: string };
-
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.reply,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, assistantMsg]);
-    } catch {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "I'm having trouble connecting right now. Please try again in a moment.",
-        timestamp: new Date(),
-      }]);
-    } finally {
-      setLoading(false);
-    }
+    // Simulate thinking delay (600–1200ms) then answer from local knowledge base
+    const thinkMs = 600 + Math.random() * 600;
+    await new Promise(r => setTimeout(r, thinkMs));
+    const reply = findAnswer(content);
+    setMessages(prev => [...prev, {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: reply,
+      timestamp: new Date(),
+    }]);
+    setLoading(false);
   }
 
   function copyMessage(id: string, content: string) {

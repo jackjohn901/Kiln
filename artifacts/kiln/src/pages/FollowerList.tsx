@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { Users, UserCheck } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -71,15 +71,16 @@ export default function FollowerList() {
   const type: "followers" | "following" = location.endsWith("/following") ? "following" : "followers";
   const { isFollowing, followArtist, unfollowArtist } = useSocial();
 
+  const [visibleCount, setVisibleCount] = useState(48);
+
   const artist = findArtist(id ?? "");
   const stats = getStats(id ?? "");
   const count = type === "followers" ? stats.followers : stats.following;
 
   const users = useMemo<FakeUser[]>(() => {
     if (!id) return [];
-    const displayCount = Math.min(count, 48);
-    return generateUsers(`${id}-${type}`, displayCount);
-  }, [id, type, count]);
+    return generateUsers(`${id}-${type}`, Math.min(visibleCount, count));
+  }, [id, type, count, visibleCount]);
 
   if (!artist) {
     return (
@@ -171,10 +172,15 @@ export default function FollowerList() {
           })}
         </div>
 
-        {count > 48 && (
-          <p className="mt-6 text-center text-xs text-stone-600">
-            Showing 48 of {count.toLocaleString()} — load more coming soon
-          </p>
+        {visibleCount < count && (
+          <div className="mt-6 flex flex-col items-center gap-1">
+            <button
+              onClick={() => setVisibleCount(v => Math.min(v + 48, count))}
+              className="rounded-full border border-stone-700 px-6 py-2 text-xs font-medium text-stone-400 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+            >
+              Load more · {count - visibleCount} remaining
+            </button>
+          </div>
         )}
       </div>
     </div>
