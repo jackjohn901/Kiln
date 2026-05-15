@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  followsTable, profilesTable, notificationsTable, usersTable,
+  followsTable, profilesTable, notificationsTable, postsTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, or, ilike, inArray, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 
@@ -76,6 +76,55 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
   }
 });
 
+// GET /users/search?q=&medium=&limit=
+router.get("/users/search", async (req, res): Promise<void> => {
+  const { q, medium, limit = "30" } = req.query as Record<string, string>;
+  try {
+    const conditions: ReturnType<typeof ilike>[] = [];
+    if (q && q.trim()) {
+      conditions.push(
+        or(
+          ilike(profilesTable.displayName, `%${q.trim()}%`),
+          ilike(profilesTable.handle, `%${q.trim()}%`),
+          ilike(profilesTable.medium, `%${q.trim()}%`),
+        ) as any,
+      );
+    }
+    if (medium && medium !== "All") {
+      conditions.push(ilike(profilesTable.medium, `%${medium}%`) as any);
+    }
+
+    const profiles = await db.select().from(profilesTable)
+      .where(conditions.length > 0 ? and(...(conditions as [any, ...any[]])) : undefined)
+      .orderBy(desc(profilesTable.followerCount))
+      .limit(Math.min(Number(limit) || 30, 50));
+
+    const viewerId = req.isAuthenticated() ? req.user.id : null;
+    let followingIds = new Set<string>();
+    if (viewerId && profiles.length > 0) {
+      const userIds = profiles.map((p) => p.userId);
+      const follows = await db.select({ followingId: followsTable.followingId })
+        .from(followsTable)
+        .where(and(
+          eq(followsTable.followerId, viewerId),
+          inArray(followsTable.followingId, userIds),
+        ));
+      followingIds = new Set(follows.map((f) => f.followingId));
+    }
+
+    res.json({
+      profiles: profiles.map((p) => ({
+        ...p,
+        isFollowing: followingIds.has(p.userId),
+        createdAt: p.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "searchUsers error");
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
 // GET /users/:userId/profile
 router.get("/users/:userId/profile", async (req, res): Promise<void> => {
   const { userId } = req.params;
@@ -99,6 +148,27 @@ router.get("/users/:userId/profile", async (req, res): Promise<void> => {
   }
 });
 
+// GET /users/:userId/posts
+router.get("/users/:userId/posts", async (req, res): Promise<void> => {
+  const { userId } = req.params;
+  try {
+    const posts = await db.select().from(postsTable)
+      .where(eq(postsTable.authorId, userId))
+      .orderBy(desc(postsTable.createdAt))
+      .limit(30);
+    res.json({
+      posts: posts.map((p) => ({
+        ...p,
+        tags: p.tags ?? [],
+        createdAt: p.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "getUserPosts error");
+    res.status(500).json({ error: "Failed to load posts" });
+  }
+});
+
 // PATCH /users/:userId/profile
 router.patch("/users/:userId/profile", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -117,7 +187,7 @@ router.patch("/users/:userId/profile", async (req, res): Promise<void> => {
   }
 });
 
-// GET /me/profile — current user's profile
+// GET /me/profile — current user's profile (auto-creates if missing)
 router.get("/me/profile", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
@@ -125,7 +195,6 @@ router.get("/me/profile", async (req, res): Promise<void> => {
   try {
     const [profile] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!profile) {
-      // Auto-create profile for new users
       const user = req.user;
       const [created] = await db.insert(profilesTable).values({
         userId,
@@ -161,6 +230,27 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "updateMyProfile error");
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// GET /me/posts — logged-in user's posts
+router.get("/me/posts", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const posts = await db.select().from(postsTable)
+      .where(eq(postsTable.authorId, req.user.id))
+      .orderBy(desc(postsTable.createdAt))
+      .limit(30);
+    res.json({
+      posts: posts.map((p) => ({
+        ...p,
+        tags: p.tags ?? [],
+        createdAt: p.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "getMyPosts error");
+    res.status(500).json({ error: "Failed to load posts" });
   }
 });
 

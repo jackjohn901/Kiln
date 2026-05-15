@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Text,
   View,
-  ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,17 +17,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useGetFeed } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { apiPost } from "@/lib/api";
 import { router } from "expo-router";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const CRAFTS = ["Ceramics", "Glasswork", "Weaving", "Woodwork", "Metalwork", "Pottery"];
-const PLACEHOLDER_THUMBS = [
-  "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600",
-  "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600",
-  "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600",
-  "https://images.unsplash.com/photo-1464790719320-516ecd75af6c?w=600",
-];
 
 interface FeedPost {
   id: string;
@@ -59,16 +51,8 @@ function PostActions({
   const colors = useColors();
   return (
     <View style={styles.actions}>
-      <Pressable
-        style={styles.actionBtn}
-        onPress={onLike}
-        hitSlop={8}
-      >
-        <Feather
-          name="heart"
-          size={26}
-          color={post.isLiked ? colors.primary : "#fff"}
-        />
+      <Pressable style={styles.actionBtn} onPress={onLike} hitSlop={8}>
+        <Feather name="heart" size={26} color={post.isLiked ? "#E05D5D" : "#fff"} />
         <Text style={[styles.actionCount, { color: "#fff" }]}>
           {post.likeCount > 999 ? `${Math.floor(post.likeCount / 1000)}k` : post.likeCount}
         </Text>
@@ -78,11 +62,7 @@ function PostActions({
         <Text style={[styles.actionCount, { color: "#fff" }]}>{post.commentCount}</Text>
       </Pressable>
       <Pressable style={styles.actionBtn} onPress={onSave} hitSlop={8}>
-        <Feather
-          name="bookmark"
-          size={26}
-          color={post.isSaved ? colors.primary : "#fff"}
-        />
+        <Feather name="bookmark" size={26} color={post.isSaved ? colors.primary : "#fff"} />
         <Text style={[styles.actionCount, { color: "#fff" }]}>{post.saveCount}</Text>
       </Pressable>
     </View>
@@ -94,27 +74,39 @@ function PostItem({ item, index }: { item: FeedPost; index: number }) {
   const [liked, setLiked] = useState(item.isLiked ?? false);
   const [likeCount, setLikeCount] = useState(item.likeCount);
   const [saved, setSaved] = useState(item.isSaved ?? false);
-  const thumb = item.thumbnailUrl ?? PLACEHOLDER_THUMBS[index % PLACEHOLDER_THUMBS.length];
 
   const handleLike = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setLiked((v) => !v);
-    setLikeCount((c) => (liked ? c - 1 : c + 1));
-  }, [liked]);
+    const nowLiked = !liked;
+    setLiked(nowLiked);
+    setLikeCount((c) => (nowLiked ? c + 1 : c - 1));
+    apiPost(`/api/posts/${item.id}/like`).catch(() => {
+      setLiked(!nowLiked);
+      setLikeCount((c) => (nowLiked ? c - 1 : c + 1));
+    });
+  }, [liked, item.id]);
 
   const handleSave = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSaved((v) => !v);
-  }, []);
+    const nowSaved = !saved;
+    setSaved(nowSaved);
+    apiPost(`/api/posts/${item.id}/save`).catch(() => {
+      setSaved(!nowSaved);
+    });
+  }, [saved, item.id]);
 
   return (
     <View style={[styles.postContainer, { width: SCREEN_WIDTH }]}>
-      <Image
-        source={{ uri: thumb }}
-        style={styles.thumbnail}
-        contentFit="cover"
-        transition={300}
-      />
+      {item.thumbnailUrl ? (
+        <Image
+          source={{ uri: item.thumbnailUrl }}
+          style={styles.thumbnail}
+          contentFit="cover"
+          transition={300}
+        />
+      ) : (
+        <View style={[styles.thumbnail, { backgroundColor: "#222" }]} />
+      )}
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.85)"]}
         style={styles.gradient}
@@ -138,15 +130,11 @@ function PostItem({ item, index }: { item: FeedPost; index: number }) {
           <Text style={styles.authorName}>{item.authorName}</Text>
           {item.technique ? (
             <View style={[styles.tag, { borderColor: colors.primary }]}>
-              <Text style={[styles.tagText, { color: colors.primary }]}>
-                {item.technique}
-              </Text>
+              <Text style={[styles.tagText, { color: colors.primary }]}>{item.technique}</Text>
             </View>
           ) : null}
         </View>
-        <Text style={styles.caption} numberOfLines={3}>
-          {item.caption}
-        </Text>
+        <Text style={styles.caption} numberOfLines={3}>{item.caption}</Text>
       </View>
       <PostActions
         post={{ ...item, isLiked: liked, likeCount, isSaved: saved }}
@@ -158,40 +146,17 @@ function PostItem({ item, index }: { item: FeedPost; index: number }) {
   );
 }
 
-const DEMO_POSTS: FeedPost[] = CRAFTS.map((craft, i) => ({
-  id: `demo-${i}`,
-  authorId: `artist-${i}`,
-  authorName: ["Elena Vasquez", "Marco Chen", "Zoe Nakamura", "Felix Okafor", "Aria Patel", "Sam Rivera"][i],
-  thumbnailUrl: PLACEHOLDER_THUMBS[i % PLACEHOLDER_THUMBS.length],
-  caption: [
-    "Just finished this piece after 3 weeks at the wheel. The glaze oxidation turned out even better than expected.",
-    "New glass panel commission complete. Natural light changes everything about this piece.",
-    "Warp and weft — finally nailed the twill variation I've been experimenting with.",
-    "Off the lathe after 8 hours. Cherry burl never disappoints.",
-    "Forged and finished. This Damascus blade took 400 folds to get right.",
-    "High-fire reduction kiln results just came out. Worth every minute of the wait.",
-  ][i],
-  technique: craft,
-  likeCount: Math.floor(Math.random() * 2000) + 100,
-  commentCount: Math.floor(Math.random() * 200) + 5,
-  saveCount: Math.floor(Math.random() * 500) + 20,
-}));
-
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
-  const { isAuthenticated } = useAuth();
   const flatRef = useRef<FlatList>(null);
 
   const { data, isLoading } = useGetFeed(
     { limit: 20 },
-    { query: { enabled: isAuthenticated } as any }
+    { query: { enabled: true } as any }
   );
 
-  const posts: FeedPost[] =
-    data?.posts && data.posts.length > 0 ? data.posts : DEMO_POSTS;
-
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
+  const posts: FeedPost[] = data?.posts ?? [];
 
   const renderItem = useCallback(
     ({ item, index }: { item: FeedPost; index: number }) => (
@@ -208,10 +173,7 @@ export default function FeedScreen() {
       <View style={[styles.header, { top: topPad || insets.top }]}>
         <Text style={[styles.headerLogo, { color: colors.primary }]}>kiln</Text>
         <View style={styles.headerRight}>
-          <Pressable
-            onPress={() => router.push("/chat/inbox" as any)}
-            hitSlop={8}
-          >
+          <Pressable onPress={() => router.push("/chat/inbox" as any)} hitSlop={8}>
             <Feather name="send" size={22} color="#fff" />
           </Pressable>
         </View>
@@ -220,6 +182,12 @@ export default function FeedScreen() {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : posts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Feather name="video-off" size={48} color="rgba(255,255,255,0.3)" />
+          <Text style={styles.emptyTitle}>No posts yet</Text>
+          <Text style={styles.emptySub}>Be the first — share your craft.</Text>
         </View>
       ) : (
         <FlatList
@@ -231,7 +199,6 @@ export default function FeedScreen() {
           snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
-          viewabilityConfig={viewabilityConfig.current}
           contentContainerStyle={{ paddingBottom: bottomPad }}
         />
       )}
@@ -258,19 +225,31 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   headerRight: { flexDirection: "row", gap: 18 },
-  loadingContainer: {
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+  emptyContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    color: "rgba(255,255,255,0.7)",
+  },
+  emptySub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: "rgba(255,255,255,0.4)",
+    textAlign: "center",
   },
   postContainer: {
     height: SCREEN_HEIGHT,
     position: "relative",
     backgroundColor: "#111",
   },
-  thumbnail: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  thumbnail: { ...StyleSheet.absoluteFillObject },
   gradient: {
     position: "absolute",
     bottom: 0,
@@ -298,26 +277,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-    color: "#191615",
-  },
-  authorName: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: "#fff",
-  },
+  avatarText: { fontFamily: "Inter_700Bold", fontSize: 14, color: "#191615" },
+  authorName: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   tag: {
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  tagText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-  },
+  tagText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   caption: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
@@ -331,12 +299,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 20,
   },
-  actionBtn: {
-    alignItems: "center",
-    gap: 4,
-  },
-  actionCount: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-  },
+  actionBtn: { alignItems: "center", gap: 4 },
+  actionCount: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
 });

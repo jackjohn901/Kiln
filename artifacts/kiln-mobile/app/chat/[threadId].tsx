@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -10,127 +11,190 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
+import { apiGet, apiPost, relativeTime } from "@/lib/api";
+
+interface ThreadInfo {
+  id: string;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserHandle: string | null;
+  otherUserAvatar: string | null;
+}
 
 interface Message {
   id: string;
+  threadId: string;
+  senderId: string;
+  senderName: string;
   text: string;
-  fromMe: boolean;
-  time: string;
+  read: boolean;
+  createdAt: string;
 }
-
-const DEMO_MSGS: Message[] = [
-  { id: "1", text: "Hey! Love your recent ceramics post — the glaze is stunning.", fromMe: false, time: "10:32 AM" },
-  { id: "2", text: "Thank you so much! It took 3 tries to get the oxidation right 😅", fromMe: true, time: "10:35 AM" },
-  { id: "3", text: "Worth it. What kiln temp did you end up using?", fromMe: false, time: "10:36 AM" },
-  { id: "4", text: "Around 2300°F in a reduction atmosphere. The colour shift is all from the copper in the glaze.", fromMe: true, time: "10:38 AM" },
-  { id: "5", text: "That makes sense. I've been experimenting with iron for a more subtle effect.", fromMe: false, time: "10:40 AM" },
-];
 
 export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const { user } = useAuth();
 
-  const [messages, setMessages] = useState<Message[]>(DEMO_MSGS);
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const flatRef = useRef<FlatList>(null);
 
-  const send = () => {
-    if (!draft.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const msg: Message = {
-      id: Date.now().toString(),
-      text: draft.trim(),
-      fromMe: true,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    };
-    setMessages((prev) => [...prev, msg]);
-    setDraft("");
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
-  };
+  const queryKey = ["thread", threadId];
 
-  const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 0);
+  const { data, isLoading, refetch } = useQuery({
+    queryKey,
+    queryFn: () =>
+      apiGet<{ thread: ThreadInfo; messages: Message[] }>(`/api/messages/threads/${threadId}`),
+    enabled: !!threadId && threadId !== "inbox",
+    refetchInterval: 5_000,
+  });
+
+  const thread = data?.thread;
+  const messages = [...(data?.messages ?? [])].reverse();
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
+    }
+  }, [messages.length]);
+
+  const handleSend = useCallback(async () => {
+    if (!draft.trim() || !thread?.otherUserId || sending) return;
+    const text = draft.trim();
+    setDraft("");
+    setSending(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await apiPost("/api/messages/send", { recipientId: thread.otherUserId, text });
+      await refetch();
+    } catch {
+      setDraft(text);
+    } finally {
+      setSending(false);
+    }
+  }, [draft, thread, sending, refetch]);
+
+  const bottomPad = insets.bottom + (Platform.OS === "web" ? 84 : 0);
+
+  if (threadId === "inbox" || !threadId) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.topBar, { paddingTop: insets.top + 12, borderBottomColor: colors.border }]}>
+          <Pressable onPress={() => router.back()} hitSlop={10}>
+            <Feather name="arrow-left" size={22} color={colors.foreground} />
+          </Pressable>
+          <Text style={[styles.topBarTitle, { color: colors.foreground }]}>Messages</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <View style={styles.center}>
+          <Feather name="message-square" size={48} color={colors.mutedForeground} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No messages yet</Text>
+          <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
+            Follow artists and start a conversation
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior="padding"
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
-      <FlatList
-        ref={flatRef}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.bubble,
-              item.fromMe
-                ? [styles.bubbleMe, { backgroundColor: colors.primary }]
-                : [styles.bubbleThem, { backgroundColor: colors.card, borderColor: colors.border }],
-            ]}
-          >
-            <Text
-              style={[
-                styles.bubbleText,
-                { color: item.fromMe ? colors.primaryForeground : colors.foreground },
-              ]}
-            >
-              {item.text}
-            </Text>
-            <Text
-              style={[
-                styles.bubbleTime,
-                { color: item.fromMe ? `${colors.primaryForeground}99` : colors.mutedForeground },
-              ]}
-            >
-              {item.time}
-            </Text>
-          </View>
-        )}
-        onLayout={() => flatRef.current?.scrollToEnd({ animated: false })}
-      />
+      <View style={[styles.topBar, { paddingTop: insets.top + 12, borderBottomColor: colors.border }]}>
+        <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
+        </Pressable>
+        <Text style={[styles.topBarTitle, { color: colors.foreground }]} numberOfLines={1}>
+          {thread?.otherUserName ?? "Chat"}
+        </Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      {isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          ref={flatRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.messageList, { paddingBottom: 12 }]}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const fromMe = item.senderId === user?.id;
+            return (
+              <View style={[styles.msgRow, fromMe ? styles.msgRowMe : styles.msgRowThem]}>
+                <View
+                  style={[
+                    styles.bubble,
+                    fromMe
+                      ? [styles.bubbleMe, { backgroundColor: colors.primary }]
+                      : [styles.bubbleThem, { backgroundColor: colors.card, borderColor: colors.border }],
+                  ]}
+                >
+                  <Text style={[styles.bubbleText, { color: fromMe ? colors.primaryForeground : colors.foreground }]}>
+                    {item.text}
+                  </Text>
+                </View>
+                <Text style={[styles.msgTime, { color: colors.mutedForeground }]}>
+                  {relativeTime(item.createdAt)} ago
+                </Text>
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>No messages yet</Text>
+            </View>
+          }
+        />
+      )}
+
       <View
         style={[
-          styles.inputRow,
-          {
-            backgroundColor: colors.background,
-            borderTopColor: colors.border,
-            paddingBottom: bottomPad,
-          },
+          styles.composer,
+          { borderTopColor: colors.border, paddingBottom: bottomPad, backgroundColor: colors.background },
         ]}
       >
         <TextInput
-          style={[
-            styles.input,
-            { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border },
-          ]}
+          style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border, fontFamily: "Inter_400Regular" }]}
           placeholder="Message…"
           placeholderTextColor={colors.mutedForeground}
           value={draft}
           onChangeText={setDraft}
-          returnKeyType="send"
-          onSubmitEditing={send}
           multiline
-          maxLength={1000}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
+          blurOnSubmit={false}
         />
         <Pressable
           style={[
             styles.sendBtn,
-            { backgroundColor: draft.trim() ? colors.primary : colors.muted },
+            {
+              backgroundColor: draft.trim() ? colors.primary : colors.secondary,
+            },
           ]}
-          onPress={send}
-          disabled={!draft.trim()}
+          onPress={handleSend}
+          disabled={!draft.trim() || sending}
         >
-          <Feather name="send" size={18} color={draft.trim() ? colors.primaryForeground : colors.mutedForeground} />
+          {sending ? (
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : (
+            <Feather name="send" size={18} color={draft.trim() ? colors.primaryForeground : colors.mutedForeground} />
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -139,39 +203,55 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  topBarTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17, flex: 1, textAlign: "center", marginHorizontal: 8 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 40 },
+  emptyTitle: { fontFamily: "Inter_700Bold", fontSize: 20 },
+  emptySub: { fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center" },
+  messageList: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
+  msgRow: { gap: 3 },
+  msgRowMe: { alignItems: "flex-end" },
+  msgRowThem: { alignItems: "flex-start" },
   bubble: {
     maxWidth: "78%",
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    gap: 4,
   },
-  bubbleMe: { alignSelf: "flex-end", borderBottomRightRadius: 4 },
-  bubbleThem: { alignSelf: "flex-start", borderWidth: 1, borderBottomLeftRadius: 4 },
+  bubbleMe: { borderBottomRightRadius: 4 },
+  bubbleThem: { borderWidth: 1, borderBottomLeftRadius: 4 },
   bubbleText: { fontFamily: "Inter_400Regular", fontSize: 15, lineHeight: 21 },
-  bubbleTime: { fontFamily: "Inter_400Regular", fontSize: 11, alignSelf: "flex-end" },
-  inputRow: {
+  msgTime: { fontFamily: "Inter_400Regular", fontSize: 11, paddingHorizontal: 4 },
+  composer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingTop: 10,
     gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   input: {
     flex: 1,
-    borderRadius: 22,
     borderWidth: 1,
-    paddingHorizontal: 16,
+    borderRadius: 20,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 120,
   },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 1,
   },
 });

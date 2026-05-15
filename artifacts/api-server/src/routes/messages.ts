@@ -24,12 +24,12 @@ router.get("/messages/threads", async (req, res): Promise<void> => {
 
       const unreadMessages = await db.select({ id: messagesTable.id }).from(messagesTable)
         .where(and(eq(messagesTable.threadId, t.id), eq(messagesTable.read, false)));
-      const unreadCount = unreadMessages.filter((m) => true).length;
+      const unreadCount = unreadMessages.length;
 
       return {
         ...t,
         otherUserId: otherId,
-        otherUserName: profile?.displayName ?? null,
+        otherUserName: profile?.displayName ?? "Artist",
         otherUserAvatar: profile?.avatarUrl ?? null,
         unreadCount,
         lastMessageAt: t.lastMessageAt.toISOString(),
@@ -43,7 +43,7 @@ router.get("/messages/threads", async (req, res): Promise<void> => {
   }
 });
 
-// GET /messages/threads/:threadId
+// GET /messages/threads/:threadId — includes thread metadata + messages
 router.get("/messages/threads/:threadId", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { threadId } = req.params;
@@ -56,17 +56,33 @@ router.get("/messages/threads/:threadId", async (req, res): Promise<void> => {
       res.status(403).json({ error: "Forbidden" }); return;
     }
 
+    const otherId = thread.participantA === userId ? thread.participantB : thread.participantA;
+    const [otherProfile] = await db.select({
+      displayName: profilesTable.displayName,
+      avatarUrl: profilesTable.avatarUrl,
+      handle: profilesTable.handle,
+    }).from(profilesTable).where(eq(profilesTable.userId, otherId));
+
     const messages = await db.select().from(messagesTable)
       .where(eq(messagesTable.threadId, threadId))
       .orderBy(desc(messagesTable.createdAt))
       .limit(50);
 
-    // Mark messages as read
     await db.update(messagesTable)
       .set({ read: true })
       .where(and(eq(messagesTable.threadId, threadId), eq(messagesTable.read, false)));
 
-    res.json({ messages: messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })) });
+    res.json({
+      thread: {
+        ...thread,
+        otherUserId: otherId,
+        otherUserName: otherProfile?.displayName ?? "Artist",
+        otherUserHandle: otherProfile?.handle ?? null,
+        otherUserAvatar: otherProfile?.avatarUrl ?? null,
+        lastMessageAt: thread.lastMessageAt.toISOString(),
+      },
+      messages: messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+    });
   } catch (err) {
     req.log.error({ err }, "getMessages error");
     res.status(500).json({ error: "Failed to load messages" });
@@ -84,7 +100,6 @@ router.post("/messages/send", async (req, res): Promise<void> => {
   const user = req.user;
 
   try {
-    // Find or create thread
     let thread = await db.select().from(messageThreadsTable)
       .where(or(
         and(eq(messageThreadsTable.participantA, senderId), eq(messageThreadsTable.participantB, recipientId)),
@@ -114,10 +129,13 @@ router.post("/messages/send", async (req, res): Promise<void> => {
       .set({ lastMessageAt: new Date(), lastMessageText: text.trim() })
       .where(eq(messageThreadsTable.id, thread.id));
 
-    // Real-time broadcast to recipient
     broadcast(recipientId, { type: "message", threadId: thread.id, senderId, recipientId });
 
-    res.status(201).json({ ...message, createdAt: message.createdAt.toISOString() });
+    res.status(201).json({
+      ...message,
+      threadId: thread.id,
+      createdAt: message.createdAt.toISOString(),
+    });
   } catch (err) {
     req.log.error({ err }, "sendMessage error");
     res.status(500).json({ error: "Failed to send message" });
