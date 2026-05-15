@@ -188,4 +188,28 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
   }
 });
 
+// GET /me/saves — logged-in user's saved posts
+router.get("/me/saves", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const rows = await db
+      .select({ post: postsTable })
+      .from(savesTable)
+      .innerJoin(postsTable, eq(savesTable.postId, postsTable.id))
+      .where(eq(savesTable.userId, req.user.id))
+      .orderBy(desc(savesTable.createdAt))
+      .limit(30);
+    res.json({
+      posts: rows.map((r) => ({
+        ...r.post,
+        tags: r.post.tags ?? [],
+        createdAt: r.post.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "getMySaves error");
+    res.status(500).json({ error: "Failed to load saves" });
+  }
+});
+
 export default router;

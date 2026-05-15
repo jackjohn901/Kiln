@@ -718,6 +718,40 @@ export default function Feed() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
+  // Fetch real posts from API and prepend to feed
+  useEffect(() => {
+    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
+    fetch("/api/feed?limit=20")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        if (!data?.posts?.length) return;
+        const apiReels: Reel[] = data.posts.map((p: any) => ({
+          id: `db-${p.id}`,
+          videoId: "",
+          videoUrl: p.videoUrl ?? undefined,
+          artistId: p.authorId ?? "unknown",
+          artistName: p.authorName ?? "Artist",
+          technique: p.technique ?? "Studio Craft",
+          location: "",
+          caption: p.caption ?? "",
+          craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
+          likes: p.likeCount ?? 0,
+          saves: p.saveCount ?? 0,
+          thumbnail: p.thumbnailUrl ?? undefined,
+          avatarUrl: p.authorAvatarUrl ?? undefined,
+          musicTrackId: defaultMusicId,
+          available: false,
+          patronOnly: p.isPatronOnly ?? false,
+        }));
+        setUserPostReels((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const fresh = apiReels.filter((r) => !existingIds.has(r.id));
+          return fresh.length ? [...fresh, ...prev] : prev;
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   // Detect and auto-publish any scheduled posts that are now past their scheduled time
   useEffect(() => {
     try {

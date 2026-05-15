@@ -67,6 +67,7 @@ export default function ProfileScreen() {
   const [editMedium, setEditMedium] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<"posts" | "saved">("posts");
 
   const {
     data: profile,
@@ -85,6 +86,13 @@ export default function ProfileScreen() {
   });
 
   const posts = postsData?.posts ?? [];
+
+  const { data: savedData, isLoading: savedLoading } = useQuery({
+    queryKey: ["me/saves"],
+    queryFn: () => apiGet<{ posts: Post[] }>("/api/me/saves"),
+    enabled: isAuthenticated && activeTab === "saved",
+  });
+  const savedPosts = savedData?.posts ?? [];
 
   useEffect(() => {
     if (profile) {
@@ -260,42 +268,92 @@ export default function ProfileScreen() {
       </View>
 
       {!isEditing && (
-        postsLoading ? (
-          <View style={styles.postsLoading}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : posts.length === 0 ? (
-          <View style={styles.emptyPosts}>
-            <Feather name="camera-off" size={32} color={colors.mutedForeground} />
-            <Text style={[styles.emptyPostsText, { color: colors.mutedForeground }]}>
-              No posts yet — share your first creation
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.grid}>
-            {posts.map((post) => (
-              <Pressable key={post.id} style={styles.gridItem}>
-                {post.thumbnailUrl ? (
-                  <Image
-                    source={{ uri: post.thumbnailUrl }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: "#222", alignItems: "center", justifyContent: "center" }]}>
-                    <Feather name="image" size={20} color="#555" />
-                  </View>
-                )}
-                <View style={styles.gridLikes}>
-                  <Feather name="heart" size={11} color="#fff" />
-                  <Text style={styles.gridLikeText}>
-                    {post.likeCount > 999 ? `${(post.likeCount / 1000).toFixed(1)}k` : post.likeCount}
-                  </Text>
-                </View>
+        <>
+          {/* Tab switcher */}
+          <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
+            {(["posts", "saved"] as const).map((tab) => (
+              <Pressable
+                key={tab}
+                style={[styles.tabBtn, activeTab === tab && { borderBottomColor: colors.foreground, borderBottomWidth: 2 }]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Feather
+                  name={tab === "posts" ? "grid" : "bookmark"}
+                  size={18}
+                  color={activeTab === tab ? colors.foreground : colors.mutedForeground}
+                />
               </Pressable>
             ))}
           </View>
-        )
+
+          {activeTab === "posts" ? (
+            postsLoading ? (
+              <View style={styles.postsLoading}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : posts.length === 0 ? (
+              <View style={styles.emptyPosts}>
+                <Feather name="camera-off" size={32} color={colors.mutedForeground} />
+                <Text style={[styles.emptyPostsText, { color: colors.mutedForeground }]}>
+                  No posts yet — share your first creation
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.grid}>
+                {posts.map((post) => (
+                  <Pressable key={post.id} style={styles.gridItem}>
+                    {post.thumbnailUrl ? (
+                      <Image source={{ uri: post.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: "#222", alignItems: "center", justifyContent: "center" }]}>
+                        <Feather name="image" size={20} color="#555" />
+                      </View>
+                    )}
+                    <View style={styles.gridLikes}>
+                      <Feather name="heart" size={11} color="#fff" />
+                      <Text style={styles.gridLikeText}>
+                        {post.likeCount > 999 ? `${(post.likeCount / 1000).toFixed(1)}k` : post.likeCount}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )
+          ) : (
+            savedLoading ? (
+              <View style={styles.postsLoading}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : savedPosts.length === 0 ? (
+              <View style={styles.emptyPosts}>
+                <Feather name="bookmark" size={32} color={colors.mutedForeground} />
+                <Text style={[styles.emptyPostsText, { color: colors.mutedForeground }]}>
+                  No saved posts yet — bookmark posts you love
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.grid}>
+                {savedPosts.map((post) => (
+                  <Pressable key={post.id} style={styles.gridItem}>
+                    {post.thumbnailUrl ? (
+                      <Image source={{ uri: post.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: "#222", alignItems: "center", justifyContent: "center" }]}>
+                        <Feather name="image" size={20} color="#555" />
+                      </View>
+                    )}
+                    <View style={styles.gridLikes}>
+                      <Feather name="bookmark" size={11} color="#fff" />
+                      <Text style={styles.gridLikeText}>
+                        {post.likeCount > 999 ? `${(post.likeCount / 1000).toFixed(1)}k` : post.likeCount}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -359,6 +417,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  tabBar: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginTop: 12,
+  },
+  tabBtn: {
+    flex: 1, alignItems: "center", paddingVertical: 12,
+    borderBottomWidth: 2, borderBottomColor: "transparent",
+  },
   postsLoading: { paddingTop: 40, alignItems: "center" },
   emptyPosts: { alignItems: "center", paddingTop: 40, gap: 12, paddingHorizontal: 40 },
   emptyPostsText: { fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" },

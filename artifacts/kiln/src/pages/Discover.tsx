@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy, Sparkles, ChevronRight } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { artists } from "@/data/artists";
@@ -37,6 +37,40 @@ export default function Discover() {
   const [statusFilter, setStatusFilter] = useState<"Any" | "Open" | "Waitlisted">("Any");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  interface CommunityProfile {
+    userId: string;
+    handle: string | null;
+    displayName: string | null;
+    medium: string | null;
+    avatarUrl: string | null;
+    followerCount: number;
+    isFollowing: boolean;
+  }
+  const [communityProfiles, setCommunityProfiles] = useState<CommunityProfile[]>([]);
+  const [communityFollowing, setCommunityFollowing] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetch("/api/users/search?limit=8")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => { if (data?.profiles?.length) setCommunityProfiles(data.profiles); })
+      .catch(() => {});
+  }, []);
+
+  const handleCommunityFollow = (userId: string) => {
+    const nowFollowing = !communityFollowing.has(userId);
+    setCommunityFollowing((prev) => {
+      const next = new Set(prev);
+      nowFollowing ? next.add(userId) : next.delete(userId);
+      return next;
+    });
+    fetch(`/api/users/${userId}/follow`, { method: "POST", credentials: "include" }).catch(() => {
+      setCommunityFollowing((prev) => {
+        const next = new Set(prev);
+        nowFollowing ? next.delete(userId) : next.add(userId);
+        return next;
+      });
+    });
+  };
 
   const suggestions = useMemo(() => {
     if (query.length < 2) return { artists: [], techniques: [] };
@@ -253,6 +287,40 @@ export default function Discover() {
               })}
             </div>
           </div>
+
+          {/* From the community — real profiles from the platform */}
+          {communityProfiles.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <Users size={14} className="text-amber-400" />
+                <h2 className="text-sm font-semibold text-stone-300">From the community</h2>
+                <span className="rounded-full bg-stone-800 border border-stone-700 px-2 py-0.5 text-[9px] text-stone-500">Live on Kiln</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {communityProfiles.map((p) => {
+                  const following = communityFollowing.has(p.userId) || p.isFollowing;
+                  const displayName = p.displayName ?? p.handle ?? "Artist";
+                  const avatarUrl = p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/200/200`;
+                  return (
+                    <div key={p.userId} className="flex flex-col items-center gap-2.5 rounded-2xl border border-white/8 bg-stone-900/60 p-4 hover:border-amber-500/30 hover:bg-stone-900 transition-all">
+                      <img src={avatarUrl} alt={displayName} className="h-12 w-12 rounded-full object-cover border border-white/10" />
+                      <div className="text-center min-w-0 w-full">
+                        <p className="text-sm font-semibold text-stone-100 truncate">{displayName}</p>
+                        {p.medium && <p className="text-[10px] text-stone-500 truncate">{p.medium}</p>}
+                        <p className="text-[10px] text-stone-600">{p.followerCount} followers</p>
+                      </div>
+                      <button
+                        onClick={() => handleCommunityFollow(p.userId)}
+                        className={`text-[10px] px-3 py-1 rounded-full border transition-colors ${following ? "border-stone-600 text-stone-500" : "border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-stone-950"}`}
+                      >
+                        {following ? "Following" : "Follow"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div ref={searchRef} className="relative mb-4">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 z-10 pointer-events-none" />
