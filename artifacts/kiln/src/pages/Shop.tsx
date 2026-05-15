@@ -1,14 +1,32 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { SlidersHorizontal, ShoppingCart, Plus, Check } from "lucide-react";
+import { SlidersHorizontal, ShoppingCart, Plus, Check, Heart } from "lucide-react";
 import Nav from "@/components/Nav";
 import { listings, formatPrice, Listing } from "@/data/listings";
 import { artists } from "@/data/artists";
 import { useCart } from "@/contexts/CartContext";
+import { useWishlist } from "@/hooks/useWishlist";
 
 const MEDIUMS = ["All", "Glass", "Metal", "Sculpture", "Fiber"];
 const SORTS = ["Default", "Price: Low to High", "Price: High to Low"];
+
+const SIZES = ['Any size', 'Small (<12")', 'Medium (12–24")', 'Large (24–48")', 'Monumental (48"+)'] as const;
+type SizeLabel = typeof SIZES[number];
+
+function maxDim(dims: string): number {
+  const nums = [...dims.matchAll(/[\d.]+/g)].map(m => parseFloat(m[0]));
+  return Math.max(...nums, 0);
+}
+function matchSize(listing: Listing, s: SizeLabel): boolean {
+  if (s === 'Any size') return true;
+  const m = maxDim(listing.dimensions);
+  if (s === 'Small (<12")') return m < 12;
+  if (s === 'Medium (12–24")') return m >= 12 && m < 24;
+  if (s === 'Large (24–48")') return m >= 24 && m < 48;
+  if (s === 'Monumental (48"+)') return m >= 48;
+  return true;
+}
 
 const PRICE_RANGES = [
   { label: "Any price", min: 0, max: Infinity },
@@ -37,11 +55,14 @@ export default function Shop() {
   const [sort, setSort] = useState("Default");
   const [showSold, setShowSold] = useState(false);
   const [priceRangeIdx, setPriceRangeIdx] = useState(0);
+  const [size, setSize] = useState<SizeLabel>('Any size');
   const { addItem, isInCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
 
   const priceRange = PRICE_RANGES[priceRangeIdx];
   let filtered = listings.filter((l) =>
     matchMedium(l, medium) &&
+    matchSize(l, size) &&
     (showSold || l.available) &&
     l.price >= priceRange.min &&
     l.price <= priceRange.max
@@ -133,6 +154,24 @@ export default function Shop() {
               </button>
             ))}
           </div>
+
+          {/* Row 3: size */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-muted-foreground mr-1">Size:</span>
+            {SIZES.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSize(s)}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                  size === s
+                    ? "border-primary/50 text-primary bg-primary/10"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-border/80"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -147,24 +186,31 @@ export default function Shop() {
                 !listing.available ? "opacity-60" : ""
               }`}
             >
-              <Link href={`/listings/${listing.id}`}>
               <div className="relative aspect-[4/3] overflow-hidden bg-muted cursor-pointer">
-                {listing.imageUrl && (
-                  <img
-                    src={listing.imageUrl}
-                    alt={listing.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                )}
-                {!listing.available && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <span className="px-3 py-1 rounded-full bg-black/60 text-white/70 text-[10px] uppercase tracking-wider">
-                      Sold
-                    </span>
-                  </div>
-                )}
+                <Link href={`/listings/${listing.id}`}>
+                  {listing.imageUrl && (
+                    <img
+                      src={listing.imageUrl}
+                      alt={listing.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  )}
+                  {!listing.available && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <span className="px-3 py-1 rounded-full bg-black/60 text-white/70 text-[10px] uppercase tracking-wider">
+                        Sold
+                      </span>
+                    </div>
+                  )}
+                </Link>
+                <button
+                  onClick={() => toggleWishlist(listing.id)}
+                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-colors hover:bg-black/70"
+                  title={isWishlisted(listing.id) ? "Remove from wishlist" : "Save to wishlist"}
+                >
+                  <Heart size={13} className={isWishlisted(listing.id) ? "fill-rose-400 text-rose-400" : "text-white/70"} />
+                </button>
               </div>
-              </Link>
 
               <div className="p-4">
                 <Link href={`/listings/${listing.id}`}>

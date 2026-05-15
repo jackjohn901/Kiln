@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
-  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag,
+  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
 import { getTrackById } from "@/data/music";
@@ -487,12 +487,31 @@ export default function Feed() {
     }
   }, [navigate]);
 
+  const [justPublishedCount, setJustPublishedCount] = useState(0);
+
   // Reload user posts on mount and whenever window regains focus (e.g. after Create)
   useEffect(() => {
     setUserPostReels(userPostsToReels());
     const onFocus = () => setUserPostReels(userPostsToReels());
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  // Detect and auto-publish any scheduled posts that are now past their scheduled time
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("kiln_scheduled_posts_v1");
+      if (!raw) return;
+      const posts = JSON.parse(raw) as Array<{ id: string; status: string; scheduledAt: string }>;
+      const now = Date.now();
+      const goLive = posts.filter(p => p.status === "scheduled" && new Date(p.scheduledAt).getTime() <= now);
+      if (goLive.length === 0) return;
+      const updated = posts.map(p => goLive.some(g => g.id === p.id) ? { ...p, status: "published" } : p);
+      localStorage.setItem("kiln_scheduled_posts_v1", JSON.stringify(updated));
+      setJustPublishedCount(goLive.length);
+      setUserPostReels(userPostsToReels());
+      setTimeout(() => setJustPublishedCount(0), 6000);
+    } catch { /* ignore */ }
   }, []);
 
   // For You algorithm: score and sort based on user behaviour + settings
@@ -736,6 +755,23 @@ export default function Feed() {
       {showNotifications && (
         <NotificationPanel onClose={() => setShowNotifications(false)} />
       )}
+
+      {/* Scheduled posts auto-publish banner */}
+      <AnimatePresence>
+        {justPublishedCount > 0 && (
+          <motion.div
+            className="pointer-events-none fixed bottom-24 left-1/2 z-40 -translate-x-1/2"
+            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+          >
+            <div className="flex items-center gap-2 rounded-full bg-emerald-500/90 backdrop-blur-sm px-5 py-2.5 shadow-lg shadow-emerald-900/40">
+              <Check size={14} className="text-stone-950" />
+              <span className="text-xs font-semibold text-stone-950">
+                {justPublishedCount === 1 ? "1 scheduled post went live" : `${justPublishedCount} scheduled posts went live`}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Reel scroll container */}
       {reels.length === 0 ? (

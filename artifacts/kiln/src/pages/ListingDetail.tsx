@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { useWishlist } from "@/hooks/useWishlist";
 import {
   ChevronLeft, ShoppingCart, Heart, Share2, Check, Plus,
   Shield, Truck, Award, MapPin, ExternalLink, ChevronRight,
@@ -119,8 +120,17 @@ export default function ListingDetail() {
   const { getReviews, addReview, sendCommissionInquiry } = useSocial();
   const { profile } = useProfile();
 
-  const [wishlisted, setWishlisted] = useState(false);
+  const { isWishlisted, toggleWishlist } = useWishlist();
+  const wishlisted = id ? isWishlisted(id) : false;
   const [copied, setCopied] = useState(false);
+  const [showPriceAlert, setShowPriceAlert] = useState(false);
+  const [priceAlertTarget, setPriceAlertTarget] = useState("");
+  const [priceAlertSaved, setPriceAlertSaved] = useState(() => {
+    try { const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}"); return id ? !!a[id] : false; } catch { return false; }
+  });
+  const [priceAlertValue, setPriceAlertValue] = useState(() => {
+    try { const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}"); return id && a[id] ? String(a[id]) : ""; } catch { return ""; }
+  });
   const [selectedImg, setSelectedImg] = useState(0);
 
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -465,10 +475,11 @@ export default function ListingDetail() {
                     </button>
                   </Link>
                   <button
-                    onClick={() => setWishlisted((v) => !v)}
+                    onClick={() => id && toggleWishlist(id)}
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                      wishlisted ? "border-red-500/40 bg-red-500/10 text-red-400" : "border-white/10 text-stone-500 hover:border-white/20 hover:text-stone-300"
+                      wishlisted ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : "border-white/10 text-stone-500 hover:border-white/20 hover:text-stone-300"
                     }`}
+                    title={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
                   >
                     <Heart size={16} fill={wishlisted ? "currentColor" : "none"} />
                   </button>
@@ -496,6 +507,18 @@ export default function ListingDetail() {
                       <Landmark size={14} /> Payment plan
                     </button>
                   )}
+                  <button
+                    onClick={() => setShowPriceAlert(true)}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs transition-all ${
+                      priceAlertSaved
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                        : "border-stone-700 text-stone-400 hover:border-amber-500/30 hover:text-amber-400"
+                    }`}
+                    title="Set a price drop alert"
+                  >
+                    <TrendingDown size={13} />
+                    {priceAlertSaved ? `Alert: ${priceAlertValue ? `<$${parseInt(priceAlertValue).toLocaleString()}` : "set"}` : "Price alert"}
+                  </button>
                 </div>
               </>
             ) : (
@@ -812,6 +835,83 @@ export default function ListingDetail() {
                     <Send size={14} /> Send request
                   </button>
                   <p className="text-[10px] text-stone-700 text-center mt-3">Payment plans are arranged directly with the artist. All payments remain peer-to-peer.</p>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Price alert modal */}
+      <AnimatePresence>
+        {showPriceAlert && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowPriceAlert(false)}
+          >
+            <motion.div
+              className="w-full max-w-sm rounded-2xl bg-stone-900 border border-stone-700 p-6 space-y-4"
+              initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-lg font-bold text-amber-100">Price Drop Alert</h3>
+                <button onClick={() => setShowPriceAlert(false)} className="text-stone-500 hover:text-stone-300">
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="text-sm text-stone-400">
+                We'll notify you if this piece drops below your target price. Alerts are stored locally.
+              </p>
+              {priceAlertSaved ? (
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-center">
+                  <Check size={20} className="text-emerald-400 mx-auto mb-1" />
+                  <p className="text-sm text-emerald-400 font-medium">Alert set for &lt;${parseInt(priceAlertValue).toLocaleString()}</p>
+                  <button
+                    onClick={() => {
+                      const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}");
+                      delete a[id!];
+                      localStorage.setItem("kiln_price_alerts_v1", JSON.stringify(a));
+                      setPriceAlertSaved(false);
+                      setPriceAlertValue("");
+                    }}
+                    className="mt-2 text-xs text-stone-500 hover:text-stone-300 underline"
+                  >
+                    Remove alert
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-stone-400 uppercase tracking-wider mb-1.5 block">Alert me when price drops below</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={priceAlertTarget}
+                        onChange={(e) => setPriceAlertTarget(e.target.value)}
+                        placeholder={(listing?.price ? Math.round(listing.price * 0.85) : 0).toString()}
+                        className="w-full rounded-xl bg-stone-800 border border-stone-600 pl-7 pr-4 py-2.5 text-sm text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+                    <p className="text-[11px] text-stone-600 mt-1.5">Current price: {listing ? formatPrice(listing.price) : "—"}</p>
+                  </div>
+                  <button
+                    disabled={!priceAlertTarget || parseInt(priceAlertTarget) <= 0}
+                    onClick={() => {
+                      if (!priceAlertTarget || !id) return;
+                      const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}");
+                      a[id] = parseInt(priceAlertTarget);
+                      localStorage.setItem("kiln_price_alerts_v1", JSON.stringify(a));
+                      setPriceAlertSaved(true);
+                      setPriceAlertValue(priceAlertTarget);
+                      setShowPriceAlert(false);
+                    }}
+                    className="w-full rounded-full bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Set alert
+                  </button>
                 </>
               )}
             </motion.div>

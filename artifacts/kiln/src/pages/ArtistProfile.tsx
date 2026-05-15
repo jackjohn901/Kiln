@@ -6,7 +6,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import Nav from "@/components/Nav";
@@ -156,6 +156,11 @@ export default function ArtistProfile() {
   const [selectedDrop, setSelectedDrop] = useState<Drop | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
+  const [showVisitModal, setShowVisitModal] = useState(false);
+  const [visitDate, setVisitDate] = useState("");
+  const [visitSlot, setVisitSlot] = useState("Morning (10am–12pm)");
+  const [visitNote, setVisitNote] = useState("");
+  const [visitRequested, setVisitRequested] = useState(false);
 
   if (!artist) {
     return (
@@ -394,6 +399,12 @@ export default function ArtistProfile() {
                   View rates
                 </button>
               </Link>
+              <button
+                onClick={() => setShowVisitModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-stone-700 text-xs text-stone-500 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+              >
+                <CalendarDays size={11} /> Book studio visit
+              </button>
             </div>
           )}
         </div>
@@ -877,6 +888,94 @@ export default function ArtistProfile() {
       {/* Lightbox */}
       <AnimatePresence>
         {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
+      </AnimatePresence>
+
+      {/* Studio visit booking modal */}
+      <AnimatePresence>
+        {showVisitModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => { setShowVisitModal(false); setVisitRequested(false); }}
+          >
+            <motion.div
+              className="w-full max-w-sm rounded-2xl bg-stone-900 border border-stone-700 p-6 space-y-4"
+              initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {visitRequested ? (
+                <div className="text-center py-4 space-y-3">
+                  <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-amber-500/15">
+                    <CheckCircle size={28} className="text-amber-400" />
+                  </div>
+                  <h3 className="font-serif text-lg font-bold text-amber-100">Request sent!</h3>
+                  <p className="text-sm text-stone-400">{artist.name} will confirm your studio visit for {visitDate || "your selected date"}.</p>
+                  <button
+                    onClick={() => { setShowVisitModal(false); setVisitRequested(false); }}
+                    className="w-full rounded-full bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-serif text-lg font-bold text-amber-100">Book Studio Visit</h3>
+                    <button onClick={() => setShowVisitModal(false)} className="text-stone-500 hover:text-stone-300">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <p className="text-sm text-stone-400">
+                    Request an in-person visit to {artist.name}'s studio. Visits are by appointment and coordinated directly with the artist.
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-stone-400 uppercase tracking-wider mb-1.5 block">Preferred date</label>
+                      <input
+                        type="date"
+                        value={visitDate}
+                        onChange={(e) => setVisitDate(e.target.value)}
+                        className="w-full rounded-xl bg-stone-800 border border-stone-600 px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        style={{ colorScheme: "dark" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-stone-400 uppercase tracking-wider mb-1.5 block">Time slot</label>
+                      <select
+                        value={visitSlot}
+                        onChange={(e) => setVisitSlot(e.target.value)}
+                        className="w-full rounded-xl bg-stone-800 border border-stone-600 px-3 py-2.5 text-sm text-stone-100 focus:outline-none focus:border-amber-500/60"
+                        style={{ background: "hsl(20 8% 12%)" }}
+                      >
+                        {["Morning (10am–12pm)", "Afternoon (1pm–4pm)", "Evening (5pm–7pm)"].map((s) => (
+                          <option key={s} value={s} style={{ background: "hsl(20 8% 12%)" }}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-stone-400 uppercase tracking-wider mb-1.5 block">Message (optional)</label>
+                      <textarea
+                        value={visitNote}
+                        onChange={(e) => setVisitNote(e.target.value)}
+                        placeholder="Tell the artist what you're hoping to see or discuss…"
+                        rows={3}
+                        className="w-full rounded-xl bg-stone-800 border border-stone-600 px-3 py-2.5 text-sm text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/60 resize-none"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    disabled={!visitDate}
+                    onClick={() => setVisitRequested(true)}
+                    className="w-full rounded-full bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Send visit request
+                  </button>
+                  <p className="text-[11px] text-stone-600 text-center">All arrangements are made directly with the artist.</p>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Commission modal */}

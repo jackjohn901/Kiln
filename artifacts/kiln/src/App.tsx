@@ -50,6 +50,7 @@ import Mentorship from "@/pages/Mentorship";
 import PatronTiers from "@/pages/PatronTiers";
 import PressKit from "@/pages/PressKit";
 import Materials from "@/pages/Materials";
+import GlazeLibrary from "@/pages/GlazeLibrary";
 import SeriesJournal from "@/pages/SeriesJournal";
 import SeriesDetail from "@/pages/SeriesDetail";
 import Settings from "@/pages/Settings";
@@ -216,6 +217,7 @@ function Router() {
       <Route path="/commission-contract" component={CommissionContract} />
       <Route path="/commission-contract/:artistId" component={CommissionContract} />
       <Route path="/materials-exchange" component={MaterialExchange} />
+      <Route path="/glaze-library" component={GlazeLibrary} />
       <Route component={NotFound} />
     </Switch>
   );
