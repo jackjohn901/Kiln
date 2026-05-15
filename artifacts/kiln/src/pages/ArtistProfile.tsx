@@ -6,9 +6,10 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
+import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
 import Nav from "@/components/Nav";
 import { getArtistById, artists, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -138,7 +139,7 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio";
+type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv";
 
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
@@ -485,6 +486,7 @@ export default function ArtistProfile() {
               ...(workshops.length > 0 ? [{ key: "workshops", icon: Hammer, label: "Workshops" }] : []),
               ...(drops.length > 0 ? [{ key: "drops", icon: Zap, label: "Drops" }] : []),
               { key: "bio", icon: BookOpen, label: "Bio" },
+              { key: "cv", icon: Award, label: "CV" },
             ] as { key: Tab; icon: React.ElementType; label: string }[]
           ).map(({ key, icon: Icon, label }) => (
             <button
@@ -825,6 +827,96 @@ export default function ArtistProfile() {
               </div>
             </div>
           )}
+
+          {/* CV / Exhibition history */}
+          {tab === "cv" && (() => {
+            const cv = getArtistCV(artist.id);
+            return (
+              <div className="max-w-2xl space-y-8 py-2">
+                {/* Education */}
+                <div>
+                  <h3 className="mb-3 font-serif text-lg text-amber-100">Education</h3>
+                  <div className="space-y-2">
+                    {cv.education.map((e, i) => (
+                      <div key={i} className="flex gap-4 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3">
+                        <span className="shrink-0 text-xs font-mono text-stone-600 w-20 pt-0.5">{e.year}</span>
+                        <div>
+                          <p className="text-sm font-medium text-stone-200">{e.degree}</p>
+                          <p className="text-xs text-stone-500">{e.institution}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Exhibitions */}
+                <div>
+                  <h3 className="mb-3 font-serif text-lg text-amber-100">Exhibitions & Fairs</h3>
+                  <div className="space-y-2">
+                    {cv.exhibitions.map((ex, i) => (
+                      <div key={i} className="flex gap-4 items-start rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3">
+                        <span className="shrink-0 text-xs font-mono text-stone-600 w-10 pt-0.5">{ex.year}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <p className="text-sm font-semibold text-stone-200">{ex.title}</p>
+                            <span className={`rounded-full border px-1.5 py-0 text-[10px] font-medium ${EXHIBITION_TYPE_COLORS[ex.type]}`}>
+                              {EXHIBITION_TYPE_LABELS[ex.type]}
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-500">{ex.venue} · {ex.location}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Awards */}
+                {cv.awards.length > 0 && (
+                  <div>
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Awards & Grants</h3>
+                    <div className="space-y-2">
+                      {cv.awards.map((a, i) => (
+                        <div key={i} className="flex items-start gap-3 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3">
+                          <Award size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                          <p className="text-sm text-stone-300">{a}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Collections */}
+                {cv.collections.length > 0 && (
+                  <div>
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Public Collections</h3>
+                    <div className="space-y-1.5">
+                      {cv.collections.map((c, i) => (
+                        <div key={i} className="flex items-start gap-2.5 px-1">
+                          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-amber-500/60" />
+                          <p className="text-sm text-stone-400">{c}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Publications */}
+                {cv.publications.length > 0 && (
+                  <div>
+                    <h3 className="mb-3 font-serif text-lg text-amber-100">Publications</h3>
+                    <div className="space-y-1.5">
+                      {cv.publications.map((p, i) => (
+                        <div key={i} className="flex items-start gap-2.5 px-1">
+                          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone-600" />
+                          <p className="text-sm text-stone-400">{p}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

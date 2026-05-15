@@ -8,6 +8,7 @@ import {
   MessageSquare, GraduationCap, Link2, CalendarDays, Briefcase,
   Award, BookOpen, FlaskConical, Flame, Box, Map, TrendingUp,
   Zap, Gavel, BookMarked, Calendar, Mail, X, ChevronRight,
+  Download, Grid3x3, SplitSquareHorizontal,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -76,6 +77,9 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/auctions", icon: Gavel, label: "Auctions" },
       { href: "/series", icon: BookMarked, label: "Process Journals" },
       { href: "/calendar", icon: Calendar, label: "Craft Calendar" },
+      { href: "/downloads", icon: Download, label: "Digital Downloads" },
+      { href: "/boards", icon: Grid3x3, label: "Inspiration Boards" },
+      { href: "/duet", icon: SplitSquareHorizontal, label: "Duet Studio" },
     ],
   },
 ];

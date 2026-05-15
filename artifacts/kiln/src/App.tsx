@@ -78,6 +78,9 @@ import Auctions from "@/pages/Auctions";
 import EmbedPortfolio from "@/pages/EmbedPortfolio";
 import CommissionContract from "@/pages/CommissionContract";
 import MaterialExchange from "@/pages/MaterialExchange";
+import DigitalDownloads from "@/pages/DigitalDownloads";
+import InspirationBoards from "@/pages/InspirationBoards";
+import DuetStudio from "@/pages/DuetStudio";
 
 const queryClient = new QueryClient();
 
@@ -218,6 +221,10 @@ function Router() {
       <Route path="/commission-contract/:artistId" component={CommissionContract} />
       <Route path="/materials-exchange" component={MaterialExchange} />
       <Route path="/glaze-library" component={GlazeLibrary} />
+      <Route path="/downloads" component={DigitalDownloads} />
+      <Route path="/boards" component={InspirationBoards} />
+      <Route path="/duet" component={DuetStudio} />
+      <Route path="/duet/:reelId" component={DuetStudio} />
       <Route component={NotFound} />
     </Switch>
   );

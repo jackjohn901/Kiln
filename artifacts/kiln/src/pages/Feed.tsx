@@ -5,8 +5,10 @@ import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
+  SplitSquareHorizontal,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
+import { ParsedCaption } from "@/lib/parseCaption";
 import { getTrackById } from "@/data/music";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -327,9 +329,10 @@ function ReelCard({
           )}
         </div>
 
-        <p className="line-clamp-2 max-w-[78vw] text-sm leading-snug text-stone-200 drop-shadow">
-          {reel.caption}
-        </p>
+        <ParsedCaption
+          text={reel.caption}
+          className="line-clamp-2 max-w-[78vw] text-sm leading-snug text-stone-200 drop-shadow"
+        />
 
         <div className="pt-1">
           <MusicDisc trackId={reel.musicTrackId} spinning={isActive && !musicMuted} />
@@ -429,6 +432,14 @@ function ReelCard({
           />
           <span className="text-[9px] font-bold text-white drop-shadow">{reposted ? "On" : ""}</span>
         </button>
+
+        {/* Duet */}
+        <Link href={`/duet/${reel.id}`}>
+          <button className="flex flex-col items-center gap-1">
+            <SplitSquareHorizontal size={22} className="text-white" />
+            <span className="text-[9px] font-bold text-white drop-shadow">Duet</span>
+          </button>
+        </Link>
 
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />

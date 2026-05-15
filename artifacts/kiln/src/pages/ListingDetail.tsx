@@ -99,6 +99,82 @@ function StarRow({ rating, size = 14, interactive = false, onRate }: {
   );
 }
 
+// ─── Shipping Estimate ─────────────────────────────────────────────────────────
+
+const US_REGIONS: Record<string, string> = {
+  "0": "Northeast", "1": "Northeast", "2": "Mid-Atlantic", "3": "Southeast",
+  "4": "Southeast", "5": "Midwest", "6": "South Central", "7": "South Central",
+  "8": "Mountain", "9": "West Coast",
+};
+
+function estimateShipping(listing: Listing, zip: string): { label: string; days: string; price: number }[] | null {
+  if (zip.length !== 5 || !/^\d{5}$/.test(zip)) return null;
+  const region = US_REGIONS[zip[0]] ?? "US";
+  const base = listing.price >= 5000 ? 65 : listing.price >= 1500 ? 45 : listing.price >= 500 ? 25 : 18;
+  const regional = region === "West Coast" || region === "Northeast" ? 0 : 8;
+  const std = base + regional;
+  const exp = Math.round(std * 2.2);
+  const free = listing.price >= 3000;
+  return [
+    { label: `Standard — White Glove Delivery (${region})`, days: "7–14 business days", price: free ? 0 : std },
+    { label: "Expedited Freight", days: "3–5 business days", price: free ? Math.round(exp * 0.4) : exp },
+    { label: "Express Art Courier", days: "1–2 business days", price: Math.round(exp * 1.6) },
+  ];
+}
+
+function ShippingEstimate({ listing }: { listing: Listing }) {
+  const [zip, setZip] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const estimates = submitted ? estimateShipping(listing, zip) : null;
+
+  return (
+    <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Truck size={14} className="text-amber-400" />
+        <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shipping estimate</p>
+        {listing.price >= 3000 && (
+          <span className="ml-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+            Free shipping
+          </span>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={zip}
+          onChange={(e) => { setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setSubmitted(false); }}
+          placeholder="Enter ZIP code"
+          inputMode="numeric"
+          maxLength={5}
+          className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+        />
+        <button
+          onClick={() => zip.length === 5 && setSubmitted(true)}
+          disabled={zip.length !== 5}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+        >
+          Calculate
+        </button>
+      </div>
+      {estimates && (
+        <div className="mt-3 space-y-2">
+          {estimates.map((e) => (
+            <div key={e.label} className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-stone-400 truncate">{e.label}</p>
+                <p className="text-[10px] text-stone-600">{e.days}</p>
+              </div>
+              <span className="shrink-0 text-sm font-bold text-amber-300">
+                {e.price === 0 ? "Free" : formatPrice(e.price)}
+              </span>
+            </div>
+          ))}
+          <p className="text-[10px] text-stone-700 pt-1">Estimates only — final shipping arranged directly with artist. All works are professionally packed.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const WAITLIST_KEY = "kiln_listing_waitlist_v1";
 function getWaitlisted(): string[] {
   try { return JSON.parse(localStorage.getItem(WAITLIST_KEY) ?? "[]"); } catch { return []; }
@@ -453,6 +529,9 @@ export default function ListingDetail() {
                 />
               </div>
             )}
+
+            {/* ── Shipping Estimate ── */}
+            <ShippingEstimate listing={listing} />
 
             {/* ── Actions ── */}
             {listing.available ? (
