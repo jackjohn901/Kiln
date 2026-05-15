@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Vote, CheckCircle2, Clock, Flame, ChevronRight, Users, Trophy, Zap, X } from "lucide-react";
+import { Vote, CheckCircle2, Clock, Flame, ChevronRight, Users, Trophy, Zap, X, Plus, Trash2 } from "lucide-react";
 import { useSocial } from "@/contexts/SocialContext";
 
 interface Proposal {
@@ -116,6 +116,11 @@ export default function Parliament() {
   const [proposals, setProposals] = useState<Proposal[]>(SEED_PROPOSALS);
   const [selected, setSelected] = useState<Proposal | null>(null);
   const [votingFor, setVotingFor] = useState<string | null>(null);
+  const [showPropose, setShowPropose] = useState(false);
+  const [proposeTitle, setProposeTitle] = useState("");
+  const [proposeDesc, setProposeDesc] = useState("");
+  const [proposeCategory, setProposeCategory] = useState<Proposal["category"]>("community");
+  const [proposeOptions, setProposeOptions] = useState(["", ""]);
 
   const voiceTokens = Math.max(
     state.myTokens,
@@ -127,6 +132,27 @@ export default function Parliament() {
   );
 
   useEffect(() => { saveState(state); }, [state]);
+
+  function submitProposal() {
+    const opts = proposeOptions.map(o => o.trim()).filter(Boolean);
+    if (!proposeTitle.trim() || opts.length < 2) return;
+    const newProposal: Proposal = {
+      id: `prop-user-${Date.now()}`,
+      title: proposeTitle.trim(),
+      description: proposeDesc.trim() || "A community proposal.",
+      category: proposeCategory,
+      options: opts.map((label, i) => ({ id: `opt-${i}`, label, votes: 0 })),
+      endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      totalVoices: 0,
+      proposedBy: "You",
+      proposedByAvatar: "",
+    };
+    setProposals(prev => [newProposal, ...prev]);
+    setProposeTitle("");
+    setProposeDesc("");
+    setProposeOptions(["", ""]);
+    setShowPropose(false);
+  }
 
   function castVote(proposalId: string, optionId: string) {
     if (state.myVotes[proposalId]) return;
@@ -289,8 +315,16 @@ export default function Parliament() {
           })}
         </div>
 
+        {/* Submit proposal CTA */}
+        <button
+          onClick={() => setShowPropose(true)}
+          className="mt-6 w-full rounded-2xl border border-dashed border-amber-500/25 py-4 flex items-center justify-center gap-2 text-sm text-amber-500/60 hover:text-amber-400 hover:border-amber-500/40 transition-colors"
+        >
+          <Plus size={14} /> Submit a proposal to the community
+        </button>
+
         {/* How it works */}
-        <div className="mt-6 rounded-2xl bg-stone-900/40 border border-white/8 p-4">
+        <div className="mt-4 rounded-2xl bg-stone-900/40 border border-white/8 p-4">
           <p className="text-xs font-semibold text-stone-400 mb-3">How Voice Tokens Work</p>
           <div className="space-y-2 text-[11px] text-stone-500">
             <p>• Every follow earns <span className="text-amber-400">+3 tokens</span></p>
@@ -301,6 +335,82 @@ export default function Parliament() {
           </div>
         </div>
       </div>
+
+      {/* Submit proposal modal */}
+      <AnimatePresence>
+        {showPropose && (
+          <>
+            <motion.div className="fixed inset-0 z-[62] bg-black/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowPropose(false)} />
+            <motion.div className="fixed bottom-0 left-0 right-0 z-[63] max-h-[90vh] overflow-y-auto rounded-t-3xl bg-[#1a1714] border-t border-white/10 p-6"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-amber-100">Submit a Proposal</h2>
+                <button onClick={() => setShowPropose(false)} className="rounded-full bg-stone-800 p-2 text-stone-400"><X size={14} /></button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-stone-500 mb-1.5 block">Proposal title *</label>
+                  <input value={proposeTitle} onChange={e => setProposeTitle(e.target.value)}
+                    placeholder="e.g. Next guest teacher for the masterclass series"
+                    className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                </div>
+                <div>
+                  <label className="text-xs text-stone-500 mb-1.5 block">Description (optional)</label>
+                  <textarea value={proposeDesc} onChange={e => setProposeDesc(e.target.value)}
+                    placeholder="Give the community context for what they're voting on..."
+                    rows={2} className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-stone-500 mb-1.5 block">Category</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["technique", "challenge", "grant", "feature", "community"] as const).map(cat => (
+                      <button key={cat} onClick={() => setProposeCategory(cat)}
+                        className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${proposeCategory === cat ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-stone-500 hover:border-white/20"}`}>
+                        {CATEGORY_LABELS[cat]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-stone-500 mb-1.5 block">Options (at least 2, up to 4) *</label>
+                  <div className="space-y-2">
+                    {proposeOptions.map((opt, i) => (
+                      <div key={i} className="flex gap-2">
+                        <input value={opt} onChange={e => setProposeOptions(prev => prev.map((o, j) => j === i ? e.target.value : o))}
+                          placeholder={`Option ${i + 1}`}
+                          className="flex-1 rounded-xl bg-stone-800/60 border border-white/10 px-4 py-2.5 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                        {proposeOptions.length > 2 && (
+                          <button onClick={() => setProposeOptions(prev => prev.filter((_, j) => j !== i))}
+                            className="rounded-xl border border-white/10 px-3 text-stone-500 hover:text-red-400 hover:border-red-500/30 transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {proposeOptions.length < 4 && (
+                      <button onClick={() => setProposeOptions(prev => [...prev, ""])}
+                        className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-amber-400 transition-colors">
+                        <Plus size={11} /> Add option
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setShowPropose(false)} className="flex-1 rounded-full border border-white/10 py-3 text-sm text-stone-400">Cancel</button>
+                <button
+                  onClick={submitProposal}
+                  disabled={!proposeTitle.trim() || proposeOptions.filter(o => o.trim()).length < 2}
+                  className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950 disabled:opacity-40"
+                >
+                  Submit Proposal
+                </button>
+              </div>
+              <p className="mt-3 text-center text-[10px] text-stone-700">Proposals open for 7 days. Community votes shape Kiln's future.</p>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Vote modal */}
       <AnimatePresence>

@@ -62,6 +62,46 @@ export default function LineageGraph() {
 
   const roots = LINEAGE_NODES.filter(n => !n.mentorId);
 
+  const [pathFromId, setPathFromId] = useState("");
+  const [pathToId, setPathToId] = useState("");
+  const [foundPath, setFoundPath] = useState<LineageNode[] | null>(null);
+  const [noPath, setNoPath] = useState(false);
+
+  function findPath(fromId: string, toId: string): LineageNode[] {
+    if (!fromId || !toId || fromId === toId) return [];
+    const queue: string[][] = [[fromId]];
+    const visited = new Set<string>([fromId]);
+    while (queue.length > 0) {
+      const path = queue.shift()!;
+      const current = path[path.length - 1];
+      const node = LINEAGE_NODES.find(n => n.artistId === current);
+      if (!node) continue;
+      const neighbors = [...(node.mentorId ? [node.mentorId] : []), ...node.apprenticeIds];
+      for (const neighbor of neighbors) {
+        if (visited.has(neighbor)) continue;
+        const newPath = [...path, neighbor];
+        if (neighbor === toId) {
+          return newPath.map(id => LINEAGE_NODES.find(n => n.artistId === id)!).filter(Boolean);
+        }
+        visited.add(neighbor);
+        queue.push(newPath);
+      }
+    }
+    return [];
+  }
+
+  function handleFindPath() {
+    if (!pathFromId || !pathToId) return;
+    const result = findPath(pathFromId, pathToId);
+    if (result.length > 0) {
+      setFoundPath(result);
+      setNoPath(false);
+    } else {
+      setFoundPath(null);
+      setNoPath(true);
+    }
+  }
+
   function saveClaim() {
     const claim: UserLineageClaim = {
       mentorId: claimForm.mentorId || null,
@@ -129,6 +169,59 @@ export default function LineageGraph() {
             <button onClick={() => setShowClaim(true)} className="w-full rounded-xl border border-dashed border-white/15 py-4 text-xs text-stone-500 hover:text-stone-400 hover:border-white/25 transition-colors">
               + Add your mentor to join the lineage tree
             </button>
+          )}
+        </div>
+
+        {/* Path Finder */}
+        <div className="mb-6 rounded-2xl bg-stone-900/60 border border-white/8 p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3 flex items-center gap-2">
+            <Check size={12} className="text-amber-500" /> Find the Connection
+          </p>
+          <p className="text-[11px] text-stone-600 mb-3">Select any two artists to find how they're linked through the lineage tree.</p>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label className="text-[10px] text-stone-600 mb-1 block">From artist</label>
+              <select value={pathFromId} onChange={e => { setPathFromId(e.target.value); setFoundPath(null); setNoPath(false); }}
+                className="w-full rounded-xl bg-stone-800 border border-white/10 px-3 py-2 text-xs text-amber-100 focus:outline-none focus:border-amber-500/40">
+                <option value="">Select…</option>
+                {LINEAGE_NODES.map(n => <option key={n.artistId} value={n.artistId}>{n.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-stone-600 mb-1 block">To artist</label>
+              <select value={pathToId} onChange={e => { setPathToId(e.target.value); setFoundPath(null); setNoPath(false); }}
+                className="w-full rounded-xl bg-stone-800 border border-white/10 px-3 py-2 text-xs text-amber-100 focus:outline-none focus:border-amber-500/40">
+                <option value="">Select…</option>
+                {LINEAGE_NODES.map(n => <option key={n.artistId} value={n.artistId}>{n.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <button
+            onClick={handleFindPath}
+            disabled={!pathFromId || !pathToId || pathFromId === pathToId}
+            className="w-full rounded-full bg-amber-500 py-2.5 text-xs font-bold text-stone-950 disabled:opacity-40 transition-opacity"
+          >
+            Find Connection
+          </button>
+          {noPath && (
+            <p className="mt-3 text-center text-xs text-stone-500">No direct lineage connection found between these artists.</p>
+          )}
+          {foundPath && foundPath.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[10px] text-stone-500 mb-2">{foundPath.length - 1} step{foundPath.length > 2 ? "s" : ""} apart</p>
+              <div className="flex items-center flex-wrap gap-1.5">
+                {foundPath.map((node, i) => (
+                  <div key={node.artistId} className="flex items-center gap-1.5">
+                    <button onClick={() => setSelectedNode(node)}
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-stone-800 px-2.5 py-1.5 hover:border-amber-500/30 transition-colors">
+                      <img src={node.avatarUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+                      <span className="text-xs text-amber-200">{node.name}</span>
+                    </button>
+                    {i < foundPath.length - 1 && <ChevronRight size={12} className="text-stone-600 shrink-0" />}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

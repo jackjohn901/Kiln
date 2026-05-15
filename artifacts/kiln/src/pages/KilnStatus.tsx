@@ -26,6 +26,20 @@ const CONE_OPTIONS = [
 
 const FUEL_OPTIONS = ["Electric", "Gas", "Wood / Anagama", "Propane torch", "Oxygen-propane torch", "Coal", "Mixed"];
 
+function extractTargetTemp(cone: string): number | null {
+  const match = cone.match(/(\d{3,4})°F/);
+  return match ? parseInt(match[1]!) : null;
+}
+
+function getLiveTemp(cone: string, progress: number): string {
+  const targetTemp = extractTargetTemp(cone);
+  if (!targetTemp) return "";
+  if (progress >= 100) return `Peaked at ${targetTemp.toLocaleString()}°F`;
+  const factor = Math.pow(Math.min(progress, 100) / 100, 0.58);
+  const liveTemp = Math.round(72 + (targetTemp - 72) * factor);
+  return `~${liveTemp.toLocaleString()}°F`;
+}
+
 function FiringCard({ status, isMine = false, onClear }: {
   status: KilnFiringStatus; isMine?: boolean; onClear?: () => void;
 }) {
@@ -36,7 +50,7 @@ function FiringCard({ status, isMine = false, onClear }: {
     const iv = setInterval(() => {
       setProgress(getFiringProgress(status));
       setEta(getFiringETA(status));
-    }, 30_000);
+    }, 8_000);
     return () => clearInterval(iv);
   }, [status]);
 
@@ -101,6 +115,16 @@ function FiringCard({ status, isMine = false, onClear }: {
             transition={{ duration: 0.8, ease: "easeOut" }}
           />
         </div>
+        {getLiveTemp(status.cone, progress) && (
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <Thermometer size={10} className={isComplete ? "text-stone-500" : "text-amber-400"} />
+            <span className={`text-xs font-semibold ${isComplete ? "text-stone-500" : "text-amber-300"}`}>
+              {getLiveTemp(status.cone, progress)}
+            </span>
+            <span className="text-[9px] text-stone-700">{isComplete ? "cooled" : "est. live temp"}</span>
+            {!isComplete && <span className="ml-auto text-[9px] text-stone-700">{progress}% complete</span>}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2 text-[11px]">

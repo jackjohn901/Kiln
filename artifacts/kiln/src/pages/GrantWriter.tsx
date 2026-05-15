@@ -78,11 +78,23 @@ export default function GrantWriter() {
     setError("");
     setSelectedDoc(docType);
     setShowForm(false);
-    // Generate locally using templates — simulated async delay for UX
-    await new Promise(r => setTimeout(r, 900 + Math.random() * 600));
-    const text = generateDoc(profile, docType);
-    setGenerated((prev) => ({ ...prev, [docType]: text }));
-    setLoading(false);
+    try {
+      const prompt = buildPrompt(profile, docType);
+      const res = await fetch("/api/grant-writer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error("api-error");
+      const data = await res.json() as { text: string };
+      setGenerated((prev) => ({ ...prev, [docType]: data.text }));
+    } catch {
+      const text = generateDoc(profile, docType);
+      setGenerated((prev) => ({ ...prev, [docType]: text }));
+      setError("AI unavailable — showing template draft. Review and personalize before submitting.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {

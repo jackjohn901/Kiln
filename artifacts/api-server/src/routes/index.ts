@@ -6,6 +6,7 @@ import craftAssistantRouter from "./craft-assistant";
 import aiCaptionRouter from "./ai-caption";
 import stripeRouter from "./stripe";
 import glazeOracleRouter from "./glaze-oracle";
+import grantWriterRouter from "./grant-writer";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(craftAssistantRouter);
 router.use(aiCaptionRouter);
 router.use(stripeRouter);
 router.use(glazeOracleRouter);
+router.use(grantWriterRouter);
 
 export default router;

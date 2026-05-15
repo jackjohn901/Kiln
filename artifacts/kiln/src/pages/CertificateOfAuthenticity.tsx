@@ -50,6 +50,20 @@ export default function CertificateOfAuthenticity() {
     setForm((p) => ({ ...p, [field]: value }));
   }
 
+  function handleReprintFromHistory(coa: CoAData) {
+    setForm({
+      title: coa.title,
+      year: coa.year,
+      medium: coa.medium,
+      dimensions: coa.dimensions,
+      edition: coa.edition,
+      totalEditions: coa.totalEditions,
+      artistStatement: coa.artistStatement,
+    });
+    setActiveTab("create");
+    setTimeout(() => window.print(), 350);
+  }
+
   function handleSaveAndPrint() {
     const coa: CoAData = { id: genId(), ...form, createdAt: new Date().toISOString() };
     saveCoa(coa);
@@ -104,14 +118,20 @@ export default function CertificateOfAuthenticity() {
               </div>
             ) : (
               history.map((c, i) => (
-                <div key={c.id} className={`flex items-center justify-between px-4 py-3.5 ${i < history.length - 1 ? "border-b border-white/5" : ""}`}>
-                  <div>
-                    <p className="text-sm font-medium text-stone-200">{c.title}</p>
+                <div key={c.id} className={`flex items-center gap-3 px-4 py-3.5 ${i < history.length - 1 ? "border-b border-white/5" : ""}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-stone-200 truncate">{c.title}</p>
                     <p className="text-xs text-stone-600">{c.medium} · {c.dimensions} · {new Date(c.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <span className="text-[10px] rounded-full border border-white/10 px-2 py-0.5 text-stone-500">
-                    {isUnique && c.totalEditions === "1" ? "Unique" : `${c.edition}/${c.totalEditions}`}
+                  <span className="shrink-0 text-[10px] rounded-full border border-white/10 px-2 py-0.5 text-stone-500">
+                    {c.totalEditions === "1" ? "Unique" : `${c.edition}/${c.totalEditions}`}
                   </span>
+                  <button
+                    onClick={() => handleReprintFromHistory(c)}
+                    className="shrink-0 flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-colors"
+                  >
+                    <Printer size={9} /> Reprint
+                  </button>
                 </div>
               ))
             )}

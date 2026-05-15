@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Clock, DollarSign, ChevronLeft, Star, Search, CheckCircle, ChevronDown } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Clock, DollarSign, ChevronLeft, Star, Search, CheckCircle, ChevronDown, CalendarPlus } from "lucide-react";
 import Nav from "@/components/Nav";
 import { OPPORTUNITIES, OPPORTUNITY_TYPES, daysUntilDeadline, type OpportunityType } from "@/data/opportunities";
 
@@ -248,6 +248,36 @@ const APP_STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: strin
   declined: { label: "Declined", color: "text-stone-500" },
 };
 
+function downloadCalendar(opp: typeof OPPORTUNITIES[0]) {
+  if (opp.deadline === "Rolling") return;
+  const d = new Date(opp.deadline);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dateStr = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  const nextDay = new Date(d); nextDay.setDate(nextDay.getDate() + 1);
+  const nextStr = `${nextDay.getFullYear()}${pad(nextDay.getMonth() + 1)}${pad(nextDay.getDate())}`;
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Kiln//Opportunity Board//EN",
+    "BEGIN:VEVENT",
+    `UID:${opp.id}@kiln.art`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+    `DTSTART;VALUE=DATE:${dateStr}`,
+    `DTEND;VALUE=DATE:${nextStr}`,
+    `SUMMARY:Deadline: ${opp.title}`,
+    `DESCRIPTION:${opp.organization}\\n${opp.url}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const blob = new Blob([ics], { type: "text/calendar" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${opp.id}-deadline.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function OppCard({ opp, saved, onSave, expanded, onExpand, appStatus, onSetStatus }: {
   opp: typeof OPPORTUNITIES[0];
   saved: boolean;
@@ -330,6 +360,14 @@ function OppCard({ opp, saved, onSave, expanded, onExpand, appStatus, onSetStatu
                 >
                   Apply / Learn more <ExternalLink size={13} />
                 </a>
+                {opp.deadline !== "Rolling" && (
+                  <button
+                    onClick={e => { e.stopPropagation(); downloadCalendar(opp); }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-colors"
+                  >
+                    <CalendarPlus size={12} /> Add to calendar
+                  </button>
+                )}
                 {/* Application status tracker */}
                 <div className="flex items-center gap-2">
                   {appStatus === "not-applied" ? (

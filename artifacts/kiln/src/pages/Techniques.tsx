@@ -167,11 +167,12 @@ function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: 
           </h2>
           <div className="grid grid-cols-3 gap-2">
             {techniqueReels.slice(0, 6).map((r) => (
-              <div key={r.id} className="relative aspect-[9/16] overflow-hidden rounded-xl bg-stone-900">
+              <button key={r.id} onClick={() => navigate("/feed")}
+                className="relative aspect-[9/16] overflow-hidden rounded-xl bg-stone-900 group hover:ring-2 hover:ring-amber-500/40 transition-all">
                 <img
                   src={r.thumbnail}
                   alt=""
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/200/360`;
                   }}
@@ -180,11 +181,13 @@ function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: 
                 <div className="absolute bottom-2 left-2 right-2">
                   <p className="text-[10px] font-semibold text-white leading-tight truncate">{r.artistName}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
           {techniqueReels.length > 6 && (
-            <p className="text-xs text-stone-600 mt-2">+{techniqueReels.length - 6} more reels from this technique</p>
+            <button onClick={() => navigate("/feed")} className="text-xs text-amber-500/70 hover:text-amber-400 transition-colors mt-2">
+              +{techniqueReels.length - 6} more — watch on Kiln →
+            </button>
           )}
         </div>
       )}

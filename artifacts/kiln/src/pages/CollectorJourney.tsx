@@ -124,6 +124,50 @@ export default function CollectorJourney() {
         date: "June 2025",
       });
     }
+    if (Object.values(reelLikes).filter(Boolean).length >= 25) {
+      ms.push({
+        id: "twenty-five-likes",
+        icon: Heart,
+        color: "text-rose-400",
+        bg: "bg-rose-500/15 border-rose-500/30",
+        label: "25 reels liked",
+        sublabel: "Your eye for craft is undeniable",
+        date: "June 2025",
+      });
+    }
+    if (following.length >= 20) {
+      ms.push({
+        id: "twenty-follows",
+        icon: Users,
+        color: "text-sky-400",
+        bg: "bg-sky-500/15 border-sky-500/30",
+        label: "Following 20 artists",
+        sublabel: "You've built a serious orbit",
+        date: "July 2025",
+      });
+    }
+    if (subscriptions.length >= 5) {
+      ms.push({
+        id: "five-patrons",
+        icon: Crown,
+        color: "text-amber-300",
+        bg: "bg-amber-500/25 border-amber-400/50",
+        label: "Patron of 5 artists",
+        sublabel: "You are the backbone of craft",
+        date: "August 2025",
+      });
+    }
+    if (Object.values(reelSaves).filter(Boolean).length >= 10) {
+      ms.push({
+        id: "ten-saves",
+        icon: Bookmark,
+        color: "text-violet-400",
+        bg: "bg-violet-500/15 border-violet-500/30",
+        label: "10 reels saved",
+        sublabel: "A curated reference library taking shape",
+        date: "July 2025",
+      });
+    }
 
     return ms;
   }, [following, subscriptions, reelLikes, reelSaves]);
@@ -135,7 +179,7 @@ export default function CollectorJourney() {
     { label: "Patrons of", value: subscriptions.length, icon: Crown, color: "text-amber-400" },
   ];
 
-  const completionPercent = Math.min(100, Math.round((milestones.length / 8) * 100));
+  const completionPercent = Math.min(100, Math.round((milestones.length / 12) * 100));
 
   return (
     <div className="min-h-screen bg-[#12100e]">
