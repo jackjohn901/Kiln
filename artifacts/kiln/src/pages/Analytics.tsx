@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -79,10 +79,35 @@ function KpiCard({ label, value, change, sub, icon: Icon, color }: {
 
 type Period = "30d" | "90d" | "1y";
 
+interface ApiPost {
+  id: string;
+  caption: string;
+  thumbnailUrl?: string | null;
+  videoUrl?: string | null;
+  likeCount: number;
+  commentCount: number;
+  saveCount: number;
+  technique?: string | null;
+  createdAt: string;
+}
+
 export default function Analytics() {
   const { profile } = useProfile();
   const { commissions, receivedInquiries } = useSocial();
   const [period, setPeriod] = useState<Period>("1y");
+  const [apiPosts, setApiPosts] = useState<ApiPost[]>([]);
+  const [apiFollowers, setApiFollowers] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me/posts", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (Array.isArray(data?.posts)) setApiPosts(data.posts); })
+      .catch(() => {});
+    fetch("/api/me/profile", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.profile?.followerCount != null) setApiFollowers(data.profile.followerCount); })
+      .catch(() => {});
+  }, []);
 
   if (!profile) {
     return (
@@ -138,10 +163,10 @@ export default function Analytics() {
 
         {/* KPI grid */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard label="Followers" value={lastF.toLocaleString()} change={followerChange} icon={Users} color="bg-sky-500/10 text-sky-400" />
-          <KpiCard label="Revenue" value={`$${lastR.toLocaleString()}`} change={revenueChange} sub="This month" icon={DollarSign} color="bg-emerald-500/10 text-emerald-400" />
-          <KpiCard label="Views" value={`${(VIEW_DATA[VIEW_DATA.length - 1] / 1000).toFixed(1)}k`} change={12} sub="This month" icon={Eye} color="bg-amber-500/10 text-amber-400" />
-          <KpiCard label="Total Earned" value={`$${(totalRevenue / 1000).toFixed(1)}k`} sub="All time" icon={TrendingUp} color="bg-purple-500/10 text-purple-400" />
+          <KpiCard label="Followers" value={(apiFollowers ?? lastF).toLocaleString()} change={followerChange} icon={Users} color="bg-sky-500/10 text-sky-400" />
+          <KpiCard label="Total likes" value={apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0).toLocaleString() : `${(VIEW_DATA[VIEW_DATA.length - 1] / 1000).toFixed(1)}k`} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
+          <KpiCard label="Total saves" value={apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.saveCount, 0).toLocaleString() : "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
+          <KpiCard label="Posts" value={apiPosts.length > 0 ? String(apiPosts.length) : String(lastF > 0 ? 13 : 0)} sub="Published" icon={TrendingUp} color="bg-emerald-500/10 text-emerald-400" />
         </div>
 
         {/* Follower chart */}
@@ -393,39 +418,42 @@ export default function Analytics() {
         {/* Top posts */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <h2 className="mb-4 text-sm font-bold text-stone-200">Top Performing Posts</h2>
-          <div className="flex flex-col gap-2">
-            {[
-              { title: "Testing new Gaffer amber in the hot shop", views: "38.5k", likes: "2.4k", type: "Reel", shopClicks: "312", inquiries: 4, follows: 89 },
-              { title: "Murrine development — 3 days of color tests", views: "24.1k", likes: "1.8k", type: "Process", shopClicks: "187", inquiries: 2, follows: 54 },
-              { title: "Finished: Endeavour (18\", cobalt to amber)", views: "19.3k", likes: "3.1k", type: "Photo", shopClicks: "523", inquiries: 9, follows: 201 },
-              { title: "Live from the hot shop — midnight session", views: "15.7k", likes: "1.2k", type: "Live", shopClicks: "98", inquiries: 1, follows: 37 },
-            ].map((post, i) => (
-              <div key={i} className="rounded-xl bg-stone-800/40 px-3 py-2.5">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-stone-600 w-4">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-stone-300 truncate">{post.title}</p>
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-stone-600">
-                      <span className="flex items-center gap-0.5"><Eye size={9} /> {post.views}</span>
-                      <span className="flex items-center gap-0.5"><Star size={9} /> {post.likes}</span>
+          {apiPosts.length === 0 ? (
+            <p className="text-sm text-stone-500 text-center py-6">No posts yet — share your craft to see analytics here.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {[...apiPosts]
+                .sort((a, b) => b.likeCount - a.likeCount)
+                .slice(0, 6)
+                .map((post, i) => (
+                  <div key={post.id} className="rounded-xl bg-stone-800/40 px-3 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-stone-600 w-4">{i + 1}</span>
+                      {post.thumbnailUrl && (
+                        <img src={post.thumbnailUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-stone-300 truncate">{post.caption}</p>
+                        <div className="mt-0.5 flex items-center gap-3 text-[10px] text-stone-500">
+                          <span className="flex items-center gap-0.5 text-red-400">
+                            <Eye size={9} /> {post.likeCount.toLocaleString()} likes
+                          </span>
+                          <span className="flex items-center gap-0.5 text-amber-400">
+                            <Star size={9} /> {post.saveCount.toLocaleString()} saves
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <MessageCircle size={9} /> {post.commentCount.toLocaleString()} comments
+                          </span>
+                        </div>
+                      </div>
+                      {post.technique && (
+                        <span className="text-[10px] rounded-full bg-stone-700 px-2 py-0.5 text-stone-400 shrink-0">{post.technique}</span>
+                      )}
                     </div>
                   </div>
-                  <span className="text-[10px] rounded-full bg-stone-700 px-2 py-0.5 text-stone-400 shrink-0">{post.type}</span>
-                </div>
-                <div className="mt-2 ml-7 flex items-center gap-3 text-[10px]">
-                  <span className="flex items-center gap-1 text-emerald-400">
-                    <ShoppingBag size={9} /> <span>{post.shopClicks} shop clicks</span>
-                  </span>
-                  <span className="flex items-center gap-1 text-blue-400">
-                    <MessageCircle size={9} /> <span>{post.inquiries} inquiries</span>
-                  </span>
-                  <span className="flex items-center gap-1 text-amber-400">
-                    <TrendingUp size={9} /> <span>+{post.follows} follows</span>
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+                ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

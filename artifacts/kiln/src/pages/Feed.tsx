@@ -472,6 +472,9 @@ function ReelCard({
         <button
           onClick={() => {
             toggleReelLike(reel.id);
+            if (reel.id.startsWith("db-")) {
+              fetch(`/api/posts/${reel.id.slice(3)}/like`, { method: "POST", credentials: "include" }).catch(() => {});
+            }
             // Record interaction for For You algorithm
             try {
               const data = readInteractions();
@@ -508,7 +511,12 @@ function ReelCard({
         {/* Save — opens board picker */}
         <button
           onClick={() => {
-            if (!saved) toggleReelSave(reel.id);
+            if (!saved) {
+              toggleReelSave(reel.id);
+              if (reel.id.startsWith("db-")) {
+                fetch(`/api/posts/${reel.id.slice(3)}/save`, { method: "POST", credentials: "include" }).catch(() => {});
+              }
+            }
             setShowBoardPicker(true);
             try {
               const data = readInteractions();
