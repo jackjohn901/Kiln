@@ -212,7 +212,7 @@ export default function PublicProfileScreen() {
       ) : (
         <View style={styles.grid}>
           {posts.map((post) => (
-            <View key={post.id} style={styles.gridItem}>
+            <Pressable key={post.id} style={styles.gridItem} onPress={() => router.push(`/post/${post.id}` as any)}>
               {post.thumbnailUrl ? (
                 <Image source={{ uri: post.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
@@ -226,7 +226,7 @@ export default function PublicProfileScreen() {
                   {post.likeCount > 999 ? `${(post.likeCount / 1000).toFixed(1)}k` : post.likeCount}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           ))}
         </View>
       )}

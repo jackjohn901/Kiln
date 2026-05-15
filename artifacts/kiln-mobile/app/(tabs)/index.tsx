@@ -11,8 +11,10 @@ import {
   Text,
   TextInput,
   View,
+  ViewToken,
 } from "react-native";
 import { Image } from "expo-image";
+import { Video, ResizeMode } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -22,6 +24,7 @@ import { useColors } from "@/hooks/useColors";
 import { useGetFeed } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { apiGet, apiPost, relativeTime } from "@/lib/api";
+import { useWebSocket } from "@/lib/useWebSocket";
 import { router } from "expo-router";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -32,6 +35,7 @@ interface FeedPost {
   authorName: string;
   authorAvatarUrl?: string | null;
   thumbnailUrl?: string | null;
+  videoUrl?: string | null;
   caption: string;
   technique?: string | null;
   likeCount: number;
@@ -118,9 +122,7 @@ function CommentsSheet({ postId, onClose }: { postId: string; onClose: () => voi
               <View style={styles.commentBody}>
                 <View style={styles.commentMeta}>
                   <Text style={[styles.commentAuthor, { color: colors.foreground }]}>{item.authorName}</Text>
-                  <Text style={[styles.commentTime, { color: colors.mutedForeground }]}>
-                    {relativeTime(item.createdAt)}
-                  </Text>
+                  <Text style={[styles.commentTime, { color: colors.mutedForeground }]}>{relativeTime(item.createdAt)}</Text>
                 </View>
                 <Text style={[styles.commentText, { color: colors.foreground }]}>{item.text}</Text>
               </View>
@@ -129,9 +131,7 @@ function CommentsSheet({ postId, onClose }: { postId: string; onClose: () => voi
           ListEmptyComponent={
             <View style={styles.sheetCenter}>
               <Feather name="message-circle" size={32} color={colors.mutedForeground} />
-              <Text style={[styles.emptyComments, { color: colors.mutedForeground }]}>
-                No comments yet — be first
-              </Text>
+              <Text style={[styles.emptyComments, { color: colors.mutedForeground }]}>No comments yet — be first</Text>
             </View>
           }
         />
@@ -167,13 +167,8 @@ function CommentsSheet({ postId, onClose }: { postId: string; onClose: () => voi
   );
 }
 
-function PostActions({
-  post,
-  onLike,
-  onSave,
-  onComment,
-}: {
-  post: FeedPost;
+function PostActions({ post, onLike, onSave, onComment }: {
+  post: FeedPost & { isLiked: boolean; isSaved: boolean };
   onLike: () => void;
   onSave: () => void;
   onComment: () => void;
@@ -198,17 +193,25 @@ function PostActions({
   );
 }
 
-function PostItem({
-  item,
-  onComment,
-}: {
+function PostItem({ item, isActive, onComment }: {
   item: FeedPost;
+  isActive: boolean;
   onComment: () => void;
 }) {
   const colors = useColors();
+  const videoRef = useRef<Video>(null);
   const [liked, setLiked] = useState(item.isLiked ?? false);
   const [likeCount, setLikeCount] = useState(item.likeCount);
   const [saved, setSaved] = useState(item.isSaved ?? false);
+
+  React.useEffect(() => {
+    if (!videoRef.current) return;
+    if (isActive) {
+      videoRef.current.playAsync().catch(() => {});
+    } else {
+      videoRef.current.pauseAsync().catch(() => {});
+    }
+  }, [isActive]);
 
   const handleLike = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -230,16 +233,28 @@ function PostItem({
 
   return (
     <View style={[styles.postContainer, { width: SCREEN_WIDTH }]}>
-      {item.thumbnailUrl ? (
+      {item.videoUrl ? (
+        <Video
+          ref={videoRef}
+          source={{ uri: item.videoUrl }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={isActive}
+          isLooping
+          isMuted={false}
+        />
+      ) : item.thumbnailUrl ? (
         <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} contentFit="cover" transition={300} />
       ) : (
         <View style={[styles.thumbnail, { backgroundColor: "#222" }]} />
       )}
+
       <LinearGradient
         colors={["transparent", "rgba(0,0,0,0.85)"]}
         style={styles.gradient}
         locations={[0.4, 1]}
       />
+
       <View style={styles.postMeta}>
         <Pressable
           style={styles.authorRow}
@@ -262,12 +277,19 @@ function PostItem({
         </Pressable>
         <Text style={styles.caption} numberOfLines={3}>{item.caption}</Text>
       </View>
+
       <PostActions
         post={{ ...item, isLiked: liked, likeCount, isSaved: saved }}
         onLike={handleLike}
         onSave={handleSave}
         onComment={onComment}
       />
+
+      {item.videoUrl && (
+        <View style={styles.videoIndicator}>
+          <Feather name="play-circle" size={14} color="rgba(255,255,255,0.7)" />
+        </View>
+      )}
     </View>
   );
 }
@@ -277,6 +299,9 @@ export default function FeedScreen() {
   const colors = useColors();
   const flatRef = useRef<FlatList>(null);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useWebSocket();
 
   const { data, isLoading } = useGetFeed(
     { limit: 20 },
@@ -285,11 +310,25 @@ export default function FeedScreen() {
 
   const posts: FeedPost[] = data?.posts ?? [];
 
-  const renderItem = useCallback(
-    ({ item }: { item: FeedPost }) => (
-      <PostItem item={item} onComment={() => setCommentPostId(item.id)} />
-    ),
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index != null) {
+        setActiveIndex(viewableItems[0].index);
+      }
+    },
     []
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: FeedPost; index: number }) => (
+      <PostItem
+        item={item}
+        isActive={index === activeIndex}
+        onComment={() => setCommentPostId(item.id)}
+      />
+    ),
+    [activeIndex]
   );
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -324,6 +363,8 @@ export default function FeedScreen() {
           snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
+          viewabilityConfig={viewabilityConfig.current}
+          onViewableItemsChanged={onViewableItemsChanged}
           contentContainerStyle={{ paddingBottom: bottomPad }}
         />
       )}
@@ -346,15 +387,9 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    position: "absolute", left: 0, right: 0, zIndex: 10,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingVertical: 10,
   },
   headerLogo: { fontFamily: "Inter_700Bold", fontSize: 26, letterSpacing: -0.5 },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -363,59 +398,35 @@ const styles = StyleSheet.create({
   emptySub: { fontFamily: "Inter_400Regular", fontSize: 15, color: "rgba(255,255,255,0.4)", textAlign: "center" },
   postContainer: { height: SCREEN_HEIGHT, position: "relative", backgroundColor: "#111" },
   thumbnail: { ...StyleSheet.absoluteFillObject },
-  gradient: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    height: SCREEN_HEIGHT * 0.55,
-  },
+  gradient: { position: "absolute", bottom: 0, left: 0, right: 0, height: SCREEN_HEIGHT * 0.55 },
   postMeta: { position: "absolute", bottom: 100, left: 16, right: 80 },
   authorRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    overflow: "hidden", alignItems: "center", justifyContent: "center",
-  },
+  avatar: { width: 36, height: 36, borderRadius: 18, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   avatarText: { fontFamily: "Inter_700Bold", fontSize: 14, color: "#191615" },
   authorName: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   tag: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   tagText: { fontFamily: "Inter_500Medium", fontSize: 11 },
-  caption: {
-    fontFamily: "Inter_400Regular", fontSize: 14,
-    color: "rgba(255,255,255,0.9)", lineHeight: 20,
-  },
-  actions: {
-    position: "absolute", right: 16, bottom: 110,
-    alignItems: "center", gap: 20,
-  },
+  caption: { fontFamily: "Inter_400Regular", fontSize: 14, color: "rgba(255,255,255,0.9)", lineHeight: 20 },
+  actions: { position: "absolute", right: 16, bottom: 110, alignItems: "center", gap: 20 },
   actionBtn: { alignItems: "center", gap: 4 },
   actionCount: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
-  modalBackdrop: {
-    flex: 0,
-    height: "40%",
-    backgroundColor: "rgba(0,0,0,0.5)",
+  videoIndicator: {
+    position: "absolute", top: 16, right: 16,
+    backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 12,
+    padding: 6,
   },
-  sheet: {
-    flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: "hidden",
-  },
-  sheetHandle: {
-    width: 36, height: 4, borderRadius: 2,
-    alignSelf: "center", marginTop: 8, marginBottom: 4,
-  },
+  modalBackdrop: { flex: 0, height: "40%", backgroundColor: "rgba(0,0,0,0.5)" },
+  sheet: { flex: 1, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: "hidden" },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 8, marginBottom: 4 },
   sheetHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetTitle: { fontFamily: "Inter_700Bold", fontSize: 16 },
   sheetCenter: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 40 },
   commentList: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
   commentRow: { flexDirection: "row", gap: 10 },
-  commentAvatar: {
-    width: 32, height: 32, borderRadius: 16,
-    overflow: "hidden", alignItems: "center", justifyContent: "center",
-    flexShrink: 0,
-  },
+  commentAvatar: { width: 32, height: 32, borderRadius: 16, overflow: "hidden", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   commentAvatarText: { fontFamily: "Inter_700Bold", fontSize: 12 },
   commentBody: { flex: 1 },
   commentMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
@@ -425,17 +436,13 @@ const styles = StyleSheet.create({
   emptyComments: { fontFamily: "Inter_400Regular", fontSize: 14 },
   composer: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    paddingHorizontal: 16, paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth,
   },
   composerInput: {
     flex: 1, borderWidth: 1, borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 10,
     fontSize: 14, fontFamily: "Inter_400Regular",
   },
-  composerBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: "center", justifyContent: "center",
-  },
+  composerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   signInPrompt: { fontFamily: "Inter_400Regular", fontSize: 14 },
 });

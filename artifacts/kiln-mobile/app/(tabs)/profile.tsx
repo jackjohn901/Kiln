@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { apiGet, apiPatch } from "@/lib/api";
+import { router } from "expo-router";
 
 interface Profile {
   userId: string;
@@ -301,7 +302,7 @@ export default function ProfileScreen() {
             ) : (
               <View style={styles.grid}>
                 {posts.map((post) => (
-                  <Pressable key={post.id} style={styles.gridItem}>
+                  <Pressable key={post.id} style={styles.gridItem} onPress={() => router.push(`/post/${post.id}` as any)}>
                     {post.thumbnailUrl ? (
                       <Image source={{ uri: post.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
                     ) : (
@@ -334,7 +335,7 @@ export default function ProfileScreen() {
             ) : (
               <View style={styles.grid}>
                 {savedPosts.map((post) => (
-                  <Pressable key={post.id} style={styles.gridItem}>
+                  <Pressable key={post.id} style={styles.gridItem} onPress={() => router.push(`/post/${post.id}` as any)}>
                     {post.thumbnailUrl ? (
                       <Image source={{ uri: post.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
                     ) : (

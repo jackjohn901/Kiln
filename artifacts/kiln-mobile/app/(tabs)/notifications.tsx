@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { useGetNotifications } from "@workspace/api-client-react";
+import { router } from "expo-router";
 import { relativeTime } from "@/lib/api";
 
 type NotifType = "like" | "follow" | "comment" | "sale";
@@ -79,11 +80,14 @@ export default function NotificationsScreen() {
             const text = item.text ?? "";
             const time = item.createdAt ? relativeTime(item.createdAt) : "";
             return (
-              <View
+              <Pressable
                 style={[
                   styles.row,
                   { backgroundColor: item.read ? "transparent" : colors.card },
                 ]}
+                onPress={() => {
+                  if (item.link) router.push(item.link as any);
+                }}
               >
                 <View style={[styles.iconCircle, { backgroundColor: `${icon.color}22` }]}>
                   <Feather name={icon.name} size={18} color={icon.color} />
@@ -100,7 +104,7 @@ export default function NotificationsScreen() {
                 {!item.read && (
                   <View style={[styles.dot, { backgroundColor: colors.primary }]} />
                 )}
-              </View>
+              </Pressable>
             );
           }}
           ListEmptyComponent={

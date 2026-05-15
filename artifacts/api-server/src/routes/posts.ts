@@ -40,6 +40,19 @@ router.post("/posts", async (req, res): Promise<void> => {
   }
 });
 
+// GET /posts/:postId — single post
+router.get("/posts/:postId", async (req, res): Promise<void> => {
+  try {
+    const { postId } = req.params;
+    const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId));
+    if (!post) { res.status(404).json({ error: "Not found" }); return; }
+    res.json({ post: { ...post, tags: post.tags ?? [], createdAt: post.createdAt.toISOString() } });
+  } catch (err) {
+    req.log.error({ err }, "getPost error");
+    res.status(500).json({ error: "Failed to load post" });
+  }
+});
+
 // POST /posts/:postId/like — toggle like
 router.post("/posts/:postId/like", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Heart, Send } from "lucide-react";
-import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
 
 function timeAgo(iso: string): string {
@@ -13,6 +12,16 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
+interface ApiComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  text: string;
+  likeCount: number;
+  createdAt: string;
+}
+
 interface Props {
   postId: string;
   artistName: string;
@@ -20,39 +29,58 @@ interface Props {
 }
 
 export default function Comments({ postId, artistName, onClose }: Props) {
-  const { getComments, addComment, likeComment } = useSocial();
   const { profile } = useProfile();
+  const [comments, setComments] = useState<ApiComment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const comments = getComments(postId);
+  // Use a stable postId that strips the "db-" prefix if present
+  const rawId = postId.startsWith("db-") ? postId.slice(3) : postId;
 
   useEffect(() => {
+    setLoading(true);
+    fetch(`/api/posts/${rawId}/comments`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => setComments(data.comments ?? []))
+      .catch(() => setComments([]))
+      .finally(() => setLoading(false));
     setTimeout(() => inputRef.current?.focus(), 300);
-  }, []);
+  }, [rawId]);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const trimmed = text.trim();
-    if (!trimmed || !profile) return;
-    addComment(
-      postId,
-      profile.id ?? "user",
-      profile.name,
-      profile.avatarUrl ?? `https://picsum.photos/seed/${profile.id}/60/60`,
-      trimmed
-    );
+    if (!trimmed || submitting || !profile) return;
+    setSubmitting(true);
     setText("");
-    setTimeout(() => {
-      listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    }, 50);
+    try {
+      const res = await fetch(`/api/posts/${rawId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setComments((prev) => [data.comment, ...prev]);
+        listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } catch {
+      setText(trimmed);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleLike(commentId: string) {
     if (liked[commentId]) return;
     setLiked((p) => ({ ...p, [commentId]: true }));
-    likeComment(postId, commentId);
+    setComments((prev) =>
+      prev.map((c) => c.id === commentId ? { ...c, likeCount: c.likeCount + 1 } : c)
+    );
   }
 
   return (
@@ -72,7 +100,12 @@ export default function Comments({ postId, artistName, onClose }: Props) {
         </div>
 
         <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-4 min-h-0">
-          {comments.length === 0 && (
+          {loading && (
+            <div className="text-center py-10 text-stone-500">
+              <p className="text-sm">Loading comments…</p>
+            </div>
+          )}
+          {!loading && comments.length === 0 && (
             <div className="text-center py-10 text-stone-500">
               <p className="text-sm">No comments yet.</p>
               <p className="text-xs mt-1">Be the first to say something about {artistName}'s work.</p>
@@ -80,11 +113,13 @@ export default function Comments({ postId, artistName, onClose }: Props) {
           )}
           {comments.map((c) => (
             <div key={c.id} className="flex gap-3">
-              <img
-                src={c.authorAvatarUrl}
-                alt={c.authorName}
-                className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5"
-              />
+              {c.authorAvatarUrl ? (
+                <img src={c.authorAvatarUrl} alt={c.authorName} className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-white">{c.authorName.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   <span className="text-xs font-semibold text-stone-200">{c.authorName}</span>
@@ -96,7 +131,7 @@ export default function Comments({ postId, artistName, onClose }: Props) {
                   onClick={() => handleLike(c.id)}
                 >
                   <Heart size={11} fill={liked[c.id] ? "currentColor" : "none"} />
-                  {c.likes + (liked[c.id] ? 1 : 0) > 0 && (c.likes + (liked[c.id] ? 1 : 0))}
+                  {(c.likeCount) > 0 && c.likeCount}
                 </button>
               </div>
             </div>
@@ -115,13 +150,13 @@ export default function Comments({ postId, artistName, onClose }: Props) {
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSubmit()}
                 placeholder="Add a comment…"
                 className="flex-1 bg-stone-800 rounded-full px-4 py-2 text-sm text-stone-100 placeholder-stone-500 outline-none focus:ring-1 focus:ring-amber-500"
               />
               <button
                 onClick={handleSubmit}
-                disabled={!text.trim()}
+                disabled={!text.trim() || submitting}
                 className="text-amber-400 disabled:text-stone-600 hover:text-amber-300 transition-colors"
               >
                 <Send size={18} />
