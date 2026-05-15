@@ -67,6 +67,9 @@ import InventoryManager from "@/pages/InventoryManager";
 import ListingDetail from "@/pages/ListingDetail";
 import CommunityEvents from "@/pages/CommunityEvents";
 import CommissionRates from "@/pages/CommissionRates";
+import ActivityFeed from "@/pages/ActivityFeed";
+import StudioDialogue from "@/pages/StudioDialogue";
+import QRProfile from "@/pages/QRProfile";
 
 const queryClient = new QueryClient();
 
@@ -195,6 +198,9 @@ function Router() {
       <Route path="/listings/:id" component={ListingDetail} />
       <Route path="/events" component={CommunityEvents} />
       <Route path="/artists/:artistId/rates" component={CommissionRates} />
+      <Route path="/activity" component={ActivityFeed} />
+      <Route path="/dialogue" component={StudioDialogue} />
+      <Route path="/qr-profile" component={QRProfile} />
       <Route component={NotFound} />
     </Switch>
   );

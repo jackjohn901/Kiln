@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useLocation } from "wouter";
 import {
-  ChevronLeft, ExternalLink, Heart, Bookmark, Share2,
+  ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, BellOff, MoreHorizontal,
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
@@ -144,7 +144,7 @@ export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage } = useSocial();
+  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted } = useSocial();
 
   const artist = findArtist(id ?? "");
   const isOwn = profile?.id === id;
@@ -155,6 +155,7 @@ export default function ArtistProfile() {
   const [showTip, setShowTip] = useState(false);
   const [selectedDrop, setSelectedDrop] = useState<Drop | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [showOverflow, setShowOverflow] = useState(false);
 
   if (!artist) {
     return (
@@ -298,6 +299,35 @@ export default function ArtistProfile() {
                 >
                   {shareCopied ? <Check size={13} className="text-green-400" /> : <Share2 size={14} />}
                 </button>
+                {!isOwn && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowOverflow((v) => !v)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-stone-400 hover:border-white/30 transition-colors"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                    {showOverflow && (
+                      <div className="absolute right-0 top-10 z-50 w-44 rounded-xl border border-white/10 bg-stone-900 shadow-xl overflow-hidden">
+                        <button
+                          onClick={() => { isMuted(artist.id) ? unmuteArtist(artist.id) : muteArtist(artist.id); setShowOverflow(false); }}
+                          className="flex w-full items-center gap-2.5 px-4 py-3 text-sm text-stone-300 hover:bg-white/5 transition-colors"
+                        >
+                          <BellOff size={13} className="text-stone-500" />
+                          {isMuted(artist.id) ? "Unmute" : "Mute"} posts
+                        </button>
+                        <div className="h-px bg-white/8" />
+                        <button
+                          onClick={() => { isBlocked(artist.id) ? unblockArtist(artist.id) : blockArtist(artist.id); setShowOverflow(false); }}
+                          className="flex w-full items-center gap-2.5 px-4 py-3 text-sm text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        >
+                          <Ban size={13} />
+                          {isBlocked(artist.id) ? "Unblock" : "Block"} artist
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

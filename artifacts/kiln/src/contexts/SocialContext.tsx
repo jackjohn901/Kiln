@@ -206,6 +206,34 @@ const SEED_MESSAGE_THREADS: MessageThread[] = [
   },
 ];
 
+interface RepostRecord {
+  reelId: string;
+  artistId: string;
+  artistName: string;
+  caption: string;
+  thumbnailUrl: string;
+  repostedAt: string;
+}
+
+interface ActivityItem {
+  id: string;
+  type: "like" | "save" | "follow" | "repost";
+  actorId: string;
+  actorName: string;
+  actorAvatar: string;
+  targetId: string;
+  targetName: string;
+  targetLink: string;
+  thumbnailUrl?: string;
+  createdAt: string;
+}
+
+interface StreakData {
+  current: number;
+  longest: number;
+  lastPostDate: string | null;
+}
+
 interface SocialState {
   following: string[];
   notifications: KilnNotification[];
@@ -217,11 +245,17 @@ interface SocialState {
   artistCommissionStatuses: Record<string, CommissionStatus>;
   reelLikes: Record<string, boolean>;
   reelSaves: Record<string, boolean>;
+  reelReposts: Record<string, boolean>;
   dropsWaitlisted: Record<string, boolean>;
   subscriptions: string[];
   threads: MessageThread[];
   verifiedArtists: string[];
   reviews: ShopReview[];
+  blocked: string[];
+  muted: string[];
+  reposts: RepostRecord[];
+  activityFeed: ActivityItem[];
+  streak: StreakData;
 }
 
 interface SocialContextType extends SocialState {
@@ -243,6 +277,7 @@ interface SocialContextType extends SocialState {
   sendTip: (toArtistId: string, toArtistName: string, amount: number, message?: string) => void;
   toggleReelLike: (reelId: string) => void;
   toggleReelSave: (reelId: string) => void;
+  toggleReelRepost: (reelId: string, reel: { artistId: string; artistName: string; caption: string; thumbnail: string }) => void;
   joinDropWaitlist: (dropId: string, dropTitle: string, artistName: string) => void;
   leaveDropWaitlist: (dropId: string) => void;
   isOnDropWaitlist: (dropId: string) => boolean;
@@ -257,6 +292,13 @@ interface SocialContextType extends SocialState {
   quoteInquiry: (id: string, quote: CommissionQuote) => void;
   addReview: (review: Omit<ShopReview, "id" | "createdAt">) => void;
   getReviews: (listingId: string) => ShopReview[];
+  blockArtist: (artistId: string) => void;
+  unblockArtist: (artistId: string) => void;
+  isBlocked: (artistId: string) => boolean;
+  muteArtist: (artistId: string) => void;
+  unmuteArtist: (artistId: string) => void;
+  isMuted: (artistId: string) => boolean;
+  recordPost: () => void;
 }
 
 const SocialContext = createContext<SocialContextType>({} as SocialContextType);
@@ -335,11 +377,17 @@ function defaultState(): SocialState {
     artistCommissionStatuses: SEED_STATUSES,
     reelLikes: {},
     reelSaves: {},
+    reelReposts: {},
     dropsWaitlisted: {},
     subscriptions: [],
     threads: SEED_MESSAGE_THREADS,
     verifiedArtists: VERIFIED_ARTIST_IDS,
     reviews: [],
+    blocked: [],
+    muted: [],
+    reposts: [],
+    activityFeed: [],
+    streak: { current: 0, longest: 0, lastPostDate: null },
   };
 }
 
@@ -358,6 +406,12 @@ function readState(): SocialState {
       threads: parsed.threads?.length ? parsed.threads : def.threads,
       verifiedArtists: def.verifiedArtists,
       reviews: parsed.reviews ?? [],
+    blocked: parsed.blocked ?? [],
+    muted: parsed.muted ?? [],
+    reposts: parsed.reposts ?? [],
+    activityFeed: parsed.activityFeed ?? [],
+    reelReposts: parsed.reelReposts ?? {},
+    streak: parsed.streak ?? { current: 0, longest: 0, lastPostDate: null },
     };
   } catch {
     return defaultState();
@@ -470,6 +524,58 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const toggleReelSave = useCallback((reelId: string) => {
     update((s) => ({ ...s, reelSaves: { ...s.reelSaves, [reelId]: !s.reelSaves[reelId] } }));
+  }, []);
+
+  const toggleReelRepost = useCallback((reelId: string, reel: { artistId: string; artistName: string; caption: string; thumbnail: string }) => {
+    update((s) => {
+      const alreadyReposted = !!s.reelReposts[reelId];
+      const newReposts = alreadyReposted
+        ? s.reposts.filter((r) => r.reelId !== reelId)
+        : [{ reelId, artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnailUrl: reel.thumbnail, repostedAt: new Date().toISOString() }, ...s.reposts];
+      const newActivity: ActivityItem[] = alreadyReposted ? s.activityFeed : [
+        { id: genId(), type: "repost", actorId: "__current_user__", actorName: "You", actorAvatar: "", targetId: reelId, targetName: `${reel.artistName}'s reel`, targetLink: "/", thumbnailUrl: reel.thumbnail, createdAt: new Date().toISOString() },
+        ...s.activityFeed,
+      ];
+      return { ...s, reelReposts: { ...s.reelReposts, [reelId]: !alreadyReposted }, reposts: newReposts, activityFeed: newActivity };
+    });
+  }, []);
+
+  const blockArtist = useCallback((artistId: string) => {
+    update((s) => ({
+      ...s,
+      blocked: s.blocked.includes(artistId) ? s.blocked : [...s.blocked, artistId],
+      following: s.following.filter((id) => id !== artistId),
+    }));
+  }, []);
+
+  const unblockArtist = useCallback((artistId: string) => {
+    update((s) => ({ ...s, blocked: s.blocked.filter((id) => id !== artistId) }));
+  }, []);
+
+  const isBlocked = useCallback((artistId: string) => state.blocked.includes(artistId), [state.blocked]);
+
+  const muteArtist = useCallback((artistId: string) => {
+    update((s) => ({ ...s, muted: s.muted.includes(artistId) ? s.muted : [...s.muted, artistId] }));
+  }, []);
+
+  const unmuteArtist = useCallback((artistId: string) => {
+    update((s) => ({ ...s, muted: s.muted.filter((id) => id !== artistId) }));
+  }, []);
+
+  const isMuted = useCallback((artistId: string) => state.muted.includes(artistId), [state.muted]);
+
+  const recordPost = useCallback(() => {
+    update((s) => {
+      const today = new Date().toDateString();
+      const lastDate = s.streak.lastPostDate;
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      let current = s.streak.current;
+      if (lastDate === today) return s;
+      if (lastDate === yesterday) current += 1;
+      else current = 1;
+      const longest = Math.max(current, s.streak.longest);
+      return { ...s, streak: { current, longest, lastPostDate: today } };
+    });
   }, []);
 
   const joinDropWaitlist = useCallback((dropId: string, dropTitle: string, artistName: string) => {
@@ -596,6 +702,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         sendTip,
         toggleReelLike,
         toggleReelSave,
+        toggleReelRepost,
         joinDropWaitlist,
         leaveDropWaitlist,
         isOnDropWaitlist,
@@ -610,6 +717,13 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         quoteInquiry,
         addReview,
         getReviews,
+        blockArtist,
+        unblockArtist,
+        isBlocked,
+        muteArtist,
+        unmuteArtist,
+        isMuted,
+        recordPost,
       }}
     >
       {children}

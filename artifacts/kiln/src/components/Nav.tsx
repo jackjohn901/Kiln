@@ -56,6 +56,9 @@ export default function Nav() {
     { href: "/newsletter", label: "Newsletter", icon: Mail },
     { href: "/inventory", label: "Inventory", icon: Package },
     { href: "/map", label: "Map", icon: MapPin },
+    { href: "/activity", label: "Activity", icon: TrendingUp },
+    { href: "/dialogue", label: "Studio Dialogue", icon: MessageSquare },
+    { href: "/qr-profile", label: "QR Profile", icon: UsersRound },
   ];
 
   useEffect(() => {

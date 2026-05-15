@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
-  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X,
+  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2,
 } from "lucide-react";
 import { getTrackById } from "@/data/music";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -115,6 +115,19 @@ function BottomTab() {
   );
 }
 
+// ─── Streak badge ─────────────────────────────────────────────────────────────
+
+function StreakBadge() {
+  const { streak } = useSocial();
+  if (streak.current === 0) return null;
+  return (
+    <div className="flex h-8 items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/25 px-2.5">
+      <Flame size={12} className="text-amber-400" />
+      <span className="text-xs font-bold text-amber-300">{streak.current}</span>
+    </div>
+  );
+}
+
 // ─── Share button ─────────────────────────────────────────────────────────────
 
 function ShareButton({ artistId, artistName }: { artistId: string; artistName: string }) {
@@ -193,9 +206,10 @@ function ReelCard({
   onToggleMusic: () => void;
   onComment: (reelId: string, artistName: string) => void;
 }) {
-  const { reelLikes, reelSaves, toggleReelLike, toggleReelSave, getComments, getArtistCommissionStatus } = useSocial();
+  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus } = useSocial();
   const liked = reelLikes[reel.id] ?? false;
   const saved = reelSaves[reel.id] ?? false;
+  const reposted = reelReposts[reel.id] ?? false;
   const commentCount = getComments(reel.id).length;
   const color = TECHNIQUE_COLORS[reel.technique] ?? "bg-amber-500";
   const commissionStatus = getArtistCommissionStatus(reel.artistId);
@@ -358,6 +372,19 @@ function ReelCard({
           <span className="text-[11px] font-bold text-white drop-shadow">
             {fmt(reel.saves + (saved ? 1 : 0))}
           </span>
+        </button>
+
+        {/* Repost / Amplify */}
+        <button
+          onClick={() => toggleReelRepost(reel.id, { artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnail: reel.thumbnail })}
+          className="flex flex-col items-center gap-1"
+        >
+          <Repeat2
+            size={24}
+            className={reposted ? "text-emerald-400" : "text-white"}
+            style={{ transition: "all 0.15s" }}
+          />
+          <span className="text-[9px] font-bold text-white drop-shadow">{reposted ? "On" : ""}</span>
         </button>
 
         {/* Share */}
@@ -596,6 +623,7 @@ export default function Feed() {
                 </span>
               )}
             </button>
+            <StreakBadge />
             <Link href="/discover" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm">
               <Search size={15} />
             </Link>
