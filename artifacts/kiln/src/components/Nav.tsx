@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
+import { useCart } from "@/contexts/CartContext";
 import NotificationPanel from "@/components/NotificationPanel";
 import GlobalSearch from "@/components/GlobalSearch";
 
@@ -11,6 +12,7 @@ export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
   const { unreadCount, unreadMessageCount, receivedInquiries, isVerified } = useSocial();
+  const { itemCount } = useCart();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -43,6 +45,9 @@ export default function Nav() {
     { href: "/calendar", label: "Calendar", icon: CalendarDays },
     { href: "/critique", label: "Critique", icon: MessageSquare },
     { href: "/mentorship", label: "Mentorship", icon: GraduationCap },
+    { href: "/collab", label: "Collab", icon: UsersRound },
+    { href: "/trending", label: "Trending", icon: TrendingUp },
+    { href: "/assistant", label: "AI Assistant", icon: Sparkles },
     { href: "/map", label: "Map", icon: MapPin },
   ];
 
@@ -68,6 +73,7 @@ export default function Nav() {
           ? []
           : [{ href: "/apply-verified", icon: Shield, label: "Apply for Verified" }]),
         { href: "/analytics",      icon: BarChart2, label: "Analytics" },
+        { href: "/settings",       icon: Settings,  label: "Settings" },
       ]
     : [];
 
@@ -111,6 +117,20 @@ export default function Nav() {
             >
               <Search size={15} />
             </button>
+
+            {/* Cart */}
+            <Link
+              href="/cart"
+              className="relative flex h-8 w-8 items-center justify-center rounded-full border border-stone-700 text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors"
+              title="Cart"
+            >
+              <ShoppingCart size={15} />
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-stone-950">
+                  {itemCount > 9 ? "9+" : itemCount}
+                </span>
+              )}
+            </Link>
 
             {/* Saved */}
             <Link

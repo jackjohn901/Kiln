@@ -1,0 +1,148 @@
+import { Link } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck } from "lucide-react";
+import Nav from "@/components/Nav";
+import { useCart } from "@/contexts/CartContext";
+import { formatPrice } from "@/data/listings";
+
+export default function Cart() {
+  const { items, itemCount, subtotal, removeItem, updateQty, clearCart } = useCart();
+
+  const shipping = subtotal > 500 ? 0 : subtotal > 0 ? 18 : 0;
+  const total = subtotal + shipping;
+
+  return (
+    <div className="min-h-screen bg-[#12100e]">
+      <Nav />
+      <div className="mx-auto max-w-2xl px-4 pb-32 pt-6">
+
+        <div className="mb-6 flex items-center gap-3">
+          <Link href="/shop" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
+            <ChevronLeft size={16} />
+          </Link>
+          <div className="flex items-center gap-2 flex-1">
+            <h1 className="font-serif text-2xl text-amber-100">Cart</h1>
+            {itemCount > 0 && (
+              <span className="rounded-full bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 text-xs font-bold text-amber-400">
+                {itemCount} {itemCount === 1 ? "item" : "items"}
+              </span>
+            )}
+          </div>
+          {itemCount > 0 && (
+            <button onClick={clearCart} className="text-xs text-stone-600 hover:text-red-400 transition-colors">
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {items.length === 0 ? (
+          <div className="py-24 text-center">
+            <ShoppingBag size={40} className="mx-auto mb-4 text-stone-700" />
+            <p className="text-stone-500 mb-1">Your cart is empty</p>
+            <p className="text-sm text-stone-700 mb-6">Discover original craft pieces in the shop</p>
+            <Link href="/shop">
+              <button className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors">
+                Browse shop
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <AnimatePresence>
+              {items.map(({ listing, quantity }) => {
+                const imageUrl = listing.imageUrl ?? `https://picsum.photos/seed/${listing.id}/200/200`;
+                const price = typeof listing.price === "number" ? listing.price : 0;
+                return (
+                  <motion.div
+                    key={listing.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="flex gap-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4"
+                  >
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-stone-800">
+                      <img src={imageUrl} alt={listing.title} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-amber-100 leading-snug line-clamp-2">{listing.title}</p>
+                      <p className="text-xs text-stone-500 mt-0.5">{listing.artistId}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-sm font-bold text-amber-400">{formatPrice(listing.price)}</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => updateQty(listing.id, quantity - 1)}
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-stone-400 hover:border-white/20 transition-colors"
+                          >
+                            <Minus size={10} />
+                          </button>
+                          <span className="w-5 text-center text-sm font-medium text-stone-200">{quantity}</span>
+                          <button
+                            onClick={() => updateQty(listing.id, quantity + 1)}
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-stone-400 hover:border-white/20 transition-colors"
+                          >
+                            <Plus size={10} />
+                          </button>
+                          <button
+                            onClick={() => removeItem(listing.id)}
+                            className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-stone-600 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+
+            {/* Order summary */}
+            <div className="mt-2 rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Order summary</p>
+              <div className="flex justify-between text-sm text-stone-400">
+                <span>Subtotal ({itemCount} {itemCount === 1 ? "item" : "items"})</span>
+                <span>${subtotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm text-stone-400">
+                <span className="flex items-center gap-1">
+                  <Truck size={12} /> Shipping
+                </span>
+                <span className={shipping === 0 ? "text-emerald-400" : ""}>
+                  {shipping === 0 ? (subtotal > 0 ? "Free" : "—") : `$${shipping}`}
+                </span>
+              </div>
+              {subtotal > 0 && subtotal <= 500 && (
+                <p className="text-xs text-stone-600">
+                  Add ${(500 - subtotal).toLocaleString()} more for free shipping
+                </p>
+              )}
+              <div className="border-t border-white/8 pt-3 flex justify-between text-base font-bold text-amber-100">
+                <span>Total</span>
+                <span>${total.toLocaleString()}</span>
+              </div>
+
+              <Link href="/cart/checkout">
+                <button className="mt-1 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors">
+                  Proceed to checkout <ArrowRight size={14} />
+                </button>
+              </Link>
+              <Link href="/shop">
+                <button className="w-full text-center text-xs text-stone-500 hover:text-stone-300 transition-colors py-1">
+                  Continue shopping
+                </button>
+              </Link>
+            </div>
+
+            {/* Trust badges */}
+            <div className="flex items-center justify-center gap-6 text-xs text-stone-700 py-2">
+              <span>🔒 Secure checkout</span>
+              <span>🎨 Artist-direct</span>
+              <span>✓ Satisfaction guarantee</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

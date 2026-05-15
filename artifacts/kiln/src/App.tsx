@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProfileProvider } from "@/contexts/ProfileContext";
 import { SocialProvider } from "@/contexts/SocialContext";
+import { CartProvider } from "@/contexts/CartContext";
+import MobileNav from "@/components/MobileNav";
 import NotFound from "@/pages/not-found";
 import Feed from "@/pages/Feed";
 import Artists from "@/pages/Artists";
@@ -49,6 +51,11 @@ import PressKit from "@/pages/PressKit";
 import Materials from "@/pages/Materials";
 import SeriesJournal from "@/pages/SeriesJournal";
 import SeriesDetail from "@/pages/SeriesDetail";
+import Settings from "@/pages/Settings";
+import Cart from "@/pages/Cart";
+import CollabBoard from "@/pages/CollabBoard";
+import Trending from "@/pages/Trending";
+import CraftAssistant from "@/pages/CraftAssistant";
 
 const queryClient = new QueryClient();
 
@@ -102,6 +109,11 @@ function Router() {
       <Route path="/materials" component={Materials} />
       <Route path="/series" component={SeriesJournal} />
       <Route path="/series/:id" component={SeriesDetail} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/cart" component={Cart} />
+      <Route path="/collab" component={CollabBoard} />
+      <Route path="/trending" component={Trending} />
+      <Route path="/assistant" component={CraftAssistant} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -113,10 +125,13 @@ function App() {
       <TooltipProvider>
         <ProfileProvider>
           <SocialProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
-            </WouterRouter>
-            <Toaster />
+            <CartProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Router />
+                <MobileNav />
+              </WouterRouter>
+              <Toaster />
+            </CartProvider>
           </SocialProvider>
         </ProfileProvider>
       </TooltipProvider>
