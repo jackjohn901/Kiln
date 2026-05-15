@@ -40,6 +40,15 @@ import OnboardingQuiz from "@/pages/OnboardingQuiz";
 import OpportunityBoard from "@/pages/OpportunityBoard";
 import Guilds from "@/pages/Guilds";
 import GuildDetail from "@/pages/GuildDetail";
+import NotificationsPage from "@/pages/NotificationsPage";
+import CraftCalendar from "@/pages/CraftCalendar";
+import CritiqueFeed from "@/pages/CritiqueFeed";
+import Mentorship from "@/pages/Mentorship";
+import PatronTiers from "@/pages/PatronTiers";
+import PressKit from "@/pages/PressKit";
+import Materials from "@/pages/Materials";
+import SeriesJournal from "@/pages/SeriesJournal";
+import SeriesDetail from "@/pages/SeriesDetail";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +93,15 @@ function Router() {
       <Route path="/opportunities" component={OpportunityBoard} />
       <Route path="/guilds" component={Guilds} />
       <Route path="/guilds/:id" component={GuildDetail} />
+      <Route path="/notifications-all" component={NotificationsPage} />
+      <Route path="/calendar" component={CraftCalendar} />
+      <Route path="/critique" component={CritiqueFeed} />
+      <Route path="/mentorship" component={Mentorship} />
+      <Route path="/artists/:artistId/patron" component={PatronTiers} />
+      <Route path="/artists/:artistId/press-kit" component={PressKit} />
+      <Route path="/materials" component={Materials} />
+      <Route path="/series" component={SeriesJournal} />
+      <Route path="/series/:id" component={SeriesDetail} />
       <Route component={NotFound} />
     </Switch>
   );

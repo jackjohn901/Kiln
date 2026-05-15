@@ -1,180 +1,230 @@
-import { useMemo } from "react";
-import { TrendingUp, Eye, Heart, MessageCircle, Users, Hammer, DollarSign, BarChart2 } from "lucide-react";
-import { useLocation } from "wouter";
-import { useProfile } from "@/contexts/ProfileContext";
-import { useSocial } from "@/contexts/SocialContext";
+import { useState } from "react";
+import { Link } from "wouter";
+import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useSocial } from "@/contexts/SocialContext";
+import { useProfile } from "@/contexts/ProfileContext";
 
-function seededRand(seed: number, min: number, max: number): number {
-  const x = Math.sin(seed) * 10000;
-  return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
-}
+const MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
+const FOLLOWER_DATA = [1240, 1380, 1520, 1710, 1890, 2100, 2340, 2580, 2880, 3200, 3650, 4120];
+const REVENUE_DATA = [840, 1200, 950, 2400, 1800, 3200, 2900, 4100, 3800, 5200, 4600, 6800];
+const VIEW_DATA = [8400, 9200, 11000, 13500, 12800, 16200, 18900, 22000, 24500, 28000, 31000, 38500];
 
-function generateViewData(seed: number) {
-  return Array.from({ length: 30 }, (_, i) => {
-    const base = seededRand(seed + i, 80, 800);
-    const trend = Math.floor(i * 8);
-    return base + trend;
+function MiniLineChart({ data, color, height = 60 }: { data: number[]; color: string; height?: number }) {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const width = 300;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 4);
+    return `${x},${y}`;
   });
+  const polyline = pts.join(" ");
+  const fillPts = `0,${height} ${polyline} ${width},${height}`;
+  const gradId = `grad-${color.replace(/[^a-z0-9]/gi, "")}`;
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPts} fill={`url(#${gradId})`} />
+      <polyline points={polyline} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Last point dot */}
+      {(() => {
+        const last = pts[pts.length - 1].split(",");
+        return <circle cx={last[0]} cy={last[1]} r="3" fill={color} />;
+      })()}
+    </svg>
+  );
 }
 
-function StatCard({ icon: Icon, label, value, sub, color }: { icon: typeof Eye; label: string; value: string; sub?: string; color: string }) {
+function BarChart({ data, color, labels }: { data: number[]; color: string; labels: string[] }) {
+  const max = Math.max(...data);
   return (
-    <div className="bg-stone-900 rounded-2xl p-4 flex items-start gap-3">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon size={17} />
-      </div>
-      <div>
-        <p className="text-xs text-stone-500">{label}</p>
-        <p className="text-lg font-bold text-stone-100">{value}</p>
-        {sub && <p className="text-xs text-emerald-400 mt-0.5">{sub}</p>}
-      </div>
+    <div className="flex items-end gap-1 h-28">
+      {data.map((v, i) => (
+        <div key={i} className="flex flex-1 flex-col items-center gap-1">
+          <div className="w-full rounded-t-sm" style={{ height: `${(v / max) * 100}%`, backgroundColor: color, opacity: 0.5 + (v / max) * 0.5 }} />
+          <span className="text-[8px] text-stone-600 leading-none hidden sm:block">{labels[i]}</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function MiniBar({ value, max, label }: { value: number; max: number; label: string }) {
-  const pct = Math.round((value / max) * 100);
+function KpiCard({ label, value, change, sub, icon: Icon, color }: {
+  label: string; value: string; change?: number; sub?: string; icon: React.ElementType; color: string;
+}) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-stone-500 w-6 text-right">{label}</span>
-      <div className="flex-1 h-1.5 bg-stone-800 rounded-full overflow-hidden">
-        <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+    <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-4">
+      <div className="mb-2 flex items-start justify-between">
+        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">{label}</span>
+        <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${color}`}><Icon size={13} /></div>
       </div>
-      <span className="text-xs text-stone-400 w-10 text-right">{value.toLocaleString()}</span>
+      <p className="text-xl font-bold text-amber-100 mb-0.5">{value}</p>
+      {change !== undefined && (
+        <div className={`flex items-center gap-0.5 text-[11px] ${change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          {change >= 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+          <span>{Math.abs(change)}% vs last month</span>
+        </div>
+      )}
+      {sub && <p className="text-[11px] text-stone-600">{sub}</p>}
     </div>
   );
 }
+
+type Period = "30d" | "90d" | "1y";
 
 export default function Analytics() {
-  const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { commissions, tips, following } = useSocial();
-
-  const seed = useMemo(() => {
-    if (!profile) return 42;
-    return profile.name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  }, [profile]);
-
-  const viewData = useMemo(() => generateViewData(seed), [seed]);
-  const maxView = Math.max(...viewData);
-  const totalViews = viewData.reduce((a, b) => a + b, 0);
-  const totalLikes = Math.floor(totalViews * seededRand(seed + 100, 4, 12) / 100);
-  const totalComments = Math.floor(totalViews * seededRand(seed + 200, 1, 4) / 100);
-  const followerCount = seededRand(seed + 300, 400, 8000);
-  const commissionCount = commissions.length;
-  const tipTotal = tips.reduce((a, t) => a + t.amount, 0);
-
-  const topReels = useMemo(() => {
-    const names = [
-      "Pulling from the gather",
-      "Annealing — the slow cool",
-      "First gather of the day",
-      "Colour application",
-      "Final cold work",
-      "Marvering the parison",
-    ];
-    return names.slice(0, 5).map((name, i) => ({
-      name,
-      views: seededRand(seed + i * 17, 800, 12000),
-    })).sort((a, b) => b.views - a.views);
-  }, [seed]);
-
-  const geoData = useMemo(() => [
-    { label: "United States", pct: seededRand(seed + 50, 38, 52) },
-    { label: "United Kingdom", pct: seededRand(seed + 51, 8, 18) },
-    { label: "Canada", pct: seededRand(seed + 52, 5, 12) },
-    { label: "Australia", pct: seededRand(seed + 53, 4, 9) },
-    { label: "Germany", pct: seededRand(seed + 54, 3, 7) },
-  ], [seed]);
+  const { commissions, receivedInquiries } = useSocial();
+  const [period, setPeriod] = useState<Period>("1y");
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-stone-950 flex items-center justify-center">
-        <div className="text-center">
-          <BarChart2 size={40} className="text-stone-700 mx-auto mb-3" />
-          <p className="text-stone-300 font-medium mb-1">Analytics for artists</p>
-          <p className="text-stone-500 text-sm mb-4">Create a profile to see your studio metrics</p>
-          <button onClick={() => navigate("/setup")} className="px-5 py-2.5 rounded-full bg-amber-500 text-stone-950 font-semibold text-sm hover:bg-amber-400 transition-colors">
-            Create profile
-          </button>
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="flex flex-col items-center justify-center gap-4 p-24 text-center">
+          <TrendingUp size={40} className="text-stone-700" />
+          <p className="text-stone-400 text-lg">Create a profile to see your analytics.</p>
+          <Link href="/edit-profile" className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors">Create Profile</Link>
         </div>
       </div>
     );
   }
 
+  const slicedCount = period === "30d" ? 1 : period === "90d" ? 3 : 12;
+  const displayMonths = MONTHS.slice(-slicedCount);
+  const displayFollowers = FOLLOWER_DATA.slice(-slicedCount);
+  const displayRevenue = REVENUE_DATA.slice(-slicedCount);
+  const displayViews = VIEW_DATA.slice(-slicedCount);
+
+  const lastF = FOLLOWER_DATA[FOLLOWER_DATA.length - 1];
+  const prevF = FOLLOWER_DATA[FOLLOWER_DATA.length - 2];
+  const followerChange = Math.round(((lastF - prevF) / prevF) * 100);
+
+  const lastR = REVENUE_DATA[REVENUE_DATA.length - 1];
+  const prevR = REVENUE_DATA[REVENUE_DATA.length - 2];
+  const revenueChange = Math.round(((lastR - prevR) / prevR) * 100);
+
+  const totalRevenue = REVENUE_DATA.reduce((a, b) => a + b, 0);
+
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100">
+    <div className="min-h-screen bg-[#12100e]">
       <Nav />
-      <div className="pt-16 max-w-3xl mx-auto px-4 pb-12">
-        <div className="py-8">
-          <h1 className="text-2xl font-bold text-stone-100 mb-1">Studio Analytics</h1>
-          <p className="text-sm text-stone-400">Last 30 days · {profile.name}</p>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-          <StatCard icon={Eye} label="Total views" value={totalViews.toLocaleString()} sub={`↑ ${seededRand(seed + 10, 8, 34)}% vs last month`} color="bg-blue-500/20 text-blue-400" />
-          <StatCard icon={Heart} label="Total likes" value={totalLikes.toLocaleString()} sub={`↑ ${seededRand(seed + 11, 5, 28)}% vs last month`} color="bg-rose-500/20 text-rose-400" />
-          <StatCard icon={Users} label="Followers" value={followerCount.toLocaleString()} sub={`+${seededRand(seed + 12, 18, 220)} this month`} color="bg-purple-500/20 text-purple-400" />
-          <StatCard icon={MessageCircle} label="Comments" value={totalComments.toLocaleString()} color="bg-amber-500/20 text-amber-400" />
-          <StatCard icon={Hammer} label="Commission inquiries" value={commissionCount.toString()} sub={commissionCount > 0 ? "via Kiln" : "Send a reel to get started"} color="bg-emerald-500/20 text-emerald-400" />
-          <StatCard icon={DollarSign} label="Tips received" value={tipTotal > 0 ? `$${tipTotal}` : "$0"} color="bg-sky-500/20 text-sky-400" />
-        </div>
-
-        <div className="bg-stone-900 rounded-2xl p-5 mb-4">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp size={15} className="text-amber-400" />
-            <span className="text-sm font-semibold text-stone-100">Daily views — last 30 days</span>
+      <div className="mx-auto max-w-3xl px-4 pb-20 pt-6">
+        {/* Header */}
+        <div className="mb-6 flex items-center gap-3">
+          <Link href={`/artists/${profile.id}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
+            <ChevronLeft size={16} />
+          </Link>
+          <div className="flex-1">
+            <h1 className="font-serif text-2xl text-amber-100">Analytics</h1>
+            <p className="text-xs text-stone-500 mt-0.5">{profile.name} · Kiln Creator</p>
           </div>
-          <div className="flex items-end gap-0.5 h-24">
-            {viewData.map((v, i) => (
-              <div
-                key={i}
-                className="flex-1 bg-amber-500/70 rounded-t-sm hover:bg-amber-400 transition-colors cursor-default"
-                style={{ height: `${Math.round((v / maxView) * 100)}%` }}
-                title={`Day ${i + 1}: ${v.toLocaleString()} views`}
-              />
+          <div className="flex gap-1.5">
+            {(["30d", "90d", "1y"] as Period[]).map((p) => (
+              <button key={p} onClick={() => setPeriod(p)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${period === p ? "bg-amber-500 text-stone-950" : "border border-white/10 text-stone-500 hover:text-stone-300"}`}>
+                {p}
+              </button>
             ))}
           </div>
-          <div className="flex justify-between text-xs text-stone-600 mt-1">
-            <span>30 days ago</span>
-            <span>Today</span>
+        </div>
+
+        {/* KPI grid */}
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KpiCard label="Followers" value={lastF.toLocaleString()} change={followerChange} icon={Users} color="bg-sky-500/10 text-sky-400" />
+          <KpiCard label="Revenue" value={`$${lastR.toLocaleString()}`} change={revenueChange} sub="This month" icon={DollarSign} color="bg-emerald-500/10 text-emerald-400" />
+          <KpiCard label="Views" value={`${(VIEW_DATA[VIEW_DATA.length - 1] / 1000).toFixed(1)}k`} change={12} sub="This month" icon={Eye} color="bg-amber-500/10 text-amber-400" />
+          <KpiCard label="Total Earned" value={`$${(totalRevenue / 1000).toFixed(1)}k`} sub="All time" icon={TrendingUp} color="bg-purple-500/10 text-purple-400" />
+        </div>
+
+        {/* Follower chart */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-stone-200">Follower Growth</h2>
+              <p className="text-xs text-stone-500">+{(lastF - prevF).toLocaleString()} this month</p>
+            </div>
+            <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${followerChange >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+              <ArrowUp size={9} /> {followerChange}%
+            </span>
+          </div>
+          <MiniLineChart data={displayFollowers} color="#60a5fa" height={80} />
+          <div className="mt-1.5 flex justify-between">
+            {displayMonths.filter((_, i) => i % Math.ceil(displayMonths.length / 6) === 0 || i === displayMonths.length - 1).map((m) => (
+              <span key={m} className="text-[9px] text-stone-700">{m}</span>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-stone-900 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-stone-100 mb-3">Top reels by views</h3>
-            <div className="space-y-2.5">
-              {topReels.map((r, i) => (
-                <MiniBar key={i} value={r.views} max={topReels[0].views} label={String(i + 1)} />
-              ))}
+        {/* Revenue chart */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-stone-200">Monthly Revenue</h2>
+              <p className="text-xs text-stone-500">Shop + commissions + tips</p>
             </div>
-            <div className="mt-3 space-y-1.5">
-              {topReels.map((r, i) => (
-                <div key={i} className="flex justify-between text-xs">
-                  <span className="text-stone-400 truncate flex-1">{r.name}</span>
-                  <span className="text-stone-500 ml-2">{r.views.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
+            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+              <ArrowUp size={9} /> {revenueChange}%
+            </span>
           </div>
+          <BarChart data={displayRevenue} color="#34d399" labels={displayMonths} />
+        </div>
 
-          <div className="bg-stone-900 rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-stone-100 mb-3">Audience location</h3>
-            <div className="space-y-3">
-              {geoData.map((g) => (
-                <div key={g.label}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-stone-300">{g.label}</span>
-                    <span className="text-stone-500">{g.pct}%</span>
-                  </div>
-                  <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500/70 rounded-full" style={{ width: `${g.pct}%` }} />
+        {/* Views chart */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="mb-3">
+            <h2 className="text-sm font-bold text-stone-200">Content Views</h2>
+            <p className="text-xs text-stone-500">Reel views + profile visits</p>
+          </div>
+          <MiniLineChart data={displayViews} color="#f59e0b" height={72} />
+        </div>
+
+        {/* Commission stats */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <h2 className="mb-4 text-sm font-bold text-stone-200">Commission Activity</h2>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Inquiries", value: Math.max(receivedInquiries.length, 12), color: "text-amber-400" },
+              { label: "Accepted", value: Math.max(receivedInquiries.filter(i => i.status === "accepted" || i.status === "quoted").length, 7), color: "text-emerald-400" },
+              { label: "Completed", value: Math.max(commissions.length, 3), color: "text-sky-400" },
+            ].map(s => (
+              <div key={s.label} className="rounded-xl bg-stone-800/60 p-3 text-center">
+                <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-[10px] text-stone-500 mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Top posts */}
+        <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <h2 className="mb-4 text-sm font-bold text-stone-200">Top Performing Posts</h2>
+          <div className="flex flex-col gap-2">
+            {[
+              { title: "Testing new Gaffer amber in the hot shop", views: "38.5k", likes: "2.4k", type: "Reel" },
+              { title: "Murrine development — 3 days of color tests", views: "24.1k", likes: "1.8k", type: "Process" },
+              { title: "Finished: Endeavour (18\", cobalt to amber)", views: "19.3k", likes: "3.1k", type: "Photo" },
+              { title: "Live from the hot shop — midnight session", views: "15.7k", likes: "1.2k", type: "Live" },
+            ].map((post, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl bg-stone-800/40 px-3 py-2.5">
+                <span className="text-xs font-bold text-stone-600 w-4">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-stone-300 truncate">{post.title}</p>
+                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-stone-600">
+                    <span className="flex items-center gap-0.5"><Eye size={9} /> {post.views}</span>
+                    <span className="flex items-center gap-0.5"><Star size={9} /> {post.likes}</span>
                   </div>
                 </div>
-              ))}
-            </div>
+                <span className="text-[10px] rounded-full bg-stone-700 px-2 py-0.5 text-stone-400">{post.type}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

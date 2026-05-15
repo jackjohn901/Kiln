@@ -6,8 +6,9 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer,
 } from "lucide-react";
+import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import Nav from "@/components/Nav";
 import { getArtistById, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -647,7 +648,7 @@ export default function ArtistProfile() {
               )}
 
               {!isOwn && (
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={() => setShowCommission(true)}
                     className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-5 py-2 text-sm text-amber-300 hover:bg-amber-500/20 transition-colors"
@@ -660,6 +661,20 @@ export default function ArtistProfile() {
                   >
                     <HeartIcon size={14} fill="currentColor" /> Support
                   </button>
+                  <Link href={`/artists/${artist.id}/patron`}
+                    className="flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-5 py-2 text-sm text-purple-400 hover:bg-purple-500/20 transition-colors"
+                  >
+                    <Crown size={14} /> Become a Patron
+                  </Link>
+                </div>
+              )}
+              {isOwn && (
+                <div className="flex gap-3 flex-wrap">
+                  <Link href={`/artists/${artist.id}/press-kit`}
+                    className="flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-stone-400 hover:text-stone-200 hover:border-white/20 transition-colors"
+                  >
+                    <Printer size={14} /> Press Kit
+                  </Link>
                 </div>
               )}
 
@@ -679,6 +694,35 @@ export default function ArtistProfile() {
                   </div>
                 </div>
               )}
+
+              {/* Achievements */}
+              {(() => {
+                const unlocked = SEED_UNLOCKED;
+                const earned = ALL_ACHIEVEMENTS.filter(a => unlocked.includes(a.id));
+                const totalXp = earned.reduce((s, a) => s + a.xp, 0);
+                const { level, title: lvTitle } = getXpLevel(totalXp);
+                if (earned.length === 0) return null;
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-serif text-lg text-amber-100">Achievements</h3>
+                      <div className="flex items-center gap-2 text-xs text-stone-500">
+                        <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-amber-400 font-bold">Lv.{level} {lvTitle}</span>
+                        <span>{totalXp.toLocaleString()} XP</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {earned.map(a => (
+                        <div key={a.id} title={`${a.title}: ${a.description}`}
+                          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs cursor-default ${RARITY_COLORS[a.rarity]}`}>
+                          <span>{a.emoji}</span>
+                          <span className="font-medium">{a.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {artist.collections.length > 0 && (
                 <div>

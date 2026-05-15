@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -38,6 +38,11 @@ export default function Nav() {
     { href: "/challenges", label: "Challenges", icon: Trophy },
     { href: "/guilds", label: "Guilds", icon: Users },
     { href: "/opportunities", label: "Opportunities", icon: Briefcase },
+    { href: "/series", label: "Journals", icon: BookOpen },
+    { href: "/materials", label: "Materials", icon: FlaskConical },
+    { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    { href: "/critique", label: "Critique", icon: MessageSquare },
+    { href: "/mentorship", label: "Mentorship", icon: GraduationCap },
     { href: "/map", label: "Map", icon: MapPin },
   ];
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Clock, DollarSign, ChevronLeft, Star, Search } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Clock, DollarSign, ChevronLeft, Star, Search, CheckCircle, ChevronDown } from "lucide-react";
 import Nav from "@/components/Nav";
 import { OPPORTUNITIES, OPPORTUNITY_TYPES, daysUntilDeadline, type OpportunityType } from "@/data/opportunities";
 
@@ -38,6 +38,7 @@ function formatDeadline(deadline: string): string {
 }
 
 const SAVED_KEY = "kiln_saved_opps";
+const APPLIED_KEY = "kiln_opps_applied";
 
 function getSaved(): string[] {
   try { return JSON.parse(localStorage.getItem(SAVED_KEY) ?? "[]"); } catch { return []; }
@@ -46,11 +47,30 @@ function setSaved(ids: string[]) {
   try { localStorage.setItem(SAVED_KEY, JSON.stringify(ids)); } catch {}
 }
 
+type ApplicationStatus = "not-applied" | "applied" | "submitted" | "accepted" | "declined";
+
+function getApplications(): Record<string, ApplicationStatus> {
+  try { return JSON.parse(localStorage.getItem(APPLIED_KEY) ?? "{}"); } catch { return {}; }
+}
+function saveApplications(apps: Record<string, ApplicationStatus>) {
+  try { localStorage.setItem(APPLIED_KEY, JSON.stringify(apps)); } catch {}
+}
+
 export default function OpportunityBoard() {
   const [filter, setFilter] = useState<OpportunityType | "all">("all");
   const [query, setQuery] = useState("");
   const [saved, setSavedState] = useState<string[]>(getSaved);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [applications, setApplications] = useState<Record<string, ApplicationStatus>>(getApplications);
+  const [showApplied, setShowApplied] = useState(false);
+
+  function setAppStatus(id: string, status: ApplicationStatus) {
+    setApplications(prev => {
+      const next = { ...prev, [id]: status };
+      saveApplications(next);
+      return next;
+    });
+  }
 
   function toggleSave(id: string) {
     setSavedState((prev) => {
@@ -129,6 +149,43 @@ export default function OpportunityBoard() {
           </div>
         )}
 
+        {/* Application tracker toggle */}
+        {Object.keys(applications).length > 0 && (
+          <div className="mb-5">
+            <button
+              onClick={() => setShowApplied(s => !s)}
+              className="flex items-center gap-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              <CheckCircle size={12} /> {Object.keys(applications).length} application{Object.keys(applications).length !== 1 ? "s" : ""} tracked
+              <span className="text-stone-600">{showApplied ? "▲" : "▼"}</span>
+            </button>
+            {showApplied && (
+              <div className="mt-3 flex flex-col gap-2">
+                {OPPORTUNITIES.filter(o => applications[o.id]).map(opp => (
+                  <div key={opp.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-stone-300 truncate">{opp.title}</p>
+                      <p className="text-[10px] text-stone-600">{opp.organization}</p>
+                    </div>
+                    <select
+                      value={applications[opp.id]}
+                      onChange={e => setAppStatus(opp.id, e.target.value as ApplicationStatus)}
+                      onClick={e => e.stopPropagation()}
+                      className="rounded-lg border border-white/10 bg-stone-800 px-2 py-1 text-[10px] font-semibold text-stone-300 focus:outline-none"
+                    >
+                      <option value="applied">Applied</option>
+                      <option value="submitted">Submitted</option>
+                      <option value="accepted">Accepted ✓</option>
+                      <option value="declined">Declined</option>
+                      <option value="not-applied">Remove</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Featured */}
         {featured.length > 0 && (
           <div className="mb-8">
@@ -138,7 +195,7 @@ export default function OpportunityBoard() {
             </div>
             <div className="flex flex-col gap-3">
               {featured.map((opp) => (
-                <OppCard key={opp.id} opp={opp} saved={saved.includes(opp.id)} onSave={() => toggleSave(opp.id)} expanded={expanded === opp.id} onExpand={() => setExpanded(expanded === opp.id ? null : opp.id)} />
+                <OppCard key={opp.id} opp={opp} saved={saved.includes(opp.id)} onSave={() => toggleSave(opp.id)} expanded={expanded === opp.id} onExpand={() => setExpanded(expanded === opp.id ? null : opp.id)} appStatus={applications[opp.id] ?? "not-applied"} onSetStatus={s => setAppStatus(opp.id, s)} />
               ))}
             </div>
           </div>
@@ -148,7 +205,7 @@ export default function OpportunityBoard() {
         {rest.length > 0 && (
           <div className="flex flex-col gap-3">
             {rest.map((opp) => (
-              <OppCard key={opp.id} opp={opp} saved={saved.includes(opp.id)} onSave={() => toggleSave(opp.id)} expanded={expanded === opp.id} onExpand={() => setExpanded(expanded === opp.id ? null : opp.id)} />
+              <OppCard key={opp.id} opp={opp} saved={saved.includes(opp.id)} onSave={() => toggleSave(opp.id)} expanded={expanded === opp.id} onExpand={() => setExpanded(expanded === opp.id ? null : opp.id)} appStatus={applications[opp.id] ?? "not-applied"} onSetStatus={s => setAppStatus(opp.id, s)} />
             ))}
           </div>
         )}
@@ -183,12 +240,22 @@ export default function OpportunityBoard() {
   );
 }
 
-function OppCard({ opp, saved, onSave, expanded, onExpand }: {
+const APP_STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string }> = {
+  "not-applied": { label: "Mark Applied", color: "text-stone-500 hover:text-amber-400" },
+  applied: { label: "Applied ✓", color: "text-amber-400" },
+  submitted: { label: "Submitted", color: "text-sky-400" },
+  accepted: { label: "Accepted 🎉", color: "text-emerald-400" },
+  declined: { label: "Declined", color: "text-stone-500" },
+};
+
+function OppCard({ opp, saved, onSave, expanded, onExpand, appStatus, onSetStatus }: {
   opp: typeof OPPORTUNITIES[0];
   saved: boolean;
   onSave: () => void;
   expanded: boolean;
   onExpand: () => void;
+  appStatus: ApplicationStatus;
+  onSetStatus: (s: ApplicationStatus) => void;
 }) {
   const days = daysUntilDeadline(opp.deadline);
 
@@ -254,14 +321,45 @@ function OppCard({ opp, saved, onSave, expanded, onExpand }: {
           >
             <div className="border-t border-white/8 px-5 py-4">
               <p className="text-sm text-stone-300 leading-relaxed mb-4">{opp.description}</p>
-              <a
-                href={opp.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
-              >
-                Apply / Learn more <ExternalLink size={13} />
-              </a>
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href={opp.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+                >
+                  Apply / Learn more <ExternalLink size={13} />
+                </a>
+                {/* Application status tracker */}
+                <div className="flex items-center gap-2">
+                  {appStatus === "not-applied" ? (
+                    <button
+                      onClick={e => { e.stopPropagation(); onSetStatus("applied"); }}
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-stone-500 hover:border-amber-500/30 hover:text-amber-400 transition-colors"
+                    >
+                      <CheckCircle size={11} /> Track application
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-semibold ${APP_STATUS_CONFIG[appStatus].color}`}>
+                        {APP_STATUS_CONFIG[appStatus].label}
+                      </span>
+                      <select
+                        value={appStatus}
+                        onChange={e => { e.stopPropagation(); onSetStatus(e.target.value as ApplicationStatus); }}
+                        onClick={e => e.stopPropagation()}
+                        className="rounded-lg border border-white/10 bg-stone-800 px-2 py-1 text-[10px] text-stone-400 focus:outline-none"
+                      >
+                        <option value="applied">Applied</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="declined">Declined</option>
+                        <option value="not-applied">Remove</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
