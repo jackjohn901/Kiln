@@ -305,6 +305,7 @@ export default function Create() {
             {showMusicPicker && (
               <MusicPicker
                 selectedTrackId={selectedTrack?.id ?? null}
+                selectedTrack={selectedTrack}
                 onSelect={(t) => { setSelectedTrack(t); if (t) setShowMusicPicker(false); }}
               />
             )}
