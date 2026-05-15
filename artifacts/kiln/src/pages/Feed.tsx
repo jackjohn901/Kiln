@@ -14,7 +14,10 @@ import NotificationPanel from "@/components/NotificationPanel";
 import Stories from "@/components/Stories";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
 import { ALL_REELS, TECHNIQUE_COLORS, type Reel } from "@/data/reels";
+
+const PREFS_KEY = "kiln_prefs_v1";
 
 function fmt(n: number) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
 
@@ -324,6 +327,13 @@ export default function Feed() {
   const [showNotifications, setShowNotifications] = useState(false);
 
   const { following, unreadCount } = useSocial();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!localStorage.getItem(PREFS_KEY)) {
+      navigate("/quiz");
+    }
+  }, [navigate]);
 
   const baseReels = useMemo(
     () => feedTab === "following" ? ALL_REELS.filter((r) => following.includes(r.artistId)) : ALL_REELS,

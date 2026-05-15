@@ -6,14 +6,14 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio,
+  Users, MessageCircle, Radio, Image, Star,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getArtistById, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { getListingsByArtist, formatPrice } from "@/data/listings";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
+import { useSocial, CommissionStatus, type ShopReview } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
 import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
@@ -137,7 +137,7 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "shop" | "workshops" | "drops" | "bio";
+type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio";
 
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
@@ -408,6 +408,7 @@ export default function ArtistProfile() {
             [
               { key: "posts", icon: Grid3x3, label: "Posts" },
               { key: "process", icon: Video, label: "Process" },
+              { key: "portfolio", icon: Image, label: "Portfolio" },
               { key: "shop", icon: ShoppingBag, label: "Shop" },
               ...(workshops.length > 0 ? [{ key: "workshops", icon: Hammer, label: "Workshops" }] : []),
               ...(drops.length > 0 ? [{ key: "drops", icon: Zap, label: "Drops" }] : []),
@@ -473,6 +474,61 @@ export default function ArtistProfile() {
                 </div>
               )}
             </>
+          )}
+
+          {/* Portfolio */}
+          {tab === "portfolio" && (
+            <div>
+              <p className="mb-4 text-sm text-stone-500 leading-relaxed">
+                Selected works — the pieces {artist.name.split(" ")[0]} considers most representative of their practice.
+              </p>
+              {artist.images.length === 0 && artist.videos.length === 0 ? (
+                <div className="py-16 text-center text-stone-600 text-sm">No portfolio pieces yet.</div>
+              ) : (
+                <div className="columns-2 gap-2 sm:columns-3">
+                  {[
+                    ...artist.images.map((img, i) => ({ key: `img-${i}`, src: img.url, caption: img.caption ?? artist.medium, isVideo: false })),
+                    ...artist.videos.slice(0, 6).map((v, i) => ({
+                      key: `vid-${i}`,
+                      src: `https://img.youtube.com/vi/${v.id}/hqdefault.jpg`,
+                      caption: v.title,
+                      isVideo: true,
+                    })),
+                    // Pad with picsum for visual richness
+                    ...Array.from({ length: Math.max(0, 9 - artist.images.length - Math.min(artist.videos.length, 6)) }, (_, i) => ({
+                      key: `gen-${i}`,
+                      src: `https://picsum.photos/seed/${artist.id}-portfolio-${i}/600/${400 + i * 60}`,
+                      caption: artist.medium,
+                      isVideo: false,
+                    })),
+                  ].map((item) => (
+                    <div key={item.key} className="mb-2 break-inside-avoid overflow-hidden rounded-xl border border-white/8 bg-stone-900/60 group relative">
+                      <img
+                        src={item.src}
+                        alt={item.caption}
+                        className="w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist.id}${item.key}/600/400`; }}
+                      />
+                      {item.isVideo && (
+                        <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60">
+                          <Play size={11} fill="white" className="text-white" />
+                        </div>
+                      )}
+                      <div className="px-2.5 py-2">
+                        <p className="text-[11px] text-stone-500 truncate">{item.caption}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Reviews section */}
+              <div className="mt-8 border-t border-white/8 pt-6">
+                <h3 className="mb-4 font-serif text-lg text-amber-100">Collector Reviews</h3>
+                <ReviewSection artistId={artist.id} />
+              </div>
+            </div>
           )}
 
           {/* Shop */}
@@ -687,6 +743,119 @@ export default function ArtistProfile() {
       {selectedDrop && (
         <DropModal drop={selectedDrop} onClose={() => setSelectedDrop(null)} />
       )}
+    </div>
+  );
+}
+
+// ─── Review Section ────────────────────────────────────────────────────────────
+
+const SEED_REVIEWS: Record<string, ShopReview[]> = {};
+
+function ReviewSection({ artistId }: { artistId: string }) {
+  const { getReviews, addReview } = useSocial();
+  const { profile } = useProfile();
+  const contextReviews = getReviews(artistId);
+  const seedRevs = SEED_REVIEWS[artistId] ?? [
+    { id: `seed-r1-${artistId}`, listingId: artistId, fromName: "Margaret T.", fromAvatarUrl: `https://picsum.photos/seed/${artistId}-r1/60/60`, rating: 5, text: "Absolutely stunning work. The piece arrived beautifully packed and exceeded every expectation. I've already commissioned a second piece.", createdAt: "2026-03-18" },
+    { id: `seed-r2-${artistId}`, listingId: artistId, fromName: "James K.", fromAvatarUrl: `https://picsum.photos/seed/${artistId}-r2/60/60`, rating: 5, text: "Working with this artist was a pleasure from start to finish. Clear communication, exquisite craftsmanship, and delivered on time.", createdAt: "2026-01-22" },
+    { id: `seed-r3-${artistId}`, listingId: artistId, fromName: "Priya M.", fromAvatarUrl: `https://picsum.photos/seed/${artistId}-r3/60/60`, rating: 4, text: "The technique is extraordinary — you can see the years of practice in every detail. Highly recommend.", createdAt: "2025-12-05" },
+  ];
+
+  const allReviews = [...contextReviews, ...seedRevs];
+  const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ rating: 5, text: "" });
+  const [submitted, setSubmitted] = useState(false);
+
+  function handleSubmit() {
+    if (!form.text.trim()) return;
+    addReview({
+      listingId: artistId,
+      fromName: profile?.name ?? "Anonymous",
+      fromAvatarUrl: `https://picsum.photos/seed/${profile?.id ?? "anon"}/60/60`,
+      rating: form.rating,
+      text: form.text,
+    });
+    setSubmitted(true);
+    setShowForm(false);
+    setForm({ rating: 5, text: "" });
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className="text-center">
+          <p className="text-3xl font-bold text-amber-100">{avgRating.toFixed(1)}</p>
+          <div className="flex items-center gap-0.5 mt-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} size={12} className={i < Math.round(avgRating) ? "text-amber-400" : "text-stone-700"} fill="currentColor" />
+            ))}
+          </div>
+          <p className="text-xs text-stone-500 mt-1">{allReviews.length} reviews</p>
+        </div>
+        {profile && !submitted && (
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="ml-auto rounded-full border border-amber-500/30 px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition-colors"
+          >
+            {showForm ? "Cancel" : "+ Write a review"}
+          </button>
+        )}
+        {submitted && (
+          <p className="ml-auto text-xs text-emerald-400">Review submitted — thank you!</p>
+        )}
+      </div>
+
+      {/* Write review form */}
+      {showForm && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3 mb-4">
+          <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Your Review</p>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <button key={i} onClick={() => setForm((f) => ({ ...f, rating: i + 1 }))}>
+                <Star size={20} className={i < form.rating ? "text-amber-400" : "text-stone-700"} fill="currentColor" />
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={form.text}
+            onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+            rows={3}
+            placeholder="Describe your experience with this artist's work…"
+            className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none resize-none"
+          />
+          <button
+            disabled={!form.text.trim()}
+            onClick={handleSubmit}
+            className="rounded-xl bg-amber-500 px-5 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Submit Review
+          </button>
+        </div>
+      )}
+
+      {/* Review cards */}
+      {allReviews.map((r, i) => (
+        <div key={i} className="rounded-xl border border-white/8 bg-stone-900/40 p-4">
+          <div className="flex items-start gap-3">
+            <img src={r.fromAvatarUrl} alt={r.fromName} className="h-8 w-8 rounded-full object-cover border border-white/10" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${i}/60/60`; }} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-stone-200">{r.fromName}</span>
+                <span className="text-[11px] text-stone-600">{new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+              </div>
+              <div className="flex items-center gap-0.5 mt-0.5 mb-2">
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <Star key={j} size={10} className={j < r.rating ? "text-amber-400" : "text-stone-700"} fill="currentColor" />
+                ))}
+              </div>
+              <p className="text-sm text-stone-400 leading-relaxed">{r.text}</p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

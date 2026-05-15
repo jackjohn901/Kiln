@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -36,6 +36,8 @@ export default function Nav() {
     { href: "/workshops", label: "Workshops" },
     { href: "/techniques", label: "Techniques" },
     { href: "/challenges", label: "Challenges", icon: Trophy },
+    { href: "/guilds", label: "Guilds", icon: Users },
+    { href: "/opportunities", label: "Opportunities", icon: Briefcase },
     { href: "/map", label: "Map", icon: MapPin },
   ];
 

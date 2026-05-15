@@ -36,6 +36,10 @@ import WorkshopCheckout from "@/pages/WorkshopCheckout";
 import LiveStudio from "@/pages/LiveStudio";
 import CommissionFlow from "@/pages/CommissionFlow";
 import StudioMap from "@/pages/StudioMap";
+import OnboardingQuiz from "@/pages/OnboardingQuiz";
+import OpportunityBoard from "@/pages/OpportunityBoard";
+import Guilds from "@/pages/Guilds";
+import GuildDetail from "@/pages/GuildDetail";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +80,10 @@ function Router() {
       <Route path="/live/:artistId" component={LiveStudio} />
       <Route path="/commission/:artistId" component={CommissionFlow} />
       <Route path="/map" component={StudioMap} />
+      <Route path="/quiz" component={OnboardingQuiz} />
+      <Route path="/opportunities" component={OpportunityBoard} />
+      <Route path="/guilds" component={Guilds} />
+      <Route path="/guilds/:id" component={GuildDetail} />
       <Route component={NotFound} />
     </Switch>
   );

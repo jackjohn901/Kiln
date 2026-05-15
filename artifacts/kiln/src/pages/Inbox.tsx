@@ -23,6 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
   pending: "text-amber-400 bg-amber-500/10 border-amber-500/20",
   accepted: "text-green-400 bg-green-500/10 border-green-500/20",
   declined: "text-red-400 bg-red-500/10 border-red-500/20",
+  quoted: "text-sky-400 bg-sky-500/10 border-sky-500/20",
 };
 
 function timeAgo(iso: string): string {
@@ -38,9 +39,11 @@ function timeAgo(iso: string): string {
 export default function Inbox() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { receivedInquiries, commissions, acceptInquiry, declineInquiry } = useSocial();
+  const { receivedInquiries, commissions, acceptInquiry, declineInquiry, quoteInquiry } = useSocial();
   const [tab, setTab] = useState<"received" | "sent">("received");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [quotingId, setQuotingId] = useState<string | null>(null);
+  const [quoteForm, setQuoteForm] = useState({ price: "", paymentSchedule: "", deliveryDate: "", terms: "" });
 
   if (!profile) {
     return (
@@ -187,9 +190,68 @@ export default function Inbox() {
                         </button>
                       </div>
                     )}
-                    {inquiry.status !== "pending" && (
+                    {inquiry.status === "accepted" && quotingId !== inquiry.id && (
+                      <div className="space-y-2">
+                        <div className={`rounded-xl border px-4 py-3 text-sm font-medium text-center ${STATUS_COLORS[inquiry.status]}`}>
+                          Accepted — send a formal quote to move forward.
+                        </div>
+                        <button
+                          onClick={() => { setQuotingId(inquiry.id); setQuoteForm({ price: "", paymentSchedule: "50% up front, 50% on delivery", deliveryDate: "", terms: "Payment via bank transfer or Venmo. No refunds after work begins." }); }}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 py-2.5 text-sm font-medium text-sky-300 hover:bg-sky-500/20 transition-colors"
+                        >
+                          <DollarSign size={14} /> Send Quote
+                        </button>
+                      </div>
+                    )}
+                    {inquiry.status === "accepted" && quotingId === inquiry.id && (
+                      <div className="space-y-3 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+                        <p className="text-xs font-semibold text-sky-400 uppercase tracking-wide">Formal Quote</p>
+                        <div>
+                          <label className="block text-[11px] text-stone-500 mb-1">Price *</label>
+                          <input value={quoteForm.price} onChange={(e) => setQuoteForm((f) => ({ ...f, price: e.target.value }))} placeholder="e.g. $1,200" className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-sky-500/40 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-stone-500 mb-1">Payment Schedule *</label>
+                          <input value={quoteForm.paymentSchedule} onChange={(e) => setQuoteForm((f) => ({ ...f, paymentSchedule: e.target.value }))} placeholder="50% up front, 50% on delivery" className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-sky-500/40 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-stone-500 mb-1">Expected Delivery Date *</label>
+                          <input type="date" value={quoteForm.deliveryDate} onChange={(e) => setQuoteForm((f) => ({ ...f, deliveryDate: e.target.value }))} className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 focus:border-sky-500/40 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-stone-500 mb-1">Terms & Conditions</label>
+                          <textarea value={quoteForm.terms} onChange={(e) => setQuoteForm((f) => ({ ...f, terms: e.target.value }))} rows={3} placeholder="Cancellation policy, revisions included, etc." className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-sky-500/40 focus:outline-none resize-none" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            disabled={!quoteForm.price || !quoteForm.paymentSchedule || !quoteForm.deliveryDate}
+                            onClick={() => {
+                              quoteInquiry(inquiry.id, { ...quoteForm, sentAt: new Date().toISOString() });
+                              setQuotingId(null);
+                            }}
+                            className="flex-1 rounded-xl bg-sky-600 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Send Quote
+                          </button>
+                          <button onClick={() => setQuotingId(null)} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-stone-400 hover:text-stone-200 transition-colors">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {inquiry.status === "quoted" && inquiry.quote && (
+                      <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 space-y-2">
+                        <p className="text-xs font-semibold text-sky-400 uppercase tracking-wide">Quote Sent</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div><p className="text-stone-500">Price</p><p className="text-stone-200 font-semibold">{inquiry.quote.price}</p></div>
+                          <div><p className="text-stone-500">Delivery</p><p className="text-stone-200">{inquiry.quote.deliveryDate}</p></div>
+                          <div className="col-span-2"><p className="text-stone-500">Payment</p><p className="text-stone-200">{inquiry.quote.paymentSchedule}</p></div>
+                        </div>
+                      </div>
+                    )}
+                    {inquiry.status === "declined" && (
                       <div className={`rounded-xl border px-4 py-3 text-sm font-medium text-center ${STATUS_COLORS[inquiry.status]}`}>
-                        {inquiry.status === "accepted" ? "You accepted this inquiry — reach out to get started." : "You declined this inquiry."}
+                        You declined this inquiry.
                       </div>
                     )}
                   </div>

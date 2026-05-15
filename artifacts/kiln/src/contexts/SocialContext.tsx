@@ -36,7 +36,8 @@ export interface CommissionInquiry {
   budget: string;
   timeline: string;
   dimensions?: string;
-  status: "pending" | "accepted" | "declined";
+  status: "pending" | "accepted" | "declined" | "quoted";
+  quote?: CommissionQuote;
   createdAt: string;
 }
 
@@ -46,6 +47,24 @@ export interface TipRecord {
   toArtistName: string;
   amount: number;
   message?: string;
+  createdAt: string;
+}
+
+export interface CommissionQuote {
+  price: string;
+  paymentSchedule: string;
+  deliveryDate: string;
+  terms: string;
+  sentAt: string;
+}
+
+export interface ShopReview {
+  id: string;
+  listingId: string;
+  fromName: string;
+  fromAvatarUrl: string;
+  rating: number;
+  text: string;
   createdAt: string;
 }
 
@@ -202,6 +221,7 @@ interface SocialState {
   subscriptions: string[];
   threads: MessageThread[];
   verifiedArtists: string[];
+  reviews: ShopReview[];
 }
 
 interface SocialContextType extends SocialState {
@@ -234,6 +254,9 @@ interface SocialContextType extends SocialState {
   getThread: (participantId: string) => MessageThread | undefined;
   unreadMessageCount: number;
   markThreadRead: (threadId: string) => void;
+  quoteInquiry: (id: string, quote: CommissionQuote) => void;
+  addReview: (review: Omit<ShopReview, "id" | "createdAt">) => void;
+  getReviews: (listingId: string) => ShopReview[];
 }
 
 const SocialContext = createContext<SocialContextType>({} as SocialContextType);
@@ -316,6 +339,7 @@ function defaultState(): SocialState {
     subscriptions: [],
     threads: SEED_MESSAGE_THREADS,
     verifiedArtists: VERIFIED_ARTIST_IDS,
+    reviews: [],
   };
 }
 
@@ -333,6 +357,7 @@ function readState(): SocialState {
       receivedInquiries: def.receivedInquiries,
       threads: parsed.threads?.length ? parsed.threads : def.threads,
       verifiedArtists: def.verifiedArtists,
+      reviews: parsed.reviews ?? [],
     };
   } catch {
     return defaultState();
@@ -524,6 +549,25 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const quoteInquiry = useCallback((id: string, quote: CommissionQuote) => {
+    update((s) => ({
+      ...s,
+      receivedInquiries: s.receivedInquiries.map((i) =>
+        i.id === id ? { ...i, status: "quoted" as const, quote } : i
+      ),
+    }));
+  }, []);
+
+  const addReview = useCallback((review: Omit<ShopReview, "id" | "createdAt">) => {
+    const newReview: ShopReview = { ...review, id: genId(), createdAt: new Date().toISOString() };
+    update((s) => ({ ...s, reviews: [newReview, ...s.reviews] }));
+  }, []);
+
+  const getReviews = useCallback(
+    (listingId: string) => state.reviews.filter((r) => r.listingId === listingId),
+    [state.reviews]
+  );
+
   const unreadCount = state.notifications.filter((n) => !n.read).length;
   const unreadMessageCount = state.threads.reduce(
     (sum, t) => sum + t.messages.filter((m) => !m.read && m.senderId !== "__current_user__").length,
@@ -563,6 +607,9 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         getThread,
         unreadMessageCount,
         markThreadRead,
+        quoteInquiry,
+        addReview,
+        getReviews,
       }}
     >
       {children}
