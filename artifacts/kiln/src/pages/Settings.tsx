@@ -68,6 +68,9 @@ export default function Settings() {
       saveSettings(next);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
+      if (key === "display_dark_mode") {
+        document.documentElement.classList.toggle("light", !next.display_dark_mode);
+      }
       return next;
     });
   }

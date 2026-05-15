@@ -177,6 +177,40 @@
   --sidebar-ring: 28 68% 52%;
 }
 
+/* Light mode theme — applied when display_dark_mode is off */
+.light {
+  --background: 35 30% 96%;
+  --foreground: 20 20% 12%;
+  --border: 25 15% 82%;
+  --input: 25 15% 84%;
+  --ring: 28 68% 45%;
+  --card: 35 25% 93%;
+  --card-foreground: 20 20% 12%;
+  --card-border: 25 15% 80%;
+  --popover: 35 28% 95%;
+  --popover-foreground: 20 20% 12%;
+  --popover-border: 25 15% 78%;
+  --primary: 28 68% 45%;
+  --primary-foreground: 35 30% 96%;
+  --secondary: 30 18% 88%;
+  --secondary-foreground: 20 15% 25%;
+  --muted: 30 18% 88%;
+  --muted-foreground: 25 10% 45%;
+  --accent: 28 55% 40%;
+  --accent-foreground: 35 30% 96%;
+  --destructive: 0 60% 42%;
+  --destructive-foreground: 35 30% 96%;
+  --opaque-button-border-intensity: -9;
+  --button-outline: rgba(0,0,0,.1);
+  --elevate-1: rgba(0,0,0,.04);
+  --elevate-2: rgba(0,0,0,.08);
+}
+
+.light body {
+  background-color: hsl(35, 30%, 96%);
+  color: hsl(20, 20%, 12%);
+}
+
 @layer base {
   * {
     @apply border-border;

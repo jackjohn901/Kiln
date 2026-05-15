@@ -60,8 +60,22 @@ import CraftAssistant from "@/pages/CraftAssistant";
 import GrantWriter from "@/pages/GrantWriter";
 import CollectorPortal from "@/pages/CollectorPortal";
 import PostScheduler from "@/pages/PostScheduler";
+import CreatorHome from "@/pages/CreatorHome";
+import Newsletter from "@/pages/Newsletter";
+import InventoryManager from "@/pages/InventoryManager";
 
 const queryClient = new QueryClient();
+
+function applyThemeFromSettings() {
+  try {
+    const raw = localStorage.getItem("kiln_settings_v1");
+    if (raw) {
+      const s = JSON.parse(raw);
+      document.documentElement.classList.toggle("light", s.display_dark_mode === false);
+    }
+  } catch {}
+}
+applyThemeFromSettings();
 
 function Router() {
   return (
@@ -122,6 +136,9 @@ function Router() {
       <Route path="/grants" component={GrantWriter} />
       <Route path="/collector" component={CollectorPortal} />
       <Route path="/scheduler" component={PostScheduler} />
+      <Route path="/creator-home" component={CreatorHome} />
+      <Route path="/newsletter" component={Newsletter} />
+      <Route path="/inventory" component={InventoryManager} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import Nav from "@/components/Nav";
-import { getArtistById, type Artist } from "@/data/artists";
+import { getArtistById, artists, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { getListingsByArtist, formatPrice } from "@/data/listings";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -756,6 +756,63 @@ export default function ArtistProfile() {
           )}
         </div>
       </div>
+
+      {/* Similar Artists */}
+      {(() => {
+        const ALL_FOR_SIMILAR = [...artists, ...seedArtists];
+        const currentMediums = artist.medium.toLowerCase().split(/[,/]/).map((m: string) => m.trim());
+        const similar = ALL_FOR_SIMILAR
+          .filter((a) => a.id !== artist.id)
+          .map((a) => {
+            const aMediums = a.medium.toLowerCase().split(/[,/]/).map((m: string) => m.trim());
+            const overlap = aMediums.filter((m: string) => currentMediums.some((cm: string) => cm.includes(m) || m.includes(cm))).length;
+            return { artist: a, score: overlap };
+          })
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 8)
+          .map((x) => x.artist);
+        if (similar.length === 0) return null;
+        return (
+          <div className="bg-[#12100e] border-t border-white/5 px-4 py-6 pb-28">
+            <div className="mx-auto max-w-xl">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-600 mb-3">Similar artists</p>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
+                {similar.map((a) => {
+                  const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/160/160`;
+                  const followed = isFollowing(a.id);
+                  return (
+                    <div key={a.id} className="shrink-0 w-32 flex flex-col items-center gap-1.5">
+                      <Link href={`/artists/${a.id}`}>
+                        <img
+                          src={avatar}
+                          alt={a.name}
+                          className="h-16 w-16 rounded-full object-cover border-2 border-white/10 hover:border-amber-500/40 transition-colors"
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${a.id}/160/160`; }}
+                        />
+                      </Link>
+                      <Link href={`/artists/${a.id}`}>
+                        <p className="text-xs font-medium text-stone-300 text-center line-clamp-1 hover:text-amber-300 transition-colors">{a.name}</p>
+                      </Link>
+                      <p className="text-[10px] text-stone-600 text-center line-clamp-1">{a.medium.split(",")[0]}</p>
+                      <button
+                        onClick={() => followed ? unfollowArtist(a.id) : followArtist(a.id, a.name, avatar)}
+                        className={`rounded-full border px-3 py-1 text-[10px] font-semibold transition-colors ${
+                          followed
+                            ? "border-stone-700 text-stone-500 hover:border-rose-500/40 hover:text-rose-400"
+                            : "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                        }`}
+                      >
+                        {followed ? "Following" : "Follow"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Lightbox */}
       <AnimatePresence>

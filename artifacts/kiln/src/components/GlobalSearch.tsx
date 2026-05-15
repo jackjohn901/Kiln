@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Search, X, TrendingUp, ArrowRight, User, BookOpen, Wrench, MapPin, Flame } from "lucide-react";
+import { Search, X, TrendingUp, ArrowRight, User, BookOpen, Wrench, MapPin, Flame, FlaskConical, ScrollText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { TECHNIQUES } from "@/data/techniques";
 import { workshops } from "@/data/workshops";
 import { ALL_REELS } from "@/data/reels";
+import { MATERIALS } from "@/data/materials";
+import { ALL_SERIES } from "@/data/processSeries";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -64,7 +66,23 @@ export default function GlobalSearch({ onClose }: Props) {
       ).slice(0, 3)
     : [];
 
-  const hasResults = artistHits.length + techniqueHits.length + workshopHits.length + postHits.length > 0;
+  const materialHits = q
+    ? MATERIALS.filter((m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.description.toLowerCase().includes(q) ||
+        m.category.toLowerCase().includes(q)
+      ).slice(0, 3)
+    : [];
+
+  const seriesHits = q
+    ? ALL_SERIES.filter((s) =>
+        s.title.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q) ||
+        s.artistName.toLowerCase().includes(q)
+      ).slice(0, 3)
+    : [];
+
+  const hasResults = artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length > 0;
 
   function go(href: string) { navigate(href); onClose(); }
 
@@ -215,7 +233,7 @@ export default function GlobalSearch({ onClose }: Props) {
 
             {/* Posts */}
             {postHits.length > 0 && (
-              <div>
+              <div className="border-b border-white/5">
                 <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Posts</p>
                 {postHits.map((r) => (
                   <button key={r.id} onClick={() => go(`/posts/${r.id}`)}
@@ -230,6 +248,48 @@ export default function GlobalSearch({ onClose }: Props) {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-stone-200 truncate">{r.caption}</p>
                       <p className="text-xs text-stone-600 truncate">{r.artistName} · {r.technique}</p>
+                    </div>
+                    <ArrowRight size={13} className="text-stone-700 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Materials */}
+            {materialHits.length > 0 && (
+              <div className="border-b border-white/5">
+                <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Materials</p>
+                {materialHits.map((m) => (
+                  <button key={m.id} onClick={() => go("/materials")}
+                    className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/15">
+                      <FlaskConical size={15} className="text-teal-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-stone-200">{m.name}</p>
+                      <p className="text-xs text-stone-600 truncate capitalize">{m.category} · {m.description.slice(0, 50)}…</p>
+                    </div>
+                    <ArrowRight size={13} className="text-stone-700 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Series / Journals */}
+            {seriesHits.length > 0 && (
+              <div>
+                <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Process Journals</p>
+                {seriesHits.map((s) => (
+                  <button key={s.id} onClick={() => go(`/series/${s.id}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/15">
+                      <ScrollText size={15} className="text-rose-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-stone-200 truncate">{s.title}</p>
+                      <p className="text-xs text-stone-600 truncate">{s.artistName} · {s.steps.length} steps</p>
                     </div>
                     <ArrowRight size={13} className="text-stone-700 shrink-0" />
                   </button>
