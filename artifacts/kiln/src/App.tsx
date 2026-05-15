@@ -14,6 +14,11 @@ import Create from "@/pages/Create";
 import Discover from "@/pages/Discover";
 import Analytics from "@/pages/Analytics";
 import Workshops from "@/pages/Workshops";
+import Inbox from "@/pages/Inbox";
+import Messages from "@/pages/Messages";
+import Drops from "@/pages/Drops";
+import Techniques from "@/pages/Techniques";
+import Subscribe from "@/pages/Subscribe";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +34,13 @@ function Router() {
       <Route path="/analytics" component={Analytics} />
       <Route path="/setup" component={Setup} />
       <Route path="/create" component={Create} />
+      <Route path="/inbox" component={Inbox} />
+      <Route path="/messages" component={Messages} />
+      <Route path="/messages/:participantId" component={Messages} />
+      <Route path="/drops" component={Drops} />
+      <Route path="/techniques" component={Techniques} />
+      <Route path="/techniques/:id" component={Techniques} />
+      <Route path="/subscribe/:artistId" component={Subscribe} />
       <Route component={NotFound} />
     </Switch>
   );

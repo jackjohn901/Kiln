@@ -91,7 +91,7 @@ export default function Discover() {
             ))}
           </div>
 
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-2 mb-4">
             <span className="text-xs text-stone-500 self-center mr-1">Commission:</span>
             {STATUS_FILTERS.map((s) => (
               <button
@@ -106,6 +106,26 @@ export default function Discover() {
                 {s}
               </button>
             ))}
+          </div>
+
+          {/* Technique / material search */}
+          <div className="mb-6">
+            <p className="text-xs text-stone-500 mb-2">Popular techniques:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {["Glass Blowing","Flameworking","Kiln Forming","Raku","Reduction Firing","Blacksmithing","Bronze Casting","Natural Dyeing","Cloisonné","Pâte de Verre","Welding","Fiber Arts"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setQuery((q) => q === t ? "" : t)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                    query === t
+                      ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                      : "border-stone-800 text-stone-600 hover:border-stone-600 hover:text-stone-400"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
 
           <p className="text-xs text-stone-500 mb-4">{filtered.length} artist{filtered.length !== 1 ? "s" : ""}</p>

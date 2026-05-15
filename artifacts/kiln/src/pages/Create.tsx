@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
-  X, Music, Flame, Check, Tag, Loader2,
+  X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
@@ -49,6 +49,10 @@ export default function Create() {
   const [stage, setStage] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [seriesName, setSeriesName] = useState("");
+  const [isDrop, setIsDrop] = useState(false);
+  const [dropPrice, setDropPrice] = useState("");
+  const [dropDate, setDropDate] = useState("");
   const [publishing, setPublishing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -380,6 +384,78 @@ export default function Create() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Series */}
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-stone-400">
+                <Layers size={12} /> Series (optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Vessel Studies, Summer 2026"
+                value={seriesName}
+                onChange={(e) => setSeriesName(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+              />
+              <p className="mt-1 text-xs text-stone-700">Group this post with related work as part of a series</p>
+            </div>
+
+            {/* Drop scheduling */}
+            <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-4 space-y-3">
+              <button
+                onClick={() => setIsDrop((v) => !v)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Zap size={14} className={isDrop ? "text-amber-400" : "text-stone-500"} />
+                  <div>
+                    <p className={`text-sm font-medium ${isDrop ? "text-amber-200" : "text-stone-300"}`}>
+                      Schedule as a limited drop
+                    </p>
+                    <p className="text-xs text-stone-600">Release this work at a specific date and time</p>
+                  </div>
+                </div>
+                <div className={`h-5 w-9 rounded-full transition-colors ${isDrop ? "bg-amber-500" : "bg-stone-700"} relative`}>
+                  <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isDrop ? "translate-x-4" : "translate-x-0.5"}`} />
+                </div>
+              </button>
+
+              {isDrop && (
+                <div className="space-y-3 pt-1 border-t border-white/8">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-stone-500">Price (USD)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={dropPrice}
+                          onChange={(e) => setDropPrice(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-stone-800 pl-7 pr-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 flex items-center gap-1 text-xs font-medium text-stone-500">
+                        <Calendar size={10} /> Drop date &amp; time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={dropDate}
+                        onChange={(e) => setDropDate(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  {dropPrice && dropDate && (
+                    <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-300">
+                      This work will drop for ${parseFloat(dropPrice).toLocaleString()} on {new Date(dropDate).toLocaleDateString("en-US", { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Tags */}

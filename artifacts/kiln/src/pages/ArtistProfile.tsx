@@ -5,7 +5,8 @@ import {
   ChevronLeft, ExternalLink, Heart, Bookmark, Share2,
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
-  Heart as HeartIcon, BarChart2, MessageSquare,
+  Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
+  Users, MessageCircle,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getArtistById, type Artist } from "@/data/artists";
@@ -14,8 +15,10 @@ import { getListingsByArtist, formatPrice } from "@/data/listings";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
+import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
 import TipModal from "@/components/TipModal";
+import DropModal from "@/components/DropModal";
 
 function findArtist(id: string): Artist | undefined {
   return getArtistById(id) ?? seedArtists.find((a) => a.id === id);
@@ -134,13 +137,13 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "shop" | "workshops" | "bio";
+type Tab = "posts" | "process" | "shop" | "workshops" | "drops" | "bio";
 
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus } = useSocial();
+  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage } = useSocial();
 
   const artist = findArtist(id ?? "");
   const isOwn = profile?.id === id;
@@ -149,6 +152,8 @@ export default function ArtistProfile() {
   const [lightbox, setLightbox] = useState<GridItem | null>(null);
   const [showCommission, setShowCommission] = useState(false);
   const [showTip, setShowTip] = useState(false);
+  const [selectedDrop, setSelectedDrop] = useState<Drop | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   if (!artist) {
     return (
@@ -167,11 +172,28 @@ export default function ArtistProfile() {
   const artworkItems = allGridItems.filter((g) => !g.isVideo);
   const listings = getListingsByArtist(artist.id);
   const workshops = getWorkshopsByArtist(artist.id);
+  const drops = getDropsByArtist(artist.id);
   const stats = getStats(artist.id);
   const score = craftScore(artist.id);
   const following = isFollowing(artist.id);
+  const verified = isVerified(artist.id);
+  const subscribed = isSubscribed(artist.id);
   const commissionStatus = getArtistCommissionStatus(artist.id);
+
   const statusCfg = STATUS_CONFIG[commissionStatus];
+
+  function handleShare() {
+    const url = window.location.href;
+    const name = artist!.name;
+    if (navigator.share) {
+      navigator.share({ title: name, text: `${name} on Kiln`, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      }).catch(() => {});
+    }
+  }
 
   const coverImg = artist.images[0]?.url
     ?? (artist.videos[0] ? `https://img.youtube.com/vi/${artist.videos[0].id}/hqdefault.jpg` : "");
@@ -251,8 +273,29 @@ export default function ArtistProfile() {
                 >
                   <HeartIcon size={12} fill="currentColor" /> Support
                 </button>
-                <button className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-stone-400 hover:border-white/30 transition-colors">
-                  <Share2 size={14} />
+                <button
+                  onClick={() => navigate(`/subscribe/${artist.id}`)}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors ${
+                    subscribed
+                      ? "border-purple-500/40 bg-purple-500/10 text-purple-400"
+                      : "border-stone-600 text-stone-400 hover:border-purple-500/40 hover:text-purple-400"
+                  }`}
+                >
+                  <Users size={11} /> {subscribed ? "Supporting" : "Support"}
+                </button>
+                <button
+                  onClick={() => { sendDirectMessage(artist.id, artist.name, avatarImg, "Hey! Love your work."); navigate("/messages"); }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-stone-400 hover:border-blue-400/40 hover:text-blue-400 transition-colors"
+                  title="Send message"
+                >
+                  <MessageCircle size={14} />
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-stone-400 hover:border-white/30 transition-colors"
+                  title={shareCopied ? "Copied!" : "Share profile"}
+                >
+                  {shareCopied ? <Check size={13} className="text-green-400" /> : <Share2 size={14} />}
                 </button>
               </>
             )}
@@ -263,6 +306,11 @@ export default function ArtistProfile() {
         <div className="mt-3">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="font-serif text-2xl font-bold text-amber-100">{artist.name}</h1>
+            {verified && (
+              <span title="Verified studio" className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 shrink-0">
+                <Check size={11} className="text-white" />
+              </span>
+            )}
             <div className="flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/25 px-2.5 py-0.5">
               <Flame size={11} className="text-amber-400" />
               <span className="text-xs font-bold text-amber-300">{score}</span>
@@ -351,6 +399,7 @@ export default function ArtistProfile() {
               { key: "process", icon: Video, label: "Process" },
               { key: "shop", icon: ShoppingBag, label: "Shop" },
               ...(workshops.length > 0 ? [{ key: "workshops", icon: Hammer, label: "Workshops" }] : []),
+              ...(drops.length > 0 ? [{ key: "drops", icon: Zap, label: "Drops" }] : []),
               { key: "bio", icon: BookOpen, label: "Bio" },
             ] as { key: Tab; icon: React.ElementType; label: string }[]
           ).map(({ key, icon: Icon, label }) => (
@@ -458,6 +507,48 @@ export default function ArtistProfile() {
               <Link href="/workshops" className="block text-center text-xs text-amber-400 hover:text-amber-300 py-2">
                 Browse all workshops →
               </Link>
+            </div>
+          )}
+
+          {/* Drops */}
+          {tab === "drops" && (
+            <div className="space-y-4">
+              {drops.length === 0 ? (
+                <div className="py-16 text-center text-stone-600 text-sm">No drops yet.</div>
+              ) : (
+                drops.map((drop) => (
+                  <div
+                    key={drop.id}
+                    onClick={() => drop.status !== "sold" && setSelectedDrop(drop)}
+                    className={`rounded-2xl border border-white/10 bg-stone-900/60 overflow-hidden ${drop.status !== "sold" ? "cursor-pointer hover:border-amber-500/30" : "opacity-60"} transition-all`}
+                  >
+                    <div className="flex gap-4 p-4">
+                      <img src={drop.imageUrl} alt={drop.title} className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-medium text-amber-100">{drop.title}</p>
+                          {drop.status === "live" && (
+                            <span className="flex items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white shrink-0">
+                              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />Live
+                            </span>
+                          )}
+                          {drop.status === "upcoming" && (
+                            <span className="text-xs text-amber-300 font-medium shrink-0">{getTimeUntilDrop(drop.dropDate)}</span>
+                          )}
+                          {drop.status === "sold" && (
+                            <span className="text-xs text-stone-500 shrink-0">Sold out</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-stone-500 mb-2">{drop.technique}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-amber-300">${drop.price.toLocaleString()}</p>
+                          <p className="text-xs text-stone-500">{drop.spotsTotal === 1 ? "Unique" : `${drop.spotsLeft}/${drop.spotsTotal} left`}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
@@ -569,6 +660,11 @@ export default function ArtistProfile() {
           artistAvatarUrl={avatarImg}
           onClose={() => setShowTip(false)}
         />
+      )}
+
+      {/* Drop modal */}
+      {selectedDrop && (
+        <DropModal drop={selectedDrop} onClose={() => setSelectedDrop(null)} />
       )}
     </div>
   );

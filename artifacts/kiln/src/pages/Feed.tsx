@@ -171,6 +171,41 @@ function BottomTab() {
   );
 }
 
+// ─── Share button ─────────────────────────────────────────────────────────────
+
+function ShareButton({ artistId, artistName }: { artistId: string; artistName: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleShare() {
+    const base = window.location.origin + window.location.pathname.replace(/\/$/, "");
+    const url = `${base}/artists/${artistId}`;
+    if (navigator.share) {
+      navigator.share({ title: artistName, text: `Check out ${artistName} on Kiln`, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {});
+    }
+  }
+  return (
+    <button onClick={handleShare} className="flex flex-col items-center gap-1">
+      {copied ? (
+        <>
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
+            <span className="text-[10px] text-white font-bold">✓</span>
+          </div>
+          <span className="text-[11px] font-bold text-green-400">Copied</span>
+        </>
+      ) : (
+        <>
+          <Share2 size={24} className="text-white" />
+          <span className="text-[11px] font-bold text-white drop-shadow">Share</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 // ─── Spinning music disc ───────────────────────────────────────────────────────
 
 function MusicDisc({ trackId, spinning }: { trackId: string; spinning: boolean }) {
@@ -363,10 +398,7 @@ function ReelCard({
         </button>
 
         {/* Share */}
-        <button className="flex flex-col items-center gap-1">
-          <Share2 size={24} className="text-white" />
-          <span className="text-[11px] font-bold text-white drop-shadow">Share</span>
-        </button>
+        <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
 
         {/* Music toggle */}
         <button onClick={onToggleMusic} className="flex flex-col items-center gap-1">
