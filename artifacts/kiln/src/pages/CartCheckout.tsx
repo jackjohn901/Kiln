@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Check, Package, ArrowRight, Truck, ShieldCheck,
-  ExternalLink, MessageCircle, Info, CreditCard,
+  ExternalLink, MessageCircle, Info, CreditCard, Gift,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
@@ -69,6 +69,9 @@ export default function CartCheckout() {
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDR);
   const [orderId] = useState(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
   const [groups, setGroups] = useState<ArtistGroup[]>([]);
+  const [isGift, setIsGift] = useState(false);
+  const [giftRecipient, setGiftRecipient] = useState("");
+  const [giftMessage, setGiftMessage] = useState("");
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
@@ -219,6 +222,44 @@ export default function CartCheckout() {
                           <option value="JP">Japan</option>
                         </select>
                       </div>
+                    </div>
+
+                    {/* Gift toggle */}
+                    <div className="rounded-xl border border-white/8 bg-stone-800/40 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Gift size={14} className={isGift ? "text-amber-400" : "text-stone-500"} />
+                          <span className="text-sm text-stone-200">Send as a gift</span>
+                        </div>
+                        <button
+                          onClick={() => setIsGift((v) => !v)}
+                          className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${isGift ? "bg-amber-500" : "bg-stone-700"}`}
+                        >
+                          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isGift ? "translate-x-5" : "translate-x-0.5"}`} />
+                        </button>
+                      </div>
+                      <AnimatePresence>
+                        {isGift && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden space-y-2"
+                          >
+                            <Field label="Recipient name" value={giftRecipient} onChange={setGiftRecipient} />
+                            <div>
+                              <label className="text-xs text-stone-500 mb-1 block">Gift message (optional)</label>
+                              <textarea
+                                value={giftMessage}
+                                onChange={(e) => setGiftMessage(e.target.value)}
+                                placeholder="Write a personal note to include with the artwork…"
+                                rows={2}
+                                className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none resize-none"
+                              />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Free platform note */}
@@ -400,6 +441,12 @@ export default function CartCheckout() {
                         <span>Ship to</span>
                         <span className="text-stone-300">{addr.name || "—"}</span>
                       </div>
+                      {isGift && giftRecipient && (
+                        <div className="flex justify-between">
+                          <span className="flex items-center gap-1"><Gift size={11} /> Gift for</span>
+                          <span className="text-amber-300">{giftRecipient}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Payments</span>
                         <span className="text-emerald-400">Sent directly to artists</span>
@@ -409,6 +456,12 @@ export default function CartCheckout() {
                         <span className="text-stone-300">5–10 business days</span>
                       </div>
                     </div>
+                    {isGift && giftMessage && (
+                      <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 px-4 py-3 text-sm">
+                        <p className="text-[10px] text-amber-500/70 uppercase tracking-wide font-semibold mb-1">Gift message</p>
+                        <p className="text-stone-300 italic">"{giftMessage}"</p>
+                      </div>
+                    )}
                     <div className="flex items-center justify-center gap-2 text-xs text-stone-600">
                       <ShieldCheck size={12} className="text-emerald-600" /> Artist-verified, authenticity guaranteed
                     </div>

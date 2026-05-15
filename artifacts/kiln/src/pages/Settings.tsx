@@ -1,11 +1,32 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
 
 const SETTING_KEY = "kiln_settings_v1";
+const SHIPPING_KEY = "kiln_shipping_v1";
+
+interface ShippingSettings {
+  domesticRate: number;
+  internationalRate: number;
+  freeThreshold: number;
+  offerFreeShipping: boolean;
+}
+
+function defaultShipping(): ShippingSettings {
+  return { domesticRate: 18, internationalRate: 45, freeThreshold: 500, offerFreeShipping: false };
+}
+
+function readShippingSettings(): ShippingSettings {
+  try { return { ...defaultShipping(), ...JSON.parse(localStorage.getItem(SHIPPING_KEY) ?? "{}") }; }
+  catch { return defaultShipping(); }
+}
+
+function saveShippingSettings(s: ShippingSettings) {
+  try { localStorage.setItem(SHIPPING_KEY, JSON.stringify(s)); } catch {}
+}
 
 interface KilnSettings {
   notif_likes: boolean;
@@ -55,7 +76,7 @@ function saveSettings(s: KilnSettings) {
   try { localStorage.setItem(SETTING_KEY, JSON.stringify(s)); } catch {}
 }
 
-type Section = "notifications" | "privacy" | "display" | "account" | "payments";
+type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping";
 
 export default function Settings() {
   const { profile, logout } = useProfile();
@@ -64,6 +85,8 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [payments, setPayments] = useState<ArtistPayments>(readPaymentSettings);
   const [paymentSaved, setPaymentSaved] = useState(false);
+  const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
+  const [shippingSaved, setShippingSaved] = useState(false);
 
   function toggle(key: keyof KilnSettings) {
     setSettings((prev) => {
@@ -78,11 +101,19 @@ export default function Settings() {
     });
   }
 
+  function saveShipping(next: ShippingSettings) {
+    setShipping(next);
+    saveShippingSettings(next);
+    setShippingSaved(true);
+    setTimeout(() => setShippingSaved(false), 1800);
+  }
+
   const sections: { key: Section; icon: React.ElementType; label: string; desc: string }[] = [
     { key: "notifications", icon: Bell, label: "Notifications", desc: "What alerts you get and how" },
     { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you" },
     { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings" },
     { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly" },
+    { key: "shipping", icon: Truck, label: "Shipping Rates", desc: "Your domestic and international rates" },
     { key: "account", icon: User, label: "Account", desc: "Profile, security, and data" },
   ];
 
@@ -262,6 +293,92 @@ export default function Settings() {
               >
                 {paymentSaved ? <><Check size={14} /> Saved!</> : "Save payment methods"}
               </button>
+            </div>
+          </div>
+        )}
+
+        {section === "shipping" && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-1">How it works</p>
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  Buyers see your shipping rates at checkout. You arrange shipping directly with each buyer after payment.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between py-3 border-b border-white/5">
+                <div>
+                  <p className="text-sm text-stone-200">Offer free shipping</p>
+                  <p className="text-xs text-stone-600 mt-0.5">Waive shipping on all orders</p>
+                </div>
+                <button
+                  onClick={() => setShipping((s) => ({ ...s, offerFreeShipping: !s.offerFreeShipping }))}
+                  className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${shipping.offerFreeShipping ? "bg-amber-500" : "bg-stone-700"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${shipping.offerFreeShipping ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+
+              {!shipping.offerFreeShipping && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">Domestic rate (USA)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={shipping.domesticRate}
+                        onChange={(e) => setShipping((s) => ({ ...s, domesticRate: Number(e.target.value) }))}
+                        className="w-full rounded-xl border border-white/10 bg-stone-800/60 pl-8 pr-4 py-2.5 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                    <p className="text-[10px] text-stone-700 mt-1">Per order, not per item</p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">International rate</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={shipping.internationalRate}
+                        onChange={(e) => setShipping((s) => ({ ...s, internationalRate: Number(e.target.value) }))}
+                        className="w-full rounded-xl border border-white/10 bg-stone-800/60 pl-8 pr-4 py-2.5 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">Free shipping threshold</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={shipping.freeThreshold}
+                        onChange={(e) => setShipping((s) => ({ ...s, freeThreshold: Number(e.target.value) }))}
+                        className="w-full rounded-xl border border-white/10 bg-stone-800/60 pl-8 pr-4 py-2.5 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                    <p className="text-[10px] text-stone-700 mt-1">Orders over this amount ship free. Set to 0 to disable.</p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => saveShipping(shipping)}
+                className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+              >
+                {shippingSaved ? <><Check size={14} /> Saved!</> : "Save shipping rates"}
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-stone-900/40 px-5 py-4">
+              <p className="text-xs text-stone-600 leading-relaxed">
+                <span className="text-stone-400 font-medium">Tip: </span>
+                For large or fragile work, include packaging materials, insurance, and your time in the shipping rate.
+                White glove and crated delivery can cost $150–$500+ for large sculptures.
+              </p>
             </div>
           </div>
         )}

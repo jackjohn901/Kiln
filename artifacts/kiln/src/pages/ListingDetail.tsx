@@ -5,8 +5,9 @@ import {
   ChevronLeft, ShoppingCart, Heart, Share2, Check, Plus,
   Shield, Truck, Award, MapPin, ExternalLink, ChevronRight,
   Package, Ruler, Calendar, Palette, Star, MessageSquare,
-  Bell, BellOff, DollarSign, X, Send, TrendingDown,
+  Bell, BellOff, DollarSign, X, Send, TrendingDown, Landmark,
 } from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import Nav from "@/components/Nav";
 import { listings, formatPrice, type Listing } from "@/data/listings";
 import { getArtistById, artists } from "@/data/artists";
@@ -59,6 +60,23 @@ function buildGallery(imageUrl: string | null): string[] {
   return imageUrl ? [imageUrl] : [];
 }
 
+function generatePriceHistory(listing: Listing) {
+  const seed = listing.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const months = 12;
+  const current = listing.price;
+  const start = Math.round(current * 0.78);
+  return Array.from({ length: months + 1 }, (_, i) => {
+    const date = new Date(2026, 4 - months + i, 1);
+    const progress = i / months;
+    const noiseFactor = ((seed * (i + 7) * 13) % 97 - 48) / 1200;
+    const price = Math.round(start + (current - start) * (progress + noiseFactor));
+    return {
+      month: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+      price: Math.max(price, Math.round(start * 0.88)),
+    };
+  });
+}
+
 function StarRow({ rating, size = 14, interactive = false, onRate }: {
   rating: number; size?: number; interactive?: boolean; onRate?: (r: number) => void;
 }) {
@@ -88,6 +106,12 @@ function setWaitlisted(ids: string[]) {
   localStorage.setItem(WAITLIST_KEY, JSON.stringify(ids));
 }
 
+const PLAN_OPTIONS = [
+  { id: "half", label: "50 / 50", desc: "50% now, 50% in 30 days", schedule: "50% deposit, 50% on delivery" },
+  { id: "thirds", label: "3 installments", desc: "Equal payments over 3 months", schedule: "33% monthly over 3 months" },
+  { id: "quarters", label: "4 installments", desc: "Equal payments over 4 months", schedule: "25% monthly over 4 months" },
+];
+
 export default function ListingDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -104,6 +128,11 @@ export default function ListingDetail() {
   const [offerNote, setOfferNote] = useState("");
   const [offerSent, setOfferSent] = useState(false);
 
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [planNote, setPlanNote] = useState("");
+  const [planSent, setPlanSent] = useState(false);
+
   const [onWaitlist, setOnWaitlist] = useState(() =>
     id ? getWaitlisted().includes(id) : false
   );
@@ -114,8 +143,8 @@ export default function ListingDetail() {
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   const listing = findListing(id ?? "");
-
   const gallery = useMemo(() => buildGallery(listing?.imageUrl ?? null), [listing?.imageUrl]);
+  const priceHistory = useMemo(() => listing ? generatePriceHistory(listing) : [], [listing]);
 
   function handleShare() {
     const url = window.location.href;
@@ -162,6 +191,30 @@ export default function ListingDetail() {
     }, 1800);
   }
 
+  function handleSendPlan() {
+    if (!listing || !selectedPlan) return;
+    const plan = PLAN_OPTIONS.find((p) => p.id === selectedPlan)!;
+    const artist = getArtistById(listing.artistId) ?? ALL_ARTISTS.find((a) => a.id === listing.artistId);
+    sendCommissionInquiry({
+      toArtistId: listing.artistId,
+      toArtistName: artist?.name ?? "Unknown Artist",
+      fromName: profile?.name ?? "Anonymous Collector",
+      fromEmail: "collector@kiln.app",
+      fromHandle: profile?.handle,
+      type: "custom",
+      description: `Payment plan request for "${listing.title}" (${formatPrice(listing.price)})\n\nRequested plan: ${plan.desc}${planNote ? `\n\n${planNote}` : ""}`,
+      budget: formatPrice(listing.price),
+      timeline: plan.schedule,
+    });
+    setPlanSent(true);
+    setTimeout(() => {
+      setShowPlanModal(false);
+      setPlanSent(false);
+      setSelectedPlan(null);
+      setPlanNote("");
+    }, 1800);
+  }
+
   function handleSubmitReview() {
     if (!listing || reviewRating === 0) return;
     addReview({
@@ -199,7 +252,9 @@ export default function ListingDetail() {
   const reviews = getReviews(listing.id);
   const avgRating = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const suggestedOffer = Math.round(listing.price * 0.85 / 100) * 100;
-
+  const priceGrowth = priceHistory.length > 1
+    ? Math.round((listing.price / priceHistory[0]!.price - 1) * 100)
+    : 0;
   const currentImage = gallery[selectedImg] ?? listing.imageUrl;
 
   return (
@@ -216,7 +271,7 @@ export default function ListingDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-14">
 
-          {/* Image gallery */}
+          {/* ── Image gallery ── */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-3">
             <div className="relative aspect-square rounded-2xl overflow-hidden bg-stone-900 border border-white/8">
               {currentImage ? (
@@ -256,12 +311,8 @@ export default function ListingDetail() {
                       selectedImg === i ? "border-amber-500" : "border-white/10 hover:border-white/25"
                     }`}
                   >
-                    <img
-                      src={src}
-                      alt={`View ${i + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
+                    <img src={src} alt={`View ${i + 1}`} className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   </button>
                 ))}
               </div>
@@ -283,9 +334,10 @@ export default function ListingDetail() {
             </div>
           </motion.div>
 
-          {/* Details */}
+          {/* ── Details column ── */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col">
-            {/* Artist */}
+
+            {/* Artist link */}
             {artist && (
               <Link href={`/artists/${artist.id}`}>
                 <div className="flex items-center gap-2.5 mb-4 group w-fit">
@@ -314,8 +366,8 @@ export default function ListingDetail() {
               </div>
             )}
 
-            {/* Specs */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            {/* Specs grid */}
+            <div className="grid grid-cols-2 gap-3 mb-5">
               {[
                 { icon: Calendar, label: "Year", value: listing.year },
                 { icon: Ruler, label: "Dimensions", value: listing.dimensions },
@@ -332,10 +384,50 @@ export default function ListingDetail() {
               ))}
             </div>
 
+            {/* Price history chart */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] text-stone-600 uppercase tracking-wide font-semibold">Price history · 12 months</p>
+                {priceGrowth > 0 && (
+                  <span className="text-[10px] text-emerald-400 font-semibold">+{priceGrowth}% appreciation</span>
+                )}
+              </div>
+              <div className="rounded-xl border border-white/8 bg-stone-900/40 px-3 pt-3 pb-1">
+                <ResponsiveContainer width="100%" height={72}>
+                  <AreaChart data={priceHistory} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                    <defs>
+                      <linearGradient id={`priceGrad-${listing.id}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip
+                      contentStyle={{ background: "#1a1714", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, padding: "4px 10px" }}
+                      formatter={(v: number) => [formatPrice(v), "Price"]}
+                      labelStyle={{ color: "#78716c", fontSize: 10 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="price"
+                      stroke="#f59e0b"
+                      strokeWidth={1.5}
+                      fill={`url(#priceGrad-${listing.id})`}
+                      dot={false}
+                      activeDot={{ r: 3, fill: "#f59e0b", stroke: "#12100e", strokeWidth: 1.5 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="flex justify-between mt-0.5">
+                  <span className="text-[9px] text-stone-700">{priceHistory[0]?.month}</span>
+                  <span className="text-[9px] text-stone-700">{priceHistory[priceHistory.length - 1]?.month}</span>
+                </div>
+              </div>
+            </div>
+
             {/* Price */}
-            <div className="flex items-baseline gap-3 mb-6">
+            <div className="flex items-baseline gap-3 mb-5">
               <span className="font-serif text-4xl text-amber-200 font-medium">{formatPrice(listing.price)}</span>
-              {listing.price > 25000 && (
+              {listing.price >= 5000 && (
                 <span className="text-xs text-stone-600">Payment plans available</span>
               )}
             </div>
@@ -352,10 +444,10 @@ export default function ListingDetail() {
               </div>
             )}
 
-            {/* Actions */}
+            {/* ── Actions ── */}
             {listing.available ? (
               <>
-                <div className="flex gap-2 mb-3">
+                <div className="flex gap-2 mb-2.5">
                   <button
                     onClick={() => addItem(listing)}
                     className={`flex-1 flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold border transition-all ${
@@ -388,13 +480,23 @@ export default function ListingDetail() {
                   </button>
                 </div>
 
-                {/* Make an offer */}
-                <button
-                  onClick={() => { setShowOfferModal(true); setOfferAmount(String(suggestedOffer)); }}
-                  className="w-full flex items-center justify-center gap-2 rounded-full border border-stone-700 py-2.5 text-sm text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-all mb-4"
-                >
-                  <TrendingDown size={14} /> Make an offer
-                </button>
+                {/* Make an offer + Payment plan */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => { setShowOfferModal(true); setOfferAmount(String(suggestedOffer)); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-full border border-stone-700 py-2.5 text-sm text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-all"
+                  >
+                    <TrendingDown size={14} /> Make an offer
+                  </button>
+                  {listing.price >= 5000 && (
+                    <button
+                      onClick={() => setShowPlanModal(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-full border border-stone-700 py-2.5 text-sm text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-all"
+                    >
+                      <Landmark size={14} /> Payment plan
+                    </button>
+                  )}
+                </div>
               </>
             ) : (
               <div className="space-y-2 mb-4">
@@ -408,7 +510,6 @@ export default function ListingDetail() {
                     </button>
                   </Link>
                 </div>
-                {/* Waitlist */}
                 <button
                   onClick={handleWaitlist}
                   className={`w-full flex items-center justify-center gap-2 rounded-full border py-2.5 text-sm transition-all ${
@@ -417,7 +518,9 @@ export default function ListingDetail() {
                       : "border-white/10 text-stone-500 hover:border-amber-500/30 hover:text-amber-400"
                   }`}
                 >
-                  {onWaitlist ? <><BellOff size={14} /> Remove from waitlist</> : <><Bell size={14} /> Notify me when similar work is available</>}
+                  {onWaitlist
+                    ? <><BellOff size={14} /> Remove from waitlist</>
+                    : <><Bell size={14} /> Notify me when similar work is available</>}
                 </button>
               </div>
             )}
@@ -459,7 +562,7 @@ export default function ListingDetail() {
           </motion.div>
         </div>
 
-        {/* Reviews section */}
+        {/* ── Reviews ── */}
         <div className="mb-14">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -486,7 +589,6 @@ export default function ListingDetail() {
             )}
           </div>
 
-          {/* Review form */}
           <AnimatePresence>
             {showReviewForm && (
               <motion.div
@@ -506,17 +608,12 @@ export default function ListingDetail() {
                     className="mt-4 w-full rounded-xl border border-white/10 bg-stone-800 px-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40 resize-none"
                   />
                   <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => setShowReviewForm(false)}
-                      className="flex-1 rounded-full border border-white/10 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors"
-                    >
+                    <button onClick={() => setShowReviewForm(false)}
+                      className="flex-1 rounded-full border border-white/10 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors">
                       Cancel
                     </button>
-                    <button
-                      onClick={handleSubmitReview}
-                      disabled={reviewRating === 0}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-full bg-amber-500 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
+                    <button onClick={handleSubmitReview} disabled={reviewRating === 0}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-full bg-amber-500 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                       <Send size={11} /> Post review
                     </button>
                   </div>
@@ -529,26 +626,17 @@ export default function ListingDetail() {
             <div className="rounded-2xl border border-white/5 bg-stone-900/30 py-12 flex flex-col items-center gap-3">
               <Star size={28} className="text-stone-700" />
               <p className="text-sm text-stone-600">No reviews yet</p>
-              <button
-                onClick={() => setShowReviewForm(true)}
-                className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
-              >
+              <button onClick={() => setShowReviewForm(true)} className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
                 Be the first to review this work
               </button>
             </div>
           ) : (
             <div className="space-y-4">
               {reviews.map((r) => (
-                <motion.div
-                  key={r.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-white/8 bg-stone-900/40 p-5"
-                >
+                <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border border-white/8 bg-stone-900/40 p-5">
                   <div className="flex items-start gap-3">
-                    <img
-                      src={r.fromAvatarUrl}
-                      alt={r.fromName}
+                    <img src={r.fromAvatarUrl} alt={r.fromName}
                       className="h-9 w-9 rounded-full object-cover border border-white/10 shrink-0"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/60/60`; }}
                     />
@@ -569,7 +657,7 @@ export default function ListingDetail() {
           )}
         </div>
 
-        {/* Related works */}
+        {/* ── Related works ── */}
         {related.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-5">
@@ -580,12 +668,7 @@ export default function ListingDetail() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               {related.map((r, i) => (
-                <motion.div
-                  key={r.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                >
+                <motion.div key={r.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
                   <Link href={`/listings/${r.id}`}>
                     <div className="group rounded-2xl border border-white/8 bg-stone-900/40 overflow-hidden hover:border-amber-500/20 transition-colors cursor-pointer">
                       <div className="aspect-[4/3] overflow-hidden bg-stone-800">
@@ -595,9 +678,7 @@ export default function ListingDetail() {
                             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Palette size={28} className="text-stone-700" />
-                          </div>
+                          <div className="w-full h-full flex items-center justify-center"><Palette size={28} className="text-stone-700" /></div>
                         )}
                       </div>
                       <div className="p-4">
@@ -615,31 +696,21 @@ export default function ListingDetail() {
         )}
       </div>
 
-      {/* Make an Offer modal */}
+      {/* ── Make an Offer modal ── */}
       <AnimatePresence>
         {showOfferModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowOfferModal(false); }}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              className="w-full max-w-md rounded-3xl border border-white/10 bg-[#1a1714] p-6"
-            >
+            onClick={(e) => { if (e.target === e.currentTarget) setShowOfferModal(false); }}>
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+              className="w-full max-w-md rounded-3xl border border-white/10 bg-[#1a1714] p-6">
               {offerSent ? (
                 <div className="py-8 flex flex-col items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
                     <Check size={22} className="text-emerald-400" />
                   </div>
                   <p className="text-base font-semibold text-stone-200">Offer sent!</p>
-                  <p className="text-sm text-stone-500 text-center">
-                    {getArtistName(listing.artistId)} will review your offer and respond in their inbox.
-                  </p>
+                  <p className="text-sm text-stone-500 text-center">{getArtistName(listing.artistId)} will review your offer and respond via their inbox.</p>
                 </div>
               ) : (
                 <>
@@ -648,50 +719,99 @@ export default function ListingDetail() {
                       <p className="font-serif text-lg text-amber-100">Make an offer</p>
                       <p className="text-xs text-stone-600 mt-0.5">{listing.title} · Asking {formatPrice(listing.price)}</p>
                     </div>
-                    <button onClick={() => setShowOfferModal(false)} className="text-stone-600 hover:text-stone-300 transition-colors">
-                      <X size={18} />
-                    </button>
+                    <button onClick={() => setShowOfferModal(false)} className="text-stone-600 hover:text-stone-300 transition-colors"><X size={18} /></button>
                   </div>
-
                   <div className="mb-4">
                     <label className="text-xs text-stone-500 uppercase tracking-wide mb-2 block">Your offer</label>
                     <div className="relative">
                       <DollarSign size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500" />
-                      <input
-                        type="number"
-                        value={offerAmount}
-                        onChange={(e) => setOfferAmount(e.target.value)}
+                      <input type="number" value={offerAmount} onChange={(e) => setOfferAmount(e.target.value)}
                         placeholder={String(suggestedOffer)}
-                        className="w-full rounded-xl border border-white/10 bg-stone-800 pl-9 pr-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40"
-                      />
+                        className="w-full rounded-xl border border-white/10 bg-stone-800 pl-9 pr-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40" />
                     </div>
-                    <p className="text-[10px] text-stone-700 mt-1.5">
-                      Suggested: {formatPrice(suggestedOffer)} (15% below asking)
-                    </p>
+                    <p className="text-[10px] text-stone-700 mt-1.5">Suggested: {formatPrice(suggestedOffer)} (15% below asking)</p>
+                  </div>
+                  <div className="mb-5">
+                    <label className="text-xs text-stone-500 uppercase tracking-wide mb-2 block">Message <span className="text-stone-700">(optional)</span></label>
+                    <textarea value={offerNote} onChange={(e) => setOfferNote(e.target.value)}
+                      placeholder="Introduce yourself or explain your offer…" rows={3}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800 px-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
+                  </div>
+                  <button onClick={handleSendOffer} disabled={!offerAmount}
+                    className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Send size={14} /> Send offer
+                  </button>
+                  <p className="text-[10px] text-stone-700 text-center mt-3">Your offer goes directly to the artist. Kiln does not guarantee acceptance.</p>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Payment Plan modal ── */}
+      <AnimatePresence>
+        {showPlanModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowPlanModal(false); }}>
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+              className="w-full max-w-md rounded-3xl border border-white/10 bg-[#1a1714] p-6">
+              {planSent ? (
+                <div className="py-8 flex flex-col items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Check size={22} className="text-emerald-400" />
+                  </div>
+                  <p className="text-base font-semibold text-stone-200">Request sent!</p>
+                  <p className="text-sm text-stone-500 text-center">{getArtistName(listing.artistId)} will review your payment plan request and follow up directly.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <p className="font-serif text-lg text-amber-100">Request payment plan</p>
+                      <p className="text-xs text-stone-600 mt-0.5">{listing.title} · {formatPrice(listing.price)}</p>
+                    </div>
+                    <button onClick={() => setShowPlanModal(false)} className="text-stone-600 hover:text-stone-300 transition-colors"><X size={18} /></button>
+                  </div>
+
+                  <div className="space-y-2 mb-5">
+                    {PLAN_OPTIONS.map((plan) => (
+                      <button
+                        key={plan.id}
+                        onClick={() => setSelectedPlan(plan.id)}
+                        className={`w-full text-left rounded-xl border px-4 py-3.5 transition-all ${
+                          selectedPlan === plan.id
+                            ? "border-amber-500/50 bg-amber-500/10"
+                            : "border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className={`text-sm font-semibold ${selectedPlan === plan.id ? "text-amber-300" : "text-stone-200"}`}>{plan.label}</p>
+                          {selectedPlan === plan.id && <Check size={14} className="text-amber-400" />}
+                        </div>
+                        <p className="text-xs text-stone-500 mt-0.5">{plan.desc}</p>
+                        <p className="text-xs text-stone-600 mt-0.5">
+                          {plan.id === "half" && `${formatPrice(Math.round(listing.price / 2))} × 2`}
+                          {plan.id === "thirds" && `${formatPrice(Math.round(listing.price / 3))} × 3`}
+                          {plan.id === "quarters" && `${formatPrice(Math.round(listing.price / 4))} × 4`}
+                        </p>
+                      </button>
+                    ))}
                   </div>
 
                   <div className="mb-5">
-                    <label className="text-xs text-stone-500 uppercase tracking-wide mb-2 block">Message to artist <span className="text-stone-700">(optional)</span></label>
-                    <textarea
-                      value={offerNote}
-                      onChange={(e) => setOfferNote(e.target.value)}
-                      placeholder="Introduce yourself or explain your offer…"
-                      rows={3}
-                      className="w-full rounded-xl border border-white/10 bg-stone-800 px-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40 resize-none"
-                    />
+                    <label className="text-xs text-stone-500 uppercase tracking-wide mb-2 block">Message <span className="text-stone-700">(optional)</span></label>
+                    <textarea value={planNote} onChange={(e) => setPlanNote(e.target.value)}
+                      placeholder="Anything you'd like the artist to know…" rows={2}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800 px-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
                   </div>
 
-                  <button
-                    onClick={handleSendOffer}
-                    disabled={!offerAmount}
-                    className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Send size={14} /> Send offer
+                  <button onClick={handleSendPlan} disabled={!selectedPlan}
+                    className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Send size={14} /> Send request
                   </button>
-
-                  <p className="text-[10px] text-stone-700 text-center mt-3 leading-relaxed">
-                    Your offer is sent directly to the artist. Kiln does not guarantee acceptance.
-                  </p>
+                  <p className="text-[10px] text-stone-700 text-center mt-3">Payment plans are arranged directly with the artist. All payments remain peer-to-peer.</p>
                 </>
               )}
             </motion.div>
