@@ -1,0 +1,137 @@
+export interface ChallengeEntry {
+  artistId: string;
+  artistName: string;
+  avatarUrl: string;
+  likes: number;
+  thumbnail: string;
+}
+
+export interface Challenge {
+  id: string;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  technique: string | null;
+  prize: string;
+  deadline: string;
+  entries: number;
+  tag: string;
+  status: "active" | "upcoming" | "ended";
+  sponsoredBy?: string;
+  leaderboard: ChallengeEntry[];
+}
+
+export const challenges: Challenge[] = [
+  {
+    id: "ch-001",
+    emoji: "🔥",
+    title: "60-Second Gather",
+    subtitle: "Show your gather in under a minute",
+    description: "Record your best 60-second gather from start to finished gather ball. We want to see your technique, your posture, your rhythm. Glass artists only — any gather size, any color.",
+    technique: "Glass Blowing",
+    prize: "$500 Bullseye Glass credit",
+    deadline: "2026-05-31T23:59:00Z",
+    entries: 347,
+    tag: "60secondgather",
+    status: "active",
+    sponsoredBy: "Bullseye Glass",
+    leaderboard: [
+      { artistId: "lino-tagliapietra", artistName: "Lino Tagliapietra", avatarUrl: "https://picsum.photos/seed/lino/80/80", likes: 4821, thumbnail: "https://img.youtube.com/vi/dQhKVFbpZoQ/maxresdefault.jpg" },
+      { artistId: "dante-marioni", artistName: "Dante Marioni", avatarUrl: "https://picsum.photos/seed/dante/80/80", likes: 3104, thumbnail: "https://img.youtube.com/vi/kOd0r6FWMOY/maxresdefault.jpg" },
+      { artistId: "caleb-siemon", artistName: "Caleb Siemon", avatarUrl: "https://picsum.photos/seed/caleb/80/80", likes: 2587, thumbnail: "https://img.youtube.com/vi/RVZ7HFOP7VY/maxresdefault.jpg" },
+    ],
+  },
+  {
+    id: "ch-002",
+    emoji: "🏺",
+    title: "Imperfect Perfect",
+    subtitle: "The piece that surprised you",
+    description: "Share a piece that didn't go as planned but turned out more interesting because of it. Cracks, unexpected color shifts, collapsed forms — what happy accident became your best work?",
+    technique: "Ceramics",
+    prize: "Featured artist slot on Kiln homepage for 30 days",
+    deadline: "2026-06-07T23:59:00Z",
+    entries: 218,
+    tag: "imperfectperfect",
+    status: "active",
+    leaderboard: [
+      { artistId: "maya-chen", artistName: "Maya Chen", avatarUrl: "https://picsum.photos/seed/maya-chen/80/80", likes: 2943, thumbnail: "https://picsum.photos/seed/raku1/600/400" },
+      { artistId: "elena-vasquez", artistName: "Elena Vasquez", avatarUrl: "https://picsum.photos/seed/elena/80/80", likes: 1876, thumbnail: "https://picsum.photos/seed/raku2/600/400" },
+      { artistId: "hana-kim", artistName: "Hana Kim", avatarUrl: "https://picsum.photos/seed/hana/80/80", likes: 1204, thumbnail: "https://picsum.photos/seed/raku3/600/400" },
+    ],
+  },
+  {
+    id: "ch-003",
+    emoji: "⚒️",
+    title: "First Heat of the Day",
+    subtitle: "What does your studio morning look like?",
+    description: "Show us the first moments of your workday. Whether you're lighting a forge, loading a kiln, or mixing glazes at 5am — we want to see the ritual of making.",
+    technique: null,
+    prize: "$300 tool credit at Wentworth Metalworks",
+    deadline: "2026-06-14T23:59:00Z",
+    entries: 891,
+    tag: "firstheat",
+    status: "active",
+    sponsoredBy: "Wentworth Metalworks",
+    leaderboard: [
+      { artistId: "james-okafor", artistName: "James Okafor", avatarUrl: "https://picsum.photos/seed/james/80/80", likes: 5102, thumbnail: "https://picsum.photos/seed/forge1/600/400" },
+      { artistId: "marcus-williams", artistName: "Marcus Williams", avatarUrl: "https://picsum.photos/seed/marcus/80/80", likes: 3841, thumbnail: "https://picsum.photos/seed/forge2/600/400" },
+      { artistId: "felix-braun", artistName: "Felix Braun", avatarUrl: "https://picsum.photos/seed/felix/80/80", likes: 2918, thumbnail: "https://picsum.photos/seed/forge3/600/400" },
+    ],
+  },
+  {
+    id: "ch-004",
+    emoji: "🌈",
+    title: "Color Theory",
+    subtitle: "Explore a single color in your medium",
+    description: "Pick one color — just one — and explore it completely. Multiple pieces, multiple techniques, same color family. Show us what one color can do.",
+    technique: null,
+    prize: "Solo exhibition feature in Kiln's curated gallery + press coverage",
+    deadline: "2026-06-28T23:59:00Z",
+    entries: 134,
+    tag: "kilncolortheory",
+    status: "active",
+    leaderboard: [
+      { artistId: "alex-bernstein", artistName: "Alex Bernstein", avatarUrl: "https://picsum.photos/seed/alex/80/80", likes: 3201, thumbnail: "https://img.youtube.com/vi/7xZfRTsNBos/maxresdefault.jpg" },
+      { artistId: "priya-patel", artistName: "Priya Patel", avatarUrl: "https://picsum.photos/seed/priya/80/80", likes: 1987, thumbnail: "https://picsum.photos/seed/color1/600/400" },
+      { artistId: "ingrid-larsson", artistName: "Ingrid Larsson", avatarUrl: "https://picsum.photos/seed/ingrid/80/80", likes: 1543, thumbnail: "https://picsum.photos/seed/color2/600/400" },
+    ],
+  },
+  {
+    id: "ch-005",
+    emoji: "🧵",
+    title: "Slow Stitch",
+    subtitle: "The meditative side of fiber arts",
+    description: "Share a time-lapse or close-up of your stitching, weaving, or knotting process. We want to feel the patience required. Fiber arts, textile, embroidery, basketry — all welcome.",
+    technique: "Fiber Arts",
+    prize: "Year of Kiln Pro + fiber arts supply kit",
+    deadline: "2026-07-04T23:59:00Z",
+    entries: 76,
+    tag: "slowstitch",
+    status: "upcoming",
+    leaderboard: [],
+  },
+  {
+    id: "ch-006",
+    emoji: "⚡",
+    title: "Spark to Finish",
+    subtitle: "Document an entire weld from tack to grind",
+    description: "Start to finish documentation of a single weld joint — tack welds, fill passes, cap, then the grind and final surface. Show your process, your PPE, your pride.",
+    technique: "Welding",
+    prize: "$250 Miller Electric store credit",
+    deadline: "2026-04-30T23:59:00Z",
+    entries: 512,
+    tag: "sparktofinish",
+    status: "ended",
+    sponsoredBy: "Miller Electric",
+    leaderboard: [
+      { artistId: "james-okafor", artistName: "James Okafor", avatarUrl: "https://picsum.photos/seed/james/80/80", likes: 7241, thumbnail: "https://picsum.photos/seed/weld1/600/400" },
+      { artistId: "marcus-williams", artistName: "Marcus Williams", avatarUrl: "https://picsum.photos/seed/marcus/80/80", likes: 5103, thumbnail: "https://picsum.photos/seed/weld2/600/400" },
+      { artistId: "tomas-novak", artistName: "Tomas Novak", avatarUrl: "https://picsum.photos/seed/tomas/80/80", likes: 4027, thumbnail: "https://picsum.photos/seed/weld3/600/400" },
+    ],
+  },
+];
+
+export function getActiveChallenge(id: string): Challenge | undefined {
+  return challenges.find((c) => c.id === id);
+}

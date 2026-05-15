@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { SlidersHorizontal, ExternalLink } from "lucide-react";
+import { SlidersHorizontal, ShoppingCart } from "lucide-react";
 import Nav from "@/components/Nav";
 import { listings, formatPrice, Listing } from "@/data/listings";
 import { artists } from "@/data/artists";
@@ -139,13 +139,13 @@ export default function Shop() {
                     {formatPrice(listing.price)}
                   </span>
                   {listing.available ? (
-                    <Link href={`/artists/${listing.artistId}`}>
+                    <Link href={`/shop/checkout/${listing.id}`}>
                       <button
                         data-testid={`inquire-btn-${listing.id}`}
                         className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-medium transition-all"
                         style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}
                       >
-                        Inquire <ExternalLink size={9} />
+                        <ShoppingCart size={9} /> Buy Now
                       </button>
                     </Link>
                   ) : (

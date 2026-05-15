@@ -29,6 +29,10 @@ import Orders from "@/pages/Orders";
 import Drafts from "@/pages/Drafts";
 import FollowerList from "@/pages/FollowerList";
 import TagFeed from "@/pages/TagFeed";
+import PostDetail from "@/pages/PostDetail";
+import Challenges from "@/pages/Challenges";
+import Checkout from "@/pages/Checkout";
+import WorkshopCheckout from "@/pages/WorkshopCheckout";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +66,10 @@ function Router() {
       <Route path="/orders" component={Orders} />
       <Route path="/drafts" component={Drafts} />
       <Route path="/tag/:tag" component={TagFeed} />
+      <Route path="/posts/:id" component={PostDetail} />
+      <Route path="/challenges" component={Challenges} />
+      <Route path="/shop/checkout/:listingId" component={Checkout} />
+      <Route path="/workshops/book/:workshopId" component={WorkshopCheckout} />
       <Route component={NotFound} />
     </Switch>
   );

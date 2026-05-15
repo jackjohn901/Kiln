@@ -439,23 +439,33 @@ export default function ArtistProfile() {
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-0.5">
-                  {tabItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setLightbox(item)}
-                      className="group relative aspect-square overflow-hidden bg-stone-900"
-                    >
-                      <img
-                        src={item.imageUrl} alt={item.caption}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/30 flex items-center justify-center">
-                        {item.isVideo && <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />}
+                  {tabItems.map((item) => {
+                    const thumb = (
+                      <div className="group relative aspect-square overflow-hidden bg-stone-900">
+                        <img
+                          src={item.imageUrl} alt={item.caption}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/30 flex items-center justify-center">
+                          {item.isVideo && <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />}
+                        </div>
+                        {item.isVideo && <div className="absolute right-1.5 top-1.5"><Video size={11} className="text-white drop-shadow" /></div>}
                       </div>
-                      {item.isVideo && <div className="absolute right-1.5 top-1.5"><Video size={11} className="text-white drop-shadow" /></div>}
-                    </button>
-                  ))}
+                    );
+                    if (item.isVideo && item.videoId) {
+                      return (
+                        <Link key={item.id} href={`/posts/${artist.id}-${item.videoId}`} className="block">
+                          {thumb}
+                        </Link>
+                      );
+                    }
+                    return (
+                      <button key={item.id} onClick={() => setLightbox(item)} className="block w-full text-left">
+                        {thumb}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </>

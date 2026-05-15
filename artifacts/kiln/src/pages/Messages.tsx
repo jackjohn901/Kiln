@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
-import { MessageCircle, Send, ArrowLeft, Search } from "lucide-react";
+import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type MessageThread } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { artists } from "@/data/artists";
+import { seedArtists } from "@/data/seedArtists";
+
+const ALL_ARTISTS = [...artists, ...seedArtists];
 
 function timeShort(iso: string): string {
   const d = new Date(iso);
@@ -54,6 +58,8 @@ function ThreadItem({ thread, active, onClick }: { thread: MessageThread; active
 
 export default function Messages() {
   const [, navigate] = useLocation();
+  const [composing, setComposing] = useState(false);
+  const [composeSearch, setComposeSearch] = useState("");
   const params = useParams<{ participantId?: string }>();
   const { profile } = useProfile();
   const { threads, sendDirectMessage, markThreadRead } = useSocial();
@@ -109,17 +115,64 @@ export default function Messages() {
         {/* Thread list */}
         <div className={`w-full md:w-72 shrink-0 border-r border-white/10 flex flex-col ${activeThread ? "hidden md:flex" : "flex"}`}>
           <div className="p-4 border-b border-white/10">
-            <h2 className="font-serif text-lg text-amber-100 mb-3">Messages</h2>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-600" />
-              <input
-                type="text"
-                placeholder="Search conversations"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-stone-800 py-2 pl-8 pr-3 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-              />
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-serif text-lg text-amber-100">Messages</h2>
+              <button
+                onClick={() => { setComposing((v) => !v); setComposeSearch(""); }}
+                className={`rounded-full p-1.5 transition-colors ${composing ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-amber-300"}`}
+                title="New message"
+              >
+                {composing ? <X size={16} /> : <PenSquare size={16} />}
+              </button>
             </div>
+
+            {composing ? (
+              <div>
+                <div className="relative mb-2">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-600" />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Search artists…"
+                    value={composeSearch}
+                    onChange={(e) => setComposeSearch(e.target.value)}
+                    className="w-full rounded-lg border border-amber-500/30 bg-stone-800 py-2 pl-8 pr-3 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/60 focus:outline-none"
+                  />
+                </div>
+                <div className="max-h-52 overflow-y-auto space-y-0.5">
+                  {ALL_ARTISTS
+                    .filter((a) => !composeSearch || a.name.toLowerCase().includes(composeSearch.toLowerCase()))
+                    .slice(0, 12)
+                    .map((a) => {
+                      const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`;
+                      return (
+                        <button
+                          key={a.id}
+                          onClick={() => { setComposing(false); navigate(`/messages/${a.id}`); }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-white/5 transition-colors text-left"
+                        >
+                          <img src={avatar} alt={a.name} className="h-8 w-8 rounded-full object-cover shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm text-stone-200 truncate">{a.name}</p>
+                            <p className="text-[10px] text-stone-600 truncate">{a.medium.split(",")[0]}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-600" />
+                <input
+                  type="text"
+                  placeholder="Search conversations"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-stone-800 py-2 pl-8 pr-3 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                />
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto">
             {filtered.length === 0 && (

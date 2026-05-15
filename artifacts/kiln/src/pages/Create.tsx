@@ -8,7 +8,7 @@ import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
 import MusicPicker from "@/components/MusicPicker";
 import { useProfile } from "@/contexts/ProfileContext";
-import { addPost, generateId } from "@/data/posts";
+import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { useUpload } from "@/hooks/useUpload";
 
@@ -54,6 +54,8 @@ export default function Create() {
   const [dropPrice, setDropPrice] = useState("");
   const [dropDate, setDropDate] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -77,6 +79,30 @@ export default function Create() {
   function addTag(raw: string) {
     const t = raw.replace(/^#+/, "").trim().toLowerCase().replace(/\s+/g, "");
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
+  }
+
+  function handleSaveDraft() {
+    if (!profile) return;
+    setSavingDraft(true);
+    saveDraft({
+      type: mediaType,
+      mediaUrl: previewUrl,
+      caption,
+      technique,
+      stage,
+      tags,
+      seriesName,
+      isDrop,
+      dropPrice,
+      dropDate,
+      musicTrackId: selectedTrack?.id,
+      filter: filterSettings?.preset,
+    });
+    setTimeout(() => {
+      setSavingDraft(false);
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2500);
+    }, 600);
   }
 
   async function handlePublish() {
@@ -518,6 +544,19 @@ export default function Create() {
             >
               {publishing ? <Loader2 size={16} className="animate-spin" /> : <Flame size={16} />}
               {publishing ? "Publishing…" : "Post to Kiln"}
+            </button>
+
+            <button
+              onClick={handleSaveDraft}
+              disabled={savingDraft || publishing || !previewUrl}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-white/10 py-2.5 text-sm text-stone-400 hover:border-amber-500/30 hover:text-amber-300 transition-all disabled:opacity-40"
+            >
+              {savingDraft ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : draftSaved ? (
+                <Check size={14} className="text-emerald-400" />
+              ) : null}
+              {draftSaved ? "Draft saved" : savingDraft ? "Saving…" : "Save as Draft"}
             </button>
 
             <p className="text-center text-xs text-stone-700">

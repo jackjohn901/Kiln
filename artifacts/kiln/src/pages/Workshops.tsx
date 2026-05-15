@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { MapPin, Clock, Users, ChevronRight, Star, X } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Star } from "lucide-react";
 import { useLocation } from "wouter";
 import { workshops, workshopMediums, Workshop } from "@/data/workshops";
 import Nav from "@/components/Nav";
-import CommissionModal from "@/components/CommissionModal";
-import { useSocial } from "@/contexts/SocialContext";
 
 const LEVEL_COLORS: Record<string, string> = {
   Beginner: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
@@ -13,7 +11,7 @@ const LEVEL_COLORS: Record<string, string> = {
   "All levels": "text-sky-400 bg-sky-500/10 border-sky-500/30",
 };
 
-function WorkshopCard({ w, onReserve }: { w: Workshop; onReserve: (w: Workshop) => void }) {
+function WorkshopCard({ w }: { w: Workshop }) {
   const [, navigate] = useLocation();
   const spotsRemaining = w.spotsLeft;
   const soldOut = spotsRemaining === 0;
@@ -83,11 +81,11 @@ function WorkshopCard({ w, onReserve }: { w: Workshop; onReserve: (w: Workshop) 
         <div className="flex items-center justify-between">
           <span className="text-lg font-bold text-stone-100">${w.price}</span>
           <button
-            onClick={() => onReserve(w)}
+            onClick={() => navigate(soldOut ? `/workshops` : `/workshops/book/${w.id}`)}
             disabled={soldOut}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500 disabled:bg-stone-700 disabled:text-stone-500 text-stone-950 font-semibold text-xs hover:bg-amber-400 transition-colors"
           >
-            {soldOut ? "Waitlist" : "Reserve spot"}
+            {soldOut ? "Waitlist" : "Reserve Spot"}
             <ChevronRight size={13} />
           </button>
         </div>
@@ -98,8 +96,6 @@ function WorkshopCard({ w, onReserve }: { w: Workshop; onReserve: (w: Workshop) 
 
 export default function Workshops() {
   const [medium, setMedium] = useState("All");
-  const [reserving, setReserving] = useState<Workshop | null>(null);
-  const { getArtistCommissionStatus } = useSocial();
 
   const filtered = medium === "All" ? workshops : workshops.filter((w) => w.medium === medium);
 
@@ -133,7 +129,7 @@ export default function Workshops() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((w) => (
-              <WorkshopCard key={w.id} w={w} onReserve={setReserving} />
+              <WorkshopCard key={w.id} w={w} />
             ))}
           </div>
 
@@ -145,15 +141,6 @@ export default function Workshops() {
         </div>
       </div>
 
-      {reserving && (
-        <CommissionModal
-          artistId={reserving.artistId}
-          artistName={reserving.artistName}
-          artistAvatarUrl={reserving.artistAvatarUrl}
-          commissionStatus={getArtistCommissionStatus(reserving.artistId)}
-          onClose={() => setReserving(null)}
-        />
-      )}
     </div>
   );
 }

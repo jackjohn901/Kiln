@@ -1,11 +1,21 @@
 import { useState, useMemo } from "react";
-import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X } from "lucide-react";
-import { useLocation } from "wouter";
+import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
+import { ALL_REELS } from "@/data/reels";
 import Nav from "@/components/Nav";
+
+const TRENDING_TECHNIQUES = [
+  { name: "Glass Blowing", emoji: "🔥", growth: "+24%", reels: ALL_REELS.filter((r) => r.technique === "Glass Blowing").length },
+  { name: "Raku", emoji: "🏺", growth: "+18%", reels: ALL_REELS.filter((r) => r.technique === "Raku").length },
+  { name: "Metal Forging", emoji: "⚒️", growth: "+31%", reels: ALL_REELS.filter((r) => r.technique === "Metal Forging").length },
+  { name: "Fiber Arts", emoji: "🧵", growth: "+12%", reels: ALL_REELS.filter((r) => r.technique === "Fiber Arts").length },
+  { name: "Ceramics", emoji: "🎨", growth: "+9%", reels: ALL_REELS.filter((r) => r.technique === "Ceramics").length },
+  { name: "Flameworking", emoji: "🌡️", growth: "+41%", reels: ALL_REELS.filter((r) => r.technique === "Flameworking").length },
+];
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -58,6 +68,63 @@ export default function Discover() {
           <div className="py-8">
             <h1 className="text-2xl font-bold text-stone-100 mb-1">Discover Artists</h1>
             <p className="text-sm text-stone-400">Find craft artists by technique, location, or commission availability</p>
+          </div>
+
+          {/* Trending this week */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp size={14} className="text-amber-400" />
+              <h2 className="text-sm font-semibold text-stone-300">Trending this week</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+              {TRENDING_TECHNIQUES.map((t) => (
+                <Link key={t.name} href={`/tag/${encodeURIComponent(t.name)}`}>
+                  <div className="group flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/60 px-3 py-2.5 hover:border-amber-500/30 hover:bg-stone-900 transition-all cursor-pointer">
+                    <span className="text-xl">{t.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-stone-200 truncate">{t.name}</p>
+                      <p className="text-[10px] text-stone-600">{t.reels} reels</p>
+                    </div>
+                    <span className="ml-auto text-[10px] font-bold text-emerald-400 shrink-0">{t.growth}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Rising artists */}
+            <div className="flex items-center gap-2 mb-3">
+              <Flame size={13} className="text-amber-400" />
+              <h2 className="text-sm font-semibold text-stone-300">Rising artists</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+              {[...artists, ...seedArtists].slice(0, 8).map((a) => {
+                const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/200/200`;
+                return (
+                  <Link key={a.id} href={`/artists/${a.id}`}>
+                    <div className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer group">
+                      <div className="relative h-14 w-14 rounded-full overflow-hidden border-2 border-amber-500/30 group-hover:border-amber-400/70 transition-colors">
+                        <img src={avatar} alt={a.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                      </div>
+                      <p className="text-[10px] text-stone-400 group-hover:text-amber-300 transition-colors text-center max-w-[60px] truncate">{a.name.split(" ")[0]}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Weekly challenge callout */}
+            <Link href="/challenges">
+              <div className="mt-4 flex items-center justify-between rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 hover:bg-amber-500/10 transition-colors cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <Trophy size={18} className="text-amber-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-100">60-Second Gather · Live Challenge</p>
+                    <p className="text-xs text-stone-500">347 entries · ends in 16 days</p>
+                  </div>
+                </div>
+                <span className="text-xs text-amber-400 font-medium">Enter →</span>
+              </div>
+            </Link>
           </div>
 
           <div className="relative mb-4">
