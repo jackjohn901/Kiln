@@ -18,6 +18,51 @@ import Stories from "@/components/Stories";
 import { ALL_REELS, TECHNIQUE_COLORS, type Reel } from "@/data/reels";
 
 const PREFS_KEY = "kiln_prefs_v1";
+const SETTING_KEY = "kiln_settings_v1";
+const INTERACTIONS_KEY = "kiln_interactions_v1";
+
+interface FeedInteractions {
+  likedTechniques: Record<string, number>;
+  savedTechniques: Record<string, number>;
+  watchedArtists: Record<string, number>;
+}
+
+function readInteractions(): FeedInteractions {
+  try {
+    return JSON.parse(localStorage.getItem(INTERACTIONS_KEY) ?? "{}");
+  } catch {
+    return { likedTechniques: {}, savedTechniques: {}, watchedArtists: {} };
+  }
+}
+
+function readKilnSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SETTING_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function scoreReel(
+  reel: Reel,
+  interactions: FeedInteractions,
+  following: string[],
+  quizTechniques: string[],
+): number {
+  let score = reel.craftScore;
+  // Boost followed artists
+  if (following.includes(reel.artistId)) score += 30;
+  // Boost techniques the user has liked/saved
+  score += (interactions.likedTechniques[reel.technique] ?? 0) * 8;
+  score += (interactions.savedTechniques[reel.technique] ?? 0) * 12;
+  // Boost artists the user has watched
+  score += (interactions.watchedArtists[reel.artistId] ?? 0) * 5;
+  // Boost quiz-selected techniques
+  if (quizTechniques.includes(reel.technique)) score += 20;
+  // Add small random shuffle so it's not static
+  score += Math.floor(Math.random() * 10);
+  return score;
+}
 
 function fmt(n: number) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
 
@@ -255,7 +300,17 @@ function ReelCard({
 
         {/* Like */}
         <button
-          onClick={() => toggleReelLike(reel.id)}
+          onClick={() => {
+            toggleReelLike(reel.id);
+            // Record interaction for For You algorithm
+            try {
+              const data = readInteractions();
+              const delta = liked ? -1 : 1;
+              data.likedTechniques[reel.technique] = Math.max(0, (data.likedTechniques[reel.technique] ?? 0) + delta);
+              data.watchedArtists[reel.artistId] = (data.watchedArtists[reel.artistId] ?? 0) + 1;
+              localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
+            } catch {}
+          }}
           className="flex flex-col items-center gap-1"
         >
           <Heart
@@ -282,7 +337,16 @@ function ReelCard({
 
         {/* Save */}
         <button
-          onClick={() => toggleReelSave(reel.id)}
+          onClick={() => {
+            toggleReelSave(reel.id);
+            try {
+              const data = readInteractions();
+              const delta = saved ? -1 : 1;
+              data.savedTechniques[reel.technique] = Math.max(0, (data.savedTechniques[reel.technique] ?? 0) + delta);
+              data.watchedArtists[reel.artistId] = (data.watchedArtists[reel.artistId] ?? 0) + 1;
+              localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
+            } catch {}
+          }}
           className="flex flex-col items-center gap-1"
         >
           <Bookmark
@@ -335,10 +399,29 @@ export default function Feed() {
     }
   }, [navigate]);
 
-  const baseReels = useMemo(
-    () => feedTab === "following" ? ALL_REELS.filter((r) => following.includes(r.artistId)) : ALL_REELS,
-    [feedTab, following]
-  );
+  // For You algorithm: score and sort based on user behaviour + settings
+  const baseReels = useMemo(() => {
+    if (feedTab === "following") {
+      return ALL_REELS.filter((r) => following.includes(r.artistId));
+    }
+    // Read current interaction data and quiz prefs each time
+    const interactions = readInteractions();
+    const settings = readKilnSettings();
+    const prefs = (() => {
+      try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}"); } catch { return {}; }
+    })();
+    const quizTechniques: string[] = prefs.techniques ?? [];
+    // Score every reel
+    const scored = ALL_REELS.map((r) => ({
+      reel: r,
+      score: scoreReel(r, interactions, following, quizTechniques),
+    }));
+    // Respect settings (autoplay / sound etc wired in feed)
+    void settings;
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .map((s) => s.reel);
+  }, [feedTab, following]);
 
   const reels = useMemo(
     () => techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels,

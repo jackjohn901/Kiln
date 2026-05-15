@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -48,6 +48,9 @@ export default function Nav() {
     { href: "/collab", label: "Collab", icon: UsersRound },
     { href: "/trending", label: "Trending", icon: TrendingUp },
     { href: "/assistant", label: "AI Assistant", icon: Sparkles },
+    { href: "/grants", label: "Grant Writer", icon: FileText },
+    { href: "/collector", label: "Collector", icon: Store },
+    { href: "/scheduler", label: "Scheduler", icon: PenLine },
     { href: "/map", label: "Map", icon: MapPin },
   ];
 

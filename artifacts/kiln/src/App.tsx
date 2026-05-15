@@ -53,9 +53,13 @@ import SeriesJournal from "@/pages/SeriesJournal";
 import SeriesDetail from "@/pages/SeriesDetail";
 import Settings from "@/pages/Settings";
 import Cart from "@/pages/Cart";
+import CartCheckout from "@/pages/CartCheckout";
 import CollabBoard from "@/pages/CollabBoard";
 import Trending from "@/pages/Trending";
 import CraftAssistant from "@/pages/CraftAssistant";
+import GrantWriter from "@/pages/GrantWriter";
+import CollectorPortal from "@/pages/CollectorPortal";
+import PostScheduler from "@/pages/PostScheduler";
 
 const queryClient = new QueryClient();
 
@@ -111,9 +115,13 @@ function Router() {
       <Route path="/series/:id" component={SeriesDetail} />
       <Route path="/settings" component={Settings} />
       <Route path="/cart" component={Cart} />
+      <Route path="/cart/checkout" component={CartCheckout} />
       <Route path="/collab" component={CollabBoard} />
       <Route path="/trending" component={Trending} />
       <Route path="/assistant" component={CraftAssistant} />
+      <Route path="/grants" component={GrantWriter} />
+      <Route path="/collector" component={CollectorPortal} />
+      <Route path="/scheduler" component={PostScheduler} />
       <Route component={NotFound} />
     </Switch>
   );
