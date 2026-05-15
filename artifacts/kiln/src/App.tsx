@@ -33,6 +33,9 @@ import PostDetail from "@/pages/PostDetail";
 import Challenges from "@/pages/Challenges";
 import Checkout from "@/pages/Checkout";
 import WorkshopCheckout from "@/pages/WorkshopCheckout";
+import LiveStudio from "@/pages/LiveStudio";
+import CommissionFlow from "@/pages/CommissionFlow";
+import StudioMap from "@/pages/StudioMap";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +73,9 @@ function Router() {
       <Route path="/challenges" component={Challenges} />
       <Route path="/shop/checkout/:listingId" component={Checkout} />
       <Route path="/workshops/book/:workshopId" component={WorkshopCheckout} />
+      <Route path="/live/:artistId" component={LiveStudio} />
+      <Route path="/commission/:artistId" component={CommissionFlow} />
+      <Route path="/map" component={StudioMap} />
       <Route component={NotFound} />
     </Switch>
   );

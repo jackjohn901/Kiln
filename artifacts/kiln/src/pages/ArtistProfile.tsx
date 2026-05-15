@@ -6,7 +6,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle,
+  Users, MessageCircle, Radio,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getArtistById, type Artist } from "@/data/artists";
@@ -319,8 +319,13 @@ export default function ArtistProfile() {
           <p className="text-sm text-stone-500">@{artist.id}</p>
 
           {isOwn ? (
-            <div className="mt-2">
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
               <CommissionStatusSelector />
+              <Link href={`/live/${artist.id}`}>
+                <button className="flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-colors">
+                  <Radio size={11} className="animate-pulse" /> Go Live
+                </button>
+              </Link>
             </div>
           ) : (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -329,12 +334,11 @@ export default function ArtistProfile() {
                 {statusCfg.label}
               </span>
               {commissionStatus !== "closed" && (
-                <button
-                  onClick={() => setShowCommission(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-800 border border-stone-600 text-xs font-medium text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
-                >
-                  <Hammer size={11} /> Request commission
-                </button>
+                <Link href={`/commission/${artist.id}`}>
+                  <button className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-800 border border-stone-600 text-xs font-medium text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition-colors">
+                    <Hammer size={11} /> Request commission
+                  </button>
+                </Link>
               )}
             </div>
           )}

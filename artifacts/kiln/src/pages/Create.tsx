@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
-  X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar,
+  X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
@@ -53,6 +53,7 @@ export default function Create() {
   const [isDrop, setIsDrop] = useState(false);
   const [dropPrice, setDropPrice] = useState("");
   const [dropDate, setDropDate] = useState("");
+  const [collabArtist, setCollabArtist] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -410,6 +411,23 @@ export default function Create() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Collab tag */}
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-stone-400">
+                <Users size={12} /> Tag a collaborator (optional)
+              </label>
+              <input
+                type="text"
+                placeholder="@artist-handle or name"
+                value={collabArtist}
+                onChange={(e) => setCollabArtist(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+              />
+              {collabArtist && (
+                <p className="mt-1 text-xs text-stone-600">This will appear on both your profiles as a collaborative post.</p>
+              )}
             </div>
 
             {/* Series */}

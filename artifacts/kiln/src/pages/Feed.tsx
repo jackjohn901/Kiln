@@ -11,6 +11,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import Comments from "@/components/Comments";
 import NotificationPanel from "@/components/NotificationPanel";
+import Stories from "@/components/Stories";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { ALL_REELS, TECHNIQUE_COLORS, type Reel } from "@/data/reels";
@@ -468,6 +469,11 @@ export default function Feed() {
               <Search size={15} />
             </Link>
           </div>
+        </div>
+
+        {/* Stories row */}
+        <div className="pointer-events-auto border-b border-white/5">
+          <Stories />
         </div>
 
         {/* Technique filter chips */}

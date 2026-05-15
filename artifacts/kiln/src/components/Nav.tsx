@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3 } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import NotificationPanel from "@/components/NotificationPanel";
+import GlobalSearch from "@/components/GlobalSearch";
 
 export default function Nav() {
   const [location] = useLocation();
@@ -11,7 +13,19 @@ export default function Nav() {
   const { unreadCount, unreadMessageCount, receivedInquiries, isVerified } = useSocial();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
 
@@ -21,6 +35,8 @@ export default function Nav() {
     { href: "/drops", label: "Drops" },
     { href: "/workshops", label: "Workshops" },
     { href: "/techniques", label: "Techniques" },
+    { href: "/challenges", label: "Challenges", icon: Trophy },
+    { href: "/map", label: "Map", icon: MapPin },
   ];
 
   useEffect(() => {
@@ -79,6 +95,16 @@ export default function Nav() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Global Search */}
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-700 text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors"
+              title="Search (⌘K)"
+              aria-label="Open search"
+            >
+              <Search size={15} />
+            </button>
+
             {/* Saved */}
             <Link
               href="/saved"
@@ -214,6 +240,10 @@ export default function Nav() {
       {showNotifications && (
         <NotificationPanel onClose={() => setShowNotifications(false)} />
       )}
+
+      <AnimatePresence>
+        {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
+      </AnimatePresence>
     </>
   );
 }
