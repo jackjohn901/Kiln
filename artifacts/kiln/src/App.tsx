@@ -19,6 +19,16 @@ import Messages from "@/pages/Messages";
 import Drops from "@/pages/Drops";
 import Techniques from "@/pages/Techniques";
 import Subscribe from "@/pages/Subscribe";
+import Notifications from "@/pages/Notifications";
+import Saved from "@/pages/Saved";
+import Earnings from "@/pages/Earnings";
+import Collection from "@/pages/Collection";
+import ApplyVerified from "@/pages/ApplyVerified";
+import EditProfile from "@/pages/EditProfile";
+import Orders from "@/pages/Orders";
+import Drafts from "@/pages/Drafts";
+import FollowerList from "@/pages/FollowerList";
+import TagFeed from "@/pages/TagFeed";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +39,8 @@ function Router() {
       <Route path="/discover" component={Discover} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:id" component={ArtistProfile} />
+      <Route path="/artists/:id/followers" component={FollowerList} />
+      <Route path="/artists/:id/following" component={FollowerList} />
       <Route path="/shop" component={Shop} />
       <Route path="/workshops" component={Workshops} />
       <Route path="/analytics" component={Analytics} />
@@ -41,6 +53,15 @@ function Router() {
       <Route path="/techniques" component={Techniques} />
       <Route path="/techniques/:id" component={Techniques} />
       <Route path="/subscribe/:artistId" component={Subscribe} />
+      <Route path="/notifications" component={Notifications} />
+      <Route path="/saved" component={Saved} />
+      <Route path="/earnings" component={Earnings} />
+      <Route path="/collection" component={Collection} />
+      <Route path="/apply-verified" component={ApplyVerified} />
+      <Route path="/edit-profile" component={EditProfile} />
+      <Route path="/orders" component={Orders} />
+      <Route path="/drafts" component={Drafts} />
+      <Route path="/tag/:tag" component={TagFeed} />
       <Route component={NotFound} />
     </Switch>
   );

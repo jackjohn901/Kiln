@@ -1,0 +1,162 @@
+import { useState } from "react";
+import { Link } from "wouter";
+import { motion } from "framer-motion";
+import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign } from "lucide-react";
+import Nav from "@/components/Nav";
+import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
+
+const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: string; bg: string }> = {
+  follow:       { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },
+  like:         { icon: Heart,         color: "text-rose-400",   bg: "bg-rose-500/15" },
+  comment:      { icon: MessageCircle, color: "text-sky-400",    bg: "bg-sky-500/15" },
+  commission:   { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
+  tip:          { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-500/15" },
+  workshop:     { icon: BookOpen,      color: "text-purple-400", bg: "bg-purple-500/15" },
+  drop:         { icon: Zap,           color: "text-orange-400", bg: "bg-orange-500/15" },
+  subscription: { icon: Star,          color: "text-amber-300",  bg: "bg-amber-400/15" },
+};
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function groupByDate(notifs: KilnNotification[]): Array<{ label: string; items: KilnNotification[] }> {
+  const groups = new Map<string, KilnNotification[]>();
+  const now = new Date();
+  for (const n of notifs) {
+    const d = new Date(n.createdAt);
+    const diff = now.getTime() - d.getTime();
+    let label: string;
+    if (diff < 86400000) label = "Today";
+    else if (diff < 172800000) label = "Yesterday";
+    else if (diff < 604800000) label = "This Week";
+    else label = "Earlier";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push(n);
+  }
+  const order = ["Today", "Yesterday", "This Week", "Earlier"];
+  return order.filter((l) => groups.has(l)).map((l) => ({ label: l, items: groups.get(l)! }));
+}
+
+export default function Notifications() {
+  const { notifications, markRead, markAllRead } = useSocial();
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+
+  const visible = filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const grouped = groupByDate(visible);
+
+  return (
+    <div className="min-h-screen bg-[#12100e]">
+      <Nav />
+      <div className="mx-auto max-w-2xl px-4 py-8">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-2xl font-bold text-amber-100">Notifications</h1>
+            {unreadCount > 0 && (
+              <p className="text-sm text-stone-500">{unreadCount} unread</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllRead}
+                className="flex items-center gap-1.5 rounded-full border border-stone-700 px-3 py-1.5 text-xs font-medium text-stone-400 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+              >
+                <CheckCheck size={12} />
+                Mark all read
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div className="mb-6 flex gap-1 rounded-xl bg-stone-900/50 p-1 border border-white/5">
+          {(["all", "unread"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors capitalize ${
+                filter === f ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"
+              }`}
+            >
+              {f === "all" ? `All (${notifications.length})` : `Unread (${unreadCount})`}
+            </button>
+          ))}
+        </div>
+
+        {/* Notifications */}
+        {grouped.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Bell size={40} className="mb-4 text-stone-700" />
+            <p className="text-stone-500">{filter === "unread" ? "No unread notifications" : "No notifications yet"}</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {grouped.map(({ label, items }) => (
+              <div key={label}>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-stone-600">{label}</p>
+                <div className="space-y-1">
+                  {items.map((n) => {
+                    const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.follow;
+                    const Icon = cfg.icon;
+                    return (
+                      <motion.div
+                        key={n.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`group relative flex items-start gap-3 rounded-2xl p-3 transition-colors ${
+                          n.read ? "bg-transparent hover:bg-white/3" : "bg-white/5 hover:bg-white/7"
+                        }`}
+                      >
+                        {/* Avatar + type icon */}
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={n.fromAvatarUrl || `https://picsum.photos/seed/${n.fromId}/40/40`}
+                            alt=""
+                            className="h-10 w-10 rounded-full object-cover"
+                          />
+                          <div className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ${cfg.bg} border border-[#12100e]`}>
+                            <Icon size={10} className={cfg.color} />
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="min-w-0 flex-1" onClick={() => markRead(n.id)}>
+                          {n.link ? (
+                            <Link href={n.link} className="block">
+                              <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                              <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
+                            </Link>
+                          ) : (
+                            <>
+                              <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                              <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Unread dot */}
+                        {!n.read && (
+                          <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-amber-400" />
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

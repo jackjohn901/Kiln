@@ -245,8 +245,8 @@ export default function ArtistProfile() {
                 <Link href="/create" className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
                   <Plus size={14} /> Post
                 </Link>
-                <Link href="/setup" className="rounded-full border border-white/15 px-3 py-1.5 text-sm text-stone-300 hover:border-amber-400/40 transition-colors">
-                  Edit
+                <Link href="/edit-profile" className="rounded-full border border-white/15 px-3 py-1.5 text-sm text-stone-300 hover:border-amber-400/40 transition-colors">
+                  Edit Profile
                 </Link>
               </>
             ) : (
@@ -360,17 +360,24 @@ export default function ArtistProfile() {
 
         {/* Stats */}
         <div className="mt-4 flex gap-6 border-t border-white/8 pt-4">
-          {[
-            { label: "posts", value: allGridItems.length },
-            { label: "followers", value: stats.followers.toLocaleString() },
-            { label: "following", value: stats.following },
-            ...(workshops.length > 0 ? [{ label: "workshops", value: workshops.length }] : []),
-          ].map(({ label, value }) => (
-            <div key={label} className="text-center">
-              <p className="font-bold text-white">{value}</p>
-              <p className="text-xs text-stone-500">{label}</p>
+          <div className="text-center">
+            <p className="font-bold text-white">{allGridItems.length}</p>
+            <p className="text-xs text-stone-500">posts</p>
+          </div>
+          <Link href={`/artists/${artist.id}/followers`} className="text-center hover:opacity-80 transition-opacity">
+            <p className="font-bold text-white">{stats.followers.toLocaleString()}</p>
+            <p className="text-xs text-stone-500">followers</p>
+          </Link>
+          <Link href={`/artists/${artist.id}/following`} className="text-center hover:opacity-80 transition-opacity">
+            <p className="font-bold text-white">{stats.following}</p>
+            <p className="text-xs text-stone-500">following</p>
+          </Link>
+          {workshops.length > 0 && (
+            <div className="text-center">
+              <p className="font-bold text-white">{workshops.length}</p>
+              <p className="text-xs text-stone-500">workshops</p>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Story highlights (series) */}

@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
-  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart,
+  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X,
 } from "lucide-react";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -293,9 +293,9 @@ function ReelCard({
       {/* ── Bottom-left: artist info ── */}
       <div className="absolute bottom-[88px] left-4 right-20 z-10 space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-flex items-center gap-1 rounded-full ${color} px-2.5 py-0.5 text-[10px] font-bold text-white shadow`}>
+          <Link href={`/tag/${encodeURIComponent(reel.technique)}`} className={`inline-flex items-center gap-1 rounded-full ${color} px-2.5 py-0.5 text-[10px] font-bold text-white shadow`}>
             🔥 {reel.technique}
-          </span>
+          </Link>
           <span className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 backdrop-blur-sm">
             <Flame size={9} className="text-amber-400" />
             <span className="text-[9px] font-bold text-amber-300">{reel.craftScore}</span>
@@ -423,14 +423,26 @@ export default function Feed() {
   const [musicMuted, setMusicMuted] = useState(false);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
   const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");
+  const [techniqueFilter, setTechniqueFilter] = useState<string | null>(null);
   const [commentReel, setCommentReel] = useState<{ id: string; artistName: string } | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const { following, unreadCount } = useSocial();
 
-  const reels = feedTab === "following"
-    ? ALL_REELS.filter((r) => following.includes(r.artistId))
-    : ALL_REELS;
+  const baseReels = useMemo(
+    () => feedTab === "following" ? ALL_REELS.filter((r) => following.includes(r.artistId)) : ALL_REELS,
+    [feedTab, following]
+  );
+
+  const reels = useMemo(
+    () => techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels,
+    [baseReels, techniqueFilter]
+  );
+
+  const availableTechniques = useMemo(() => {
+    const set = new Set(baseReels.map((r) => r.technique));
+    return Array.from(set).sort();
+  }, [baseReels]);
 
   const activeReel = reels[activeIndex];
 
@@ -452,13 +464,13 @@ export default function Feed() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [reels.length]);
 
-  // Reset scroll when tab changes
+  // Reset scroll when tab or technique filter changes
   useEffect(() => {
     setActiveIndex(0);
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
-  }, [feedTab]);
+  }, [feedTab, techniqueFilter]);
 
   // Music: switch track when active reel changes
   useEffect(() => {
@@ -520,45 +532,72 @@ export default function Feed() {
       <div className="pointer-events-none absolute left-0 right-0 top-0 z-40 h-36 bg-gradient-to-b from-black via-black/70 to-transparent" />
 
       {/* Fixed top bar */}
-      <div className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between px-4 pt-4">
-        <Link href="/" className="pointer-events-auto flex items-center gap-1.5">
-          <Flame size={18} className="text-amber-400" />
-          <span className="font-serif text-xl font-bold tracking-tight text-white">Kiln</span>
-        </Link>
+      <div className="absolute left-0 right-0 top-0 z-50 flex flex-col">
+        <div className="flex items-center justify-between px-4 pt-4">
+          <Link href="/" className="pointer-events-auto flex items-center gap-1.5">
+            <Flame size={18} className="text-amber-400" />
+            <span className="font-serif text-xl font-bold tracking-tight text-white">Kiln</span>
+          </Link>
 
-        <div className="pointer-events-auto flex items-center gap-4">
-          <button
-            onClick={() => setFeedTab("foryou")}
-            className={`pb-0.5 text-sm font-bold transition-colors ${feedTab === "foryou" ? "border-b-2 border-amber-400 text-white" : "text-white/40"}`}
-          >
-            For You
-          </button>
-          <button
-            onClick={() => setFeedTab("following")}
-            className={`pb-0.5 text-sm font-medium transition-colors relative ${feedTab === "following" ? "border-b-2 border-amber-400 text-white" : "text-white/40"}`}
-          >
-            Following
-            {following.length > 0 && feedTab !== "following" && (
-              <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-amber-400" />
-            )}
-          </button>
+          <div className="pointer-events-auto flex items-center gap-4">
+            <button
+              onClick={() => setFeedTab("foryou")}
+              className={`pb-0.5 text-sm font-bold transition-colors ${feedTab === "foryou" ? "border-b-2 border-amber-400 text-white" : "text-white/40"}`}
+            >
+              For You
+            </button>
+            <button
+              onClick={() => setFeedTab("following")}
+              className={`pb-0.5 text-sm font-medium transition-colors relative ${feedTab === "following" ? "border-b-2 border-amber-400 text-white" : "text-white/40"}`}
+            >
+              Following
+              {following.length > 0 && feedTab !== "following" && (
+                <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-amber-400" />
+              )}
+            </button>
+          </div>
+
+          <div className="pointer-events-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowNotifications((v) => !v)}
+              className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm"
+            >
+              <Bell size={15} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-stone-950">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            <Link href="/discover" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm">
+              <Search size={15} />
+            </Link>
+          </div>
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-2">
-          <button
-            onClick={() => setShowNotifications((v) => !v)}
-            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm"
-          >
-            <Bell size={15} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-stone-950">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
-          <Link href="/discover" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm">
-            <Search size={15} />
-          </Link>
+        {/* Technique filter chips */}
+        <div className="pointer-events-auto flex gap-2 overflow-x-auto px-4 pt-2 pb-1" style={{ scrollbarWidth: "none" }}>
+          {techniqueFilter && (
+            <button
+              onClick={() => setTechniqueFilter(null)}
+              className="flex flex-shrink-0 items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-stone-950"
+            >
+              <X size={9} /> All
+            </button>
+          )}
+          {availableTechniques.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTechniqueFilter(techniqueFilter === t ? null : t)}
+              className={`flex-shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                techniqueFilter === t
+                  ? "border-amber-400/60 bg-amber-500/20 text-amber-300"
+                  : "border-white/15 bg-black/30 text-white/60 backdrop-blur-sm hover:border-white/30 hover:text-white/90"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
       </div>
 
