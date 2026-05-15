@@ -1,83 +1,132 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Lock, Check, Package, ArrowRight, Truck, ShieldCheck, CreditCard, ExternalLink } from "lucide-react";
+import {
+  ChevronLeft, Check, Package, ArrowRight, Truck, ShieldCheck,
+  ExternalLink, MessageCircle, Info, CreditCard,
+} from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
+import { artists } from "@/data/artists";
+import { seedArtists } from "@/data/seedArtists";
+import {
+  readPaymentSettings, venmoUrl, cashAppUrl, paypalMeUrl,
+  type ArtistPayments,
+} from "@/utils/paymentSettings";
 
-type Step = "address" | "review" | "success";
+const ALL_ARTISTS = [...artists, ...seedArtists];
+
+type Step = "address" | "pay" | "done";
 
 interface AddressForm {
   name: string; email: string; phone: string;
   address: string; city: string; state: string; zip: string; country: string;
 }
+const EMPTY_ADDR: AddressForm = {
+  name: "", email: "", phone: "", address: "", city: "", state: "", zip: "", country: "US",
+};
 
-const EMPTY_ADDR: AddressForm = { name: "", email: "", phone: "", address: "", city: "", state: "", zip: "", country: "US" };
+// Per-artist group in cart
+interface ArtistGroup {
+  artistId: string;
+  artistName: string;
+  avatarUrl?: string;
+  items: Array<{ listing: any; quantity: number }>;
+  subtotal: number;
+  payments: ArtistPayments;
+  paid: boolean;
+}
+
+// Demo payment stubs for seeded artists so the UI shows live examples
+const DEMO_PAYMENTS: Record<string, Partial<ArtistPayments>> = {
+  "alex-bernstein":  { stripeLink: "https://buy.stripe.com/test_demo", venmo: "@alexbglass" },
+  "lino-tagliapietra": { venmo: "@linotagliapietra", paypalMe: "linotagliapietra" },
+  "default": { venmo: "@artist", cashapp: "$artist" },
+};
+
+function getArtistPayments(artistId: string): ArtistPayments {
+  // Check if this is the logged-in user's own listings (use their saved settings)
+  const saved = readPaymentSettings();
+  const hasSaved = saved.stripeLink || saved.venmo || saved.cashapp || saved.paypalMe;
+  if (hasSaved) return saved;
+
+  // Fall back to demo stubs
+  const demo = DEMO_PAYMENTS[artistId] ?? DEMO_PAYMENTS["default"];
+  return {
+    stripeLink: demo.stripeLink ?? "",
+    venmo: demo.venmo ?? "",
+    cashapp: demo.cashapp ?? "",
+    paypalMe: demo.paypalMe ?? "",
+    notes: demo.notes ?? "",
+  };
+}
 
 export default function CartCheckout() {
   const [, navigate] = useLocation();
   const { items, subtotal, itemCount, clearCart } = useCart();
   const [step, setStep] = useState<Step>("address");
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDR);
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [orderId] = useState(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
+  const [groups, setGroups] = useState<ArtistGroup[]>([]);
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
 
-  const STEPS: Step[] = ["address", "review", "success"];
-  const stepIdx = STEPS.indexOf(step);
-
+  // Detect return from success
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "1") {
       clearCart();
-      setStep("success");
+      setStep("done");
     }
   }, []);
+
+  // Build artist groups when entering pay step
+  useEffect(() => {
+    if (step !== "pay") return;
+    const map = new Map<string, ArtistGroup>();
+    for (const { listing, quantity } of items) {
+      const aid = listing.artistId;
+      if (!map.has(aid)) {
+        const artist = ALL_ARTISTS.find((a) => a.id === aid);
+        map.set(aid, {
+          artistId: aid,
+          artistName: artist?.name ?? aid,
+          avatarUrl: artist?.images?.[0]?.url,
+          items: [],
+          subtotal: 0,
+          payments: getArtistPayments(aid),
+          paid: false,
+        });
+      }
+      const g = map.get(aid)!;
+      g.items.push({ listing, quantity });
+      g.subtotal += listing.price * quantity;
+    }
+    setGroups(Array.from(map.values()));
+  }, [step, items]);
+
+  function togglePaid(artistId: string) {
+    setGroups((gs) => gs.map((g) => g.artistId === artistId ? { ...g, paid: !g.paid } : g));
+  }
+
+  const allPaid = groups.length > 0 && groups.every((g) => g.paid);
+
+  function handleDone() {
+    clearCart();
+    setStep("done");
+  }
 
   function addrValid() {
     return addr.name && addr.email && addr.address && addr.city && addr.state && addr.zip;
   }
 
-  async function handleStripeCheckout() {
-    setProcessing(true);
-    setError(null);
-    try {
-      const basePath = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-      const resp = await fetch(`${basePath}/api/stripe/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map(({ listing, quantity }) => ({
-            name: listing.title,
-            price: listing.price,
-            quantity,
-            imageUrl: listing.imageUrl ?? undefined,
-            artistName: listing.artistId,
-          })),
-          customerEmail: addr.email,
-          successPath: "/cart/checkout?success=1",
-          cancelPath: "/cart/checkout",
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error ?? "Checkout failed");
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("No checkout URL returned");
-      }
-    } catch (err: any) {
-      setError(err.message ?? "Something went wrong. Please try again.");
-      setProcessing(false);
-    }
-  }
+  const STEPS: Step[] = ["address", "pay", "done"];
+  const stepIdx = STEPS.indexOf(step);
 
-  if (items.length === 0 && step !== "success") {
+  if (items.length === 0 && step !== "done") {
     return (
       <div className="min-h-screen bg-[#12100e]">
         <Nav />
@@ -101,7 +150,7 @@ export default function CartCheckout() {
 
         {/* Header */}
         <div className="mb-6 flex items-center gap-3">
-          {step !== "success" && (
+          {step !== "done" && (
             <button
               onClick={() => step === "address" ? navigate("/cart") : setStep("address")}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors"
@@ -110,22 +159,22 @@ export default function CartCheckout() {
             </button>
           )}
           <h1 className="font-serif text-2xl text-amber-100">
-            {step === "success" ? "Order Confirmed" : "Checkout"}
+            {step === "done" ? "Order Complete" : "Checkout"}
           </h1>
         </div>
 
         {/* Progress bar */}
-        {step !== "success" && (
+        {step !== "done" && (
           <div className="mb-8 flex items-center gap-2">
-            {(["address", "review"] as Step[]).map((s, i) => (
+            {(["address", "pay"] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center gap-2 flex-1">
                 <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   stepIdx > i ? "bg-emerald-500 text-white" : stepIdx === i ? "bg-amber-500 text-stone-950" : "bg-stone-800 text-stone-500"
                 }`}>
                   {stepIdx > i ? <Check size={12} /> : i + 1}
                 </div>
-                <span className={`text-xs capitalize ${stepIdx === i ? "text-amber-300" : "text-stone-600"}`}>
-                  {s === "address" ? "Shipping" : "Review & Pay"}
+                <span className={`text-xs ${stepIdx === i ? "text-amber-300" : "text-stone-600"}`}>
+                  {s === "address" ? "Shipping info" : "Pay artists"}
                 </span>
                 {i < 1 && <div className={`flex-1 h-px ${stepIdx > i ? "bg-emerald-500/40" : "bg-stone-800"}`} />}
               </div>
@@ -134,13 +183,14 @@ export default function CartCheckout() {
         )}
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Main form */}
           <div className="flex-1">
             <AnimatePresence mode="wait">
+
+              {/* ── Step 1: Shipping address ── */}
               {step === "address" && (
                 <motion.div key="address" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                   <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shipping address</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Your shipping address</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
                         <Field label="Full name" value={addr.name} onChange={(v) => setAddr({ ...addr, name: v })} />
@@ -170,100 +220,189 @@ export default function CartCheckout() {
                         </select>
                       </div>
                     </div>
-                    <button
-                      disabled={!addrValid()}
-                      onClick={() => setStep("review")}
-                      className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Review order <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
 
-              {step === "review" && (
-                <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                  <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Order summary</p>
-
-                    <div className="space-y-3">
-                      {items.map(({ listing, quantity }) => (
-                        <div key={listing.id} className="flex items-center gap-3">
-                          <div className="h-12 w-12 rounded-lg overflow-hidden bg-stone-800 shrink-0">
-                            {listing.imageUrl && <img src={listing.imageUrl} alt={listing.title} className="h-full w-full object-cover" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-stone-200 line-clamp-1">{listing.title}</p>
-                            <p className="text-xs text-stone-500">Qty: {quantity}</p>
-                          </div>
-                          <p className="text-sm font-semibold text-amber-300">{formatPrice(listing.price * quantity)}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="border-t border-white/8 pt-3 space-y-1.5 text-sm text-stone-400">
-                      <div className="flex justify-between">
-                        <span>Shipping to</span>
-                        <span className="text-stone-300">{addr.city}, {addr.state}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="flex items-center gap-1"><Truck size={11} /> Shipping</span>
-                        <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping}`}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tax (8.75%)</span>
-                        <span>${tax.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-t border-white/8 pt-2 text-base font-bold text-amber-100">
-                        <span>Total</span>
-                        <span>${total.toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    {/* Stripe CTA */}
-                    <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex items-center gap-3">
-                      <CreditCard size={16} className="text-indigo-400 shrink-0" />
-                      <p className="text-xs text-stone-400">
-                        You'll be securely redirected to <span className="text-indigo-300 font-medium">Stripe</span> to enter your payment details. No card data ever touches Kiln's servers.
+                    {/* Free platform note */}
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-start gap-2">
+                      <Info size={13} className="text-emerald-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-emerald-300/80">
+                        Kiln is free — payments go directly from you to each artist. No platform fees, no middleman.
                       </p>
                     </div>
 
-                    {error && (
-                      <p className="text-xs text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">{error}</p>
-                    )}
-
                     <button
-                      disabled={processing}
-                      onClick={handleStripeCheckout}
-                      className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-70"
+                      disabled={!addrValid()}
+                      onClick={() => setStep("pay")}
+                      className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {processing ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-950 border-t-transparent" />
-                          Redirecting to Stripe…
-                        </>
-                      ) : (
-                        <><Lock size={13} /> Pay ${total.toFixed(2)} with Stripe <ExternalLink size={12} /></>
-                      )}
+                      Continue to payment <ArrowRight size={14} />
                     </button>
                   </div>
                 </motion.div>
               )}
 
-              {step === "success" && (
-                <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              {/* ── Step 2: Pay artists directly ── */}
+              {step === "pay" && (
+                <motion.div key="pay" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex items-start gap-2">
+                    <Info size={13} className="text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-300/80">
+                      Pay each artist directly using their preferred method below. Once you've sent payment, check the box to confirm. Then share your shipping address with them.
+                    </p>
+                  </div>
+
+                  {groups.map((group) => {
+                    const payNote = `Kiln artwork purchase — ${group.items.map(i => i.listing.title).join(", ")}`;
+                    const amt = group.subtotal;
+                    const p = group.payments;
+                    const hasAny = p.stripeLink || p.venmo || p.cashapp || p.paypalMe;
+
+                    return (
+                      <div key={group.artistId} className={`rounded-2xl border bg-stone-900/60 overflow-hidden transition-colors ${group.paid ? "border-emerald-500/30" : "border-white/8"}`}>
+                        {/* Artist header */}
+                        <div className="flex items-center gap-3 px-5 pt-5 pb-3">
+                          <div className="h-10 w-10 rounded-full overflow-hidden bg-stone-800 shrink-0">
+                            {group.avatarUrl
+                              ? <img src={group.avatarUrl} alt="" className="h-full w-full object-cover" />
+                              : <div className="h-full w-full flex items-center justify-center text-stone-500 text-sm font-bold">{group.artistName[0]}</div>
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-stone-200">{group.artistName}</p>
+                            <p className="text-xs text-stone-500">{group.items.length} item{group.items.length !== 1 ? "s" : ""} · {formatPrice(group.subtotal)}</p>
+                          </div>
+                          {group.paid && (
+                            <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                              <Check size={13} /> Paid
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Items */}
+                        <div className="px-5 pb-3 space-y-2">
+                          {group.items.map(({ listing, quantity }) => (
+                            <div key={listing.id} className="flex items-center gap-2.5">
+                              <div className="h-9 w-9 rounded-lg overflow-hidden bg-stone-800 shrink-0">
+                                {listing.imageUrl && <img src={listing.imageUrl} alt="" className="h-full w-full object-cover" />}
+                              </div>
+                              <p className="flex-1 text-xs text-stone-400 line-clamp-1">{listing.title}</p>
+                              <p className="text-xs font-medium text-amber-300/80">{formatPrice(listing.price * quantity)}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Payment methods */}
+                        <div className="border-t border-white/8 px-5 py-4 space-y-3">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-stone-600">Pay {group.artistName.split(" ")[0]} directly</p>
+
+                          {hasAny ? (
+                            <div className="flex flex-wrap gap-2">
+                              {p.stripeLink && (
+                                <PayButton
+                                  href={p.stripeLink}
+                                  color="bg-indigo-500/15 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25"
+                                  icon={<CreditCard size={12} />}
+                                  label="Pay with Stripe"
+                                />
+                              )}
+                              {p.venmo && (
+                                <PayButton
+                                  href={venmoUrl(p.venmo, amt, payNote)}
+                                  color="bg-sky-500/15 border-sky-500/30 text-sky-300 hover:bg-sky-500/25"
+                                  icon={<span className="text-[10px] font-black">V</span>}
+                                  label={`Venmo ${p.venmo.startsWith("@") ? p.venmo : "@" + p.venmo}`}
+                                />
+                              )}
+                              {p.cashapp && (
+                                <PayButton
+                                  href={cashAppUrl(p.cashapp, amt, payNote)}
+                                  color="bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"
+                                  icon={<span className="text-[10px] font-black">$</span>}
+                                  label={`Cash App ${p.cashapp.startsWith("$") ? p.cashapp : "$" + p.cashapp}`}
+                                />
+                              )}
+                              {p.paypalMe && (
+                                <PayButton
+                                  href={paypalMeUrl(p.paypalMe, amt)}
+                                  color="bg-blue-500/15 border-blue-500/30 text-blue-300 hover:bg-blue-500/25"
+                                  icon={<span className="text-[10px] font-black">P</span>}
+                                  label="PayPal.me"
+                                />
+                              )}
+                              <Link href={`/messages`}>
+                                <button className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-stone-400 hover:border-white/20 hover:text-stone-300 transition-colors">
+                                  <MessageCircle size={12} /> Message artist
+                                </button>
+                              </Link>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Link href={`/messages`}>
+                                <button className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-stone-400 hover:border-white/20 transition-colors">
+                                  <MessageCircle size={12} /> Message artist to arrange payment
+                                </button>
+                              </Link>
+                            </div>
+                          )}
+
+                          {p.notes && (
+                            <p className="text-xs text-stone-600 italic">Note from artist: "{p.notes}"</p>
+                          )}
+
+                          {/* Amount summary */}
+                          <div className="flex items-center justify-between text-xs text-stone-500 pt-1 border-t border-white/5">
+                            <span>Amount to send</span>
+                            <span className="font-bold text-amber-200">{formatPrice(amt)}</span>
+                          </div>
+
+                          {/* Paid confirmation */}
+                          <button
+                            onClick={() => togglePaid(group.artistId)}
+                            className={`w-full flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold border transition-colors ${
+                              group.paid
+                                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                                : "border-white/10 text-stone-400 hover:border-white/20"
+                            }`}
+                          >
+                            {group.paid ? <><Check size={12} /> Payment sent</> : "Mark as paid"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    disabled={!allPaid}
+                    onClick={handleDone}
+                    className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Check size={14} /> Complete order
+                  </button>
+                  {!allPaid && (
+                    <p className="text-center text-xs text-stone-600">Mark all payments as sent to complete your order</p>
+                  )}
+                </motion.div>
+              )}
+
+              {/* ── Done ── */}
+              {step === "done" && (
+                <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
                   <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-8 text-center space-y-4">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/30">
                       <Check size={28} className="text-emerald-400" />
                     </div>
                     <div>
-                      <h2 className="font-serif text-xl text-amber-100 mb-1">Payment successful!</h2>
-                      <p className="text-sm text-stone-400">Confirmation #{orderId}</p>
+                      <h2 className="font-serif text-xl text-amber-100 mb-1">Order complete!</h2>
+                      <p className="text-sm text-stone-400">Reference #{orderId}</p>
                     </div>
-                    <div className="rounded-xl bg-stone-900/60 border border-white/8 px-4 py-3 text-sm text-stone-400 text-left space-y-1">
+                    <div className="rounded-xl bg-stone-900/60 border border-white/8 px-4 py-3 text-sm text-stone-400 text-left space-y-1.5">
                       <div className="flex justify-between">
-                        <span>Payment processed by</span>
-                        <span className="text-indigo-300">Stripe</span>
+                        <span>Ship to</span>
+                        <span className="text-stone-300">{addr.name || "—"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Payments</span>
+                        <span className="text-emerald-400">Sent directly to artists</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Estimated delivery</span>
@@ -292,7 +431,7 @@ export default function CartCheckout() {
           </div>
 
           {/* Order summary sidebar */}
-          {step !== "success" && (
+          {step !== "done" && (
             <div className="lg:w-72 shrink-0">
               <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-4 space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
@@ -323,11 +462,11 @@ export default function CartCheckout() {
                     <span>Subtotal</span><span>${subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Shipping</span>
+                    <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
                     <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping}`}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax</span><span>${tax.toFixed(2)}</span>
+                    <span>Tax (est.)</span><span>${tax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-white/8 pt-2 text-sm font-bold text-amber-100">
                     <span>Total</span><span>${total.toFixed(2)}</span>
@@ -339,6 +478,16 @@ export default function CartCheckout() {
         </div>
       </div>
     </div>
+  );
+}
+
+function PayButton({ href, color, icon, label }: { href: string; color: string; icon: React.ReactNode; label: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      <button className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${color}`}>
+        {icon} {label} <ExternalLink size={10} />
+      </button>
+    </a>
   );
 }
 

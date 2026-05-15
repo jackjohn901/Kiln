@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
 
 const SETTING_KEY = "kiln_settings_v1";
 
@@ -54,13 +55,15 @@ function saveSettings(s: KilnSettings) {
   try { localStorage.setItem(SETTING_KEY, JSON.stringify(s)); } catch {}
 }
 
-type Section = "notifications" | "privacy" | "display" | "account";
+type Section = "notifications" | "privacy" | "display" | "account" | "payments";
 
 export default function Settings() {
   const { profile, logout } = useProfile();
   const [settings, setSettings] = useState<KilnSettings>(readSettings);
   const [section, setSection] = useState<Section | null>(null);
   const [saved, setSaved] = useState(false);
+  const [payments, setPayments] = useState<ArtistPayments>(readPaymentSettings);
+  const [paymentSaved, setPaymentSaved] = useState(false);
 
   function toggle(key: keyof KilnSettings) {
     setSettings((prev) => {
@@ -79,8 +82,16 @@ export default function Settings() {
     { key: "notifications", icon: Bell, label: "Notifications", desc: "What alerts you get and how" },
     { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you" },
     { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings" },
+    { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly" },
     { key: "account", icon: User, label: "Account", desc: "Profile, security, and data" },
   ];
+
+  function savePayments(next: ArtistPayments) {
+    setPayments(next);
+    savePaymentSettings(next);
+    setPaymentSaved(true);
+    setTimeout(() => setPaymentSaved(false), 1800);
+  }
 
   function Toggle({ settingKey, label, desc }: { settingKey: keyof KilnSettings; label: string; desc?: string }) {
     const on = settings[settingKey];
@@ -194,6 +205,67 @@ export default function Settings() {
           </div>
         )}
 
+        {section === "payments" && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-1">How it works</p>
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  Kiln is free — buyers pay you directly using the methods below. Add at least one so buyers can complete purchases from your listings.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <PayField
+                  label="Stripe payment link"
+                  placeholder="https://buy.stripe.com/..."
+                  hint="Create a payment link at dashboard.stripe.com → Payment Links"
+                  value={payments.stripeLink}
+                  onChange={(v) => setPayments((p) => ({ ...p, stripeLink: v }))}
+                />
+                <PayField
+                  label="Venmo"
+                  placeholder="@yourhandle"
+                  hint="Your Venmo @username"
+                  value={payments.venmo}
+                  onChange={(v) => setPayments((p) => ({ ...p, venmo: v }))}
+                />
+                <PayField
+                  label="Cash App"
+                  placeholder="$yourcashtag"
+                  hint="Your Cash App $cashtag"
+                  value={payments.cashapp}
+                  onChange={(v) => setPayments((p) => ({ ...p, cashapp: v }))}
+                />
+                <PayField
+                  label="PayPal.me"
+                  placeholder="paypal.me/yourname"
+                  hint="Your PayPal.me link or username"
+                  value={payments.paypalMe}
+                  onChange={(v) => setPayments((p) => ({ ...p, paypalMe: v }))}
+                />
+                <div>
+                  <label className="text-xs text-stone-500 mb-1 block">Note to buyers (optional)</label>
+                  <textarea
+                    value={payments.notes}
+                    rows={2}
+                    onChange={(e) => setPayments((p) => ({ ...p, notes: e.target.value }))}
+                    placeholder='e.g. "Please include artwork title in payment note"'
+                    className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => savePayments(payments)}
+                className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+              >
+                {paymentSaved ? <><Check size={14} /> Saved!</> : "Save payment methods"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {section === "account" && (
           <div className="space-y-3">
             <div className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden">
@@ -237,6 +309,23 @@ export default function Settings() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PayField({ label, placeholder, hint, value, onChange }: {
+  label: string; placeholder: string; hint: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-stone-500 mb-1 block">{label}</label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none transition-colors"
+      />
+      <p className="text-[10px] text-stone-700 mt-1">{hint}</p>
     </div>
   );
 }

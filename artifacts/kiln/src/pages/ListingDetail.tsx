@@ -185,6 +185,18 @@ export default function ListingDetail() {
               )}
             </div>
 
+            {/* AR Preview */}
+            {listing.imageUrl && (
+              <div className="mb-4">
+                <ARPreview
+                  imageUrl={listing.imageUrl}
+                  title={listing.title}
+                  widthInches={parseInt(listing.dimensions?.split("×")[0]) || 18}
+                  heightInches={parseInt(listing.dimensions?.split("×")[1]) || 24}
+                />
+              </div>
+            )}
+
             {/* Actions */}
             {listing.available ? (
               <div className="flex gap-2 mb-4">
