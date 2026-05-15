@@ -195,6 +195,21 @@ export default function Create() {
         patronOnly: isPatronOnly || undefined,
       });
 
+      // Persist to the real database so the post appears in the global feed
+      fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          caption: caption || technique,
+          videoUrl: mediaType === "video" ? mediaUrl : null,
+          thumbnailUrl: mediaType === "image" ? mediaUrl : null,
+          technique: technique || null,
+          tags: [...(technique ? [technique] : []), ...(stage ? [stage] : []), ...tags],
+          isPatronOnly,
+        }),
+      }).catch(() => {});
+
       recordPost();
       setStep("done");
     } finally {

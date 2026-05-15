@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign } from "lucide-react";
@@ -48,9 +48,36 @@ function groupByDate(notifs: KilnNotification[]): Array<{ label: string; items: 
 export default function Notifications() {
   const { notifications, markRead, markAllRead } = useSocial();
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [apiNotifications, setApiNotifications] = useState<KilnNotification[]>([]);
 
-  const visible = filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  useEffect(() => {
+    fetch("/api/notifications", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { notifications?: Record<string, unknown>[] } | null) => {
+        if (!Array.isArray(data?.notifications)) return;
+        setApiNotifications(data.notifications.map((n) => ({
+          id: `api-${n.id as string}`,
+          type: (n.type as KilnNotification["type"]) ?? "follow",
+          fromId: (n.fromId as string) ?? "",
+          fromName: (n.fromName as string) ?? "",
+          fromAvatarUrl: (n.fromAvatarUrl as string) ?? "",
+          text: (n.message as string) ?? "You have a new notification",
+          link: n.postId ? `/post/${n.postId as string}` : undefined,
+          read: (n.read as boolean) ?? false,
+          createdAt: n.createdAt as string,
+        })));
+      })
+      .catch(() => {});
+  }, []);
+
+  const allNotifications = useMemo(() => {
+    const seen = new Set(notifications.map(n => n.id));
+    const merged = [...notifications, ...apiNotifications.filter(n => !seen.has(n.id))];
+    return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [notifications, apiNotifications]);
+
+  const visible = filter === "unread" ? allNotifications.filter(n => !n.read) : allNotifications;
+  const unreadCount = allNotifications.filter(n => !n.read).length;
   const grouped = groupByDate(visible);
 
   return (
@@ -68,7 +95,7 @@ export default function Notifications() {
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <button
-                onClick={markAllRead}
+                onClick={() => { markAllRead(); fetch("/api/notifications/read-all", { method: "POST", credentials: "include" }).catch(() => {}); }}
                 className="flex items-center gap-1.5 rounded-full border border-stone-700 px-3 py-1.5 text-xs font-medium text-stone-400 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
               >
                 <CheckCheck size={12} />
@@ -88,7 +115,7 @@ export default function Notifications() {
                 filter === f ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"
               }`}
             >
-              {f === "all" ? `All (${notifications.length})` : `Unread (${unreadCount})`}
+              {f === "all" ? `All (${allNotifications.length})` : `Unread (${unreadCount})`}
             </button>
           ))}
         </div>

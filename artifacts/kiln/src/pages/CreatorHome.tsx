@@ -41,7 +41,7 @@ export default function CreatorHome() {
   useEffect(() => {
     fetch("/api/me/profile", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.profile) setApiProfile(data.profile); })
+      .then(data => { if (data?.userId) setApiProfile(data); })
       .catch(() => {});
     fetch("/api/me/posts", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)

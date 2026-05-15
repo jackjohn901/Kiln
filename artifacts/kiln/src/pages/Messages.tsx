@@ -9,6 +9,25 @@ import { seedArtists } from "@/data/seedArtists";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
+interface ApiThread {
+  id: string;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserAvatar: string | null;
+  lastMessageAt: string;
+  lastMessageText: string | null;
+  unreadCount: number;
+}
+interface ApiMsg {
+  id: string;
+  threadId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatarUrl: string | null;
+  text: string;
+  createdAt: string;
+}
+
 function timeShort(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -66,9 +85,13 @@ export default function Messages() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [newMsg, setNewMsg] = useState("");
   const [search, setSearch] = useState("");
+  const [apiThreads, setApiThreads] = useState<ApiThread[]>([]);
+  const [activeApiThreadId, setActiveApiThreadId] = useState<string | null>(null);
+  const [apiMessages, setApiMessages] = useState<ApiMsg[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeThread = activeThreadId ? threads.find((t) => t.id === activeThreadId) : null;
+  const activeApiThread = apiThreads.find(t => t.id === activeApiThreadId) ?? null;
 
   useEffect(() => {
     if (params.participantId) {
@@ -84,12 +107,60 @@ export default function Messages() {
     }
   }, [activeThread, activeThread?.messages.length, markThreadRead]);
 
+  useEffect(() => {
+    fetch("/api/messages/threads", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { threads?: ApiThread[] } | null) => { if (Array.isArray(d?.threads)) setApiThreads(d.threads); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeApiThread) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [activeApiThread, apiMessages.length]);
+
   const filtered = threads.filter((t) => t.participantName.toLowerCase().includes(search.toLowerCase()));
 
   function handleSend() {
     if (!newMsg.trim() || !activeThread) return;
     sendDirectMessage(activeThread.participantId, activeThread.participantName, activeThread.participantAvatar, newMsg.trim());
     setNewMsg("");
+  }
+
+  async function openApiThread(id: string) {
+    setActiveApiThreadId(id);
+    setActiveThreadId(null);
+    try {
+      const r = await fetch(`/api/messages/threads/${id}`, { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json() as { messages?: ApiMsg[] };
+        setApiMessages([...(d.messages ?? [])].reverse());
+      }
+    } catch {}
+  }
+
+  async function handleApiSend() {
+    if (!newMsg.trim() || !activeApiThread) return;
+    const text = newMsg.trim();
+    setNewMsg("");
+    try {
+      const r = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ recipientId: activeApiThread.otherUserId, text }),
+      });
+      if (r.ok) {
+        const msg = await r.json() as ApiMsg;
+        setApiMessages(prev => [...prev, msg]);
+        setApiThreads(prev => prev.map(t =>
+          t.id === activeApiThread.id
+            ? { ...t, lastMessageText: text, lastMessageAt: new Date().toISOString() }
+            : t
+        ));
+      }
+    } catch {}
   }
 
   if (!profile) {
@@ -113,7 +184,7 @@ export default function Messages() {
       <Nav />
       <div className="flex-1 flex mx-auto w-full max-w-4xl" style={{ height: "calc(100vh - 56px)" }}>
         {/* Thread list */}
-        <div className={`w-full md:w-72 shrink-0 border-r border-white/10 flex flex-col ${activeThread ? "hidden md:flex" : "flex"}`}>
+        <div className={`w-full md:w-72 shrink-0 border-r border-white/10 flex flex-col ${(activeThread || activeApiThread) ? "hidden md:flex" : "flex"}`}>
           <div className="p-4 border-b border-white/10">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-serif text-lg text-amber-100">Messages</h2>
@@ -175,30 +246,124 @@ export default function Messages() {
             )}
           </div>
           <div className="flex-1 overflow-y-auto">
-            {filtered.length === 0 && (
+            {filtered.length === 0 && apiThreads.length === 0 && (
               <div className="p-8 text-center">
                 <MessageCircle size={24} className="mx-auto mb-2 text-stone-700" />
                 <p className="text-sm text-stone-600">No conversations yet</p>
               </div>
             )}
+            {apiThreads.map((t) => (
+              <button
+                key={`api-${t.id}`}
+                onClick={() => void openApiThread(t.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/5 ${
+                  activeApiThreadId === t.id ? "bg-amber-500/10 border-l-2 border-l-amber-500" : "hover:bg-white/[0.03]"
+                }`}
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src={t.otherUserAvatar ?? `https://picsum.photos/seed/${t.otherUserId}/60/60`}
+                    alt={t.otherUserName}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                  {t.unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">
+                      {t.unreadCount}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className={`text-sm font-medium truncate ${t.unreadCount > 0 ? "text-amber-100" : "text-stone-300"}`}>
+                      {t.otherUserName}
+                    </span>
+                    <span className="text-[10px] text-stone-600 shrink-0 ml-2">{timeShort(t.lastMessageAt)}</span>
+                  </div>
+                  <p className={`text-xs truncate ${t.unreadCount > 0 ? "text-stone-400" : "text-stone-600"}`}>
+                    {t.lastMessageText ?? "No messages yet"}
+                  </p>
+                </div>
+              </button>
+            ))}
             {filtered.map((thread) => (
               <ThreadItem
                 key={thread.id}
                 thread={thread}
                 active={activeThreadId === thread.id}
-                onClick={() => setActiveThreadId(thread.id)}
+                onClick={() => { setActiveThreadId(thread.id); setActiveApiThreadId(null); }}
               />
             ))}
           </div>
         </div>
 
         {/* Conversation panel */}
-        <div className={`flex-1 flex flex-col ${activeThread ? "flex" : "hidden md:flex"}`}>
-          {!activeThread ? (
+        <div className={`flex-1 flex flex-col ${(activeThread || activeApiThread) ? "flex" : "hidden md:flex"}`}>
+          {!activeThread && !activeApiThread ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
               <MessageCircle size={32} className="text-stone-700" />
               <p className="text-stone-500 text-sm">Select a conversation or start one from an artist's profile.</p>
             </div>
+          ) : activeApiThread ? (
+            <>
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
+                <button
+                  onClick={() => setActiveApiThreadId(null)}
+                  className="md:hidden text-stone-500 hover:text-amber-300 transition-colors"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <img
+                  src={activeApiThread.otherUserAvatar ?? `https://picsum.photos/seed/${activeApiThread.otherUserId}/60/60`}
+                  alt={activeApiThread.otherUserName}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+                <p className="text-sm font-medium text-amber-100">{activeApiThread.otherUserName}</p>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                {apiMessages.length === 0 && (
+                  <p className="text-center text-sm text-stone-600 py-8">No messages yet — say hello!</p>
+                )}
+                {apiMessages.map((msg) => (
+                  <div key={msg.id} className="flex justify-start">
+                    <img
+                      src={msg.senderAvatarUrl ?? `https://picsum.photos/seed/${msg.senderId}/60/60`}
+                      alt={msg.senderName}
+                      className="h-7 w-7 rounded-full object-cover mr-2 mt-1 shrink-0"
+                    />
+                    <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm bg-stone-800 text-stone-200">
+                      <p className="text-[9px] text-stone-500 mb-0.5">{msg.senderName}</p>
+                      {msg.text}
+                      <p className="text-[10px] mt-1 text-stone-600">{timeShort(msg.createdAt)}</p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={bottomRef} />
+              </div>
+
+              {/* Compose */}
+              <div className="px-4 py-3 border-t border-white/10">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Write a message…"
+                    value={newMsg}
+                    onChange={(e) => setNewMsg(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleApiSend(); } }}
+                    className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => void handleApiSend()}
+                    disabled={!newMsg.trim()}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+                  >
+                    <Send size={15} />
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <>
               {/* Header */}
@@ -210,14 +375,14 @@ export default function Messages() {
                   <ArrowLeft size={18} />
                 </button>
                 <img
-                  src={activeThread.participantAvatar || `https://picsum.photos/seed/${activeThread.participantId}/60/60`}
-                  alt={activeThread.participantName}
+                  src={activeThread!.participantAvatar || `https://picsum.photos/seed/${activeThread!.participantId}/60/60`}
+                  alt={activeThread!.participantName}
                   className="h-8 w-8 rounded-full object-cover"
                 />
                 <div>
-                  <p className="text-sm font-medium text-amber-100">{activeThread.participantName}</p>
+                  <p className="text-sm font-medium text-amber-100">{activeThread!.participantName}</p>
                   <button
-                    onClick={() => navigate(`/artists/${activeThread.participantId}`)}
+                    onClick={() => navigate(`/artists/${activeThread!.participantId}`)}
                     className="text-xs text-stone-500 hover:text-amber-300 transition-colors"
                   >
                     View profile
@@ -227,7 +392,7 @@ export default function Messages() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-                {activeThread.messages.map((msg) => {
+                {activeThread!.messages.map((msg) => {
                   const isMe = msg.senderId === "__current_user__";
                   return (
                     <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Bookmark, Play, Heart, ShoppingBag } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -51,6 +51,21 @@ export default function Saved() {
   const { wishlistIds, toggleWishlist } = useWishlist();
   const [tab, setTab] = useState<Tab>("reels");
 
+  interface ApiPost {
+    id: string; caption: string; thumbnailUrl: string | null; videoUrl: string | null;
+    likeCount: number; technique: string | null; authorName: string; authorAvatarUrl: string | null;
+  }
+  const [apiSavedPosts, setApiSavedPosts] = useState<ApiPost[]>([]);
+
+  useEffect(() => {
+    fetch("/api/me/saves", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { posts?: ApiPost[] } | null) => {
+        if (Array.isArray(data?.posts)) setApiSavedPosts(data.posts);
+      })
+      .catch(() => {});
+  }, []);
+
   const savedReels = useMemo<SavedReel[]>(() => {
     const allArtists = [...artists, ...seedArtists];
     const reels: SavedReel[] = [];
@@ -96,7 +111,7 @@ export default function Saved() {
           <div>
             <h1 className="font-serif text-2xl font-bold text-amber-100">Saved</h1>
             <p className="text-sm text-stone-500">
-              {savedReels.length} {savedReels.length === 1 ? "reel" : "reels"} · {wishlistedListings.length} {wishlistedListings.length === 1 ? "work" : "works"}
+              {savedReels.length + apiSavedPosts.length} {savedReels.length + apiSavedPosts.length === 1 ? "reel" : "reels"} · {wishlistedListings.length} {wishlistedListings.length === 1 ? "work" : "works"}
             </p>
           </div>
         </div>
@@ -118,7 +133,7 @@ export default function Saved() {
 
         {/* Reels tab */}
         {tab === "reels" && (
-          savedReels.length === 0 ? (
+          savedReels.length === 0 && apiSavedPosts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <Bookmark size={40} className="mb-4 text-stone-700" />
               <p className="mb-2 text-stone-400 font-medium">Nothing saved yet</p>
@@ -170,6 +185,36 @@ export default function Saved() {
                   >
                     <Bookmark size={14} className="fill-current" />
                   </button>
+                </div>
+              ))}
+              {apiSavedPosts.map((post) => (
+                <div key={`api-${post.id}`} className="group relative overflow-hidden rounded-2xl bg-stone-900">
+                  <Link href={`/post/${post.id}`}>
+                    <div className="relative aspect-[9/16] overflow-hidden">
+                      {post.thumbnailUrl ? (
+                        <img src={post.thumbnailUrl} alt={post.caption} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="h-full w-full bg-stone-800 flex items-center justify-center">
+                          <Play size={32} className="text-stone-600" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <img src={post.authorAvatarUrl ?? `https://picsum.photos/seed/${post.id}/80/80`} alt="" className="h-6 w-6 rounded-full object-cover border border-white/20" />
+                          <span className="text-xs font-medium text-white truncate">{post.authorName}</span>
+                        </div>
+                        <p className="text-xs text-stone-300 line-clamp-2 leading-tight">{post.caption}</p>
+                        <div className="mt-1.5 flex items-center justify-between">
+                          {post.technique && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-stone-400">{post.technique}</span>}
+                          <div className="flex items-center gap-1">
+                            <Heart size={10} className="text-rose-400" />
+                            <span className="text-[10px] text-stone-400">{post.likeCount >= 1000 ? (post.likeCount / 1000).toFixed(1) + "k" : post.likeCount}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
                 </div>
               ))}
             </div>

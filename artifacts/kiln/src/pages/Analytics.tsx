@@ -105,7 +105,7 @@ export default function Analytics() {
       .catch(() => {});
     fetch("/api/me/profile", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.profile?.followerCount != null) setApiFollowers(data.profile.followerCount); })
+      .then(data => { if (data?.followerCount != null) setApiFollowers(data.followerCount); })
       .catch(() => {});
   }, []);
 
