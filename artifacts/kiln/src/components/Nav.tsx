@@ -59,6 +59,9 @@ export default function Nav() {
     { href: "/activity", label: "Activity", icon: TrendingUp },
     { href: "/dialogue", label: "Studio Dialogue", icon: MessageSquare },
     { href: "/qr-profile", label: "QR Profile", icon: UsersRound },
+    { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+    { href: "/audience", label: "Audience", icon: Users },
+    { href: "/coa", label: "Certificates", icon: FileText },
   ];
 
   useEffect(() => {

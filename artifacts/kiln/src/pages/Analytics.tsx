@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star } from "lucide-react";
+import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -208,21 +208,34 @@ export default function Analytics() {
           <h2 className="mb-4 text-sm font-bold text-stone-200">Top Performing Posts</h2>
           <div className="flex flex-col gap-2">
             {[
-              { title: "Testing new Gaffer amber in the hot shop", views: "38.5k", likes: "2.4k", type: "Reel" },
-              { title: "Murrine development — 3 days of color tests", views: "24.1k", likes: "1.8k", type: "Process" },
-              { title: "Finished: Endeavour (18\", cobalt to amber)", views: "19.3k", likes: "3.1k", type: "Photo" },
-              { title: "Live from the hot shop — midnight session", views: "15.7k", likes: "1.2k", type: "Live" },
+              { title: "Testing new Gaffer amber in the hot shop", views: "38.5k", likes: "2.4k", type: "Reel", shopClicks: "312", inquiries: 4, follows: 89 },
+              { title: "Murrine development — 3 days of color tests", views: "24.1k", likes: "1.8k", type: "Process", shopClicks: "187", inquiries: 2, follows: 54 },
+              { title: "Finished: Endeavour (18\", cobalt to amber)", views: "19.3k", likes: "3.1k", type: "Photo", shopClicks: "523", inquiries: 9, follows: 201 },
+              { title: "Live from the hot shop — midnight session", views: "15.7k", likes: "1.2k", type: "Live", shopClicks: "98", inquiries: 1, follows: 37 },
             ].map((post, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl bg-stone-800/40 px-3 py-2.5">
-                <span className="text-xs font-bold text-stone-600 w-4">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-stone-300 truncate">{post.title}</p>
-                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-stone-600">
-                    <span className="flex items-center gap-0.5"><Eye size={9} /> {post.views}</span>
-                    <span className="flex items-center gap-0.5"><Star size={9} /> {post.likes}</span>
+              <div key={i} className="rounded-xl bg-stone-800/40 px-3 py-2.5">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-stone-600 w-4">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-stone-300 truncate">{post.title}</p>
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px] text-stone-600">
+                      <span className="flex items-center gap-0.5"><Eye size={9} /> {post.views}</span>
+                      <span className="flex items-center gap-0.5"><Star size={9} /> {post.likes}</span>
+                    </div>
                   </div>
+                  <span className="text-[10px] rounded-full bg-stone-700 px-2 py-0.5 text-stone-400 shrink-0">{post.type}</span>
                 </div>
-                <span className="text-[10px] rounded-full bg-stone-700 px-2 py-0.5 text-stone-400">{post.type}</span>
+                <div className="mt-2 ml-7 flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <ShoppingBag size={9} /> <span>{post.shopClicks} shop clicks</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-blue-400">
+                    <MessageCircle size={9} /> <span>{post.inquiries} inquiries</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-amber-400">
+                    <TrendingUp size={9} /> <span>+{post.follows} follows</span>
+                  </span>
+                </div>
               </div>
             ))}
           </div>

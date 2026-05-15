@@ -3,11 +3,13 @@ import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
+  Sparkles, Share2, Plus,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
 import MusicPicker from "@/components/MusicPicker";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useSocial } from "@/contexts/SocialContext";
 import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { useUpload } from "@/hooks/useUpload";
@@ -34,6 +36,7 @@ type Step = "upload" | "edit" | "details" | "done";
 export default function Create() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
+  const { recordPost } = useSocial();
   const { upload, uploading, progress } = useUpload();
 
   const [step, setStep] = useState<Step>("upload");
@@ -57,8 +60,14 @@ export default function Create() {
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [captionSuggestions, setCaptionSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [crossPost, setCrossPost] = useState({ instagram: false, tiktok: false });
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+  const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const additionalInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((f: File) => {
     const isVid = f.type.startsWith("video/");
@@ -76,6 +85,33 @@ export default function Create() {
     },
     [handleFile],
   );
+
+  function handleAddMore(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    const previews = files.map((f) => URL.createObjectURL(f));
+    setAdditionalFiles((p) => [...p, ...files]);
+    setAdditionalPreviews((p) => [...p, ...previews]);
+    e.target.value = "";
+  }
+
+  async function handleSuggestCaptions() {
+    if (!technique && !stage && tags.length === 0) return;
+    setLoadingSuggestions(true);
+    setCaptionSuggestions([]);
+    try {
+      const res = await fetch("/api/ai/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ technique, stage, tags }),
+      });
+      const data = await res.json() as { captions?: string[] };
+      setCaptionSuggestions(data.captions ?? []);
+    } catch {
+      setCaptionSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
 
   function addTag(raw: string) {
     const t = raw.replace(/^#+/, "").trim().toLowerCase().replace(/\s+/g, "");
@@ -123,6 +159,17 @@ export default function Create() {
         }
       }
 
+      // Upload additional carousel images
+      const extraUrls: string[] = [];
+      for (const extraFile of additionalFiles) {
+        try {
+          const r = await upload(extraFile);
+          extraUrls.push(r.servingUrl);
+        } catch {
+          extraUrls.push(URL.createObjectURL(extraFile));
+        }
+      }
+
       addPost({
         id: generateId(),
         artistId: profile.id,
@@ -131,6 +178,7 @@ export default function Create() {
         artistAvatarUrl: profile.avatarUrl ?? "",
         type: mediaType,
         mediaUrl,
+        mediaUrls: extraUrls.length > 0 ? [mediaUrl, ...extraUrls] : undefined,
         caption: caption || technique,
         tags: [
           ...(technique ? [technique] : []),
@@ -145,6 +193,7 @@ export default function Create() {
         saves: 0,
       });
 
+      recordPost();
       setStep("done");
     } finally {
       setPublishing(false);
@@ -341,6 +390,41 @@ export default function Create() {
               />
             )}
 
+            {/* Carousel strip — only for image posts */}
+            {mediaType === "image" && (
+              <div>
+                <p className="mb-2 text-xs font-medium text-stone-400">Add more photos (carousel)</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 border-amber-500/50">
+                    <img src={previewUrl} alt="" className="h-full w-full object-cover" style={{ filter: filterCss || undefined }} />
+                  </div>
+                  {additionalPreviews.map((url, i) => (
+                    <div key={i} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/15">
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => {
+                          setAdditionalPreviews((p) => p.filter((_, j) => j !== i));
+                          setAdditionalFiles((p) => p.filter((_, j) => j !== i));
+                        }}
+                        className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white"
+                      >
+                        <X size={8} />
+                      </button>
+                    </div>
+                  ))}
+                  {additionalPreviews.length < 9 && (
+                    <button
+                      onClick={() => additionalInputRef.current?.click()}
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-stone-600 text-stone-500 hover:border-amber-500/40 hover:text-amber-400 transition-colors"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  )}
+                  <input ref={additionalInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddMore} />
+                </div>
+              </div>
+            )}
+
             <button
               onClick={() => setStep("details")}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
@@ -383,7 +467,17 @@ export default function Create() {
 
             {/* Caption */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-400">Caption</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-medium text-stone-400">Caption</label>
+                <button
+                  onClick={handleSuggestCaptions}
+                  disabled={loadingSuggestions || (!technique && !stage && tags.length === 0)}
+                  className="flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >
+                  {loadingSuggestions ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                  Suggest captions
+                </button>
+              </div>
               <textarea
                 rows={3}
                 placeholder="Describe what's happening in this moment — the technique, the challenge, the material..."
@@ -391,6 +485,19 @@ export default function Create() {
                 onChange={(e) => setCaption(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none resize-none"
               />
+              {captionSuggestions.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {captionSuggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setCaption(s); setCaptionSuggestions([]); }}
+                      className="block w-full rounded-xl border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-left text-xs text-amber-200 hover:bg-amber-500/15 transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Process stage */}
@@ -537,6 +644,33 @@ export default function Create() {
                   <Tag size={14} />
                 </button>
               </div>
+            </div>
+
+            {/* Cross-posting */}
+            <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-4 space-y-3">
+              <p className="text-xs font-medium text-stone-400 flex items-center gap-1.5">
+                <Share2 size={12} /> Cross-post to other platforms
+              </p>
+              {[
+                { key: "instagram" as const, label: "Instagram", hint: "Share as a Reel" },
+                { key: "tiktok" as const, label: "TikTok", hint: "Share as a video" },
+              ].map(({ key, label, hint }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-stone-300">{label}</p>
+                    <p className="text-xs text-stone-600">{hint}</p>
+                  </div>
+                  <button
+                    onClick={() => setCrossPost((p) => ({ ...p, [key]: !p[key] }))}
+                    className={`h-5 w-9 rounded-full transition-colors relative ${crossPost[key] ? "bg-amber-500" : "bg-stone-700"}`}
+                  >
+                    <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${crossPost[key] ? "translate-x-4" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
+              ))}
+              {(crossPost.instagram || crossPost.tiktok) && (
+                <p className="text-[10px] text-stone-600">Your post will appear on Kiln and be queued for sharing to selected platforms.</p>
+              )}
             </div>
 
             {/* Upload progress */}

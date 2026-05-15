@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useLocation } from "wouter";
 import {
-  ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, BellOff, MoreHorizontal,
+  ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, BellOff, Bell, MoreHorizontal,
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
@@ -144,7 +144,7 @@ export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted } = useSocial();
+  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
 
   const artist = findArtist(id ?? "");
   const isOwn = profile?.id === id;
@@ -291,6 +291,13 @@ export default function ArtistProfile() {
                   title="Send message"
                 >
                   <MessageCircle size={14} />
+                </button>
+                <button
+                  onClick={() => toggleArtistAlert(artist.id)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${hasArtistAlert(artist.id) ? "border-amber-500/40 bg-amber-500/10 text-amber-400" : "border-white/15 text-stone-400 hover:border-amber-400/40 hover:text-amber-400"}`}
+                  title={hasArtistAlert(artist.id) ? "Turn off new-post alerts" : "Get alerts for new posts"}
+                >
+                  {hasArtistAlert(artist.id) ? <Bell size={14} /> : <BellOff size={14} />}
                 </button>
                 <button
                   onClick={handleShare}

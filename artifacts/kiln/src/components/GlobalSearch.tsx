@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Search, X, TrendingUp, ArrowRight, User, BookOpen, Wrench, MapPin, Flame, FlaskConical, ScrollText } from "lucide-react";
+import { Search, X, TrendingUp, ArrowRight, User, BookOpen, Wrench, MapPin, Flame, FlaskConical, ScrollText, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -9,6 +9,7 @@ import { workshops } from "@/data/workshops";
 import { ALL_REELS } from "@/data/reels";
 import { MATERIALS } from "@/data/materials";
 import { ALL_SERIES } from "@/data/processSeries";
+import { challenges } from "@/data/challenges";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -82,7 +83,15 @@ export default function GlobalSearch({ onClose }: Props) {
       ).slice(0, 3)
     : [];
 
-  const hasResults = artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length > 0;
+  const challengeHits = q
+    ? challenges.filter((c) =>
+        c.title.toLowerCase().includes(q) ||
+        (c.technique ?? "").toLowerCase().includes(q) ||
+        (c.subtitle ?? "").toLowerCase().includes(q)
+      ).slice(0, 3)
+    : [];
+
+  const hasResults = artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length + challengeHits.length > 0;
 
   function go(href: string) { navigate(href); onClose(); }
 
@@ -269,6 +278,27 @@ export default function GlobalSearch({ onClose }: Props) {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-stone-200">{m.name}</p>
                       <p className="text-xs text-stone-600 truncate capitalize">{m.category} · {m.description.slice(0, 50)}…</p>
+                    </div>
+                    <ArrowRight size={13} className="text-stone-700 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Challenges */}
+            {challengeHits.length > 0 && (
+              <div>
+                <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Challenges</p>
+                {challengeHits.map((c) => (
+                  <button key={c.id} onClick={() => go("/challenges")}
+                    className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                      <Trophy size={15} className="text-amber-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-stone-200 truncate">{c.title}</p>
+                      <p className="text-xs text-stone-600 truncate">{c.subtitle}{c.technique ? ` · ${c.technique}` : ""}</p>
                     </div>
                     <ArrowRight size={13} className="text-stone-700 shrink-0" />
                   </button>

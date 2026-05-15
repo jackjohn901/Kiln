@@ -256,6 +256,7 @@ interface SocialState {
   reposts: RepostRecord[];
   activityFeed: ActivityItem[];
   streak: StreakData;
+  artistAlerts: string[];
 }
 
 interface SocialContextType extends SocialState {
@@ -299,6 +300,8 @@ interface SocialContextType extends SocialState {
   unmuteArtist: (artistId: string) => void;
   isMuted: (artistId: string) => boolean;
   recordPost: () => void;
+  toggleArtistAlert: (artistId: string) => void;
+  hasArtistAlert: (artistId: string) => boolean;
 }
 
 const SocialContext = createContext<SocialContextType>({} as SocialContextType);
@@ -388,6 +391,7 @@ function defaultState(): SocialState {
     reposts: [],
     activityFeed: [],
     streak: { current: 0, longest: 0, lastPostDate: null },
+    artistAlerts: [],
   };
 }
 
@@ -412,6 +416,7 @@ function readState(): SocialState {
     activityFeed: parsed.activityFeed ?? [],
     reelReposts: parsed.reelReposts ?? {},
     streak: parsed.streak ?? { current: 0, longest: 0, lastPostDate: null },
+    artistAlerts: parsed.artistAlerts ?? [],
     };
   } catch {
     return defaultState();
@@ -563,6 +568,17 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isMuted = useCallback((artistId: string) => state.muted.includes(artistId), [state.muted]);
+
+  const toggleArtistAlert = useCallback((artistId: string) => {
+    update((s) => ({
+      ...s,
+      artistAlerts: s.artistAlerts.includes(artistId)
+        ? s.artistAlerts.filter((id) => id !== artistId)
+        : [...s.artistAlerts, artistId],
+    }));
+  }, []);
+
+  const hasArtistAlert = useCallback((artistId: string) => state.artistAlerts.includes(artistId), [state.artistAlerts]);
 
   const recordPost = useCallback(() => {
     update((s) => {
@@ -724,6 +740,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         unmuteArtist,
         isMuted,
         recordPost,
+        toggleArtistAlert,
+        hasArtistAlert,
       }}
     >
       {children}

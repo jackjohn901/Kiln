@@ -6,6 +6,7 @@ export interface Post {
   artistAvatarUrl: string;
   type: "image" | "video";
   mediaUrl: string;
+  mediaUrls?: string[];
   caption: string;
   tags: string[];
   filter?: string;

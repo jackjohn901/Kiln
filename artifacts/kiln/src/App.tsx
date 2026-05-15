@@ -70,6 +70,9 @@ import CommissionRates from "@/pages/CommissionRates";
 import ActivityFeed from "@/pages/ActivityFeed";
 import StudioDialogue from "@/pages/StudioDialogue";
 import QRProfile from "@/pages/QRProfile";
+import Leaderboard from "@/pages/Leaderboard";
+import Audience from "@/pages/Audience";
+import CertificateOfAuthenticity from "@/pages/CertificateOfAuthenticity";
 
 const queryClient = new QueryClient();
 
@@ -201,6 +204,9 @@ function Router() {
       <Route path="/activity" component={ActivityFeed} />
       <Route path="/dialogue" component={StudioDialogue} />
       <Route path="/qr-profile" component={QRProfile} />
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/audience" component={Audience} />
+      <Route path="/coa" component={CertificateOfAuthenticity} />
       <Route component={NotFound} />
     </Switch>
   );

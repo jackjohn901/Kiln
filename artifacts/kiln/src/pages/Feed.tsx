@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
-  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2,
+  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag,
 } from "lucide-react";
+import ReportModal from "@/components/ReportModal";
 import { getTrackById } from "@/data/music";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -206,6 +207,7 @@ function ReelCard({
   onToggleMusic: () => void;
   onComment: (reelId: string, artistName: string) => void;
 }) {
+  const [showReport, setShowReport] = useState(false);
   const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus } = useSocial();
   const liked = reelLikes[reel.id] ?? false;
   const saved = reelSaves[reel.id] ?? false;
@@ -399,7 +401,24 @@ function ReelCard({
           )}
           <span className="text-[9px] text-white/60">{musicMuted ? "Off" : "Music"}</span>
         </button>
+
+        {/* Report */}
+        <button
+          onClick={() => setShowReport(true)}
+          className="flex flex-col items-center gap-1 opacity-40 hover:opacity-70 transition-opacity"
+        >
+          <Flag size={18} className="text-white" />
+          <span className="text-[9px] text-white/60">Report</span>
+        </button>
       </div>
+
+      {showReport && (
+        <ReportModal
+          postId={reel.id}
+          artistName={reel.artistName}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 }
