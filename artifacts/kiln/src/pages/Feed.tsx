@@ -494,6 +494,44 @@ export default function Feed() {
     return () => { audioRef.current?.pause(); };
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      switch (e.key) {
+        case "/":
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent("kiln:open-search"));
+          break;
+        case "ArrowUp":
+        case "k":
+          e.preventDefault();
+          setActiveIndex((prev) => {
+            const next = Math.max(0, prev - 1);
+            containerRef.current?.scrollTo({ top: next * (containerRef.current.clientHeight), behavior: "smooth" });
+            return next;
+          });
+          break;
+        case "ArrowDown":
+        case "j":
+          e.preventDefault();
+          setActiveIndex((prev) => {
+            const next = Math.min(reels.length - 1, prev + 1);
+            containerRef.current?.scrollTo({ top: next * (containerRef.current.clientHeight), behavior: "smooth" });
+            return next;
+          });
+          break;
+        case "m":
+        case "M":
+          setMusicMuted((prev) => !prev);
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [reels.length]);
+
   const unlockMusic = useCallback(() => {
     setMusicUnlocked(true);
     if (!activeReel) return;

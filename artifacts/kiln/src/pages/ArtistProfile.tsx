@@ -341,6 +341,11 @@ export default function ArtistProfile() {
                   </button>
                 </Link>
               )}
+              <Link href={`/artists/${artist.id}/rates`}>
+                <button className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-stone-700 text-xs text-stone-500 hover:border-stone-500 hover:text-stone-300 transition-colors">
+                  View rates
+                </button>
+              </Link>
             </div>
           )}
         </div>

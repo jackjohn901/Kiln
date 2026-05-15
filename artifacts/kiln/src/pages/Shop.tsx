@@ -111,7 +111,8 @@ export default function Shop() {
                 !listing.available ? "opacity-60" : ""
               }`}
             >
-              <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+              <Link href={`/listings/${listing.id}`}>
+              <div className="relative aspect-[4/3] overflow-hidden bg-muted cursor-pointer">
                 {listing.imageUrl && (
                   <img
                     src={listing.imageUrl}
@@ -127,12 +128,17 @@ export default function Shop() {
                   </div>
                 )}
               </div>
+              </Link>
 
               <div className="p-4">
-                <p className="text-[10px] uppercase tracking-[0.15em] text-primary mb-1">
-                  {getArtistName(listing.artistId)}
-                </p>
-                <p className="text-sm font-medium text-foreground leading-tight mb-1">{listing.title}</p>
+                <Link href={`/listings/${listing.id}`}>
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-primary mb-1 hover:opacity-80 transition-opacity">
+                    {getArtistName(listing.artistId)}
+                  </p>
+                </Link>
+                <Link href={`/listings/${listing.id}`}>
+                  <p className="text-sm font-medium text-foreground leading-tight mb-1 hover:opacity-80 transition-opacity cursor-pointer">{listing.title}</p>
+                </Link>
                 <p className="text-[11px] text-muted-foreground mb-1">{listing.year} · {listing.medium.split(",")[0]}</p>
                 <p className="text-[10px] text-muted-foreground mb-3">{listing.dimensions}</p>
 

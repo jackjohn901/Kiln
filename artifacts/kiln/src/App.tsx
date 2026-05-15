@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -63,6 +64,9 @@ import PostScheduler from "@/pages/PostScheduler";
 import CreatorHome from "@/pages/CreatorHome";
 import Newsletter from "@/pages/Newsletter";
 import InventoryManager from "@/pages/InventoryManager";
+import ListingDetail from "@/pages/ListingDetail";
+import CommunityEvents from "@/pages/CommunityEvents";
+import CommissionRates from "@/pages/CommissionRates";
 
 const queryClient = new QueryClient();
 
@@ -77,9 +81,58 @@ function applyThemeFromSettings() {
 }
 applyThemeFromSettings();
 
+function TitleSetter() {
+  const [location] = useLocation();
+  useEffect(() => {
+    const routes: [string, string][] = [
+      ["/", "Kiln — Craft Creator Platform"],
+      ["/discover", "Discover Artists — Kiln"],
+      ["/artists", "Artists — Kiln"],
+      ["/shop", "Shop Original Works — Kiln"],
+      ["/workshops", "Workshops — Kiln"],
+      ["/techniques", "Technique Library — Kiln"],
+      ["/challenges", "Challenges — Kiln"],
+      ["/guilds", "Guilds — Kiln"],
+      ["/opportunities", "Opportunities — Kiln"],
+      ["/series", "Process Journals — Kiln"],
+      ["/materials", "Materials — Kiln"],
+      ["/calendar", "Craft Calendar — Kiln"],
+      ["/events", "Community Events — Kiln"],
+      ["/critique", "Critique Circle — Kiln"],
+      ["/mentorship", "Mentorship — Kiln"],
+      ["/collab", "Collab Board — Kiln"],
+      ["/trending", "Trending — Kiln"],
+      ["/assistant", "AI Craft Assistant — Kiln"],
+      ["/grants", "Grant Writer — Kiln"],
+      ["/collector", "Collector Portal — Kiln"],
+      ["/scheduler", "Post Scheduler — Kiln"],
+      ["/creator-home", "Creator Home — Kiln"],
+      ["/newsletter", "Newsletter — Kiln"],
+      ["/inventory", "Inventory — Kiln"],
+      ["/settings", "Settings — Kiln"],
+      ["/earnings", "Earnings — Kiln"],
+      ["/analytics", "Analytics — Kiln"],
+      ["/inbox", "Commission Inbox — Kiln"],
+      ["/messages", "Messages — Kiln"],
+      ["/saved", "Saved — Kiln"],
+      ["/orders", "Orders — Kiln"],
+      ["/cart", "Cart — Kiln"],
+      ["/map", "Studio Map — Kiln"],
+      ["/drops", "Drops — Kiln"],
+      ["/listings", "Listing — Kiln"],
+    ];
+    const match = routes.find(([p]) =>
+      p === location || (p !== "/" && location.startsWith(p + "/"))
+    );
+    document.title = match ? match[1] : "Kiln";
+  }, [location]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
+      <TitleSetter />
       <Route path="/" component={Feed} />
       <Route path="/discover" component={Discover} />
       <Route path="/artists" component={Artists} />
@@ -139,6 +192,9 @@ function Router() {
       <Route path="/creator-home" component={CreatorHome} />
       <Route path="/newsletter" component={Newsletter} />
       <Route path="/inventory" component={InventoryManager} />
+      <Route path="/listings/:id" component={ListingDetail} />
+      <Route path="/events" component={CommunityEvents} />
+      <Route path="/artists/:artistId/rates" component={CommissionRates} />
       <Route component={NotFound} />
     </Switch>
   );

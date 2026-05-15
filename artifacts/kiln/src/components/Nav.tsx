@@ -43,6 +43,7 @@ export default function Nav() {
     { href: "/series", label: "Journals", icon: BookOpen },
     { href: "/materials", label: "Materials", icon: FlaskConical },
     { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    { href: "/events", label: "Events", icon: CalendarDays },
     { href: "/critique", label: "Critique", icon: MessageSquare },
     { href: "/mentorship", label: "Mentorship", icon: GraduationCap },
     { href: "/collab", label: "Collab", icon: UsersRound },
