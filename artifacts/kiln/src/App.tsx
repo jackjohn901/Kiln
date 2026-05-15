@@ -85,6 +85,10 @@ import CollectorProfile from "@/pages/CollectorProfile";
 import CommissionTracker from "@/pages/CommissionTracker";
 import GiftCards from "@/pages/GiftCards";
 import StitchStudio from "@/pages/StitchStudio";
+import PriceCalculator from "@/pages/PriceCalculator";
+import CollectorJourney from "@/pages/CollectorJourney";
+import KilnStatus from "@/pages/KilnStatus";
+import DropScheduler from "@/pages/DropScheduler";
 
 const queryClient = new QueryClient();
 
@@ -234,6 +238,10 @@ function Router() {
       <Route path="/gift-cards" component={GiftCards} />
       <Route path="/stitch" component={StitchStudio} />
       <Route path="/stitch/:reelId" component={StitchStudio} />
+      <Route path="/price-calculator" component={PriceCalculator} />
+      <Route path="/collector-journey" component={CollectorJourney} />
+      <Route path="/kiln-status" component={KilnStatus} />
+      <Route path="/drop-scheduler" component={DropScheduler} />
       <Route component={NotFound} />
     </Switch>
   );

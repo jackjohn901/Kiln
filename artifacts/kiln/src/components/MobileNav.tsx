@@ -9,7 +9,7 @@ import {
   Award, BookOpen, FlaskConical, Flame, Box, Map, TrendingUp,
   Zap, Gavel, BookMarked, Calendar, Mail, X, ChevronRight,
   Download, Grid3x3, SplitSquareHorizontal, Gift, Scissors,
-  CheckSquare, UserCircle2,
+  CheckSquare, UserCircle2, Calculator,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -38,6 +38,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/commission-tracker", icon: CheckSquare, label: "Commission Tracker" },
       { href: "/collection", icon: BookMarked, label: "Collection" },
       { href: "/gift-cards", icon: Gift, label: "Gift Cards" },
+      { href: "/collector-journey", icon: TrendingUp, label: "Collector Journey" },
     ],
   },
   {
@@ -52,6 +53,9 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/newsletter", icon: Newspaper, label: "Newsletter" },
       { href: "/grants", icon: Sparkles, label: "Grant Writer" },
       { href: "/assistant", icon: Bot, label: "AI Assistant" },
+      { href: "/price-calculator", icon: Calculator, label: "Price Calculator" },
+      { href: "/kiln-status", icon: Flame, label: "In the Kiln" },
+      { href: "/drop-scheduler", icon: Zap, label: "Drop Scheduler" },
     ],
   },
   {

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
-import { BookOpen, ChevronRight, ArrowLeft, Wrench, Layers, Clock, Star, Users } from "lucide-react";
+import { BookOpen, ChevronRight, ArrowLeft, Wrench, Layers, Clock, Star, Users, Film } from "lucide-react";
 import Nav from "@/components/Nav";
 import { TECHNIQUES, getTechniquesByMedium, type Technique } from "@/data/techniques";
+import { ALL_REELS } from "@/data/reels";
 
 const MEDIUMS = ["All", "Glass", "Metal", "Ceramics", "Fiber", "Enamel", "Wood"];
 
@@ -47,6 +48,7 @@ function TechniqueCard({ technique, onClick }: { technique: Technique; onClick: 
 
 function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: () => void }) {
   const [, navigate] = useLocation();
+  const techniqueReels = ALL_REELS.filter((r) => r.technique === technique.name);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -152,6 +154,60 @@ function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: 
                 {id.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reels on Kiln */}
+      {techniqueReels.length > 0 && (
+        <div className="mt-8">
+          <h2 className="font-serif text-xl text-amber-100 mb-4 flex items-center gap-2">
+            <Film size={16} className="text-amber-400" />
+            {techniqueReels.length} reel{techniqueReels.length !== 1 ? "s" : ""} on Kiln
+          </h2>
+          <div className="grid grid-cols-3 gap-2">
+            {techniqueReels.slice(0, 6).map((r) => (
+              <div key={r.id} className="relative aspect-[9/16] overflow-hidden rounded-xl bg-stone-900">
+                <img
+                  src={r.thumbnail}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/200/360`;
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                <div className="absolute bottom-2 left-2 right-2">
+                  <p className="text-[10px] font-semibold text-white leading-tight truncate">{r.artistName}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {techniqueReels.length > 6 && (
+            <p className="text-xs text-stone-600 mt-2">+{techniqueReels.length - 6} more reels from this technique</p>
+          )}
+        </div>
+      )}
+
+      {/* Related techniques */}
+      {technique.relatedTechniqueIds.length > 0 && (
+        <div className="mt-8 mb-4">
+          <h2 className="font-serif text-xl text-amber-100 mb-3">Related techniques</h2>
+          <div className="flex flex-wrap gap-2">
+            {technique.relatedTechniqueIds.map((relId) => {
+              const rel = TECHNIQUES.find((t) => t.id === relId);
+              if (!rel) return null;
+              return (
+                <button
+                  key={relId}
+                  onClick={() => navigate(`/techniques/${relId}`)}
+                  className="flex items-center gap-2 rounded-full border border-white/10 bg-stone-800/60 px-4 py-2 text-sm text-stone-300 hover:border-amber-500/30 hover:text-amber-200 transition-all"
+                >
+                  <ChevronRight size={12} className="text-stone-600" />
+                  {rel.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

@@ -16,6 +16,8 @@ import { useSocial } from "@/contexts/SocialContext";
 import Comments from "@/components/Comments";
 import NotificationPanel from "@/components/NotificationPanel";
 import Stories from "@/components/Stories";
+import VideoAnnotations, { TECHNIQUE_ANNOTATIONS } from "@/components/VideoAnnotations";
+import { SEED_KILN_STATUSES, getFiringETA } from "@/data/kilnStatuses";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -254,6 +256,14 @@ function ReelCard({
   const commissionStatus = getArtistCommissionStatus(reel.artistId);
   const csInfo = CS_ICON[commissionStatus];
 
+  const [playProgress, setPlayProgress] = useState(0);
+  useEffect(() => {
+    if (!isActive) { setPlayProgress(0); return; }
+    const iv = setInterval(() => setPlayProgress((p) => (p >= 100 ? 0 : p + 0.4)), 400);
+    return () => clearInterval(iv);
+  }, [isActive]);
+  const reelAnnotations = TECHNIQUE_ANNOTATIONS[reel.technique] ?? [];
+
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
       {reel.videoUrl ? (
@@ -320,6 +330,11 @@ function ReelCard({
         </div>
       )}
 
+
+      {/* ── Technique annotation overlay ── */}
+      {reelAnnotations.length > 0 && isActive && !isPatronGated && (
+        <VideoAnnotations annotations={reelAnnotations} progress={playProgress} />
+      )}
 
       {/* ── Bottom-left: artist info ── */}
       <div className="absolute bottom-[88px] left-4 right-20 z-10 space-y-1.5">
@@ -623,6 +638,8 @@ export default function Feed() {
 
   const { following, unreadCount } = useSocial();
   const [, navigate] = useLocation();
+  const followedFirings = SEED_KILN_STATUSES.filter((s) => following.includes(s.artistId));
+  const [kilnBannerDismissed, setKilnBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem(PREFS_KEY)) {
@@ -912,6 +929,34 @@ export default function Feed() {
                 {justPublishedCount === 1 ? "1 scheduled post went live" : `${justPublishedCount} scheduled posts went live`}
               </span>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Kiln firing banner ── */}
+      <AnimatePresence>
+        {followedFirings.length > 0 && !kilnBannerDismissed && (
+          <motion.div
+            className="pointer-events-auto fixed bottom-20 left-4 right-4 z-30 flex items-center gap-3 rounded-full border border-amber-500/30 bg-stone-950/95 px-4 py-2.5 shadow-xl backdrop-blur-sm"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+          >
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/15">
+              <Flame size={12} className="animate-pulse text-amber-400" />
+            </div>
+            <Link href="/kiln-status" className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-amber-200 truncate">
+                🔥 {followedFirings[0]!.artistName} is firing — {followedFirings[0]!.cone}
+              </p>
+              <p className="text-[10px] text-stone-500 mt-0.5">{getFiringETA(followedFirings[0]!)}</p>
+            </Link>
+            <button
+              onClick={() => setKilnBannerDismissed(true)}
+              className="shrink-0 text-stone-600 hover:text-stone-400 transition-colors"
+            >
+              <X size={14} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
