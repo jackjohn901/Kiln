@@ -208,6 +208,8 @@ export default function ListingDetail() {
     try { const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}"); return id && a[id] ? String(a[id]) : ""; } catch { return ""; }
   });
   const [selectedImg, setSelectedImg] = useState(0);
+  const [selectedEdition, setSelectedEdition] = useState("Original");
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerAmount, setOfferAmount] = useState("");
@@ -468,6 +470,51 @@ export default function ListingDetail() {
                   <p className="text-sm text-stone-300 font-medium leading-snug">{value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Edition / Format variants */}
+            <div className="mb-5 space-y-3">
+              <div>
+                <p className="text-[10px] text-stone-600 uppercase tracking-wide font-semibold mb-2">Edition</p>
+                <div className="flex flex-wrap gap-2">
+                  {["Original", "Artist Proof 1/3", "Artist Proof 2/3", "Artist Proof 3/3"].map((ed) => (
+                    <button
+                      key={ed}
+                      onClick={() => setSelectedEdition(ed)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                        selectedEdition === ed
+                          ? "border-amber-500 bg-amber-500/10 text-amber-300"
+                          : "border-white/10 text-stone-400 hover:border-white/20 hover:text-stone-300"
+                      }`}
+                    >
+                      {ed}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {listing.dimensions && (
+                <div>
+                  <p className="text-[10px] text-stone-600 uppercase tracking-wide font-semibold mb-2">Size</p>
+                  <div className="flex flex-wrap gap-2">
+                    {["As shown", "Custom scale", "Miniature edition"].map((sz) => (
+                      <button
+                        key={sz}
+                        onClick={() => setSelectedSize(selectedSize === sz ? null : sz)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                          selectedSize === sz
+                            ? "border-amber-500 bg-amber-500/10 text-amber-300"
+                            : "border-white/10 text-stone-400 hover:border-white/20 hover:text-stone-300"
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedSize && selectedSize !== "As shown" && (
+                    <p className="mt-1.5 text-[10px] text-stone-600">Custom sizing is commissioned directly. Contact the artist for a quote.</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Price history chart */}

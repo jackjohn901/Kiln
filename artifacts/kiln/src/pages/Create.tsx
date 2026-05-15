@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
-  Sparkles, Share2, Plus,
+  Sparkles, Share2, Plus, Crown,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
@@ -57,6 +57,7 @@ export default function Create() {
   const [dropPrice, setDropPrice] = useState("");
   const [dropDate, setDropDate] = useState("");
   const [collabArtist, setCollabArtist] = useState("");
+  const [isPatronOnly, setIsPatronOnly] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -191,6 +192,7 @@ export default function Create() {
         likes: 0,
         comments: 0,
         saves: 0,
+        patronOnly: isPatronOnly || undefined,
       });
 
       recordPost();
@@ -534,6 +536,30 @@ export default function Create() {
               />
               {collabArtist && (
                 <p className="mt-1 text-xs text-stone-600">This will appear on both your profiles as a collaborative post.</p>
+              )}
+            </div>
+
+            {/* Patron-only toggle */}
+            <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-4">
+              <button
+                onClick={() => setIsPatronOnly((v) => !v)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Crown size={14} className={isPatronOnly ? "text-amber-400" : "text-stone-500"} />
+                  <div>
+                    <p className={`text-sm font-medium ${isPatronOnly ? "text-amber-200" : "text-stone-300"}`}>
+                      Patron-exclusive post
+                    </p>
+                    <p className="text-xs text-stone-600">Only paying subscribers can view this</p>
+                  </div>
+                </div>
+                <div className={`h-5 w-9 rounded-full transition-colors ${isPatronOnly ? "bg-amber-500" : "bg-stone-700"} relative`}>
+                  <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isPatronOnly ? "translate-x-4" : "translate-x-0.5"}`} />
+                </div>
+              </button>
+              {isPatronOnly && (
+                <p className="mt-2 text-xs text-amber-600/80">This post will be blurred in the feed for non-patrons with an invitation to subscribe.</p>
               )}
             </div>
 

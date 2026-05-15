@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import QABlock from "@/components/QABlock";
 import { useParams, Link, useLocation } from "wouter";
 import {
   ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, BellOff, Bell, MoreHorizontal,
@@ -139,7 +140,7 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv";
+type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold";
 
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
@@ -485,6 +486,7 @@ export default function ArtistProfile() {
               { key: "shop", icon: ShoppingBag, label: "Shop" },
               ...(workshops.length > 0 ? [{ key: "workshops", icon: Hammer, label: "Workshops" }] : []),
               ...(drops.length > 0 ? [{ key: "drops", icon: Zap, label: "Drops" }] : []),
+              { key: "sold", icon: CheckCircle, label: "Sold" },
               { key: "bio", icon: BookOpen, label: "Bio" },
               { key: "cv", icon: Award, label: "CV" },
             ] as { key: Tab; icon: React.ElementType; label: string }[]
@@ -703,6 +705,67 @@ export default function ArtistProfile() {
             </div>
           )}
 
+          {/* Sold Works / Provenance */}
+          {tab === "sold" && (
+            <div className="space-y-4">
+              <div className="mb-2">
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  Sold works by {artist.name.split(" ")[0]} — each piece with provenance and acquisition detail.
+                </p>
+              </div>
+              {(() => {
+                const sold = [
+                  ...artist.images.slice(0, 3).map((img, i) => ({
+                    id: `sold-${i}`,
+                    title: img.caption ?? `${artist.medium} Study No. ${i + 1}`,
+                    imageUrl: img.url,
+                    collectorRegion: ["New York, NY", "London, UK", "Tokyo, JP", "Los Angeles, CA", "Chicago, IL"][i % 5]!,
+                    soldDate: ["Jan 2024", "Mar 2024", "Sep 2023", "Nov 2023", "Apr 2024"][i % 5]!,
+                    salePrice: [3200, 5800, 4100, 7600, 2900][i % 5]!,
+                  })),
+                  ...Array.from({ length: Math.max(0, 4 - artist.images.length) }, (_, i) => ({
+                    id: `sold-gen-${i}`,
+                    title: `${artist.medium} Piece, ${2022 + i}`,
+                    imageUrl: `https://picsum.photos/seed/${artist.id}-sold-${i}/600/400`,
+                    collectorRegion: ["San Francisco, CA", "Miami, FL", "Seattle, WA", "Boston, MA"][i % 4]!,
+                    soldDate: ["Feb 2024", "Jun 2023", "Oct 2023", "Dec 2023"][i % 4]!,
+                    salePrice: [4500, 6200, 3800, 5100][i % 4]!,
+                  })),
+                ];
+                return (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {sold.map((item) => (
+                      <div key={item.id} className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden group">
+                        <div className="aspect-[4/3] overflow-hidden relative">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.title}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 brightness-75"
+                            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/600/400`; }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <span className="rounded-full border border-white/30 bg-black/50 px-4 py-1.5 text-xs font-bold tracking-widest text-white/80 uppercase">Sold</span>
+                          </div>
+                        </div>
+                        <div className="p-3 space-y-1.5">
+                          <p className="font-medium text-stone-200 text-sm line-clamp-1">{item.title}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-stone-500">{item.collectorRegion}</span>
+                            <span className="text-xs font-bold text-amber-400">${item.salePrice.toLocaleString()}</span>
+                          </div>
+                          <p className="text-[10px] text-stone-700">Acquired {item.soldDate}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              <div className="rounded-xl bg-stone-900/40 border border-white/5 p-4 text-center">
+                <p className="text-xs text-stone-600">Provenance records are maintained by Kiln for all verified sales.</p>
+              </div>
+            </div>
+          )}
+
           {/* Bio */}
           {tab === "bio" && (
             <div className="max-w-2xl space-y-6 py-2">
@@ -917,6 +980,11 @@ export default function ArtistProfile() {
               </div>
             );
           })()}
+        </div>
+
+        {/* Q&A / AMA Section */}
+        <div className="mt-6 border-t border-white/8 pt-6">
+          <QABlock artistId={artist.id} artistName={artist.name.split(" ")[0]} isOwner={isOwn} />
         </div>
       </div>
 

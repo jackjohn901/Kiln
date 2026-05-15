@@ -15,6 +15,7 @@ export interface Post {
   likes: number;
   comments: number;
   saves: number;
+  patronOnly?: boolean;
 }
 
 export interface Draft {

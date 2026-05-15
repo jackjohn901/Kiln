@@ -81,6 +81,10 @@ import MaterialExchange from "@/pages/MaterialExchange";
 import DigitalDownloads from "@/pages/DigitalDownloads";
 import InspirationBoards from "@/pages/InspirationBoards";
 import DuetStudio from "@/pages/DuetStudio";
+import CollectorProfile from "@/pages/CollectorProfile";
+import CommissionTracker from "@/pages/CommissionTracker";
+import GiftCards from "@/pages/GiftCards";
+import StitchStudio from "@/pages/StitchStudio";
 
 const queryClient = new QueryClient();
 
@@ -225,6 +229,11 @@ function Router() {
       <Route path="/boards" component={InspirationBoards} />
       <Route path="/duet" component={DuetStudio} />
       <Route path="/duet/:reelId" component={DuetStudio} />
+      <Route path="/collectors/:id" component={CollectorProfile} />
+      <Route path="/commission-tracker" component={CommissionTracker} />
+      <Route path="/gift-cards" component={GiftCards} />
+      <Route path="/stitch" component={StitchStudio} />
+      <Route path="/stitch/:reelId" component={StitchStudio} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -18,6 +18,8 @@ export interface Reel {
   avatarUrl: string;
   musicTrackId: string;
   available: boolean;
+  patronOnly?: boolean;
+  collabArtistName?: string;
 }
 
 function hash(s: string): number {

@@ -1,15 +1,26 @@
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck } from "lucide-react";
+import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles } from "lucide-react";
+import { useState } from "react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
 
 export default function Cart() {
   const { items, itemCount, subtotal, removeItem, updateQty, clearCart } = useCart();
+  const [bundleApplied, setBundleApplied] = useState(false);
 
-  const shipping = subtotal > 500 ? 0 : subtotal > 0 ? 18 : 0;
-  const total = subtotal + shipping;
+  const bundleDiscount = bundleApplied ? Math.round(subtotal * 0.10) : 0;
+  const shipping = (subtotal - bundleDiscount) > 500 ? 0 : subtotal > 0 ? 18 : 0;
+  const total = subtotal - bundleDiscount + shipping;
+
+  const artistGroups = items.reduce<Record<string, typeof items>>((acc, item) => {
+    const id = item.listing.artistId;
+    if (!acc[id]) acc[id] = [];
+    acc[id]!.push(item);
+    return acc;
+  }, {});
+  const bundleEligible = Object.values(artistGroups).some((group) => group.length >= 2);
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -97,6 +108,43 @@ export default function Cart() {
               })}
             </AnimatePresence>
 
+            {/* Bundle deal */}
+            {bundleEligible && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 border border-amber-500/30">
+                    <Gift size={16} className="text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-sm font-semibold text-amber-100">Bundle & Save 10%</p>
+                      <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-400">
+                        <Sparkles size={8} className="inline mr-0.5" />DEAL
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-400">You have multiple pieces from the same artist. Save 10% when you bundle them.</p>
+                    {bundleApplied && (
+                      <p className="mt-1 text-xs font-semibold text-emerald-400">−${bundleDiscount.toLocaleString()} saved!</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setBundleApplied((v) => !v)}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                      bundleApplied
+                        ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"
+                        : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                    }`}
+                  >
+                    {bundleApplied ? "Applied ✓" : "Apply"}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Order summary */}
             <div className="mt-2 rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Order summary</p>
@@ -104,6 +152,12 @@ export default function Cart() {
                 <span>Subtotal ({itemCount} {itemCount === 1 ? "item" : "items"})</span>
                 <span>${subtotal.toLocaleString()}</span>
               </div>
+              {bundleApplied && (
+                <div className="flex justify-between text-sm text-emerald-400">
+                  <span>Bundle discount (10%)</span>
+                  <span>−${bundleDiscount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm text-stone-400">
                 <span className="flex items-center gap-1">
                   <Truck size={12} /> Shipping
@@ -112,7 +166,7 @@ export default function Cart() {
                   {shipping === 0 ? (subtotal > 0 ? "Free" : "—") : `$${shipping}`}
                 </span>
               </div>
-              {subtotal > 0 && subtotal <= 500 && (
+              {subtotal > 0 && (subtotal - bundleDiscount) <= 500 && !bundleApplied && (
                 <p className="text-xs text-stone-600">
                   Add ${(500 - subtotal).toLocaleString()} more for free shipping
                 </p>

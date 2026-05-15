@@ -5,9 +5,10 @@ import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
-  SplitSquareHorizontal,
+  SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
+import BoardSavePicker from "@/components/BoardSavePicker";
 import { ParsedCaption } from "@/lib/parseCaption";
 import { getTrackById } from "@/data/music";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -89,6 +90,7 @@ function userPostsToReels(): Reel[] {
       avatarUrl: post.artistAvatarUrl,
       musicTrackId: ALL_REELS[0]?.musicTrackId ?? "track-ambient-1",
       available: false,
+      patronOnly: post.patronOnly,
     }));
   } catch {
     return [];
@@ -228,15 +230,22 @@ function ReelCard({
   musicMuted,
   onToggleMusic,
   onComment,
+  onNotInterested,
+  onMoreLikeThis,
 }: {
   reel: Reel;
   isActive: boolean;
   musicMuted: boolean;
   onToggleMusic: () => void;
   onComment: (reelId: string, artistName: string) => void;
+  onNotInterested: () => void;
+  onMoreLikeThis: () => void;
 }) {
   const [showReport, setShowReport] = useState(false);
-  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus } = useSocial();
+  const [showBoardPicker, setShowBoardPicker] = useState(false);
+  const [showAlgoMenu, setShowAlgoMenu] = useState(false);
+  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed } = useSocial();
+  const isPatronGated = reel.patronOnly && !isSubscribed(reel.artistId);
   const liked = reelLikes[reel.id] ?? false;
   const saved = reelSaves[reel.id] ?? false;
   const reposted = reelReposts[reel.id] ?? false;
@@ -293,6 +302,25 @@ function ReelCard({
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/40" />
 
+      {/* Patron gate overlay */}
+      {isPatronGated && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 backdrop-blur-xl bg-black/60">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/40">
+            <Lock size={24} className="text-amber-400" />
+          </div>
+          <div className="text-center px-8">
+            <p className="font-semibold text-amber-100 mb-1">Patron-exclusive post</p>
+            <p className="text-sm text-stone-400">Subscribe to {reel.artistName.split(" ")[0]} to unlock</p>
+          </div>
+          <Link href={`/artists/${reel.artistId}/patron`}>
+            <button className="flex items-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
+              <Crown size={14} /> Become a Patron
+            </button>
+          </Link>
+        </div>
+      )}
+
+
       {/* ── Bottom-left: artist info ── */}
       <div className="absolute bottom-[88px] left-4 right-20 z-10 space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">
@@ -316,6 +344,12 @@ function ReelCard({
             {reel.artistName}
           </h2>
         </Link>
+        {reel.collabArtistName && (
+          <div className="flex items-center gap-1.5">
+            <Users size={10} className="text-amber-400/80" />
+            <span className="text-[10px] text-amber-300/90 font-medium">ft. {reel.collabArtistName}</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <p className="text-[11px] text-stone-400 drop-shadow">
@@ -395,14 +429,14 @@ function ReelCard({
           </span>
         </button>
 
-        {/* Save */}
+        {/* Save — opens board picker */}
         <button
           onClick={() => {
-            toggleReelSave(reel.id);
+            if (!saved) toggleReelSave(reel.id);
+            setShowBoardPicker(true);
             try {
               const data = readInteractions();
-              const delta = saved ? -1 : 1;
-              data.savedTechniques[reel.technique] = Math.max(0, (data.savedTechniques[reel.technique] ?? 0) + delta);
+              data.savedTechniques[reel.technique] = Math.max(0, (data.savedTechniques[reel.technique] ?? 0) + 1);
               data.watchedArtists[reel.artistId] = (data.watchedArtists[reel.artistId] ?? 0) + 1;
               localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
             } catch {}
@@ -441,6 +475,14 @@ function ReelCard({
           </button>
         </Link>
 
+        {/* Stitch */}
+        <Link href={`/stitch/${reel.id}`}>
+          <button className="flex flex-col items-center gap-1">
+            <Scissors size={20} className="text-white" />
+            <span className="text-[9px] font-bold text-white drop-shadow">Stitch</span>
+          </button>
+        </Link>
+
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
 
@@ -454,21 +496,87 @@ function ReelCard({
           <span className="text-[9px] text-white/60">{musicMuted ? "Off" : "Music"}</span>
         </button>
 
-        {/* Report */}
+        {/* More options (algo feedback + report) */}
         <button
-          onClick={() => setShowReport(true)}
+          onClick={() => setShowAlgoMenu(true)}
           className="flex flex-col items-center gap-1 opacity-40 hover:opacity-70 transition-opacity"
         >
-          <Flag size={18} className="text-white" />
-          <span className="text-[9px] text-white/60">Report</span>
+          <MoreHorizontal size={20} className="text-white" />
+          <span className="text-[9px] text-white/60">More</span>
         </button>
       </div>
+
+      {/* Algo menu */}
+      <AnimatePresence>
+        {showAlgoMenu && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowAlgoMenu(false)}
+          >
+            <motion.div
+              initial={{ y: 60 }} animate={{ y: 0 }} exit={{ y: 60 }}
+              transition={{ type: "spring", damping: 22, stiffness: 260 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-t-2xl bg-stone-900 border border-white/10 p-4 pb-10"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <p className="font-semibold text-stone-200">Post options</p>
+                <button onClick={() => setShowAlgoMenu(false)} className="text-stone-500 hover:text-stone-300">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { setShowAlgoMenu(false); onNotInterested(); }}
+                  className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                >
+                  <ThumbsDown size={16} className="text-stone-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-stone-200">Not interested</p>
+                    <p className="text-[11px] text-stone-500">Hide this reel and see less like it</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowAlgoMenu(false); onMoreLikeThis(); }}
+                  className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                >
+                  <ThumbsUp size={16} className="text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-stone-200">More like this</p>
+                    <p className="text-[11px] text-stone-500">Boost {reel.technique} in your feed</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowAlgoMenu(false); setShowReport(true); }}
+                  className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                >
+                  <Flag size={16} className="text-stone-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-stone-200">Report</p>
+                    <p className="text-[11px] text-stone-500">Flag this content for review</p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showReport && (
         <ReportModal
           postId={reel.id}
           artistName={reel.artistName}
           onClose={() => setShowReport(false)}
+        />
+      )}
+
+      {showBoardPicker && (
+        <BoardSavePicker
+          reelId={reel.id}
+          thumbnailUrl={reel.thumbnail}
+          onClose={() => setShowBoardPicker(false)}
+          onSaved={() => setShowBoardPicker(false)}
         />
       )}
     </div>
@@ -488,6 +596,30 @@ export default function Feed() {
   const [techniqueFilter, setTechniqueFilter] = useState<string | null>(null);
   const [commentReel, setCommentReel] = useState<{ id: string; artistName: string } | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  const NOT_INTERESTED_KEY = "kiln_not_interested_v1";
+  const [notInterested, setNotInterested] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(NOT_INTERESTED_KEY) ?? "[]") as string[]);
+    } catch { return new Set<string>(); }
+  });
+
+  function handleNotInterested(reelId: string) {
+    setNotInterested((prev) => {
+      const next = new Set(prev);
+      next.add(reelId);
+      localStorage.setItem(NOT_INTERESTED_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function handleMoreLikeThis(technique: string) {
+    try {
+      const data = readInteractions();
+      data.likedTechniques[technique] = (data.likedTechniques[technique] ?? 0) + 15;
+      localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
+    } catch {}
+  }
 
   const { following, unreadCount } = useSocial();
   const [, navigate] = useLocation();
@@ -551,10 +683,10 @@ export default function Feed() {
     ];
   }, [feedTab, following, userPostReels]);
 
-  const reels = useMemo(
-    () => techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels,
-    [baseReels, techniqueFilter]
-  );
+  const reels = useMemo(() => {
+    const base = techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels;
+    return notInterested.size > 0 ? base.filter((r) => !notInterested.has(r.id)) : base;
+  }, [baseReels, techniqueFilter, notInterested]);
 
   const availableTechniques = useMemo(() => {
     const set = new Set(baseReels.map((r) => r.technique));
@@ -813,6 +945,8 @@ export default function Feed() {
               musicMuted={musicMuted}
               onToggleMusic={handleToggleMusic}
               onComment={(id, name) => setCommentReel({ id, artistName: name })}
+              onNotInterested={() => handleNotInterested(reel.id)}
+              onMoreLikeThis={() => handleMoreLikeThis(reel.technique)}
             />
           ))}
         </div>

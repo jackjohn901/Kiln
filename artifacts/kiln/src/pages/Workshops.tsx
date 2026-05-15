@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Clock, Users, ChevronRight, Star } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare } from "lucide-react";
 import { useLocation } from "wouter";
 import { workshops, workshopMediums, Workshop } from "@/data/workshops";
 import Nav from "@/components/Nav";
@@ -10,6 +10,51 @@ const LEVEL_COLORS: Record<string, string> = {
   Advanced: "text-rose-400 bg-rose-500/10 border-rose-500/30",
   "All levels": "text-sky-400 bg-sky-500/10 border-sky-500/30",
 };
+
+const WORKSHOP_REVIEWS: Record<string, Array<{ name: string; rating: number; text: string }>> = {
+  "ws-glass-01": [
+    { name: "James T.", rating: 5, text: "Absolutely transformative. Gather technique is now intuitive for me." },
+    { name: "Sarah K.", rating: 5, text: "Best workshop I've taken. Marcus explains the physics beautifully." },
+    { name: "Priya M.", rating: 4, text: "Small class size means real hands-on time. Worth every penny." },
+  ],
+  "ws-ceramic-01": [
+    { name: "Leo W.", rating: 5, text: "Finally cracked the Raku process. The reduction atmosphere section was gold." },
+    { name: "Anna R.", rating: 5, text: "Incredible teacher. I left with three finished pieces and new friends." },
+  ],
+};
+
+function getWorkshopReviews(id: string): Array<{ name: string; rating: number; text: string }> {
+  if (WORKSHOP_REVIEWS[id]) return WORKSHOP_REVIEWS[id]!;
+  const hash = id.split("").reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0);
+  const names = ["Elena V.", "Chris B.", "Mai L.", "James P.", "Rona S.", "Tariq H."];
+  const texts = [
+    "Excellent instruction and studio space. Highly recommended.",
+    "The artist is so knowledgeable. I'll definitely be back.",
+    "Small group made it feel very personal. Learned a ton.",
+    "Perfect mix of theory and hands-on practice.",
+  ];
+  const count = 2 + (Math.abs(hash) % 2);
+  return Array.from({ length: count }, (_, i) => ({
+    name: names[(Math.abs(hash) + i) % names.length]!,
+    rating: 4 + (Math.abs(hash + i) % 2),
+    text: texts[(Math.abs(hash) + i) % texts.length]!,
+  }));
+}
+
+function StarRating({ value, size = 11 }: { value: number; size?: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star
+          key={s}
+          size={size}
+          fill={s <= value ? "#f59e0b" : "none"}
+          className={s <= value ? "text-amber-400" : "text-stone-700"}
+        />
+      ))}
+    </div>
+  );
+}
 
 function WorkshopCard({ w }: { w: Workshop }) {
   const [, navigate] = useLocation();
@@ -77,6 +122,34 @@ function WorkshopCard({ w }: { w: Workshop }) {
             )}
           </div>
         )}
+
+        {/* Workshop reviews */}
+        {(() => {
+          const reviews = getWorkshopReviews(w.id);
+          const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+          return (
+            <div className="mb-4 border-t border-white/5 pt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <StarRating value={Math.round(avg)} />
+                <span className="text-xs font-bold text-amber-300">{avg.toFixed(1)}</span>
+                <span className="text-[10px] text-stone-600 flex items-center gap-1">
+                  <MessageSquare size={9} /> {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {reviews.slice(0, 2).map((r, i) => (
+                  <div key={i} className="rounded-lg bg-stone-800/40 px-3 py-2">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <StarRating value={r.rating} size={9} />
+                      <span className="text-[10px] text-stone-500">{r.name}</span>
+                    </div>
+                    <p className="text-[11px] text-stone-400 leading-snug line-clamp-2">"{r.text}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="flex items-center justify-between">
           <span className="text-lg font-bold text-stone-100">${w.price}</span>

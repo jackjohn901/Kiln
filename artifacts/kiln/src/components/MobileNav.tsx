@@ -8,7 +8,8 @@ import {
   MessageSquare, GraduationCap, Link2, CalendarDays, Briefcase,
   Award, BookOpen, FlaskConical, Flame, Box, Map, TrendingUp,
   Zap, Gavel, BookMarked, Calendar, Mail, X, ChevronRight,
-  Download, Grid3x3, SplitSquareHorizontal,
+  Download, Grid3x3, SplitSquareHorizontal, Gift, Scissors,
+  CheckSquare, UserCircle2,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -34,7 +35,9 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/orders", icon: Package, label: "Orders" },
       { href: "/cart", icon: ShoppingCart, label: "Cart" },
       { href: "/inbox", icon: Mail, label: "Commission Inbox" },
+      { href: "/commission-tracker", icon: CheckSquare, label: "Commission Tracker" },
       { href: "/collection", icon: BookMarked, label: "Collection" },
+      { href: "/gift-cards", icon: Gift, label: "Gift Cards" },
     ],
   },
   {
@@ -80,6 +83,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/downloads", icon: Download, label: "Digital Downloads" },
       { href: "/boards", icon: Grid3x3, label: "Inspiration Boards" },
       { href: "/duet", icon: SplitSquareHorizontal, label: "Duet Studio" },
+      { href: "/stitch", icon: Scissors, label: "Stitch Studio" },
     ],
   },
 ];

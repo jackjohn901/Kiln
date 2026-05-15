@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy, Sparkles } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy, Sparkles, ChevronRight } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -35,6 +35,19 @@ export default function Discover() {
   const [query, setQuery] = useState("");
   const [medium, setMedium] = useState("All");
   const [statusFilter, setStatusFilter] = useState<"Any" | "Open" | "Waitlisted">("Any");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = useMemo(() => {
+    if (query.length < 2) return { artists: [], techniques: [] };
+    const q = query.toLowerCase();
+    const artistMatches = ALL_ARTISTS
+      .filter((a) => a.name.toLowerCase().includes(q) || a.location.toLowerCase().includes(q))
+      .slice(0, 5);
+    const allTechniques = [...new Set(ALL_REELS.map((r) => r.technique))];
+    const techniqueMatches = allTechniques.filter((t) => t.toLowerCase().includes(q)).slice(0, 3);
+    return { artists: artistMatches, techniques: techniqueMatches };
+  }, [query]);
 
   // Personalised recommendations: artists sharing mediums/techniques with who the user follows
   const recommended = useMemo(() => {
@@ -241,18 +254,63 @@ export default function Discover() {
             </div>
           </div>
 
-          <div className="relative mb-4">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500" />
+          <div ref={searchRef} className="relative mb-4">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 z-10 pointer-events-none" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="Search by name, technique, or location…"
               className="w-full bg-stone-900 border border-stone-700 rounded-2xl pl-10 pr-4 py-3 text-sm text-stone-100 placeholder-stone-500 outline-none focus:border-amber-500 transition-colors"
             />
             {query && (
-              <button onClick={() => setQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300">
+              <button onClick={() => { setQuery(""); setShowSuggestions(false); }} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 z-10">
                 <X size={16} />
               </button>
+            )}
+            {/* Autocomplete dropdown */}
+            {showSuggestions && query.length >= 2 && (suggestions.artists.length > 0 || suggestions.techniques.length > 0) && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-1.5 rounded-2xl border border-white/10 bg-stone-900 shadow-xl shadow-black/40 overflow-hidden">
+                {suggestions.techniques.length > 0 && (
+                  <div className="p-2 border-b border-white/5">
+                    <p className="px-3 pb-1 text-[10px] font-bold tracking-widest text-stone-600">TECHNIQUES</p>
+                    {suggestions.techniques.map((t) => (
+                      <button
+                        key={t}
+                        onMouseDown={() => { navigate(`/tag/${encodeURIComponent(t)}`); setShowSuggestions(false); }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-stone-300 hover:bg-stone-800 transition-colors"
+                      >
+                        <Flame size={12} className="text-amber-400 shrink-0" />
+                        {t}
+                        <ChevronRight size={12} className="ml-auto text-stone-700" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {suggestions.artists.length > 0 && (
+                  <div className="p-2">
+                    <p className="px-3 pb-1 text-[10px] font-bold tracking-widest text-stone-600">ARTISTS</p>
+                    {suggestions.artists.map((a) => {
+                      const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`;
+                      return (
+                        <button
+                          key={a.id}
+                          onMouseDown={() => { navigate(`/artists/${a.id}`); setShowSuggestions(false); }}
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-stone-800 transition-colors"
+                        >
+                          <img src={avatar} alt={a.name} className="h-7 w-7 rounded-full object-cover shrink-0 border border-white/10" />
+                          <div className="min-w-0">
+                            <p className="text-sm text-stone-200 truncate">{a.name}</p>
+                            <p className="text-[10px] text-stone-600 truncate">{a.location} · {a.medium.split(",")[0]}</p>
+                          </div>
+                          <ChevronRight size={12} className="ml-auto text-stone-700 shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
