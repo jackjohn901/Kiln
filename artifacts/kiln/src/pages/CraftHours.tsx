@@ -1,0 +1,326 @@
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Timer, Plus, Flame, Trophy, Target, ChevronRight, X, Check, Clock, TrendingUp, Award } from "lucide-react";
+
+interface HourLog {
+  id: string;
+  date: string;
+  hours: number;
+  minutes: number;
+  technique: string;
+  note: string;
+}
+
+interface WeeklyGoal {
+  hoursPerWeek: number;
+  startedAt: string;
+}
+
+interface CraftHoursState {
+  logs: HourLog[];
+  goal: WeeklyGoal;
+  longestStreak: number;
+  totalHours: number;
+}
+
+const STORAGE_KEY = "kiln_craft_hours_v1";
+
+const SEED_STATE: CraftHoursState = {
+  goal: { hoursPerWeek: 15, startedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
+  longestStreak: 0,
+  totalHours: 0,
+  logs: [
+    { id: "l-001", date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 3, minutes: 30, technique: "Glass Blowing", note: "Hot shop session — worked on a new gather technique for the color series." },
+    { id: "l-002", date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 2, minutes: 0, technique: "Flameworking", note: "Bench time — practicing focal beads for an upcoming order." },
+    { id: "l-003", date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 4, minutes: 15, technique: "Cold Working", note: "Grinding and polishing the pieces from last week's hot shop session." },
+    { id: "l-004", date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 1, minutes: 45, technique: "Design / Sketching", note: "Planning the next commission. Two hours of sketching feels like real work." },
+  ],
+};
+
+const COMMUNITY_BOARD = [
+  { name: "Maya Chen", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&q=80", hoursThisWeek: 28, technique: "Ceramics", badge: "🔥" },
+  { name: "James Okafor", avatarUrl: "https://picsum.photos/seed/james/60/60", hoursThisWeek: 22, technique: "Metal Forging", badge: "⚒️" },
+  { name: "Elena Vasquez", avatarUrl: "https://picsum.photos/seed/elena/60/60", hoursThisWeek: 18, technique: "Fiber Arts", badge: "🧵" },
+  { name: "Alex Bernstein", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80", hoursThisWeek: 15, technique: "Glass", badge: "💎" },
+  { name: "Takeshi Mori", avatarUrl: "https://picsum.photos/seed/takeshi/60/60", hoursThisWeek: 14, technique: "Raku", badge: "🏺" },
+];
+
+const TECHNIQUES = ["Glass Blowing", "Flameworking", "Kiln Forming", "Cold Working", "Ceramics", "Raku", "Porcelain", "Wood-Fired", "Metal Forging", "Bronze Casting", "Blacksmithing", "Enamel", "Fiber Arts", "Textile", "Design / Sketching", "Teaching", "Studio Admin"];
+
+function readState(): CraftHoursState {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return SEED_STATE;
+    const parsed = JSON.parse(raw) as CraftHoursState;
+    return { ...SEED_STATE, ...parsed };
+  } catch { return SEED_STATE; }
+}
+
+function saveState(s: CraftHoursState) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+}
+
+function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
+
+function getWeekStart(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff)).toISOString().slice(0, 10);
+}
+
+function hoursThisWeek(logs: HourLog[]): number {
+  const weekStart = getWeekStart();
+  return logs.filter(l => l.date >= weekStart).reduce((s, l) => s + l.hours + l.minutes / 60, 0);
+}
+
+function formatHours(decimal: number): string {
+  const h = Math.floor(decimal);
+  const m = Math.round((decimal - h) * 60);
+  if (!h) return `${m}m`;
+  if (!m) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function Ring({ progress, size = 100, stroke = 8, color = "#f59e0b" }: { progress: number; size?: number; stroke?: number; color?: string }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (Math.min(progress, 1) * circ);
+  return (
+    <svg width={size} height={size} className="-rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700" />
+    </svg>
+  );
+}
+
+export default function CraftHours() {
+  const [state, setState] = useState<CraftHoursState>(readState);
+  const [showLog, setShowLog] = useState(false);
+  const [showGoal, setShowGoal] = useState(false);
+  const [logForm, setLogForm] = useState({ hours: "", minutes: "0", technique: "Glass Blowing", note: "" });
+  const [goalInput, setGoalInput] = useState(state.goal.hoursPerWeek.toString());
+
+  useEffect(() => { saveState(state); }, [state]);
+
+  const thisWeek = hoursThisWeek(state.logs);
+  const totalHours = state.logs.reduce((s, l) => s + l.hours + l.minutes / 60, 0);
+  const progress = thisWeek / state.goal.hoursPerWeek;
+  const goalMet = progress >= 1;
+
+  function addLog() {
+    const h = parseInt(logForm.hours) || 0;
+    const m = parseInt(logForm.minutes) || 0;
+    if (!h && !m) return;
+    const log: HourLog = {
+      id: genId(),
+      date: new Date().toISOString().slice(0, 10),
+      hours: h,
+      minutes: m,
+      technique: logForm.technique,
+      note: logForm.note,
+    };
+    setState(prev => ({ ...prev, logs: [log, ...prev.logs], totalHours: prev.totalHours + h + m / 60 }));
+    setLogForm({ hours: "", minutes: "0", technique: "Glass Blowing", note: "" });
+    setShowLog(false);
+  }
+
+  function updateGoal() {
+    const h = parseInt(goalInput) || 10;
+    setState(prev => ({ ...prev, goal: { hoursPerWeek: h, startedAt: prev.goal.startedAt } }));
+    setShowGoal(false);
+  }
+
+  const recentLogs = state.logs.slice(0, 10);
+
+  return (
+    <div className="min-h-screen bg-[#12100e] pb-32 pt-2">
+      <div className="mx-auto max-w-lg px-4">
+        <div className="pt-10 pb-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Timer size={20} className="text-amber-400" />
+              <h1 className="text-2xl font-bold text-amber-100">Craft Hours</h1>
+            </div>
+            <p className="text-xs text-stone-500">Verified studio time — the only status that matters.</p>
+          </div>
+          <button onClick={() => setShowLog(true)} className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3.5 py-2 text-xs font-semibold text-stone-950">
+            <Plus size={13} /> Log
+          </button>
+        </div>
+
+        {/* Weekly ring */}
+        <div className="mb-6 rounded-3xl bg-stone-900/60 border border-white/8 p-6 flex items-center gap-6">
+          <div className="relative shrink-0">
+            <Ring progress={progress} size={110} stroke={10} color={goalMet ? "#34d399" : "#f59e0b"} />
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-xl font-black text-amber-100">{formatHours(thisWeek)}</span>
+              <span className="text-[10px] text-stone-500">this week</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Target size={13} className={goalMet ? "text-emerald-400" : "text-amber-400"} />
+              <span className={`text-sm font-bold ${goalMet ? "text-emerald-400" : "text-amber-100"}`}>
+                {goalMet ? "Goal achieved! 🎉" : `${formatHours(Math.max(0, state.goal.hoursPerWeek - thisWeek))} to goal`}
+              </span>
+            </div>
+            <p className="text-xs text-stone-500 mb-3">Weekly goal: <span className="text-stone-300">{state.goal.hoursPerWeek}h</span></p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-stone-800/60 p-2.5 text-center">
+                <p className="text-base font-black text-amber-100">{formatHours(totalHours)}</p>
+                <p className="text-[9px] text-stone-500">all time</p>
+              </div>
+              <div className="rounded-xl bg-stone-800/60 p-2.5 text-center">
+                <p className="text-base font-black text-amber-100">{state.logs.length}</p>
+                <p className="text-[9px] text-stone-500">sessions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Technique breakdown */}
+        {state.logs.length > 0 && (() => {
+          const breakdown: Record<string, number> = {};
+          state.logs.forEach(l => { breakdown[l.technique] = (breakdown[l.technique] ?? 0) + l.hours + l.minutes / 60; });
+          const sorted = Object.entries(breakdown).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const max = sorted[0]?.[1] ?? 1;
+          return (
+            <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40 p-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Time by Technique</p>
+              <div className="space-y-2.5">
+                {sorted.map(([tech, hrs]) => (
+                  <div key={tech}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-stone-300">{tech}</span>
+                      <span className="text-xs text-amber-400 font-semibold">{formatHours(hrs)}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-stone-800">
+                      <motion.div className="h-full rounded-full bg-amber-500" initial={{ width: 0 }} animate={{ width: `${(hrs / max) * 100}%` }} transition={{ duration: 0.5 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Community board */}
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Top Craft Hours This Week</p>
+          <div className="space-y-2">
+            {COMMUNITY_BOARD.map((artist, i) => (
+              <div key={artist.name} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-stone-900/60 p-3">
+                <span className="text-[10px] font-black text-stone-600 w-4 shrink-0">#{i + 1}</span>
+                <img src={artist.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-100">{artist.name} {artist.badge}</p>
+                  <p className="text-[10px] text-stone-500">{artist.technique}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-amber-300">{artist.hoursThisWeek}h</p>
+                  <p className="text-[9px] text-stone-600">this week</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent logs */}
+        {recentLogs.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Your Log</p>
+            <div className="space-y-2">
+              {recentLogs.map(log => (
+                <div key={log.id} className="rounded-2xl border border-white/8 bg-stone-900/60 p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-amber-100">{log.technique}</span>
+                    <span className="text-xs font-bold text-amber-400">{formatHours(log.hours + log.minutes / 60)}</span>
+                  </div>
+                  {log.note && <p className="text-xs text-stone-400 leading-relaxed">{log.note}</p>}
+                  <p className="text-[10px] text-stone-600 mt-1">{new Date(log.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Change goal */}
+        <button onClick={() => setShowGoal(true)} className="mt-6 w-full rounded-full border border-white/10 py-3 text-xs text-stone-500 hover:text-stone-300 transition-colors flex items-center justify-center gap-2">
+          <Target size={12} /> Change weekly goal (currently {state.goal.hoursPerWeek}h)
+        </button>
+      </div>
+
+      {/* Log sheet */}
+      <AnimatePresence>
+        {showLog && (
+          <>
+            <motion.div className="fixed inset-0 z-[60] bg-black/70" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowLog(false)} />
+            <motion.div className="fixed bottom-0 left-0 right-0 z-[61] rounded-t-3xl bg-[#1a1714] border-t border-white/10 p-6"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }}>
+              <h2 className="text-lg font-bold text-amber-100 mb-4">Log Studio Time</h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1.5 block">Hours</label>
+                    <input type="number" min="0" max="24" value={logForm.hours} onChange={e => setLogForm(f => ({ ...f, hours: e.target.value }))} placeholder="0"
+                      className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1.5 block">Minutes</label>
+                    <select value={logForm.minutes} onChange={e => setLogForm(f => ({ ...f, minutes: e.target.value }))}
+                      className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 focus:outline-none focus:border-amber-500/40">
+                      {[0, 15, 30, 45].map(m => <option key={m} value={m}>{m}m</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-stone-500 mb-1.5 block">Technique</label>
+                  <select value={logForm.technique} onChange={e => setLogForm(f => ({ ...f, technique: e.target.value }))}
+                    className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 focus:outline-none focus:border-amber-500/40">
+                    {TECHNIQUES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <textarea value={logForm.note} onChange={e => setLogForm(f => ({ ...f, note: e.target.value }))} placeholder="What were you working on? (optional)" rows={2}
+                  className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setShowLog(false)} className="flex-1 rounded-full border border-white/10 py-3 text-sm text-stone-400">Cancel</button>
+                <button onClick={addLog} className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950">Log Hours</button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Goal sheet */}
+      <AnimatePresence>
+        {showGoal && (
+          <>
+            <motion.div className="fixed inset-0 z-[62] bg-black/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowGoal(false)} />
+            <motion.div className="fixed bottom-0 left-0 right-0 z-[63] rounded-t-3xl bg-[#1a1714] border-t border-white/10 p-6"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }}>
+              <h2 className="text-lg font-bold text-amber-100 mb-2">Set Weekly Goal</h2>
+              <p className="text-xs text-stone-500 mb-5">How many hours do you want to spend in the studio each week?</p>
+              <div className="flex items-center gap-4 mb-6">
+                <button onClick={() => setGoalInput(v => Math.max(1, parseInt(v) - 1).toString())} className="h-12 w-12 rounded-full bg-stone-800 border border-white/10 text-xl text-amber-100 hover:bg-stone-700">−</button>
+                <div className="flex-1 text-center">
+                  <span className="text-5xl font-black text-amber-100">{goalInput}</span>
+                  <span className="text-lg text-stone-500 ml-2">hours</span>
+                </div>
+                <button onClick={() => setGoalInput(v => Math.min(80, parseInt(v) + 1).toString())} className="h-12 w-12 rounded-full bg-stone-800 border border-white/10 text-xl text-amber-100 hover:bg-stone-700">+</button>
+              </div>
+              <div className="flex gap-2 mb-5">
+                {[5, 10, 15, 20, 30, 40].map(h => (
+                  <button key={h} onClick={() => setGoalInput(h.toString())} className={`flex-1 rounded-full border py-2 text-xs font-semibold transition-colors ${parseInt(goalInput) === h ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-stone-500"}`}>{h}h</button>
+                ))}
+              </div>
+              <button onClick={updateGoal} className="w-full rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950">Set Goal</button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

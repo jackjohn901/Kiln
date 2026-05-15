@@ -89,6 +89,15 @@ import PriceCalculator from "@/pages/PriceCalculator";
 import CollectorJourney from "@/pages/CollectorJourney";
 import KilnStatus from "@/pages/KilnStatus";
 import DropScheduler from "@/pages/DropScheduler";
+import ProvenanceChain from "@/pages/ProvenanceChain";
+import CraftDNA from "@/pages/CraftDNA";
+import LineageGraph from "@/pages/LineageGraph";
+import Parliament from "@/pages/Parliament";
+import GlazeOracle from "@/pages/GlazeOracle";
+import GhostMode from "@/pages/GhostMode";
+import TasteGraph from "@/pages/TasteGraph";
+import CraftHours from "@/pages/CraftHours";
+import TechniqueGenetics from "@/pages/TechniqueGenetics";
 
 const queryClient = new QueryClient();
 
@@ -242,6 +251,15 @@ function Router() {
       <Route path="/collector-journey" component={CollectorJourney} />
       <Route path="/kiln-status" component={KilnStatus} />
       <Route path="/drop-scheduler" component={DropScheduler} />
+      <Route path="/provenance" component={ProvenanceChain} />
+      <Route path="/craft-dna" component={CraftDNA} />
+      <Route path="/lineage" component={LineageGraph} />
+      <Route path="/parliament" component={Parliament} />
+      <Route path="/glaze-oracle" component={GlazeOracle} />
+      <Route path="/ghost-mode" component={GhostMode} />
+      <Route path="/taste-graph" component={TasteGraph} />
+      <Route path="/craft-hours" component={CraftHours} />
+      <Route path="/technique-genetics" component={TechniqueGenetics} />
       <Route component={NotFound} />
     </Switch>
   );
