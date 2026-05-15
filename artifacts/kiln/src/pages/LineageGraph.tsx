@@ -13,13 +13,13 @@ const GENERATION_COLORS = [
   "from-blue-600/20 to-blue-600/5 border-blue-600/30 text-blue-300",
 ];
 
-function NodeCard({ node, depth, onSelect }: { node: LineageNode; depth: number; onSelect: () => void }) {
+function NodeCard({ node, depth, onSelect }: { node: LineageNode; depth: number; onSelect: (n: LineageNode) => void }) {
   const colorClass = GENERATION_COLORS[Math.min(depth, GENERATION_COLORS.length - 1)];
   const apprentices = LINEAGE_NODES.filter(n => node.apprenticeIds.includes(n.artistId));
 
   return (
     <div className="flex flex-col items-center">
-      <button onClick={onSelect}
+      <button onClick={() => onSelect(node)}
         className={`w-[140px] rounded-2xl border bg-gradient-to-b p-3 text-center transition-all hover:scale-105 active:scale-95 ${colorClass}`}>
         <img src={node.avatarUrl} alt="" className="mx-auto h-10 w-10 rounded-full object-cover mb-2 border-2 border-white/20" />
         <p className="text-xs font-bold leading-tight">{node.name}</p>
@@ -231,7 +231,7 @@ export default function LineageGraph() {
           <div className="overflow-x-auto pb-4">
             <div className="flex gap-6 min-w-max">
               {roots.map((root) => (
-                <NodeCard key={root.artistId} node={root} depth={0} onSelect={() => setSelectedNode(root)} />
+                <NodeCard key={root.artistId} node={root} depth={0} onSelect={(n) => setSelectedNode(n)} />
               ))}
             </div>
           </div>

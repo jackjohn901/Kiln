@@ -3,7 +3,6 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Send, Flame, Sparkles, RefreshCw, Copy, Check } from "lucide-react";
 import Nav from "@/components/Nav";
-import { findAnswer } from "@/data/craftKnowledge";
 
 interface Message {
   id: string;
@@ -23,18 +22,19 @@ const SUGGESTED_QUESTIONS = [
   "What's the Orton cone temperature chart?",
 ];
 
-const SYSTEM_PROMPT = `You are Kiln AI, a knowledgeable craft assistant specializing in glass blowing, ceramics, pottery, flamework, kilnforming, glaze chemistry, and related craft techniques. You are friendly, practical, and precise.
+const LOCAL_FALLBACKS: Record<string, string> = {
+  default: "I'm having trouble connecting to my knowledge base right now. For craft technique questions, please try again in a moment — or reach out to fellow artists in the Guilds section!",
+};
 
-When answering:
-- Be concise but thorough. Prefer bullet points for multi-step answers.
-- Use specific temperatures in both Fahrenheit and Celsius when relevant.
-- Mention safety considerations where important.
-- Reference real materials, tools, and techniques (e.g. specific Orton cone numbers, actual glaze materials like EPK, silica, whiting).
-- When discussing glazes, you can provide actual recipe starting points.
-- If asked about business/selling craft, you can give practical advice.
-- Keep answers focused on craft practice. For off-topic questions, gently redirect to craft topics.
-
-You have a warm, studio-artist tone — like a master craftsperson happy to share knowledge.`;
+function localFallback(question: string): string {
+  const q = question.toLowerCase();
+  if (q.includes("cone 6") || q.includes("stoneware")) return "Cone 6 stoneware fires at approximately 2232°F (1222°C). Always allow a slow cool through quartz inversion at 1063°F (573°C) to prevent thermal shock.";
+  if (q.includes("anneal") || q.includes("blown glass")) return "Blown glass should be annealed at around 960°F (515°C) — the strain point for most soda-lime glass — for at least 1 hour per inch of thickness, then cool at no more than 50°F per hour through 700°F.";
+  if (q.includes("cobalt") || q.includes("green")) return "Cobalt in glass typically produces rich blue, but in a reducing atmosphere or with certain base glasses it can shift toward green or purple. Use a clean oxidizing flame for pure blue results.";
+  if (q.includes("crawl")) return "Glaze crawling is usually caused by over-application, high clay content causing excessive shrinkage, or applying glaze over a dusty/oily surface. Try thinning the glaze or calcining some of the clay content.";
+  if (q.includes("s-crack") || q.includes("s crack")) return "S-cracks form when the bottom of a wheel-thrown piece dries faster than the walls. Compress the floor firmly while throwing, and allow the piece to dry slowly under a cover.";
+  return LOCAL_FALLBACKS.default;
+}
 
 export default function CraftAssistant() {
   const [messages, setMessages] = useState<Message[]>([
@@ -64,16 +64,32 @@ export default function CraftAssistant() {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
-    // Simulate thinking delay (600–1200ms) then answer from local knowledge base
-    const thinkMs = 600 + Math.random() * 600;
-    await new Promise(r => setTimeout(r, thinkMs));
-    const reply = findAnswer(content);
-    setMessages(prev => [...prev, {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: reply,
-      timestamp: new Date(),
-    }]);
+    const history = [...messages, { role: "user" as const, content }]
+      .filter(m => m.role !== "assistant" || m.id !== "welcome")
+      .map(m => ({ role: m.role, content: m.content }));
+
+    try {
+      const res = await fetch("/api/craft-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+      const data = res.ok ? await res.json() as { reply: string } : null;
+      const reply = data?.reply ?? localFallback(content);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: reply,
+        timestamp: new Date(),
+      }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: localFallback(content),
+        timestamp: new Date(),
+      }]);
+    }
     setLoading(false);
   }
 

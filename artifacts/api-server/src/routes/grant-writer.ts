@@ -27,8 +27,7 @@ router.post("/grant-writer", async (req, res) => {
         },
         { role: "user", content: prompt },
       ],
-      max_tokens: 800,
-      temperature: 0.72,
+      max_completion_tokens: 8192,
     });
 
     const text =

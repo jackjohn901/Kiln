@@ -35,8 +35,7 @@ router.post("/craft-assistant", async (req, res) => {
         { role: "system", content: SYSTEM_PROMPT },
         ...messages.slice(-12),
       ],
-      max_tokens: 800,
-      temperature: 0.7,
+      max_completion_tokens: 8192,
     });
 
     const reply = completion.choices[0]?.message?.content ?? "I couldn't generate a response. Please try again.";
