@@ -10,6 +10,14 @@ import { useCart } from "@/contexts/CartContext";
 const MEDIUMS = ["All", "Glass", "Metal", "Sculpture", "Fiber"];
 const SORTS = ["Default", "Price: Low to High", "Price: High to Low"];
 
+const PRICE_RANGES = [
+  { label: "Any price", min: 0, max: Infinity },
+  { label: "Under $1K",  min: 0,     max: 999 },
+  { label: "$1K–$5K",   min: 1000,  max: 4999 },
+  { label: "$5K–$25K",  min: 5000,  max: 24999 },
+  { label: "$25K+",     min: 25000, max: Infinity },
+] as const;
+
 function matchMedium(listing: Listing, filter: string): boolean {
   if (filter === "All") return true;
   const m = listing.medium.toLowerCase();
@@ -28,9 +36,16 @@ export default function Shop() {
   const [medium, setMedium] = useState("All");
   const [sort, setSort] = useState("Default");
   const [showSold, setShowSold] = useState(false);
+  const [priceRangeIdx, setPriceRangeIdx] = useState(0);
   const { addItem, isInCart } = useCart();
 
-  let filtered = listings.filter((l) => matchMedium(l, medium) && (showSold || l.available));
+  const priceRange = PRICE_RANGES[priceRangeIdx];
+  let filtered = listings.filter((l) =>
+    matchMedium(l, medium) &&
+    (showSold || l.available) &&
+    l.price >= priceRange.min &&
+    l.price <= priceRange.max
+  );
 
   if (sort === "Price: Low to High") filtered = [...filtered].sort((a, b) => a.price - b.price);
   if (sort === "Price: High to Low") filtered = [...filtered].sort((a, b) => b.price - a.price);
@@ -50,52 +65,73 @@ export default function Shop() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-6 border-b border-border/50">
-          <div className="flex items-center gap-1" data-testid="shop-medium-filters">
-            {MEDIUMS.map((m) => (
+        <div className="mb-8 pb-6 border-b border-border/50 space-y-3">
+          {/* Row 1: medium + controls */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-1" data-testid="shop-medium-filters">
+              {MEDIUMS.map((m) => (
+                <button
+                  key={m}
+                  data-testid={`shop-filter-${m.toLowerCase()}`}
+                  onClick={() => setMedium(m)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    medium === m
+                      ? "text-background font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                  }`}
+                  style={medium === m ? { background: "hsl(28 68% 52%)" } : {}}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
               <button
-                key={m}
-                data-testid={`shop-filter-${m.toLowerCase()}`}
-                onClick={() => setMedium(m)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  medium === m
-                    ? "text-background font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                data-testid="toggle-sold"
+                onClick={() => setShowSold((v) => !v)}
+                className={`text-[11px] transition-colors px-3 py-1.5 rounded-full border ${
+                  showSold
+                    ? "border-primary/40 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
                 }`}
-                style={medium === m ? { background: "hsl(28 68% 52%)" } : {}}
               >
-                {m}
+                {showSold ? "Hiding sold" : "Show sold"}
               </button>
-            ))}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <SlidersHorizontal size={13} />
+                <select
+                  data-testid="shop-sort"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="bg-transparent text-xs text-muted-foreground focus:outline-none cursor-pointer hover:text-foreground transition-colors"
+                >
+                  {SORTS.map((s) => (
+                    <option key={s} value={s} style={{ background: "hsl(20 8% 12%)" }}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              data-testid="toggle-sold"
-              onClick={() => setShowSold((v) => !v)}
-              className={`text-[11px] transition-colors px-3 py-1.5 rounded-full border ${
-                showSold
-                  ? "border-primary/40 text-primary"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {showSold ? "Hiding sold" : "Show sold"}
-            </button>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <SlidersHorizontal size={13} />
-              <select
-                data-testid="shop-sort"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="bg-transparent text-xs text-muted-foreground focus:outline-none cursor-pointer hover:text-foreground transition-colors"
+          {/* Row 2: price range */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-muted-foreground mr-1">Price:</span>
+            {PRICE_RANGES.map((r, i) => (
+              <button
+                key={r.label}
+                onClick={() => setPriceRangeIdx(i)}
+                className={`px-3 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                  priceRangeIdx === i
+                    ? "border-primary/50 text-primary bg-primary/10"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-border/80"
+                }`}
               >
-                {SORTS.map((s) => (
-                  <option key={s} value={s} style={{ background: "hsl(20 8% 12%)" }}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {r.label}
+              </button>
+            ))}
           </div>
         </div>
 

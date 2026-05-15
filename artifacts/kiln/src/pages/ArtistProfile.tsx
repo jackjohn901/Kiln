@@ -197,10 +197,21 @@ export default function ArtistProfile() {
     }
   }
 
-  const coverImg = artist.images[0]?.url
-    ?? (artist.videos[0] ? `https://img.youtube.com/vi/${artist.videos[0].id}/hqdefault.jpg` : "");
+  // When viewing own profile, overlay any custom edits from ProfileContext on top of static artist data
+  const displayName     = (isOwn && profile?.name)     ? profile.name     : artist.name;
+  const displayBio      = (isOwn && profile?.bio)      ? profile.bio      : artist.bio;
+  const displayLocation = (isOwn && profile?.location) ? profile.location : artist.location;
+  const displayMedium   = (isOwn && profile?.mediums?.length) ? profile.mediums.join(", ") : artist.medium;
+  const displayWebsite  = (isOwn && profile?.website !== undefined) ? profile.website : artist.website;
+  const displayInstagram = (isOwn && profile?.instagram !== undefined) ? profile.instagram : (artist.instagram ?? "");
 
-  const avatarImg = artist.images[0]?.url ?? `https://picsum.photos/seed/${artist.id}/200/200`;
+  const coverImg = (isOwn && profile?.coverUrl)
+    ? profile.coverUrl
+    : (artist.images[0]?.url ?? (artist.videos[0] ? `https://img.youtube.com/vi/${artist.videos[0].id}/hqdefault.jpg` : ""));
+
+  const avatarImg = (isOwn && profile?.avatarUrl)
+    ? profile.avatarUrl
+    : (artist.images[0]?.url ?? `https://picsum.photos/seed/${artist.id}/200/200`);
 
   const tabItems = tab === "posts" ? allGridItems : tab === "process" ? processItems : [];
 
@@ -343,7 +354,7 @@ export default function ArtistProfile() {
         {/* Name + handle + commission status */}
         <div className="mt-3">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-serif text-2xl font-bold text-amber-100">{artist.name}</h1>
+            <h1 className="font-serif text-2xl font-bold text-amber-100">{displayName}</h1>
             {verified && (
               <span title="Verified studio" className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 shrink-0">
                 <Check size={11} className="text-white" />
@@ -389,18 +400,25 @@ export default function ArtistProfile() {
 
         {/* Bio */}
         <p className="mt-2 text-sm text-stone-400 leading-relaxed max-w-xl">
-          {artist.bio.length > 220 ? artist.bio.slice(0, 220) + "…" : artist.bio}
+          {displayBio.length > 220 ? displayBio.slice(0, 220) + "…" : displayBio}
         </p>
 
         {/* Location + medium */}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-stone-600">
-          <span className="flex items-center gap-1"><MapPin size={11} /> {artist.location}</span>
-          <span>{artist.medium}</span>
-          {artist.website && (
-            <a href={artist.website} target="_blank" rel="noopener noreferrer"
+          <span className="flex items-center gap-1"><MapPin size={11} /> {displayLocation}</span>
+          <span>{displayMedium}</span>
+          {displayWebsite && (
+            <a href={displayWebsite} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1 text-amber-600 hover:text-amber-400 transition-colors"
             >
               <ExternalLink size={10} /> Website
+            </a>
+          )}
+          {displayInstagram && (
+            <a href={`https://instagram.com/${displayInstagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-pink-500/70 hover:text-pink-400 transition-colors"
+            >
+              @{displayInstagram.replace("@", "")}
             </a>
           )}
         </div>
@@ -677,7 +695,7 @@ export default function ArtistProfile() {
             <div className="max-w-2xl space-y-6 py-2">
               <div>
                 <h3 className="mb-2 font-serif text-lg text-amber-100">About</h3>
-                <p className="text-sm text-stone-400 leading-relaxed">{artist.bio}</p>
+                <p className="text-sm text-stone-400 leading-relaxed">{displayBio}</p>
               </div>
 
               {artist.artistStatement && (

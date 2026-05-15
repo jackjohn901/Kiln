@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy } from "lucide-react";
+import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy, Sparkles } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -30,11 +30,35 @@ const STATUS_UI: Record<CommissionStatus, { label: string; color: string; Icon: 
 
 export default function Discover() {
   const [, navigate] = useLocation();
-  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus } = useSocial();
+  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, following } = useSocial();
 
   const [query, setQuery] = useState("");
   const [medium, setMedium] = useState("All");
   const [statusFilter, setStatusFilter] = useState<"Any" | "Open" | "Waitlisted">("Any");
+
+  // Personalised recommendations: artists sharing mediums/techniques with who the user follows
+  const recommended = useMemo(() => {
+    if (!following.length) return [];
+    const followedIds = new Set(following);
+    const followedMediumWords = new Set<string>();
+    following.forEach((artistId) => {
+      const a = ALL_ARTISTS.find((x) => x.id === artistId);
+      if (a) {
+        a.medium.toLowerCase().split(/[,/\s]+/).filter((w) => w.length > 3).forEach((w) => followedMediumWords.add(w));
+      }
+    });
+    return ALL_ARTISTS
+      .filter((a) => !followedIds.has(a.id))
+      .map((a) => {
+        const words = a.medium.toLowerCase().split(/[,/\s]+/).filter((w) => w.length > 3);
+        const overlap = words.filter((w) => followedMediumWords.has(w)).length;
+        return { artist: a, score: overlap };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((x) => x.artist);
+  }, [following]);
 
   const filtered = useMemo(() => {
     return ALL_ARTISTS.filter((a) => {
@@ -90,6 +114,39 @@ export default function Discover() {
                 </Link>
               ))}
             </div>
+
+            {/* Personalised recommendations (only shown when following someone) */}
+            {recommended.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={13} className="text-amber-400" />
+                  <h2 className="text-sm font-semibold text-stone-300">Recommended for you</h2>
+                  <span className="rounded-full bg-stone-800 border border-stone-700 px-2 py-0.5 text-[9px] text-stone-500">Based on who you follow</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                  {recommended.map((a) => {
+                    const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/200/200`;
+                    const alreadyFollowing = isFollowing(a.id);
+                    return (
+                      <div key={a.id} className="shrink-0 flex flex-col items-center gap-1.5 w-20">
+                        <Link href={`/artists/${a.id}`}>
+                          <div className="relative h-14 w-14 rounded-full overflow-hidden border-2 border-amber-500/40 hover:border-amber-400/70 transition-colors cursor-pointer">
+                            <img src={avatar} alt={a.name} className="h-full w-full object-cover hover:scale-105 transition-transform" />
+                          </div>
+                        </Link>
+                        <p className="text-[10px] text-stone-400 text-center max-w-[72px] truncate">{a.name.split(" ")[0]}</p>
+                        <button
+                          onClick={() => alreadyFollowing ? unfollowArtist(a.id) : followArtist(a.id, a.name, avatar)}
+                          className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${alreadyFollowing ? "border-stone-600 text-stone-500" : "border-amber-500 text-amber-400 hover:bg-amber-500 hover:text-stone-950"}`}
+                        >
+                          {alreadyFollowing ? "Following" : "Follow"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Rising artists */}
             <div className="flex items-center gap-2 mb-3">
