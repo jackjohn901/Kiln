@@ -12,6 +12,16 @@ tags:
     description: Health operations
   - name: instagram
     description: Instagram media feed
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
+  - name: social
+    description: Social graph and feed
+  - name: posts
+    description: Post CRUD
+  - name: notifications
+    description: User notifications
+  - name: messages
+    description: Direct messages
 paths:
   /healthz:
     get:
@@ -45,7 +55,494 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect to the returnTo path on success.
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Token did not contain usable claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Token exchange failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+  /feed:
+    get:
+      tags: [posts]
+      operationId: getFeed
+      summary: Get paginated post feed
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Feed posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
+  /posts:
+    post:
+      tags: [posts]
+      operationId: createPost
+      summary: Create a new post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostBody'
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostRecord'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /posts/{postId}/like:
+    post:
+      tags: [social]
+      operationId: likePost
+      summary: Like a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Like toggled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /posts/{postId}/save:
+    post:
+      tags: [social]
+      operationId: savePost
+      summary: Save/unsave a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Save toggled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /posts/{postId}/comments:
+    get:
+      tags: [posts]
+      operationId: getPostComments
+      summary: Get comments for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comments list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentsResponse'
+    post:
+      tags: [posts]
+      operationId: addComment
+      summary: Add a comment to a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCommentBody'
+      responses:
+        '201':
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentRecord'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /users/{userId}/follow:
+    post:
+      tags: [social]
+      operationId: toggleFollow
+      summary: Follow or unfollow a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Follow toggled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FollowResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /users/{userId}/profile:
+    get:
+      tags: [social]
+      operationId: getUserProfile
+      summary: Get a user's profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    patch:
+      tags: [social]
+      operationId: updateUserProfile
+      summary: Update own profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileBody'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: getNotifications
+      summary: Get notifications for current user
+      responses:
+        '200':
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /notifications/read-all:
+    post:
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: All marked read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /messages/threads:
+    get:
+      tags: [messages]
+      operationId: getMessageThreads
+      summary: Get all message threads for current user
+      responses:
+        '200':
+          description: Threads list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /messages/threads/{threadId}:
+    get:
+      tags: [messages]
+      operationId: getThreadMessages
+      summary: Get messages in a thread
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /messages/send:
+    post:
+      tags: [messages]
+      operationId: sendMessage
+      summary: Send a message to a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageBody'
+      responses:
+        '201':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRecord'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /me/profile:
+    get:
+      tags: [social]
+      operationId: getMyProfile
+      summary: Get current user's profile
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    patch:
+      tags: [social]
+      operationId: updateMyProfile
+      summary: Update current user's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileBody'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — Bearer <sid>.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -92,3 +589,360 @@ components:
             $ref: "#/components/schemas/InstagramVideo"
       required:
         - videos
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: [string, 'null']
+          format: email
+        firstName:
+          type: [string, 'null']
+        lastName:
+          type: [string, 'null']
+        profileImageUrl:
+          type: [string, 'null']
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+          format: uri
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          const: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    PostRecord:
+      type: object
+      required: [id, authorId, authorName, caption, likeCount, commentCount, saveCount, viewCount, isPatronOnly, createdAt]
+      properties:
+        id:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        authorAvatarUrl:
+          type: [string, 'null']
+        videoUrl:
+          type: [string, 'null']
+        thumbnailUrl:
+          type: [string, 'null']
+        caption:
+          type: string
+        technique:
+          type: [string, 'null']
+        medium:
+          type: [string, 'null']
+        tags:
+          type: array
+          items:
+            type: string
+        likeCount:
+          type: integer
+        commentCount:
+          type: integer
+        saveCount:
+          type: integer
+        viewCount:
+          type: integer
+        isPatronOnly:
+          type: boolean
+        craftScore:
+          type: [integer, 'null']
+        isLiked:
+          type: boolean
+        isSaved:
+          type: boolean
+        createdAt:
+          type: string
+    FeedResponse:
+      type: object
+      required: [posts, hasMore]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostRecord'
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: [string, 'null']
+    CreatePostBody:
+      type: object
+      required: [caption]
+      properties:
+        caption:
+          type: string
+        videoUrl:
+          type: string
+        thumbnailUrl:
+          type: string
+        technique:
+          type: string
+        medium:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        isPatronOnly:
+          type: boolean
+    LikeResponse:
+      type: object
+      required: [liked, likeCount]
+      properties:
+        liked:
+          type: boolean
+        likeCount:
+          type: integer
+    SaveResponse:
+      type: object
+      required: [saved, saveCount]
+      properties:
+        saved:
+          type: boolean
+        saveCount:
+          type: integer
+    FollowResponse:
+      type: object
+      required: [following, followerCount]
+      properties:
+        following:
+          type: boolean
+        followerCount:
+          type: integer
+    CommentRecord:
+      type: object
+      required: [id, postId, authorId, authorName, text, likeCount, createdAt]
+      properties:
+        id:
+          type: string
+        postId:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        authorAvatarUrl:
+          type: [string, 'null']
+        text:
+          type: string
+        likeCount:
+          type: integer
+        createdAt:
+          type: string
+    CommentsResponse:
+      type: object
+      required: [comments]
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentRecord'
+    AddCommentBody:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+    UserProfile:
+      type: object
+      required: [userId, followerCount, followingCount, postCount, studioHours, isVerified, createdAt]
+      properties:
+        userId:
+          type: string
+        handle:
+          type: [string, 'null']
+        displayName:
+          type: [string, 'null']
+        bio:
+          type: [string, 'null']
+        medium:
+          type: [string, 'null']
+        location:
+          type: [string, 'null']
+        website:
+          type: [string, 'null']
+        avatarUrl:
+          type: [string, 'null']
+        bannerUrl:
+          type: [string, 'null']
+        isVerified:
+          type: boolean
+        isFollowing:
+          type: boolean
+        followerCount:
+          type: integer
+        followingCount:
+          type: integer
+        postCount:
+          type: integer
+        studioHours:
+          type: integer
+        kilnStatus:
+          type: [string, 'null']
+        generation:
+          type: [integer, 'null']
+        createdAt:
+          type: string
+    UpdateProfileBody:
+      type: object
+      properties:
+        handle:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+        medium:
+          type: string
+        location:
+          type: string
+        website:
+          type: string
+        avatarUrl:
+          type: string
+        bannerUrl:
+          type: string
+        kilnStatus:
+          type: string
+    NotificationRecord:
+      type: object
+      required: [id, userId, type, text, read, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+        fromId:
+          type: [string, 'null']
+        fromName:
+          type: [string, 'null']
+        fromAvatarUrl:
+          type: [string, 'null']
+        text:
+          type: string
+        link:
+          type: [string, 'null']
+        read:
+          type: boolean
+        createdAt:
+          type: string
+    NotificationsResponse:
+      type: object
+      required: [notifications]
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationRecord'
+    ThreadRecord:
+      type: object
+      required: [id, participantA, participantB, lastMessageAt]
+      properties:
+        id:
+          type: string
+        participantA:
+          type: string
+        participantB:
+          type: string
+        lastMessageAt:
+          type: string
+        lastMessageText:
+          type: [string, 'null']
+        otherUserId:
+          type: string
+        otherUserName:
+          type: [string, 'null']
+        otherUserAvatar:
+          type: [string, 'null']
+        unreadCount:
+          type: integer
+    ThreadsResponse:
+      type: object
+      required: [threads]
+      properties:
+        threads:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThreadRecord'
+    MessageRecord:
+      type: object
+      required: [id, threadId, senderId, senderName, text, read, createdAt]
+      properties:
+        id:
+          type: string
+        threadId:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: string
+        senderAvatarUrl:
+          type: [string, 'null']
+        text:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+    MessagesResponse:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageRecord'
+    SendMessageBody:
+      type: object
+      required: [recipientId, text]
+      properties:
+        recipientId:
+          type: string
+        text:
+          type: string
+          minLength: 1

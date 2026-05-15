@@ -12,7 +12,7 @@ interface CartLineItem {
   artistName?: string;
 }
 
-router.post('/stripe/checkout', async (req, res) => {
+router.post('/stripe/checkout', async (req, res): Promise<void> => {
   try {
     const { items, customerEmail, successPath, cancelPath } = req.body as {
       items: CartLineItem[];
@@ -22,7 +22,7 @@ router.post('/stripe/checkout', async (req, res) => {
     };
 
     if (!items?.length) {
-      return res.status(400).json({ error: 'No items provided' });
+      res.status(400).json({ error: 'No items provided' }); return;
     }
 
     const stripe = await getUncachableStripeClient();
@@ -63,7 +63,7 @@ router.post('/stripe/checkout', async (req, res) => {
   }
 });
 
-router.get('/stripe/session/:sessionId', async (req, res) => {
+router.get('/stripe/session/:sessionId', async (req, res): Promise<void> => {
   try {
     const stripe = await getUncachableStripeClient();
     const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);

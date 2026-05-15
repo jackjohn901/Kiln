@@ -1,9 +1,11 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./webhookHandlers";
+import { authMiddleware } from "./middlewares/authMiddleware";
 
 const app: Express = express();
 
@@ -26,15 +28,17 @@ app.use(
     },
   }),
 );
-app.use(cors());
+
+app.use(cors({ credentials: true, origin: true }));
+app.use(cookieParser());
 
 // ── Stripe webhook: must be registered BEFORE express.json() ──────────────────
 app.post(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     const signature = req.headers['stripe-signature'];
-    if (!signature) return res.status(400).json({ error: 'Missing stripe-signature' });
+    if (!signature) { res.status(400).json({ error: 'Missing stripe-signature' }); return; }
     try {
       const sig = Array.isArray(signature) ? signature[0] : signature;
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
@@ -46,8 +50,9 @@ app.post(
   }
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(authMiddleware);
 
 app.use("/api", router);
 

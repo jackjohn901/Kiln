@@ -1,0 +1,29 @@
+import { pgTable, text, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const profilesTable = pgTable("profiles", {
+  userId: varchar("user_id", { length: 255 }).primaryKey(),
+  handle: varchar("handle", { length: 100 }).unique(),
+  displayName: varchar("display_name", { length: 255 }),
+  bio: text("bio"),
+  medium: varchar("medium", { length: 100 }),
+  location: varchar("location", { length: 255 }),
+  website: text("website"),
+  avatarUrl: text("avatar_url"),
+  bannerUrl: text("banner_url"),
+  isVerified: boolean("is_verified").notNull().default(false),
+  followerCount: integer("follower_count").notNull().default(0),
+  followingCount: integer("following_count").notNull().default(0),
+  postCount: integer("post_count").notNull().default(0),
+  studioHours: integer("studio_hours").notNull().default(0),
+  kilnStatus: varchar("kiln_status", { length: 255 }),
+  generation: integer("generation"),
+  mentorId: varchar("mentor_id", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertProfileSchema = createInsertSchema(profilesTable).omit({ createdAt: true, updatedAt: true });
+export type InsertProfile = z.infer<typeof insertProfileSchema>;
+export type Profile = typeof profilesTable.$inferSelect;

@@ -29,3 +29,251 @@ export interface InstagramVideo {
 export interface InstagramFeed {
   videos: InstagramVideo[];
 }
+
+export interface AuthUser {
+  id: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  firstName: string | null;
+  /** @nullable */
+  lastName: string | null;
+  /** @nullable */
+  profileImageUrl: string | null;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface MobileTokenExchangeRequest {
+  /** @minLength 1 */
+  code: string;
+  /** @minLength 1 */
+  code_verifier: string;
+  /** @minLength 1 */
+  redirect_uri: string;
+  /** @minLength 1 */
+  state: string;
+  /** @minLength 1 */
+  nonce?: string;
+}
+
+export interface MobileTokenExchangeSuccess {
+  token: string;
+}
+
+export const LogoutSuccessValue = {
+  success: true,
+} as const;
+export type LogoutSuccess = typeof LogoutSuccessValue;
+
+export interface ErrorEnvelope {
+  error: string;
+}
+
+export interface PostRecord {
+  id: string;
+  authorId: string;
+  authorName: string;
+  /** @nullable */
+  authorAvatarUrl?: string | null;
+  /** @nullable */
+  videoUrl?: string | null;
+  /** @nullable */
+  thumbnailUrl?: string | null;
+  caption: string;
+  /** @nullable */
+  technique?: string | null;
+  /** @nullable */
+  medium?: string | null;
+  tags?: string[];
+  likeCount: number;
+  commentCount: number;
+  saveCount: number;
+  viewCount: number;
+  isPatronOnly: boolean;
+  /** @nullable */
+  craftScore?: number | null;
+  isLiked?: boolean;
+  isSaved?: boolean;
+  createdAt: string;
+}
+
+export interface FeedResponse {
+  posts: PostRecord[];
+  hasMore: boolean;
+  /** @nullable */
+  nextCursor?: string | null;
+}
+
+export interface CreatePostBody {
+  caption: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  technique?: string;
+  medium?: string;
+  tags?: string[];
+  isPatronOnly?: boolean;
+}
+
+export interface LikeResponse {
+  liked: boolean;
+  likeCount: number;
+}
+
+export interface SaveResponse {
+  saved: boolean;
+  saveCount: number;
+}
+
+export interface FollowResponse {
+  following: boolean;
+  followerCount: number;
+}
+
+export interface CommentRecord {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorName: string;
+  /** @nullable */
+  authorAvatarUrl?: string | null;
+  text: string;
+  likeCount: number;
+  createdAt: string;
+}
+
+export interface CommentsResponse {
+  comments: CommentRecord[];
+}
+
+export interface AddCommentBody {
+  /** @minLength 1 */
+  text: string;
+}
+
+export interface UserProfile {
+  userId: string;
+  /** @nullable */
+  handle?: string | null;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  bio?: string | null;
+  /** @nullable */
+  medium?: string | null;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  website?: string | null;
+  /** @nullable */
+  avatarUrl?: string | null;
+  /** @nullable */
+  bannerUrl?: string | null;
+  isVerified: boolean;
+  isFollowing?: boolean;
+  followerCount: number;
+  followingCount: number;
+  postCount: number;
+  studioHours: number;
+  /** @nullable */
+  kilnStatus?: string | null;
+  /** @nullable */
+  generation?: number | null;
+  createdAt: string;
+}
+
+export interface UpdateProfileBody {
+  handle?: string;
+  displayName?: string;
+  bio?: string;
+  medium?: string;
+  location?: string;
+  website?: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  kilnStatus?: string;
+}
+
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  type: string;
+  /** @nullable */
+  fromId?: string | null;
+  /** @nullable */
+  fromName?: string | null;
+  /** @nullable */
+  fromAvatarUrl?: string | null;
+  text: string;
+  /** @nullable */
+  link?: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationRecord[];
+}
+
+export interface ThreadRecord {
+  id: string;
+  participantA: string;
+  participantB: string;
+  lastMessageAt: string;
+  /** @nullable */
+  lastMessageText?: string | null;
+  otherUserId?: string;
+  /** @nullable */
+  otherUserName?: string | null;
+  /** @nullable */
+  otherUserAvatar?: string | null;
+  unreadCount?: number;
+}
+
+export interface ThreadsResponse {
+  threads: ThreadRecord[];
+}
+
+export interface MessageRecord {
+  id: string;
+  threadId: string;
+  senderId: string;
+  senderName: string;
+  /** @nullable */
+  senderAvatarUrl?: string | null;
+  text: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface MessagesResponse {
+  messages: MessageRecord[];
+}
+
+export interface SendMessageBody {
+  recipientId: string;
+  /** @minLength 1 */
+  text: string;
+}
+
+/**
+ * Opaque session token — Bearer <sid>.
+ */
+export type AuthorizationSessionHeaderParameter = string;
+
+export type BeginBrowserLoginParams = {
+  returnTo?: string;
+};
+
+export type HandleBrowserLoginCallbackParams = {
+  code?: string;
+  state?: string;
+  iss?: string;
+};
+
+export type GetFeedParams = {
+  cursor?: string;
+  limit?: number;
+};

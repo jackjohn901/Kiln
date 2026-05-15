@@ -1,5 +1,7 @@
+import { createServer } from "http";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { setupWebSocket } from "./lib/websocket";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 
@@ -11,7 +13,7 @@ async function initStripe() {
   }
   try {
     logger.info("Initializing Stripe schema...");
-    await runMigrations({ databaseUrl, schema: "stripe" });
+    await runMigrations({ databaseUrl } as any);
     logger.info("Stripe schema ready");
 
     const stripeSync = await getStripeSync();
@@ -31,9 +33,7 @@ async function initStripe() {
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+  throw new Error("PORT environment variable is required but was not provided.");
 }
 
 const port = Number(rawPort);
@@ -45,12 +45,15 @@ if (Number.isNaN(port) || port <= 0) {
 (async () => {
   await initStripe();
 
-  app.listen(port, (err) => {
-    if (err) {
-      logger.error({ err }, "Error listening on port");
-      process.exit(1);
-    }
+  const server = createServer(app);
+  setupWebSocket(server);
 
+  server.listen(port, () => {
     logger.info({ port }, "Server listening");
+  });
+
+  server.on("error", (err) => {
+    logger.error({ err }, "Server error");
+    process.exit(1);
   });
 })();
