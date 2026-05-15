@@ -73,6 +73,10 @@ import QRProfile from "@/pages/QRProfile";
 import Leaderboard from "@/pages/Leaderboard";
 import Audience from "@/pages/Audience";
 import CertificateOfAuthenticity from "@/pages/CertificateOfAuthenticity";
+import Auctions from "@/pages/Auctions";
+import EmbedPortfolio from "@/pages/EmbedPortfolio";
+import CommissionContract from "@/pages/CommissionContract";
+import MaterialExchange from "@/pages/MaterialExchange";
 
 const queryClient = new QueryClient();
 
@@ -207,6 +211,11 @@ function Router() {
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/audience" component={Audience} />
       <Route path="/coa" component={CertificateOfAuthenticity} />
+      <Route path="/auctions" component={Auctions} />
+      <Route path="/embed/:artistId" component={EmbedPortfolio} />
+      <Route path="/commission-contract" component={CommissionContract} />
+      <Route path="/commission-contract/:artistId" component={CommissionContract} />
+      <Route path="/materials-exchange" component={MaterialExchange} />
       <Route component={NotFound} />
     </Switch>
   );

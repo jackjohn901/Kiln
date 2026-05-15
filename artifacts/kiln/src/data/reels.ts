@@ -5,6 +5,7 @@ import { musicTracks } from "@/data/music";
 export interface Reel {
   id: string;
   videoId: string;
+  videoUrl?: string;
   artistId: string;
   artistName: string;
   technique: string;

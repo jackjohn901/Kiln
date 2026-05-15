@@ -203,6 +203,193 @@ export default function Analytics() {
           </div>
         </div>
 
+        {/* Best time to post */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="mb-4">
+            <h2 className="text-sm font-bold text-stone-200">Best Time to Post</h2>
+            <p className="text-xs text-stone-500 mt-0.5">Follower activity by day & hour (your timezone)</p>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[340px]">
+              {/* Day labels */}
+              <div className="flex items-center mb-1.5">
+                <div className="w-8 shrink-0" />
+                {["12a","3a","6a","9a","12p","3p","6p","9p"].map((h) => (
+                  <div key={h} className="flex-1 text-center text-[8px] text-stone-700">{h}</div>
+                ))}
+              </div>
+              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day, di) => {
+                const BASE = [0.05,0.04,0.03,0.04,0.08,0.14,0.18,0.22,0.26,0.30,0.34,0.38,0.42,0.44,0.46,0.48,0.56,0.72,0.88,0.96,0.90,0.78,0.60,0.32];
+                const WEEKEND_BOOST = di === 0 || di === 6 ? 0.12 : 0;
+                const WEEKDAY_LUNCH = (di >= 1 && di <= 5) ? [0,0,0,0,0,0,0,0,0,0,0,0.15,0.18,0.15,0,0,0,0,0,0,0,0,0,0] : new Array(24).fill(0);
+                const hourly = BASE.map((v, hi) => Math.min(1, v + WEEKEND_BOOST + (WEEKDAY_LUNCH[hi] ?? 0) + (Math.random() * 0.05)));
+                const shown = [0,3,6,9,12,15,18,21].map((hi) => hourly[hi]);
+                return (
+                  <div key={day} className="flex items-center mb-1">
+                    <div className="w-8 shrink-0 text-[9px] text-stone-600 pr-1 text-right">{day}</div>
+                    {shown.map((intensity, ci) => {
+                      const isPeak = intensity > 0.8;
+                      const bg = intensity < 0.15 ? "bg-stone-800" : intensity < 0.4 ? "bg-amber-900/60" : intensity < 0.7 ? "bg-amber-600/70" : "bg-amber-400";
+                      return (
+                        <div key={ci} className="flex-1 mx-0.5">
+                          <div
+                            className={`h-5 rounded-sm ${bg} relative`}
+                            title={`${day} ${["12a","3a","6a","9a","12p","3p","6p","9p"][ci]} — ${Math.round(intensity * 100)}% activity`}
+                          >
+                            {isPeak && <div className="absolute inset-0 rounded-sm ring-1 ring-amber-300/50" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              <div className="mt-2 flex items-center gap-3 justify-end">
+                <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
+                  <div className="h-2.5 w-2.5 rounded-sm bg-stone-800" /> Low
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
+                  <div className="h-2.5 w-2.5 rounded-sm bg-amber-600/70" /> Medium
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
+                  <div className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Peak 🔥
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 flex items-start gap-2">
+            <span className="text-amber-400 text-base leading-none mt-0.5">💡</span>
+            <p className="text-xs text-amber-200/80">Your peak engagement is <strong>Tue–Thu 6–9pm</strong> and <strong>Sat–Sun 12–3pm</strong>. Posts at these times get ~2.4× more views on average.</p>
+          </div>
+        </div>
+
+        {/* Audience demographics */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <h2 className="mb-4 text-sm font-bold text-stone-200">Audience Demographics</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {/* Locations */}
+            <div>
+              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-3">Top Locations</p>
+              {[
+                { label: "United States", pct: 48 },
+                { label: "United Kingdom", pct: 16 },
+                { label: "Canada", pct: 11 },
+                { label: "Australia", pct: 8 },
+                { label: "Germany", pct: 5 },
+                { label: "Other", pct: 12 },
+              ].map(({ label, pct }) => (
+                <div key={label} className="mb-2">
+                  <div className="flex justify-between text-[10px] mb-0.5">
+                    <span className="text-stone-400">{label}</span>
+                    <span className="text-stone-500 font-medium">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                    <div className="h-full bg-sky-500/70 rounded-full" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Medium affinity */}
+            <div>
+              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-3">Medium Affinity</p>
+              {[
+                { label: "Glass Blowing", pct: 62, color: "bg-orange-500/70" },
+                { label: "Ceramics", pct: 44, color: "bg-orange-400/70" },
+                { label: "Fiber Arts", pct: 28, color: "bg-purple-500/70" },
+                { label: "Metal Forging", pct: 19, color: "bg-slate-400/70" },
+                { label: "Wood Turning", pct: 14, color: "bg-lime-600/70" },
+              ].map(({ label, pct, color }) => (
+                <div key={label} className="mb-2">
+                  <div className="flex justify-between text-[10px] mb-0.5">
+                    <span className="text-stone-400">{label}</span>
+                    <span className="text-stone-500 font-medium">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                    <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Follower type */}
+            <div>
+              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-3">Follower Types</p>
+              <div className="space-y-3">
+                {[
+                  { label: "Collectors", pct: 34, emoji: "🏺", color: "bg-amber-500/70" },
+                  { label: "Fellow Artists", pct: 28, emoji: "🔥", color: "bg-red-500/70" },
+                  { label: "Craft Enthusiasts", pct: 22, emoji: "✨", color: "bg-purple-500/70" },
+                  { label: "Interior Design", pct: 10, emoji: "🏡", color: "bg-teal-500/70" },
+                  { label: "Press / Galleries", pct: 6, emoji: "🖼", color: "bg-sky-500/70" },
+                ].map(({ label, pct, emoji, color }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className="text-base leading-none">{emoji}</span>
+                    <div className="flex-1">
+                      <div className="flex justify-between text-[10px] mb-0.5">
+                        <span className="text-stone-400">{label}</span>
+                        <span className="text-stone-500">{pct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* A/B Test Tracker */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-stone-200">Caption A/B Tests</h2>
+              <p className="text-xs text-stone-500 mt-0.5">Which caption style resonates more with your audience</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                postTitle: "Cobalt vessel — midnight firing",
+                variantA: { caption: "Just pulled from the annealer 🔥 18 hours in the making", views: 4200, likes: 312, saves: 89 },
+                variantB: { caption: "Process over perfection. This piece taught me patience.", views: 6800, likes: 548, saves: 201 },
+                winner: "B",
+              },
+              {
+                postTitle: "New color series — Gaffer amber",
+                variantA: { caption: "Testing Gaffer 303 Amber in the hot shop — first results", views: 8900, likes: 720, saves: 234 },
+                variantB: { caption: "This color only works at 2,050°F. Chasing it for 6 months.", views: 7100, likes: 590, saves: 180 },
+                winner: "A",
+              },
+            ].map((test, i) => (
+              <div key={i} className="rounded-xl border border-white/8 bg-stone-800/40 p-4">
+                <p className="text-xs font-semibold text-stone-300 mb-3 truncate">{test.postTitle}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["A", "B"] as const).map((v) => {
+                    const variant = v === "A" ? test.variantA : test.variantB;
+                    const isWinner = test.winner === v;
+                    return (
+                      <div key={v} className={`rounded-lg p-3 border ${isWinner ? "border-emerald-500/30 bg-emerald-500/5" : "border-white/5 bg-stone-800/30"}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${isWinner ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-700 text-stone-400"}`}>
+                            Variant {v} {isWinner && "🏆"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-stone-400 mb-2 line-clamp-2 leading-relaxed">{variant.caption}</p>
+                        <div className="space-y-0.5 text-[10px] text-stone-500">
+                          <p>{(variant.views / 1000).toFixed(1)}k views · {variant.likes} likes · {variant.saves} saves</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Top posts */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <h2 className="mb-4 text-sm font-bold text-stone-200">Top Performing Posts</h2>

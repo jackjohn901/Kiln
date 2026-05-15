@@ -1,61 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, CreditCard, Lock, Check, Package, ArrowRight, Truck, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Lock, Check, Package, ArrowRight, Truck, ShieldCheck, CreditCard, ExternalLink } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
 
-type Step = "address" | "payment" | "confirm" | "success";
+type Step = "address" | "review" | "success";
 
 interface AddressForm {
   name: string; email: string; phone: string;
   address: string; city: string; state: string; zip: string; country: string;
 }
-interface PaymentForm {
-  cardName: string; cardNumber: string; expiry: string; cvv: string;
-}
 
 const EMPTY_ADDR: AddressForm = { name: "", email: "", phone: "", address: "", city: "", state: "", zip: "", country: "US" };
-const EMPTY_PAY: PaymentForm = { cardName: "", cardNumber: "", expiry: "", cvv: "" };
-
-function formatCard(v: string) {
-  return v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
-}
-function formatExpiry(v: string) {
-  const d = v.replace(/\D/g, "").slice(0, 4);
-  return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d;
-}
 
 export default function CartCheckout() {
   const [, navigate] = useLocation();
   const { items, subtotal, itemCount, clearCart } = useCart();
   const [step, setStep] = useState<Step>("address");
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDR);
-  const [pay, setPay] = useState<PaymentForm>(EMPTY_PAY);
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [orderId] = useState(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
 
-  const STEPS: Step[] = ["address", "payment", "confirm", "success"];
+  const STEPS: Step[] = ["address", "review", "success"];
   const stepIdx = STEPS.indexOf(step);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "1") {
+      clearCart();
+      setStep("success");
+    }
+  }, []);
 
   function addrValid() {
     return addr.name && addr.email && addr.address && addr.city && addr.state && addr.zip;
   }
-  function payValid() {
-    return pay.cardName && pay.cardNumber.replace(/\s/g, "").length === 16 && pay.expiry.length === 5 && pay.cvv.length >= 3;
-  }
 
-  async function handleConfirm() {
+  async function handleStripeCheckout() {
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1800));
-    setProcessing(false);
-    clearCart();
-    setStep("success");
+    setError(null);
+    try {
+      const basePath = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      const resp = await fetch(`${basePath}/api/stripe/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map(({ listing, quantity }) => ({
+            name: listing.title,
+            price: listing.price,
+            quantity,
+            imageUrl: listing.imageUrl ?? undefined,
+            artistName: listing.artistId,
+          })),
+          customerEmail: addr.email,
+          successPath: "/cart/checkout?success=1",
+          cancelPath: "/cart/checkout",
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error ?? "Checkout failed");
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (err: any) {
+      setError(err.message ?? "Something went wrong. Please try again.");
+      setProcessing(false);
+    }
   }
 
   if (items.length === 0 && step !== "success") {
@@ -84,7 +103,7 @@ export default function CartCheckout() {
         <div className="mb-6 flex items-center gap-3">
           {step !== "success" && (
             <button
-              onClick={() => step === "address" ? navigate("/cart") : setStep(STEPS[stepIdx - 1])}
+              onClick={() => step === "address" ? navigate("/cart") : setStep("address")}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors"
             >
               <ChevronLeft size={16} />
@@ -98,7 +117,7 @@ export default function CartCheckout() {
         {/* Progress bar */}
         {step !== "success" && (
           <div className="mb-8 flex items-center gap-2">
-            {(["address", "payment", "confirm"] as Step[]).map((s, i) => (
+            {(["address", "review"] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center gap-2 flex-1">
                 <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                   stepIdx > i ? "bg-emerald-500 text-white" : stepIdx === i ? "bg-amber-500 text-stone-950" : "bg-stone-800 text-stone-500"
@@ -106,9 +125,9 @@ export default function CartCheckout() {
                   {stepIdx > i ? <Check size={12} /> : i + 1}
                 </div>
                 <span className={`text-xs capitalize ${stepIdx === i ? "text-amber-300" : "text-stone-600"}`}>
-                  {s === "address" ? "Shipping" : s === "payment" ? "Payment" : "Review"}
+                  {s === "address" ? "Shipping" : "Review & Pay"}
                 </span>
-                {i < 2 && <div className={`flex-1 h-px ${stepIdx > i ? "bg-emerald-500/40" : "bg-stone-800"}`} />}
+                {i < 1 && <div className={`flex-1 h-px ${stepIdx > i ? "bg-emerald-500/40" : "bg-stone-800"}`} />}
               </div>
             ))}
           </div>
@@ -153,69 +172,7 @@ export default function CartCheckout() {
                     </div>
                     <button
                       disabled={!addrValid()}
-                      onClick={() => setStep("payment")}
-                      className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Continue to payment <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {step === "payment" && (
-                <motion.div key="payment" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                  <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Payment details</p>
-                      <div className="flex items-center gap-1.5 text-xs text-stone-600">
-                        <Lock size={10} /> SSL encrypted
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="col-span-2">
-                        <Field label="Name on card" value={pay.cardName} onChange={(v) => setPay({ ...pay, cardName: v })} />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="text-xs text-stone-500 mb-1 block">Card number</label>
-                        <div className="relative">
-                          <input
-                            value={pay.cardNumber}
-                            onChange={(e) => setPay({ ...pay, cardNumber: formatCard(e.target.value) })}
-                            placeholder="1234 5678 9012 3456"
-                            className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 pr-10 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
-                          />
-                          <CreditCard size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-600" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs text-stone-500 mb-1 block">Expiry</label>
-                        <input
-                          value={pay.expiry}
-                          onChange={(e) => setPay({ ...pay, expiry: formatExpiry(e.target.value) })}
-                          placeholder="MM/YY"
-                          className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-stone-500 mb-1 block">CVV</label>
-                        <input
-                          value={pay.cvv}
-                          onChange={(e) => setPay({ ...pay, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                          placeholder="123"
-                          type="password"
-                          className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Test mode notice */}
-                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                      <p className="text-xs text-amber-400/80">Demo mode — no real charges. Use any values to proceed.</p>
-                    </div>
-
-                    <button
-                      disabled={!payValid()}
-                      onClick={() => setStep("confirm")}
+                      onClick={() => setStep("review")}
                       className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Review order <ArrowRight size={14} />
@@ -224,10 +181,10 @@ export default function CartCheckout() {
                 </motion.div>
               )}
 
-              {step === "confirm" && (
-                <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              {step === "review" && (
+                <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                   <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Review your order</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Order summary</p>
 
                     <div className="space-y-3">
                       {items.map(({ listing, quantity }) => (
@@ -263,18 +220,30 @@ export default function CartCheckout() {
                       </div>
                     </div>
 
+                    {/* Stripe CTA */}
+                    <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex items-center gap-3">
+                      <CreditCard size={16} className="text-indigo-400 shrink-0" />
+                      <p className="text-xs text-stone-400">
+                        You'll be securely redirected to <span className="text-indigo-300 font-medium">Stripe</span> to enter your payment details. No card data ever touches Kiln's servers.
+                      </p>
+                    </div>
+
+                    {error && (
+                      <p className="text-xs text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">{error}</p>
+                    )}
+
                     <button
                       disabled={processing}
-                      onClick={handleConfirm}
+                      onClick={handleStripeCheckout}
                       className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-70"
                     >
                       {processing ? (
                         <>
                           <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-950 border-t-transparent" />
-                          Processing…
+                          Redirecting to Stripe…
                         </>
                       ) : (
-                        <><Lock size={13} /> Place order · ${total.toFixed(2)}</>
+                        <><Lock size={13} /> Pay ${total.toFixed(2)} with Stripe <ExternalLink size={12} /></>
                       )}
                     </button>
                   </div>
@@ -288,17 +257,13 @@ export default function CartCheckout() {
                       <Check size={28} className="text-emerald-400" />
                     </div>
                     <div>
-                      <h2 className="font-serif text-xl text-amber-100 mb-1">Order placed!</h2>
+                      <h2 className="font-serif text-xl text-amber-100 mb-1">Payment successful!</h2>
                       <p className="text-sm text-stone-400">Confirmation #{orderId}</p>
                     </div>
                     <div className="rounded-xl bg-stone-900/60 border border-white/8 px-4 py-3 text-sm text-stone-400 text-left space-y-1">
                       <div className="flex justify-between">
-                        <span>Shipped to</span>
-                        <span className="text-stone-300">{addr.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Confirmation sent to</span>
-                        <span className="text-stone-300 truncate ml-2">{addr.email}</span>
+                        <span>Payment processed by</span>
+                        <span className="text-indigo-300">Stripe</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Estimated delivery</span>

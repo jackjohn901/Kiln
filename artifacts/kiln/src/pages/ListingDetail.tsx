@@ -11,6 +11,7 @@ import { listings, formatPrice, type Listing } from "@/data/listings";
 import { getArtistById, artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { useCart } from "@/contexts/CartContext";
+import ARPreview from "@/components/ARPreview";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 

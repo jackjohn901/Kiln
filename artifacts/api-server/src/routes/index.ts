@@ -4,6 +4,7 @@ import instagramRouter from "./instagram";
 import storageRouter from "./storage";
 import craftAssistantRouter from "./craft-assistant";
 import aiCaptionRouter from "./ai-caption";
+import stripeRouter from "./stripe";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use("/instagram", instagramRouter);
 router.use(storageRouter);
 router.use(craftAssistantRouter);
 router.use(aiCaptionRouter);
+router.use(stripeRouter);
 
 export default router;

@@ -17,6 +17,7 @@ import Stories from "@/components/Stories";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 import { ALL_REELS, TECHNIQUE_COLORS, type Reel } from "@/data/reels";
+import { getPosts } from "@/data/posts";
 
 const PREFS_KEY = "kiln_prefs_v1";
 const SETTING_KEY = "kiln_settings_v1";
@@ -66,6 +67,31 @@ function scoreReel(
 }
 
 function fmt(n: number) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
+
+function userPostsToReels(): Reel[] {
+  try {
+    const posts = getPosts();
+    return posts.map((post) => ({
+      id: post.id,
+      videoId: "",
+      videoUrl: post.type === "video" ? post.mediaUrl : undefined,
+      artistId: post.artistId,
+      artistName: post.artistName,
+      technique: post.tags[0] ?? "Studio Craft",
+      location: "",
+      caption: post.caption,
+      craftScore: 95,
+      likes: post.likes,
+      saves: post.saves,
+      thumbnail: post.mediaUrl,
+      avatarUrl: post.artistAvatarUrl,
+      musicTrackId: ALL_REELS[0]?.musicTrackId ?? "track-ambient-1",
+      available: false,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 const CS_ICON: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   open: { icon: CheckCircle, color: "text-emerald-400", label: "Open for commissions" },
@@ -219,33 +245,48 @@ function ReelCard({
 
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
-      <img
-        src={reel.thumbnail}
-        alt={reel.caption}
-        className="absolute inset-0 h-full w-full object-cover"
-        loading="lazy"
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.id}/800/1200`;
-        }}
-      />
-
-      {isActive && (
-        <iframe
-          key={reel.videoId}
-          src={`https://www.youtube.com/embed/${reel.videoId}?autoplay=1&mute=1&controls=0&loop=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&playlist=${reel.videoId}`}
-          style={{
-            position: "absolute",
-            width: "177.78vh",
-            minWidth: "100%",
-            height: "100svh",
-            left: "50%",
-            top: 0,
-            transform: "translateX(-50%)",
-            pointerEvents: "none",
-            border: "none",
-          }}
-          allow="autoplay; encrypted-media"
+      {reel.videoUrl ? (
+        /* ── HTML5 video for user-uploaded content ── */
+        <video
+          key={reel.videoUrl}
+          src={reel.videoUrl}
+          autoPlay={isActive}
+          muted
+          loop
+          playsInline
+          poster={reel.thumbnail}
+          className="absolute inset-0 h-full w-full object-cover"
         />
+      ) : (
+        <>
+          <img
+            src={reel.thumbnail}
+            alt={reel.caption}
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.id}/800/1200`;
+            }}
+          />
+          {isActive && reel.videoId && (
+            <iframe
+              key={reel.videoId}
+              src={`https://www.youtube.com/embed/${reel.videoId}?autoplay=1&mute=1&controls=0&loop=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&playlist=${reel.videoId}`}
+              style={{
+                position: "absolute",
+                width: "177.78vh",
+                minWidth: "100%",
+                height: "100svh",
+                left: "50%",
+                top: 0,
+                transform: "translateX(-50%)",
+                pointerEvents: "none",
+                border: "none",
+              }}
+              allow="autoplay; encrypted-media"
+            />
+          )}
+        </>
       )}
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/40" />
@@ -429,6 +470,7 @@ export default function Feed() {
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [musicMuted, setMusicMuted] = useState(false);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
   const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");
@@ -445,10 +487,19 @@ export default function Feed() {
     }
   }, [navigate]);
 
+  // Reload user posts on mount and whenever window regains focus (e.g. after Create)
+  useEffect(() => {
+    setUserPostReels(userPostsToReels());
+    const onFocus = () => setUserPostReels(userPostsToReels());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
   // For You algorithm: score and sort based on user behaviour + settings
+  // User's own posts always appear first (score 95)
   const baseReels = useMemo(() => {
     if (feedTab === "following") {
-      return ALL_REELS.filter((r) => following.includes(r.artistId));
+      return [...userPostReels, ...ALL_REELS.filter((r) => following.includes(r.artistId))];
     }
     // Read current interaction data and quiz prefs each time
     const interactions = readInteractions();
@@ -464,10 +515,11 @@ export default function Feed() {
     }));
     // Respect settings (autoplay / sound etc wired in feed)
     void settings;
-    return scored
-      .sort((a, b) => b.score - a.score)
-      .map((s) => s.reel);
-  }, [feedTab, following]);
+    return [
+      ...userPostReels,
+      ...scored.sort((a, b) => b.score - a.score).map((s) => s.reel),
+    ];
+  }, [feedTab, following, userPostReels]);
 
   const reels = useMemo(
     () => techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels,
