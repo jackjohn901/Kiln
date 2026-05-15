@@ -4,11 +4,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
+  MessageCircle, Bell, CheckCircle, Clock, ShoppingCart,
 } from "lucide-react";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { musicTracks, getTrackById } from "@/data/music";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useSocial } from "@/contexts/SocialContext";
+import Comments from "@/components/Comments";
+import NotificationPanel from "@/components/NotificationPanel";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +24,7 @@ function hash(s: string): number {
 function craftScore(id: string) { return 78 + (hash(id) % 20); }
 function statVal(seed: string, min: number, max: number) { return min + (hash(seed) % (max - min)); }
 function fmt(n: number) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
+function isAvailable(id: string) { return hash(id) % 5 === 0; }
 
 function getTechnique(medium: string): string {
   const m = medium.toLowerCase();
@@ -36,7 +41,6 @@ function getTechnique(medium: string): string {
   if (m.includes("anagama") || m.includes("wood-fired")) return "Wood-Fired";
   if (m.includes("porcelain") || m.includes("celadon")) return "Porcelain";
   if (m.includes("ceramic") || m.includes("clay") || m.includes("pottery")) return "Ceramics";
-  if (m.includes("figure") && m.includes("ceramic")) return "Ceramic Sculpture";
   if (m.includes("blacksmith") || m.includes("ironwork")) return "Blacksmithing";
   if (m.includes("metal") || m.includes("steel") || m.includes("forge")) return "Metal Forging";
   if (m.includes("weld")) return "Welding";
@@ -51,31 +55,21 @@ function getTechnique(medium: string): string {
 }
 
 const TECHNIQUE_COLORS: Record<string, string> = {
-  "Glass Blowing": "bg-orange-500",
-  "Flameworking": "bg-red-500",
-  "Neon Glass": "bg-fuchsia-500",
-  "Murrine": "bg-rose-500",
-  "Glass Casting": "bg-amber-500",
-  "Kiln Forming": "bg-yellow-600",
-  "Studio Glass": "bg-teal-500",
-  "Enamel": "bg-violet-500",
-  "Raku": "bg-orange-700",
-  "Wood-Fired": "bg-orange-800",
-  "Porcelain": "bg-sky-400",
-  "Ceramics": "bg-orange-400",
-  "Ceramic Sculpture": "bg-amber-700",
-  "Blacksmithing": "bg-zinc-500",
-  "Metal Forging": "bg-slate-400",
-  "Welding": "bg-slate-500",
-  "Cast Iron": "bg-zinc-700",
-  "Bronze Casting": "bg-yellow-700",
-  "Stone Carving": "bg-stone-500",
-  "Wood Turning": "bg-lime-700",
-  "Wood": "bg-green-800",
-  "Batik": "bg-indigo-500",
-  "Fiber Arts": "bg-purple-500",
-  "Textile": "bg-pink-500",
+  "Glass Blowing": "bg-orange-500", "Flameworking": "bg-red-500", "Neon Glass": "bg-fuchsia-500",
+  "Murrine": "bg-rose-500", "Glass Casting": "bg-amber-500", "Kiln Forming": "bg-yellow-600",
+  "Studio Glass": "bg-teal-500", "Enamel": "bg-violet-500", "Raku": "bg-orange-700",
+  "Wood-Fired": "bg-orange-800", "Porcelain": "bg-sky-400", "Ceramics": "bg-orange-400",
+  "Ceramic Sculpture": "bg-amber-700", "Blacksmithing": "bg-zinc-500", "Metal Forging": "bg-slate-400",
+  "Welding": "bg-slate-500", "Cast Iron": "bg-zinc-700", "Bronze Casting": "bg-yellow-700",
+  "Stone Carving": "bg-stone-500", "Wood Turning": "bg-lime-700", "Wood": "bg-green-800",
+  "Batik": "bg-indigo-500", "Fiber Arts": "bg-purple-500", "Textile": "bg-pink-500",
   "Studio Craft": "bg-amber-500",
+};
+
+const CS_ICON: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
+  open: { icon: CheckCircle, color: "text-emerald-400", label: "Open for commissions" },
+  waitlisted: { icon: Clock, color: "text-amber-400", label: "Waitlisted" },
+  closed: { icon: CheckCircle, color: "text-stone-500", label: "Closed" },
 };
 
 // ─── Reel type ────────────────────────────────────────────────────────────────
@@ -94,13 +88,11 @@ interface Reel {
   thumbnail: string;
   avatarUrl: string;
   musicTrackId: string;
+  available: boolean;
 }
-
-// ─── Build reel list ──────────────────────────────────────────────────────────
 
 function buildReels(): Reel[] {
   const allArtists = [...artists, ...seedArtists];
-
   const raw = allArtists.flatMap((a) =>
     a.videos.map((v) => ({
       id: `${a.id}-${v.id}`,
@@ -116,10 +108,9 @@ function buildReels(): Reel[] {
       thumbnail: `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`,
       avatarUrl: a.images[0]?.url ?? `https://picsum.photos/seed/${a.id}-avatar/150/150`,
       musicTrackId: musicTracks[hash(a.id + v.id) % musicTracks.length].id,
+      available: isAvailable(a.id + v.id),
     }))
   );
-
-  // Interleave artists for variety
   const byArtist = new Map<string, typeof raw>();
   for (const r of raw) {
     if (!byArtist.has(r.artistId)) byArtist.set(r.artistId, []);
@@ -136,16 +127,17 @@ function buildReels(): Reel[] {
   return result;
 }
 
-const REELS = buildReels();
+const ALL_REELS = buildReels();
 
 // ─── Bottom tab bar ───────────────────────────────────────────────────────────
 
 function BottomTab() {
   const [location] = useLocation();
   const { profile } = useProfile();
+  const { unreadCount } = useSocial();
   const tabs = [
-    { href: "/", icon: Home, label: "Discover" },
-    { href: "/artists", icon: Users, label: "Artists" },
+    { href: "/", icon: Home, label: "Home" },
+    { href: "/discover", icon: Users, label: "Discover" },
     { href: "/create", icon: null, label: "" },
     { href: "/shop", icon: ShoppingBag, label: "Shop" },
     { href: profile ? `/artists/${profile.id}` : "/setup", icon: User, label: "Profile" },
@@ -164,8 +156,13 @@ function BottomTab() {
         }
         const isActive = href === "/" ? location === "/" : location.startsWith(href);
         return (
-          <Link key={href} href={href} className="flex min-w-[44px] flex-col items-center gap-0.5">
+          <Link key={href} href={href} className="relative flex min-w-[44px] flex-col items-center gap-0.5">
             {Icon && <Icon size={22} className={isActive ? "text-amber-400" : "text-stone-500"} />}
+            {label === "Home" && unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-[8px] font-bold text-stone-950 flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
             <span className={`text-[9px] font-medium ${isActive ? "text-amber-400" : "text-stone-600"}`}>{label}</span>
           </Link>
         );
@@ -174,7 +171,7 @@ function BottomTab() {
   );
 }
 
-// ─── Spinning music disc (TikTok-style) ───────────────────────────────────────
+// ─── Spinning music disc ───────────────────────────────────────────────────────
 
 function MusicDisc({ trackId, spinning }: { trackId: string; spinning: boolean }) {
   const track = getTrackById(trackId);
@@ -188,7 +185,7 @@ function MusicDisc({ trackId, spinning }: { trackId: string; spinning: boolean }
         <Music2 size={12} className="text-amber-400" />
       </motion.div>
       {track && (
-        <div className="overflow-hidden">
+        <div className="overflow-hidden max-w-[44vw]">
           <motion.p
             animate={spinning ? { x: ["0%", "-100%"] } : { x: "0%" }}
             transition={spinning ? { repeat: Infinity, duration: 8, ease: "linear" } : {}}
@@ -209,19 +206,24 @@ function ReelCard({
   isActive,
   musicMuted,
   onToggleMusic,
+  onComment,
 }: {
   reel: Reel;
   isActive: boolean;
   musicMuted: boolean;
   onToggleMusic: () => void;
+  onComment: (reelId: string, artistName: string) => void;
 }) {
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const { reelLikes, reelSaves, toggleReelLike, toggleReelSave, getComments, getArtistCommissionStatus } = useSocial();
+  const liked = reelLikes[reel.id] ?? false;
+  const saved = reelSaves[reel.id] ?? false;
+  const commentCount = getComments(reel.id).length;
   const color = TECHNIQUE_COLORS[reel.technique] ?? "bg-amber-500";
+  const commissionStatus = getArtistCommissionStatus(reel.artistId);
+  const csInfo = CS_ICON[commissionStatus];
 
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
-      {/* Thumbnail — always present */}
       <img
         src={reel.thumbnail}
         alt={reel.caption}
@@ -232,7 +234,6 @@ function ReelCard({
         }}
       />
 
-      {/* YouTube iframe — only for active reel */}
       {isActive && (
         <iframe
           key={reel.videoId}
@@ -252,7 +253,6 @@ function ReelCard({
         />
       )}
 
-      {/* Gradient overlays */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/40" />
 
       {/* ── Bottom-left: artist info ── */}
@@ -265,6 +265,12 @@ function ReelCard({
             <Flame size={9} className="text-amber-400" />
             <span className="text-[9px] font-bold text-amber-300">{reel.craftScore}</span>
           </span>
+          {reel.available && (
+            <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5">
+              <ShoppingCart size={9} className="text-emerald-400" />
+              <span className="text-[9px] font-bold text-emerald-300">Available</span>
+            </span>
+          )}
         </div>
 
         <Link href={`/artists/${reel.artistId}`}>
@@ -273,22 +279,29 @@ function ReelCard({
           </h2>
         </Link>
 
-        <p className="text-[11px] text-stone-400 drop-shadow">
-          @{reel.artistId} · {reel.location.split(",")[0]}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] text-stone-400 drop-shadow">
+            @{reel.artistId} · {reel.location.split(",")[0]}
+          </p>
+          {commissionStatus !== "closed" && (
+            <span className={`flex items-center gap-1 text-[10px] font-medium ${csInfo.color}`}>
+              <csInfo.icon size={9} />
+              {commissionStatus === "open" ? "Open" : "Waitlisted"}
+            </span>
+          )}
+        </div>
 
         <p className="line-clamp-2 max-w-[78vw] text-sm leading-snug text-stone-200 drop-shadow">
           {reel.caption}
         </p>
 
-        {/* Music disc */}
         <div className="pt-1">
           <MusicDisc trackId={reel.musicTrackId} spinning={isActive && !musicMuted} />
         </div>
       </div>
 
       {/* ── Right side actions ── */}
-      <div className="absolute bottom-[88px] right-3 z-10 flex flex-col items-center gap-5">
+      <div className="absolute bottom-[88px] right-3 z-10 flex flex-col items-center gap-4">
         {/* Avatar */}
         <Link href={`/artists/${reel.artistId}`} className="relative">
           <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-stone-800 shadow-xl">
@@ -307,15 +320,46 @@ function ReelCard({
         </Link>
 
         {/* Like */}
-        <button onClick={() => setLiked(!liked)} className="flex flex-col items-center gap-1">
-          <Heart size={28} fill={liked ? "#ef4444" : "none"} className={liked ? "text-red-500" : "text-white"} style={{ transition: "all 0.15s" }} />
-          <span className="text-[11px] font-bold text-white drop-shadow">{fmt(reel.likes + (liked ? 1 : 0))}</span>
+        <button
+          onClick={() => toggleReelLike(reel.id)}
+          className="flex flex-col items-center gap-1"
+        >
+          <Heart
+            size={28}
+            fill={liked ? "#ef4444" : "none"}
+            className={liked ? "text-red-500" : "text-white"}
+            style={{ transition: "all 0.15s" }}
+          />
+          <span className="text-[11px] font-bold text-white drop-shadow">
+            {fmt(reel.likes + (liked ? 1 : 0))}
+          </span>
+        </button>
+
+        {/* Comment */}
+        <button
+          onClick={() => onComment(reel.id, reel.artistName)}
+          className="flex flex-col items-center gap-1"
+        >
+          <MessageCircle size={26} className="text-white" />
+          <span className="text-[11px] font-bold text-white drop-shadow">
+            {commentCount > 0 ? commentCount : ""}
+          </span>
         </button>
 
         {/* Save */}
-        <button onClick={() => setSaved(!saved)} className="flex flex-col items-center gap-1">
-          <Bookmark size={26} fill={saved ? "#f59e0b" : "none"} className={saved ? "text-amber-400" : "text-white"} style={{ transition: "all 0.15s" }} />
-          <span className="text-[11px] font-bold text-white drop-shadow">{fmt(reel.saves + (saved ? 1 : 0))}</span>
+        <button
+          onClick={() => toggleReelSave(reel.id)}
+          className="flex flex-col items-center gap-1"
+        >
+          <Bookmark
+            size={26}
+            fill={saved ? "#f59e0b" : "none"}
+            className={saved ? "text-amber-400" : "text-white"}
+            style={{ transition: "all 0.15s" }}
+          />
+          <span className="text-[11px] font-bold text-white drop-shadow">
+            {fmt(reel.saves + (saved ? 1 : 0))}
+          </span>
         </button>
 
         {/* Share */}
@@ -331,7 +375,7 @@ function ReelCard({
           ) : (
             <Volume2 size={22} className="text-amber-400" />
           )}
-          <span className="text-[9px] text-white/60">{musicMuted ? "Music off" : "Music on"}</span>
+          <span className="text-[9px] text-white/60">{musicMuted ? "Off" : "Music"}</span>
         </button>
       </div>
     </div>
@@ -346,6 +390,17 @@ export default function Feed() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [musicMuted, setMusicMuted] = useState(false);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
+  const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");
+  const [commentReel, setCommentReel] = useState<{ id: string; artistName: string } | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const { following, unreadCount } = useSocial();
+
+  const reels = feedTab === "following"
+    ? ALL_REELS.filter((r) => following.includes(r.artistId))
+    : ALL_REELS;
+
+  const activeReel = reels[activeIndex];
 
   // Scroll detection
   useEffect(() => {
@@ -357,21 +412,27 @@ export default function Feed() {
       ticking = true;
       requestAnimationFrame(() => {
         const idx = Math.round(el.scrollTop / el.clientHeight);
-        setActiveIndex(Math.max(0, Math.min(idx, REELS.length - 1)));
+        setActiveIndex(Math.max(0, Math.min(idx, reels.length - 1)));
         ticking = false;
       });
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [reels.length]);
+
+  // Reset scroll when tab changes
+  useEffect(() => {
+    setActiveIndex(0);
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [feedTab]);
 
   // Music: switch track when active reel changes
   useEffect(() => {
-    const reel = REELS[activeIndex];
-    if (!reel || !musicUnlocked) return;
-    const track = getTrackById(reel.musicTrackId);
+    if (!activeReel || !musicUnlocked) return;
+    const track = getTrackById(activeReel.musicTrackId);
     if (!track) return;
-
     if (!audioRef.current) {
       audioRef.current = new Audio(track.url);
       audioRef.current.loop = true;
@@ -383,17 +444,10 @@ export default function Feed() {
       audioRef.current.loop = true;
       audioRef.current.volume = 0.65;
     }
+    if (!musicMuted) audioRef.current.play().catch(() => {});
+    return () => { audioRef.current?.pause(); };
+  }, [activeIndex, musicUnlocked, activeReel]);
 
-    if (!musicMuted) {
-      audioRef.current.play().catch(() => {});
-    }
-
-    return () => {
-      audioRef.current?.pause();
-    };
-  }, [activeIndex, musicUnlocked]);
-
-  // Music mute toggle
   useEffect(() => {
     if (!audioRef.current || !musicUnlocked) return;
     if (musicMuted) {
@@ -403,15 +457,14 @@ export default function Feed() {
     }
   }, [musicMuted, musicUnlocked]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => { audioRef.current?.pause(); };
   }, []);
 
   const unlockMusic = useCallback(() => {
     setMusicUnlocked(true);
-    const reel = REELS[activeIndex];
-    const track = getTrackById(reel?.musicTrackId ?? "");
+    if (!activeReel) return;
+    const track = getTrackById(activeReel.musicTrackId);
     if (track) {
       const audio = new Audio(track.url);
       audio.loop = true;
@@ -419,7 +472,7 @@ export default function Feed() {
       audioRef.current = audio;
       if (!musicMuted) audio.play().catch(() => {});
     }
-  }, [activeIndex, musicMuted]);
+  }, [activeReel, musicMuted]);
 
   const handleToggleMusic = useCallback(() => {
     if (!musicUnlocked) {
@@ -428,8 +481,6 @@ export default function Feed() {
       setMusicMuted((m) => !m);
     }
   }, [musicUnlocked, unlockMusic]);
-
-  const activeReel = REELS[activeIndex];
 
   return (
     <div className="relative h-[100svh] overflow-hidden bg-black">
@@ -442,36 +493,85 @@ export default function Feed() {
           <Flame size={18} className="text-amber-400" />
           <span className="font-serif text-xl font-bold tracking-tight text-white">Kiln</span>
         </Link>
+
         <div className="pointer-events-auto flex items-center gap-4">
-          <button className="border-b-2 border-amber-400 pb-0.5 text-sm font-bold text-white">For You</button>
-          <button className="text-sm font-medium text-white/40">Following</button>
+          <button
+            onClick={() => setFeedTab("foryou")}
+            className={`pb-0.5 text-sm font-bold transition-colors ${feedTab === "foryou" ? "border-b-2 border-amber-400 text-white" : "text-white/40"}`}
+          >
+            For You
+          </button>
+          <button
+            onClick={() => setFeedTab("following")}
+            className={`pb-0.5 text-sm font-medium transition-colors relative ${feedTab === "following" ? "border-b-2 border-amber-400 text-white" : "text-white/40"}`}
+          >
+            Following
+            {following.length > 0 && feedTab !== "following" && (
+              <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-amber-400" />
+            )}
+          </button>
         </div>
-        <button className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm">
-          <Search size={15} />
-        </button>
+
+        <div className="pointer-events-auto flex items-center gap-2">
+          <button
+            onClick={() => setShowNotifications((v) => !v)}
+            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm"
+          >
+            <Bell size={15} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-stone-950">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+          <Link href="/discover" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm">
+            <Search size={15} />
+          </Link>
+        </div>
       </div>
 
+      {/* Notification panel */}
+      {showNotifications && (
+        <NotificationPanel onClose={() => setShowNotifications(false)} />
+      )}
+
       {/* Reel scroll container */}
-      <div
-        ref={containerRef}
-        className="h-full overflow-y-scroll snap-y snap-mandatory"
-        style={{ scrollbarWidth: "none" }}
-        onClick={() => { if (!musicUnlocked) unlockMusic(); }}
-      >
-        {REELS.map((reel, i) => (
-          <ReelCard
-            key={reel.id}
-            reel={reel}
-            isActive={i === activeIndex}
-            musicMuted={musicMuted}
-            onToggleMusic={handleToggleMusic}
-          />
-        ))}
-      </div>
+      {reels.length === 0 ? (
+        <div className="flex h-full flex-col items-center justify-center text-center px-8">
+          <Users size={40} className="text-stone-700 mb-4" />
+          <p className="text-stone-300 font-medium mb-2">No reels from followed artists</p>
+          <p className="text-stone-500 text-sm mb-6">Follow some artists to see their work here</p>
+          <Link
+            href="/discover"
+            onClick={() => setFeedTab("foryou")}
+            className="px-5 py-2.5 rounded-full bg-amber-500 text-stone-950 font-semibold text-sm hover:bg-amber-400 transition-colors"
+          >
+            Discover Artists
+          </Link>
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          className="h-full overflow-y-scroll snap-y snap-mandatory"
+          style={{ scrollbarWidth: "none" }}
+          onClick={() => { if (!musicUnlocked) unlockMusic(); }}
+        >
+          {reels.map((reel, i) => (
+            <ReelCard
+              key={reel.id}
+              reel={reel}
+              isActive={i === activeIndex}
+              musicMuted={musicMuted}
+              onToggleMusic={handleToggleMusic}
+              onComment={(id, name) => setCommentReel({ id, artistName: name })}
+            />
+          ))}
+        </div>
+      )}
 
       {/* First-reel music nudge */}
       <AnimatePresence>
-        {!musicUnlocked && activeIndex === 0 && (
+        {!musicUnlocked && activeIndex === 0 && reels.length > 0 && (
           <motion.button
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -487,11 +587,21 @@ export default function Feed() {
       </AnimatePresence>
 
       {/* Reel counter */}
-      <div className="absolute right-3 top-[52px] z-50 rounded-full bg-black/40 px-2 py-0.5 text-[9px] text-stone-500 backdrop-blur-sm">
-        {activeIndex + 1} / {REELS.length}
-      </div>
+      {reels.length > 0 && (
+        <div className="absolute right-3 top-[52px] z-50 rounded-full bg-black/40 px-2 py-0.5 text-[9px] text-stone-500 backdrop-blur-sm">
+          {activeIndex + 1} / {reels.length}
+        </div>
+      )}
 
-      {/* Bottom tab bar */}
+      {/* Comments sheet */}
+      {commentReel && (
+        <Comments
+          postId={commentReel.id}
+          artistName={commentReel.artistName}
+          onClose={() => setCommentReel(null)}
+        />
+      )}
+
       <BottomTab />
     </div>
   );

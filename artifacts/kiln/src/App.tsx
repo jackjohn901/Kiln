@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProfileProvider } from "@/contexts/ProfileContext";
+import { SocialProvider } from "@/contexts/SocialContext";
 import NotFound from "@/pages/not-found";
 import Feed from "@/pages/Feed";
 import Artists from "@/pages/Artists";
@@ -10,6 +11,9 @@ import ArtistProfile from "@/pages/ArtistProfile";
 import Shop from "@/pages/Shop";
 import Setup from "@/pages/Setup";
 import Create from "@/pages/Create";
+import Discover from "@/pages/Discover";
+import Analytics from "@/pages/Analytics";
+import Workshops from "@/pages/Workshops";
 
 const queryClient = new QueryClient();
 
@@ -17,9 +21,12 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Feed} />
+      <Route path="/discover" component={Discover} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:id" component={ArtistProfile} />
       <Route path="/shop" component={Shop} />
+      <Route path="/workshops" component={Workshops} />
+      <Route path="/analytics" component={Analytics} />
       <Route path="/setup" component={Setup} />
       <Route path="/create" component={Create} />
       <Route component={NotFound} />
@@ -32,10 +39,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ProfileProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
+          <SocialProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </SocialProvider>
         </ProfileProvider>
       </TooltipProvider>
     </QueryClientProvider>
