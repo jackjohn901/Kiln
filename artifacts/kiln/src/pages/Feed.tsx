@@ -5,7 +5,7 @@ import {
   Heart, Bookmark, Share2, Volume2, VolumeX, Flame,
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
-  SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown,
+  SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown, GitBranch,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
 import BoardSavePicker from "@/components/BoardSavePicker";
@@ -50,6 +50,39 @@ function readKilnSettings() {
   }
 }
 
+const FEED_TECHNIQUE_MEDIUM_MAP: Record<string, string> = {
+  "Glass Blowing": "glass", "Flameworking": "glass", "Kiln Forming": "glass",
+  "Glass Casting": "glass", "Murrine": "glass", "Neon Glass": "glass", "Cold Working": "glass",
+  "Raku": "ceramics", "Porcelain": "ceramics", "Ceramics": "ceramics", "Wood-Fired": "ceramics",
+  "Stoneware": "ceramics", "Earthenware": "ceramics",
+  "Metal Forging": "metal", "Bronze Casting": "metal", "Blacksmithing": "metal", "Welding": "metal",
+  "Enamel": "enamel", "Fiber Arts": "fiber", "Textile": "fiber", "Tapestry": "fiber",
+};
+
+function readTasteWeights(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem("kiln_taste_graph_v1") ?? "{}"); } catch { return {}; }
+}
+
+const LINEAGE_GENERATION: Record<string, number> = {
+  "harvey-littleton": 0, "dominick-labino": 0,
+  "dale-chihuly": 1, "fritz-dreisbach": 1, "marvin-lipofsky": 1,
+  "lino-tagliapietra": 2, "william-morris": 2, "richard-marquis": 2,
+  "dante-marioni": 3, "richard-royal": 3, "john-kiley": 3,
+  "alex-bernstein": 3, "caleb-siemon": 3, "erica-rosenfeld": 3,
+};
+
+function getArtistStudioHours(artistId: string): number {
+  const SEED: Record<string, number> = {
+    "alex-bernstein": 2400, "maya-chen": 1800, "james-okafor": 3200,
+    "elena-vasquez": 1200, "takeshi-mori": 4100, "dale-chihuly": 8500,
+    "lino-tagliapietra": 12000, "dante-marioni": 5600, "william-morris": 6200,
+  };
+  if (SEED[artistId]) return SEED[artistId];
+  let h = 0;
+  for (const c of artistId) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+  return 200 + (Math.abs(h) % 3800);
+}
+
 function scoreReel(
   reel: Reel,
   interactions: FeedInteractions,
@@ -66,6 +99,18 @@ function scoreReel(
   score += (interactions.watchedArtists[reel.artistId] ?? 0) * 5;
   // Boost quiz-selected techniques
   if (quizTechniques.includes(reel.technique)) score += 20;
+  // Taste Graph: boost/suppress based on medium and aesthetic preferences
+  const tasteWeights = readTasteWeights();
+  const mediumKey = FEED_TECHNIQUE_MEDIUM_MAP[reel.technique];
+  if (mediumKey && tasteWeights[mediumKey] != null) {
+    score += ((tasteWeights[mediumKey] - 50) / 50) * 25;
+  }
+  if (tasteWeights.experimental != null && reel.craftScore > 90) {
+    score += ((tasteWeights.experimental - 50) / 50) * 8;
+  }
+  if (tasteWeights.traditional != null && reel.craftScore < 85) {
+    score += ((tasteWeights.traditional - 50) / 50) * 6;
+  }
   // Add small random shuffle so it's not static
   score += Math.floor(Math.random() * 10);
   return score;
@@ -352,6 +397,22 @@ function ReelCard({
               <span className="text-[9px] font-bold text-emerald-300">Available</span>
             </span>
           )}
+          {LINEAGE_GENERATION[reel.artistId] != null && (
+            <span className="flex items-center gap-1 rounded-full bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 backdrop-blur-sm">
+              <GitBranch size={9} className="text-purple-400" />
+              <span className="text-[9px] font-bold text-purple-300">Gen {(LINEAGE_GENERATION[reel.artistId] ?? 0) + 1}</span>
+            </span>
+          )}
+          {(() => {
+            const hrs = getArtistStudioHours(reel.artistId);
+            const label = hrs >= 1000 ? (hrs / 1000).toFixed(1) + "k" : String(hrs);
+            return (
+              <span className="flex items-center gap-1 rounded-full bg-teal-500/20 border border-teal-500/30 px-2 py-0.5 backdrop-blur-sm">
+                <Clock size={9} className="text-teal-400" />
+                <span className="text-[9px] font-bold text-teal-300">{label}h studio</span>
+              </span>
+            );
+          })()}
         </div>
 
         <Link href={`/artists/${reel.artistId}`}>

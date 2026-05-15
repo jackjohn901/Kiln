@@ -1,11 +1,28 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Radar, Sliders, TrendingUp, Heart, Bookmark, Eye, Sparkles, ChevronRight, RefreshCw } from "lucide-react";
+import { Radar, Sliders, TrendingUp, Heart, Bookmark, Eye, Sparkles, ChevronRight, RefreshCw, Users } from "lucide-react";
 import { useSocial } from "@/contexts/SocialContext";
 import { ALL_REELS } from "@/data/reels";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { Link } from "wouter";
+
+const TASTE_TWINS = [
+  { id: "tw-1", name: "Priya N.", avatarUrl: "https://picsum.photos/seed/priya/60/60", interests: ["Glass", "Experimental"], discovers: "Underground enamel & neon artists", weights: { glass: 88, ceramics: 25, metal: 40, fiber: 20, enamel: 60, experimental: 85, sculptural: 75, functional: 30, traditional: 20, intimate: 65, monumental: 50, colorful: 70 } },
+  { id: "tw-2", name: "Kenji W.", avatarUrl: "https://picsum.photos/seed/kenji/60/60", interests: ["Ceramics", "Traditional"], discovers: "Japanese wood-fired revival work", weights: { glass: 30, ceramics: 90, metal: 25, fiber: 35, enamel: 45, experimental: 30, sculptural: 55, functional: 80, traditional: 90, intimate: 70, monumental: 30, colorful: 40 } },
+  { id: "tw-3", name: "Amara L.", avatarUrl: "https://picsum.photos/seed/amara/60/60", interests: ["Fiber", "Sculptural"], discovers: "Large-scale textile installations", weights: { glass: 35, ceramics: 45, metal: 30, fiber: 95, enamel: 20, experimental: 75, sculptural: 90, functional: 25, traditional: 35, intimate: 40, monumental: 85, colorful: 80 } },
+  { id: "tw-4", name: "Felix R.", avatarUrl: "https://picsum.photos/seed/felix/60/60", interests: ["Metal", "Experimental"], discovers: "Industrial & raw material artists", weights: { glass: 45, ceramics: 30, metal: 92, fiber: 20, enamel: 35, experimental: 88, sculptural: 65, functional: 45, traditional: 15, intimate: 30, monumental: 70, colorful: 25 } },
+];
+
+function computeTwinSimilarity(w1: TasteWeights, w2: Record<string, number>): number {
+  const keys = Object.keys(w1) as (keyof TasteWeights)[];
+  let sumSq = 0;
+  keys.forEach(k => {
+    const diff = w1[k] - (w2[k] ?? 50);
+    sumSq += diff * diff;
+  });
+  return Math.max(0, Math.round(100 - Math.sqrt(sumSq / keys.length)));
+}
 
 const STORAGE_KEY = "kiln_taste_graph_v1";
 
@@ -274,6 +291,35 @@ export default function TasteGraph() {
               })}
             </div>
             <p className="mt-4 text-center text-[10px] text-stone-600">Match % is calculated transparently from your Taste Graph sliders + engagement history. No hidden signals.</p>
+
+            {/* Taste Twins */}
+            <div className="mt-8">
+              <div className="flex items-center gap-2 mb-2">
+                <Users size={13} className="text-amber-400" />
+                <p className="text-xs font-semibold uppercase tracking-widest text-stone-500">Taste Twins</p>
+              </div>
+              <p className="text-[11px] text-stone-500 mb-4 leading-relaxed">People with nearly identical Taste Graphs — see what they're discovering that you haven't found yet.</p>
+              <div className="space-y-2.5">
+                {TASTE_TWINS.map(twin => {
+                  const sim = computeTwinSimilarity(weights, twin.weights);
+                  const simColor = sim >= 75 ? "text-emerald-400" : sim >= 60 ? "text-amber-400" : "text-stone-400";
+                  return (
+                    <div key={twin.id} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-stone-900/60 p-3">
+                      <img src={twin.avatarUrl} alt={twin.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-amber-100">{twin.name}</p>
+                        <p className="text-[10px] text-stone-500">Into: {twin.interests.join(", ")}</p>
+                        <p className="text-[10px] text-amber-600 mt-0.5">Discovering: {twin.discovers}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-lg font-black ${simColor}`}>{sim}%</p>
+                        <p className="text-[9px] text-stone-600">twin match</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -252,6 +252,31 @@ export default function Parliament() {
                     </button>
                   )}
 
+                  {hasVoted && (() => {
+                    const topPct = proposal.totalVoices > 0 ? Math.round((topOption.votes / proposal.totalVoices) * 100) : 0;
+                    const myVoteLabel = proposal.options.find(o => o.id === myVote)?.label;
+                    return (
+                      <div className="mt-3 rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/20 px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <Trophy size={12} className="text-amber-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[9px] font-semibold uppercase tracking-wider text-amber-600">Community is trending toward</p>
+                            <p className="text-xs font-bold text-amber-100 truncate">{topOption.label} <span className="text-amber-400 font-normal">({topPct}%)</span></p>
+                          </div>
+                        </div>
+                        {myVoteLabel && myVote !== topOption.id && (
+                          <p className="text-[10px] text-stone-500 mt-1">Your vote: {myVoteLabel}</p>
+                        )}
+                        {topPct >= 50 && (
+                          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1">
+                            <CheckCircle2 size={10} className="text-emerald-400" />
+                            <p className="text-[10px] text-emerald-300 font-medium">Majority reached — outcome will be implemented</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex items-center justify-between mt-3">
                     <span className="flex items-center gap-1 text-[10px] text-stone-600">
                       <Users size={9} /> {proposal.totalVoices.toLocaleString()} voices cast

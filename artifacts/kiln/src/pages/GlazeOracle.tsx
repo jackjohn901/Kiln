@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, Send, Bot, User, Plus, Bookmark, Trash2, ChevronRight, Sparkles, FlaskConical, Copy, Check } from "lucide-react";
+import { Flame, Send, Bot, User, Plus, Bookmark, Trash2, ChevronRight, Sparkles, FlaskConical, Copy, Check, Camera, X } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 
 interface Message {
@@ -94,7 +94,26 @@ export default function GlazeOracle() {
   const [copied, setCopied] = useState<string | null>(null);
   const [savePrompt, setSavePrompt] = useState<{ content: string } | null>(null);
   const [saveName, setSaveName] = useState("");
+  const [showAnalyze, setShowAnalyze] = useState(false);
+  const [analyzeForm, setAnalyzeForm] = useState({ imageUrl: "", cone: "Cone 10 Reduction", colors: "", surface: "", issues: "" });
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const CONES = ["Cone 06 (earthenware)", "Cone 6 (mid-fire)", "Cone 10 Reduction", "Cone 10 Oxidation", "Cone 10-12 Wood-fired", "Cone 12+"];
+
+  function submitAnalysis() {
+    const parts = [
+      "Please analyze this fired glaze result:",
+      analyzeForm.imageUrl && `Photo reference: ${analyzeForm.imageUrl}`,
+      `Firing: ${analyzeForm.cone}`,
+      analyzeForm.colors && `Appearance/color: ${analyzeForm.colors}`,
+      analyzeForm.surface && `Surface texture: ${analyzeForm.surface}`,
+      analyzeForm.issues && `Issues observed: ${analyzeForm.issues}`,
+      "Please diagnose what caused this result, and what adjustments would produce different outcomes.",
+    ].filter(Boolean).join("\n");
+    setShowAnalyze(false);
+    setAnalyzeForm({ imageUrl: "", cone: "Cone 10 Reduction", colors: "", surface: "", issues: "" });
+    send(parts);
+  }
 
   useEffect(() => { saveFormulas(formulas); }, [formulas]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
@@ -191,6 +210,16 @@ export default function GlazeOracle() {
                     </button>
                   ))}
                 </div>
+
+                <button onClick={() => setShowAnalyze(true)} className="mt-3 w-full flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 hover:border-amber-500/35 hover:bg-amber-500/8 transition-colors">
+                  <div className="h-9 w-9 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <Camera size={15} className="text-amber-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-amber-200">Analyze a Fired Result</p>
+                    <p className="text-[10px] text-stone-500 mt-0.5">Describe your fired piece → get expert AI diagnosis</p>
+                  </div>
+                </button>
               </div>
             )}
 
@@ -285,6 +314,56 @@ export default function GlazeOracle() {
           </div>
         </div>
       )}
+
+      {/* Analyze fired result modal */}
+      <AnimatePresence>
+        {showAnalyze && (
+          <>
+            <motion.div className="fixed inset-0 z-[60] bg-black/70" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAnalyze(false)} />
+            <motion.div className="fixed bottom-0 left-0 right-0 z-[61] max-h-[90vh] rounded-t-3xl bg-[#1a1714] border-t border-white/10 overflow-y-auto"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }}>
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-amber-100">Analyze a Fired Result</h3>
+                    <p className="text-[11px] text-stone-500 mt-0.5">Get expert diagnosis from the Oracle</p>
+                  </div>
+                  <button onClick={() => setShowAnalyze(false)} className="rounded-full bg-stone-800 p-2 text-stone-400"><X size={14} /></button>
+                </div>
+                <div className="space-y-3">
+                  <input value={analyzeForm.imageUrl} onChange={e => setAnalyzeForm(f => ({ ...f, imageUrl: e.target.value }))}
+                    placeholder="Photo URL (optional — paste image link)"
+                    className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                  <div>
+                    <p className="text-[10px] text-stone-500 mb-2">Firing temperature</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {CONES.map(c => (
+                        <button key={c} onClick={() => setAnalyzeForm(f => ({ ...f, cone: c }))}
+                          className={`rounded-full border px-3 py-1.5 text-[10px] font-medium whitespace-nowrap transition-colors ${analyzeForm.cone === c ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-stone-500"}`}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <input value={analyzeForm.colors} onChange={e => setAnalyzeForm(f => ({ ...f, colors: e.target.value }))}
+                    placeholder="Colors & appearance (e.g. dark brown with iridescent sheen)"
+                    className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                  <input value={analyzeForm.surface} onChange={e => setAnalyzeForm(f => ({ ...f, surface: e.target.value }))}
+                    placeholder="Surface texture (e.g. matte, crawled, pinholed)"
+                    className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                  <textarea value={analyzeForm.issues} onChange={e => setAnalyzeForm(f => ({ ...f, issues: e.target.value }))}
+                    placeholder="Specific issues or questions…" rows={3}
+                    className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
+                </div>
+                <button onClick={submitAnalysis}
+                  className="mt-4 w-full rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950">
+                  Ask the Oracle →
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Save formula modal */}
       <AnimatePresence>

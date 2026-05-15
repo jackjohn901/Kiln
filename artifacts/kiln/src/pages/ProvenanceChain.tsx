@@ -332,6 +332,35 @@ export default function ProvenanceChain() {
                     </div>
                   )}
                 </div>
+
+                {/* QR Code for physical attachment */}
+                <div className="mt-5 rounded-2xl border border-white/8 bg-stone-900/40 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-stone-400">Physical QR Code</p>
+                    <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[9px] text-stone-500">Print & Attach</span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 mb-4 leading-relaxed">Attach to the physical artwork — collectors scan to verify provenance on any device.</p>
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl border border-white/10 bg-white p-1.5 shrink-0">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://kiln.art/provenance/${selected.id}&format=png`}
+                        alt="Provenance QR Code"
+                        width={80}
+                        height={80}
+                        className="block"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-amber-100 mb-1 truncate">{selected.title}</p>
+                      <p className="text-[10px] text-stone-500 mb-1">by {selected.artistName} · {selected.year}</p>
+                      <p className="text-[9px] text-stone-600 font-mono break-all">kiln.art/provenance/{selected.id}</p>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <Shield size={10} className="text-emerald-400 shrink-0" />
+                        <span className="text-[10px] text-emerald-400">{selected.royaltyPercent}% resale royalty encoded</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </>

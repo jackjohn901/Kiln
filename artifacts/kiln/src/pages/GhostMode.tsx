@@ -287,6 +287,14 @@ export default function GhostMode() {
                       <Plus size={12} /> Add Update
                     </button>
                   )}
+                  {selected.soldTo === "You" && selected.artistName !== "You" && (
+                    <button
+                      onClick={() => { setAddForm(f => ({ ...f, type: "photo", content: "" })); setShowAdd(true); }}
+                      className="flex-1 rounded-full bg-blue-500/20 border border-blue-500/30 py-2.5 text-xs font-semibold text-blue-300 flex items-center justify-center gap-1.5 hover:bg-blue-500/30 transition-colors"
+                    >
+                      <Camera size={12} /> In the Wild
+                    </button>
+                  )}
                   <button onClick={() => toggleSubscribe(selected.id)} className={`flex-1 rounded-full border py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${selected.ownerSubscribed ? "border-amber-500/30 text-amber-400 bg-amber-500/10" : "border-white/15 text-stone-400"}`}>
                     {selected.ownerSubscribed ? <><Bell size={12} /> Following</> : <><BellOff size={12} /> Follow Updates</>}
                   </button>

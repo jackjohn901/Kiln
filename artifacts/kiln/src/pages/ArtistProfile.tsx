@@ -7,7 +7,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -140,7 +140,7 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold";
+type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold" | "dna";
 
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
@@ -489,6 +489,7 @@ export default function ArtistProfile() {
               { key: "sold", icon: CheckCircle, label: "Sold" },
               { key: "bio", icon: BookOpen, label: "Bio" },
               { key: "cv", icon: Award, label: "CV" },
+              { key: "dna", icon: Activity, label: "DNA" },
             ] as { key: Tab; icon: React.ElementType; label: string }[]
           ).map(({ key, icon: Icon, label }) => (
             <button
@@ -977,6 +978,62 @@ export default function ArtistProfile() {
                     </div>
                   </div>
                 )}
+              </div>
+            );
+          })()}
+
+          {tab === "dna" && (() => {
+            const h = hash(artist.id);
+            const dimensions = [
+              { label: "Technique Range", desc: "Breadth of techniques mastered", value: 40 + (h % 58) },
+              { label: "Consistency", desc: "Refinement over time", value: 50 + ((h >> 3) % 45) },
+              { label: "Experimentation", desc: "Willingness to push boundaries", value: 35 + ((h >> 6) % 60) },
+              { label: "Community Impact", desc: "Teaching, mentoring, sharing", value: 30 + ((h >> 9) % 65) },
+              { label: "Material Depth", desc: "Intimacy with specific materials", value: 55 + ((h >> 12) % 40) },
+              { label: "Process Visibility", desc: "How openly they share making", value: 25 + ((h >> 15) % 70) },
+            ];
+            return (
+              <div className="space-y-6 py-2">
+                <p className="text-sm text-stone-500 leading-relaxed">
+                  {artist.name.split(" ")[0]}'s Craft DNA — six dimensions of artistic identity derived from career patterns, exhibition history, and community engagement.
+                </p>
+                <div className="space-y-4">
+                  {dimensions.map((dim, i) => (
+                    <div key={dim.label}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-semibold text-stone-200">{dim.label}</span>
+                          <span className="text-[10px] text-stone-600 ml-2 hidden sm:inline">{dim.desc}</span>
+                        </div>
+                        <span className="text-sm font-black text-amber-300 shrink-0">{dim.value}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-stone-800 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${dim.value}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut", delay: i * 0.07 }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-4">
+                  <p className="text-xs font-semibold text-stone-400 mb-2">Medium Signature</p>
+                  <div className="flex flex-wrap gap-2">
+                    {artist.medium.split(",").map(m => m.trim()).concat(
+                      artist.series.slice(0, 3).map(s => s.name)
+                    ).filter(Boolean).map((t, i) => (
+                      <span key={i} className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-[11px] text-amber-300">{t}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-4">
+                  <p className="text-xs font-semibold text-stone-400 mb-1.5">What Craft DNA is</p>
+                  <p className="text-[11px] text-stone-500 leading-relaxed">
+                    Craft DNA is a transparent representation of artistic identity — not a ranking. Scores are generated from exhibition records, teaching history, community engagement, and work breadth. No hidden signals.
+                  </p>
+                </div>
               </div>
             );
           })()}

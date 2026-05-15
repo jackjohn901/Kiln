@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Timer, Plus, Flame, Trophy, Target, ChevronRight, X, Check, Clock, TrendingUp, Award } from "lucide-react";
+import { Timer, Plus, Flame, Trophy, Target, ChevronRight, X, Check, Clock, TrendingUp, Award, Play, Square } from "lucide-react";
 
 interface HourLog {
   id: string;
@@ -101,6 +101,36 @@ export default function CraftHours() {
   const [showGoal, setShowGoal] = useState(false);
   const [logForm, setLogForm] = useState({ hours: "", minutes: "0", technique: "Glass Blowing", note: "" });
   const [goalInput, setGoalInput] = useState(state.goal.hoursPerWeek.toString());
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerTechnique, setTimerTechnique] = useState("Glass Blowing");
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerRunning) {
+      timerRef.current = setInterval(() => setTimerSeconds(s => s + 1), 1000);
+    } else {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [timerRunning]);
+
+  function formatTimer(s: number): string {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  function stopTimer() {
+    setTimerRunning(false);
+    const h = Math.floor(timerSeconds / 3600);
+    const m = Math.round((timerSeconds % 3600) / 60);
+    setLogForm({ hours: h > 0 ? h.toString() : "0", minutes: m.toString(), technique: timerTechnique, note: "" });
+    setTimerSeconds(0);
+    setShowLog(true);
+  }
 
   useEffect(() => { saveState(state); }, [state]);
 
@@ -148,6 +178,38 @@ export default function CraftHours() {
           <button onClick={() => setShowLog(true)} className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3.5 py-2 text-xs font-semibold text-stone-950">
             <Plus size={13} /> Log
           </button>
+        </div>
+
+        {/* Live Session Timer */}
+        <div className="mb-5 rounded-3xl bg-stone-900/60 border border-white/8 p-5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 mb-3">Live Session</p>
+          <div className="flex items-center justify-between">
+            <p className="text-4xl font-black font-mono text-amber-100 tabular-nums tracking-tight">{formatTimer(timerSeconds)}</p>
+            {timerRunning ? (
+              <button onClick={stopTimer} className="flex items-center gap-2 rounded-2xl bg-rose-500/20 border border-rose-500/30 px-4 py-2.5 text-sm font-bold text-rose-400 hover:bg-rose-500/30 transition-colors">
+                <Square size={13} fill="currentColor" /> Stop & Log
+              </button>
+            ) : (
+              <button onClick={() => setTimerRunning(true)} className="flex items-center gap-2 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 px-4 py-2.5 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30 transition-colors">
+                <Play size={13} fill="currentColor" /> Start Session
+              </button>
+            )}
+          </div>
+          {timerRunning ? (
+            <div className="mt-4">
+              <p className="text-[10px] text-stone-500 mb-2">Technique</p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {["Glass Blowing", "Flameworking", "Ceramics", "Raku", "Metal Forging", "Fiber Arts", "Design / Sketching"].map(t => (
+                  <button key={t} onClick={() => setTimerTechnique(t)}
+                    className={`rounded-full border px-3 py-1 text-[10px] font-semibold whitespace-nowrap transition-colors ${timerTechnique === t ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-stone-500"}`}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-stone-600">Start a timer to automatically log your studio session when done.</p>
+          )}
         </div>
 
         {/* Weekly ring */}
