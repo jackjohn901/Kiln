@@ -14,6 +14,15 @@ import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { useUpload } from "@/hooks/useUpload";
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const TECHNIQUES = [
   { id: "glass-blow", label: "Glass Blowing", emoji: "🔥" },
   { id: "glass-cast", label: "Lost-Wax Cast", emoji: "⚗️" },
@@ -156,7 +165,8 @@ export default function Create() {
           const result = await upload(file);
           mediaUrl = result.servingUrl;
         } catch {
-          // fall back to local blob URL for preview purposes
+          // fall back to base64 data URL so the post persists across navigation
+          try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
         }
       }
 
@@ -167,7 +177,7 @@ export default function Create() {
           const r = await upload(extraFile);
           extraUrls.push(r.servingUrl);
         } catch {
-          extraUrls.push(URL.createObjectURL(extraFile));
+          try { extraUrls.push(await fileToDataUrl(extraFile)); } catch { /* skip */ }
         }
       }
 

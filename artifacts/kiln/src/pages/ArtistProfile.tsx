@@ -22,6 +22,7 @@ import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
 import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
+import { getPosts } from "@/data/posts";
 
 function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
   const seed = getArtistById(id) ?? seedArtists.find((a) => a.id === id);
@@ -363,7 +364,18 @@ export default function ArtistProfile() {
     );
   }
 
-  const allGridItems = buildGrid(artist);
+  // Merge in the user's own localStorage posts when viewing own profile
+  const ownLocalPosts = isOwn
+    ? getPosts().filter((p) => p.artistId === (profile?.id ?? "") || p.artistId === (id ?? ""))
+    : [];
+  const ownLocalGridItems: GridItem[] = ownLocalPosts.map((p) => ({
+    id: p.id,
+    imageUrl: p.mediaUrl,
+    caption: p.caption,
+    isVideo: p.type === "video",
+    isProcess: p.type === "video",
+  }));
+  const allGridItems = [...ownLocalGridItems, ...buildGrid(artist)];
   const processItems = allGridItems.filter((g) => g.isVideo);
   const artworkItems = allGridItems.filter((g) => !g.isVideo);
   const listings = getListingsByArtist(artist.id);
