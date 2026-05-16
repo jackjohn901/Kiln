@@ -15,7 +15,7 @@ import Nav from "@/components/Nav";
 import { getArtistById, artists, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { getListingsByArtist, formatPrice } from "@/data/listings";
-import { useProfile } from "@/contexts/ProfileContext";
+import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
 import { useSocial, CommissionStatus, type ShopReview } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
 import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
@@ -23,8 +23,36 @@ import CommissionModal from "@/components/CommissionModal";
 import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
 
-function findArtist(id: string): Artist | undefined {
-  return getArtistById(id) ?? seedArtists.find((a) => a.id === id);
+function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
+  const seed = getArtistById(id) ?? seedArtists.find((a) => a.id === id);
+  if (seed) return seed;
+  // Build a synthetic Artist from the user's own localStorage profile
+  if (ownProfile && (ownProfile.id === id || ownProfile.handle === id)) {
+    return {
+      id: ownProfile.id,
+      name: ownProfile.name,
+      born: null,
+      nationality: "",
+      location: ownProfile.location ?? "",
+      medium: ownProfile.mediums?.join(", ") ?? "",
+      tagline: ownProfile.bio?.split(".")[0] ?? "",
+      quote: null,
+      bio: ownProfile.bio ?? "",
+      artistStatement: null,
+      concepts: [],
+      series: [],
+      collections: [],
+      videos: [],
+      images: ownProfile.avatarUrl
+        ? [{ url: ownProfile.avatarUrl, caption: ownProfile.name }]
+        : [],
+      website: ownProfile.website ?? null,
+      instagram: ownProfile.instagram ?? null,
+      habatat: "",
+      keywords: ownProfile.mediums ?? [],
+    };
+  }
+  return undefined;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -174,8 +202,8 @@ export default function ArtistProfile() {
   const { profile } = useProfile();
   const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
 
-  const artist = findArtist(id ?? "");
-  const isOwn = profile?.id === id;
+  const artist = findArtist(id ?? "", profile);
+  const isOwn = !!(profile && (profile.id === id || profile.handle === id));
 
   const [tab, setTab] = useState<Tab>("posts");
   const [lightbox, setLightbox] = useState<GridItem | null>(null);
