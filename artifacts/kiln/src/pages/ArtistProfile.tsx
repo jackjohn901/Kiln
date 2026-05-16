@@ -82,6 +82,7 @@ const STATUS_CONFIG: Record<CommissionStatus, { label: string; color: string; bg
 interface GridItem {
   id: string;
   imageUrl: string;
+  mediaUrl?: string;
   caption: string;
   isVideo: boolean;
   videoId?: string;
@@ -117,6 +118,16 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
             <iframe
               src={`https://www.youtube.com/embed/${item.videoId}?autoplay=1&rel=0&modestbranding=1`}
               className="h-full w-full" allow="autoplay; encrypted-media" allowFullScreen
+            />
+          </div>
+        ) : item.isVideo && item.mediaUrl ? (
+          <div className="overflow-hidden rounded-2xl bg-black">
+            <video
+              src={item.mediaUrl}
+              controls
+              autoPlay
+              playsInline
+              className="max-h-[75vh] w-full object-contain"
             />
           </div>
         ) : (
@@ -383,6 +394,7 @@ export default function ArtistProfile() {
   const ownLocalGridItems: GridItem[] = localPosts.map((p) => ({
     id: p.id,
     imageUrl: p.thumbnailUrl || (p.type === "image" ? p.mediaUrl : ""),
+    mediaUrl: p.mediaUrl,
     caption: p.caption,
     isVideo: p.type === "video",
     isProcess: p.type === "video",

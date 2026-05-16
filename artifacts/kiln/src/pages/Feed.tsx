@@ -138,7 +138,7 @@ function userPostsToReels(): Reel[] {
       craftScore: 95,
       likes: post.likes,
       saves: post.saves,
-      thumbnail: post.mediaUrl,
+      thumbnail: post.thumbnailUrl || post.mediaUrl,
       avatarUrl: post.artistAvatarUrl,
       musicTrackId: ALL_REELS[0]?.musicTrackId ?? "track-ambient-1",
       available: false,
@@ -721,12 +721,16 @@ export default function Feed() {
 
   const [justPublishedCount, setJustPublishedCount] = useState(0);
 
-  // Reload user posts on mount and whenever window regains focus (e.g. after Create)
+  // Reload user posts on mount, when window regains focus, or immediately after posting
   useEffect(() => {
     setUserPostReels(userPostsToReels());
-    const onFocus = () => setUserPostReels(userPostsToReels());
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    const reload = () => setUserPostReels(userPostsToReels());
+    window.addEventListener("focus", reload);
+    window.addEventListener("kiln:post-added", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("kiln:post-added", reload);
+    };
   }, []);
 
   // Fetch real posts from API and prepend to feed
