@@ -706,15 +706,13 @@ export default function Feed() {
   }
 
   const { following, unreadCount } = useSocial();
-  const [, navigate] = useLocation();
+  const { profile } = useProfile();
+  const [, navigate] = useLocation(); // used by StreakBadge and other sub-components
   const followedFirings = SEED_KILN_STATUSES.filter((s) => following.includes(s.artistId));
   const [kilnBannerDismissed, setKilnBannerDismissed] = useState(false);
-
-  useEffect(() => {
-    if (!localStorage.getItem(PREFS_KEY)) {
-      navigate("/quiz");
-    }
-  }, [navigate]);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    try { return !!localStorage.getItem("kiln_welcome_dismissed"); } catch { return false; }
+  });
 
   const [justPublishedCount, setJustPublishedCount] = useState(0);
 
@@ -980,6 +978,15 @@ export default function Feed() {
             <Link href="/discover" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm">
               <Search size={15} />
             </Link>
+            <Link
+              href={profile ? `/artists/${profile.id}` : "/setup"}
+              className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/10 text-white backdrop-blur-sm"
+            >
+              {profile?.avatarUrl
+                ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+                : <User size={15} />
+              }
+            </Link>
           </div>
         </div>
 
@@ -1060,6 +1067,41 @@ export default function Feed() {
             >
               <X size={14} />
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Welcome banner for new users without a profile */}
+      <AnimatePresence>
+        {!profile && !welcomeDismissed && (
+          <motion.div
+            className="pointer-events-auto fixed bottom-20 left-4 right-4 z-30"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+          >
+            <div className="flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-stone-950/95 px-4 py-3 shadow-xl backdrop-blur-sm">
+              <Flame size={20} className="text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-100">Start your artist profile</p>
+                <p className="text-[11px] text-stone-400 truncate">Free forever — no fees, no commission</p>
+              </div>
+              <Link
+                href="/setup"
+                className="shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-[11px] font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+              >
+                Get started
+              </Link>
+              <button
+                onClick={() => {
+                  setWelcomeDismissed(true);
+                  try { localStorage.setItem("kiln_welcome_dismissed", "1"); } catch {}
+                }}
+                className="shrink-0 text-stone-600 hover:text-stone-400 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
