@@ -13,6 +13,16 @@ import { challenges } from "@/data/challenges";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
+interface DbProfile {
+  userId: string;
+  displayName: string | null;
+  handle: string | null;
+  avatarUrl: string | null;
+  medium: string | null;
+  location: string | null;
+  followerCount: number;
+}
+
 const TRENDING = [
   "glass blowing", "raku", "Alex Bernstein", "celadon", "Seattle studio",
   "metal forging", "Lino Tagliapietra", "flameworking", "wood turning",
@@ -24,6 +34,7 @@ export default function GlobalSearch({ onClose }: Props) {
   const [query, setQuery] = useState("");
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dbProfiles, setDbProfiles] = useState<DbProfile[]>([]);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -31,6 +42,18 @@ export default function GlobalSearch({ onClose }: Props) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) { setDbProfiles([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/api/users/search?q=${encodeURIComponent(q)}&limit=5`)
+        .then((r) => r.ok ? r.json() : { profiles: [] })
+        .then((data) => setDbProfiles(data.profiles ?? []))
+        .catch(() => setDbProfiles([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const q = query.toLowerCase().trim();
 
@@ -91,7 +114,10 @@ export default function GlobalSearch({ onClose }: Props) {
       ).slice(0, 3)
     : [];
 
-  const hasResults = artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length + challengeHits.length > 0;
+  const staticArtistIds = new Set(ALL_ARTISTS.map((a) => a.id));
+  const dbOnlyProfiles = dbProfiles.filter((p) => !staticArtistIds.has(p.userId));
+
+  const hasResults = dbOnlyProfiles.length + artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length + challengeHits.length > 0;
 
   function go(href: string) { navigate(href); onClose(); }
 
@@ -173,6 +199,31 @@ export default function GlobalSearch({ onClose }: Props) {
               <div className="px-5 py-10 text-center">
                 <Search size={24} className="mx-auto mb-3 text-stone-700" />
                 <p className="text-sm text-stone-500">No results for <span className="text-stone-300">"{query}"</span></p>
+              </div>
+            )}
+
+            {/* Real DB users */}
+            {dbOnlyProfiles.length > 0 && (
+              <div className="border-b border-white/5">
+                <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Artists on Kiln</p>
+                {dbOnlyProfiles.map((p) => (
+                  <button key={p.userId} onClick={() => go(`/artists/${p.userId}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <img
+                      src={p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/80/80`}
+                      alt={p.displayName ?? "Artist"}
+                      className="h-10 w-10 rounded-full object-cover shrink-0 border border-amber-500/30"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-stone-200">{p.displayName ?? "Artist"}</p>
+                      <p className="text-xs text-stone-600 truncate">
+                        {p.handle ? `@${p.handle}` : ""}{p.medium ? ` · ${p.medium.split(",")[0]}` : ""}{p.location ? ` · ${p.location}` : ""}
+                      </p>
+                    </div>
+                    <ArrowRight size={13} className="text-stone-700 shrink-0" />
+                  </button>
+                ))}
               </div>
             )}
 

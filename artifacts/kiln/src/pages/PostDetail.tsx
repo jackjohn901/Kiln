@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import {
   ArrowLeft, Heart, Bookmark, Share2, MessageCircle,
-  CheckCircle, Clock, ShoppingBag, Flame, ExternalLink,
+  CheckCircle, Clock, Flame, ExternalLink,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
@@ -25,6 +25,24 @@ const CS_INFO: Record<string, { label: string; color: string; Icon: typeof Check
   closed: { label: "Closed", color: "text-rose-400 bg-rose-500/10 border-rose-500/30", Icon: Clock },
 };
 
+interface DbPost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  caption: string;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  technique: string | null;
+  tags: string[];
+  likeCount: number;
+  saveCount: number;
+  commentCount: number;
+  createdAt: string;
+  isLiked?: boolean;
+  isSaved?: boolean;
+}
+
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -37,7 +55,230 @@ export default function PostDetail() {
   const [showComments, setShowComments] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const reel = getReelById(id ?? "");
+  const [dbPost, setDbPost] = useState<DbPost | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbLiked, setDbLiked] = useState(false);
+  const [dbSaved, setDbSaved] = useState(false);
+  const [dbLikeCount, setDbLikeCount] = useState(0);
+  const [dbSaveCount, setDbSaveCount] = useState(0);
+
+  const isDbPost = id ? id.startsWith("db-") : false;
+  const rawPostId = isDbPost ? id!.slice(3) : id ?? "";
+
+  useEffect(() => {
+    if (!isDbPost) return;
+    setDbLoading(true);
+    fetch(`/api/posts/${rawPostId}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+      .then((data) => {
+        const p: DbPost = data.post;
+        setDbPost(p);
+        setDbLiked(p.isLiked ?? false);
+        setDbSaved(p.isSaved ?? false);
+        setDbLikeCount(p.likeCount ?? 0);
+        setDbSaveCount(p.saveCount ?? 0);
+      })
+      .catch(() => setDbPost(null))
+      .finally(() => setDbLoading(false));
+  }, [rawPostId, isDbPost]);
+
+  async function handleDbLike() {
+    const res = await fetch(`/api/posts/${rawPostId}/like`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setDbLiked(data.liked);
+      setDbLikeCount(data.likeCount);
+    }
+  }
+
+  async function handleDbSave() {
+    const res = await fetch(`/api/posts/${rawPostId}/save`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setDbSaved(data.saved);
+      setDbSaveCount(data.saveCount);
+    }
+  }
+
+  function handleShare() {
+    navigator.clipboard.writeText(window.location.href).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (isDbPost) {
+    if (dbLoading) {
+      return (
+        <div className="min-h-screen bg-[#12100e]">
+          <Nav />
+          <div className="flex items-center justify-center py-32">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          </div>
+        </div>
+      );
+    }
+    if (!dbPost) {
+      return (
+        <div className="min-h-screen bg-[#12100e]">
+          <Nav />
+          <div className="flex flex-col items-center justify-center gap-4 py-32 text-center">
+            <Flame size={32} className="text-stone-700" />
+            <p className="text-stone-400">Post not found.</p>
+            <Link href="/" className="text-amber-400 hover:text-amber-300 text-sm">← Back to feed</Link>
+          </div>
+        </div>
+      );
+    }
+
+    const following = isFollowing(dbPost.authorId);
+    const color = dbPost.technique ? (TECHNIQUE_COLORS[dbPost.technique] ?? "bg-amber-500") : "bg-amber-500";
+
+    return (
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="mx-auto max-w-5xl px-4 py-6">
+          <button
+            onClick={() => navigate(-1 as never)}
+            className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors"
+          >
+            <ArrowLeft size={15} /> Back
+          </button>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+            <div>
+              {dbPost.videoUrl ? (
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black">
+                  <video
+                    src={dbPost.videoUrl}
+                    controls
+                    className="h-full w-full object-cover"
+                    poster={dbPost.thumbnailUrl ?? undefined}
+                  />
+                </div>
+              ) : dbPost.thumbnailUrl ? (
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-stone-900">
+                  <img src={dbPost.thumbnailUrl} alt={dbPost.caption} className="h-full w-full object-cover" />
+                </div>
+              ) : (
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-stone-900 flex items-center justify-center">
+                  <Flame size={48} className="text-stone-700" />
+                </div>
+              )}
+
+              <div className="mt-4 space-y-3">
+                {dbPost.technique && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/tag/${encodeURIComponent(dbPost.technique)}`}>
+                      <span className={`inline-flex items-center gap-1 rounded-full ${color} px-2.5 py-0.5 text-xs font-bold text-white`}>
+                        🔥 {dbPost.technique}
+                      </span>
+                    </Link>
+                  </div>
+                )}
+
+                <p className="text-base font-medium text-stone-100 leading-snug">{dbPost.caption}</p>
+
+                {dbPost.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {dbPost.tags.map((t) => (
+                      <Link key={t} href={`/tag/${encodeURIComponent(t)}`}>
+                        <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-xs text-stone-400 hover:text-amber-300 transition-colors">#{t}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 pt-1 border-t border-white/8">
+                  <button
+                    onClick={handleDbLike}
+                    className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-rose-400 transition-colors"
+                  >
+                    <Heart size={18} className={dbLiked ? "fill-rose-500 text-rose-500" : ""} />
+                    <span>{fmt(dbLikeCount)}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowComments((v) => !v)}
+                    className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-amber-300 transition-colors"
+                  >
+                    <MessageCircle size={18} />
+                    <span>Comments</span>
+                  </button>
+                  <button
+                    onClick={handleDbSave}
+                    className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-amber-300 transition-colors"
+                  >
+                    <Bookmark size={18} className={dbSaved ? "fill-amber-400 text-amber-400" : ""} />
+                    <span>{fmt(dbSaveCount)}</span>
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center gap-1.5 text-sm text-stone-400 hover:text-amber-300 transition-colors ml-auto"
+                  >
+                    <Share2 size={18} />
+                    <span>{copied ? "Copied!" : "Share"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {showComments && (
+                <Comments
+                  postId={rawPostId}
+                  artistName={dbPost.authorName}
+                  onClose={() => setShowComments(false)}
+                />
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-stone-900/50 p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <Link href={`/artists/${dbPost.authorId}`}>
+                    <img
+                      src={dbPost.authorAvatarUrl ?? `https://picsum.photos/seed/${dbPost.authorId}/80/80`}
+                      alt={dbPost.authorName}
+                      className="h-14 w-14 rounded-full object-cover border-2 border-amber-500/30 hover:border-amber-400/60 transition-colors"
+                    />
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/artists/${dbPost.authorId}`}>
+                      <p className="font-semibold text-amber-100 hover:text-amber-300 transition-colors truncate">{dbPost.authorName}</p>
+                    </Link>
+                    <p className="text-xs text-stone-500">{new Date(dbPost.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  {profile?.id !== dbPost.authorId && (
+                    <button
+                      onClick={() => following
+                        ? unfollowArtist(dbPost.authorId)
+                        : followArtist(dbPost.authorId, dbPost.authorName, dbPost.authorAvatarUrl ?? "")
+                      }
+                      className={`flex-1 rounded-full py-2 text-sm font-semibold transition-colors ${
+                        following
+                          ? "border border-stone-600 text-stone-400 hover:border-rose-500 hover:text-rose-400"
+                          : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                      }`}
+                    >
+                      {following ? "Following" : "Follow"}
+                    </button>
+                  )}
+                  <Link
+                    href={`/artists/${dbPost.authorId}`}
+                    className="flex items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-sm text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors"
+                  >
+                    <ExternalLink size={13} /> Profile
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const reel = getReelById(rawPostId);
 
   if (!reel) {
     return (
@@ -58,25 +299,15 @@ export default function PostDetail() {
   const commissionStatus = getArtistCommissionStatus(reel.artistId);
   const csInfo = CS_INFO[commissionStatus];
   const color = TECHNIQUE_COLORS[reel.technique] ?? "bg-amber-500";
-
   const artist = ALL_ARTISTS.find((a) => a.id === reel.artistId);
-
   const related = ALL_REELS
     .filter((r) => r.technique === reel.technique && r.id !== reel.id)
     .slice(0, 6);
 
-  function handleShare() {
-    navigator.clipboard.writeText(window.location.href).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
-
       <div className="mx-auto max-w-5xl px-4 py-6">
-        {/* Back */}
         <button
           onClick={() => navigate(-1 as never)}
           className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors"
@@ -85,9 +316,7 @@ export default function PostDetail() {
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-          {/* Left: video + info */}
           <div>
-            {/* Video embed */}
             <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black">
               <iframe
                 src={`https://www.youtube.com/embed/${reel.videoId}?autoplay=0&rel=0&modestbranding=1`}
@@ -98,9 +327,7 @@ export default function PostDetail() {
               />
             </div>
 
-            {/* Post info */}
             <div className="mt-4 space-y-3">
-              {/* Technique + craft score */}
               <div className="flex items-center gap-2 flex-wrap">
                 <Link href={`/tag/${encodeURIComponent(reel.technique)}`}>
                   <span className={`inline-flex items-center gap-1 rounded-full ${color} px-2.5 py-0.5 text-xs font-bold text-white`}>
@@ -110,22 +337,11 @@ export default function PostDetail() {
                 <span className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-xs text-amber-300">
                   <Flame size={10} className="text-amber-400" /> Craft {reel.craftScore}
                 </span>
-                {reel.available && (
-                  <Link href="/shop">
-                    <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
-                      <ShoppingBag size={9} /> Available
-                    </span>
-                  </Link>
-                )}
               </div>
 
-              {/* Caption */}
               <p className="text-base font-medium text-stone-100 leading-snug">{reel.caption}</p>
-
-              {/* Location */}
               <p className="text-sm text-stone-500">{reel.location}</p>
 
-              {/* Action bar */}
               <div className="flex items-center gap-4 pt-1 border-t border-white/8">
                 <button
                   onClick={() => toggleReelLike(reel.id)}
@@ -158,7 +374,6 @@ export default function PostDetail() {
               </div>
             </div>
 
-            {/* Comments */}
             {showComments && (
               <Comments
                 postId={reel.id}
@@ -167,7 +382,6 @@ export default function PostDetail() {
               />
             )}
 
-            {/* Related posts */}
             {related.length > 0 && (
               <div className="mt-8">
                 <h3 className="text-sm font-semibold text-stone-400 mb-3 uppercase tracking-wider">More {reel.technique}</h3>
@@ -193,9 +407,7 @@ export default function PostDetail() {
             )}
           </div>
 
-          {/* Right: artist card */}
           <div className="space-y-4">
-            {/* Artist card */}
             <div className="rounded-2xl border border-white/10 bg-stone-900/50 p-5">
               <div className="flex items-center gap-3 mb-4">
                 <Link href={`/artists/${reel.artistId}`}>
@@ -241,7 +453,6 @@ export default function PostDetail() {
                 </Link>
               </div>
 
-              {/* Commission status */}
               <div className="mt-3 pt-3 border-t border-white/8">
                 <Link href={`/artists/${reel.artistId}`}>
                   <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${csInfo.color} hover:opacity-80 transition-opacity`}>
@@ -252,7 +463,6 @@ export default function PostDetail() {
               </div>
             </div>
 
-            {/* Artist's other reels */}
             {(() => {
               const artistReels = ALL_REELS.filter((r) => r.artistId === reel.artistId && r.id !== reel.id).slice(0, 4);
               if (!artistReels.length) return null;

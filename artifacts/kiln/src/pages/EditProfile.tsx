@@ -52,9 +52,28 @@ export default function EditProfile() {
     }));
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setProfile({ ...form, isCustom: true });
+
+    try {
+      await fetch("/api/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: form.name,
+          handle: form.handle,
+          bio: form.bio,
+          medium: form.mediums.join(", "),
+          location: form.location,
+          website: form.website,
+          avatarUrl: form.avatarUrl,
+          bannerUrl: form.coverUrl,
+        }),
+      });
+    } catch {
+    }
+
     setSaved(true);
     const dest = form.id || profile?.id || "";
     setTimeout(() => {

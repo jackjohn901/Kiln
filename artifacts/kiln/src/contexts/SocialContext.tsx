@@ -453,10 +453,12 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         ...s.notifications,
       ],
     }));
+    fetch(`/api/users/${artistId}/follow`, { method: "POST" }).catch(() => {});
   }, []);
 
   const unfollowArtist = useCallback((artistId: string) => {
     update((s) => ({ ...s, following: s.following.filter((id) => id !== artistId) }));
+    fetch(`/api/users/${artistId}/follow`, { method: "POST" }).catch(() => {});
   }, []);
 
   const isFollowing = useCallback((artistId: string) => state.following.includes(artistId), [state.following]);

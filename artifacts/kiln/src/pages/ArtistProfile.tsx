@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import QABlock from "@/components/QABlock";
 import { useParams, Link, useLocation } from "wouter";
@@ -142,6 +142,32 @@ function CommissionStatusSelector() {
 
 type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold" | "dna";
 
+interface DbUserProfile {
+  userId: string;
+  displayName: string | null;
+  handle: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  medium: string | null;
+  location: string | null;
+  website: string | null;
+  followerCount: number;
+  followingCount: number;
+  postCount: number;
+  isFollowing: boolean;
+}
+
+interface DbUserPost {
+  id: string;
+  caption: string;
+  thumbnailUrl: string | null;
+  videoUrl: string | null;
+  technique: string | null;
+  likeCount: number;
+  createdAt: string;
+}
+
 export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -164,13 +190,146 @@ export default function ArtistProfile() {
   const [visitNote, setVisitNote] = useState("");
   const [visitRequested, setVisitRequested] = useState(false);
 
+  const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
+  const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
+  const [dbPosts, setDbPosts] = useState<DbUserPost[]>([]);
+  const [dbFollowing, setDbFollowing] = useState(false);
+  const [dbFollowerCount, setDbFollowerCount] = useState(0);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/users/${id}/profile`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data && data.userId) {
+          setDbProfile(data);
+          setDbFollowing(data.isFollowing ?? false);
+          setDbFollowerCount(data.followerCount ?? 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDbProfileLoading(false));
+    fetch(`/api/users/${id}/posts`)
+      .then((r) => r.ok ? r.json() : { posts: [] })
+      .then((data) => setDbPosts(data.posts ?? []))
+      .catch(() => {});
+  }, [id]);
+
+  async function handleDbFollow() {
+    if (!id) return;
+    const res = await fetch(`/api/users/${id}/follow`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setDbFollowing(data.following);
+      setDbFollowerCount(data.followerCount);
+    }
+  }
+
   if (!artist) {
+    if (dbProfileLoading) {
+      return (
+        <div className="min-h-screen bg-[#12100e]">
+          <Nav />
+          <div className="flex items-center justify-center py-32">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+          </div>
+        </div>
+      );
+    }
+
+    if (!dbProfile) {
+      return (
+        <div className="min-h-screen bg-[#12100e]">
+          <Nav />
+          <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+            <p className="text-stone-400 mb-4">Artist not found.</p>
+            <Link href="/" className="text-amber-400 hover:text-amber-300 text-sm">← Back to Discover</Link>
+          </div>
+        </div>
+      );
+    }
+
+    const name = dbProfile.displayName ?? "Artist";
+    const avatar = dbProfile.avatarUrl ?? `https://picsum.photos/seed/${dbProfile.userId}/200/200`;
+
     return (
       <div className="min-h-screen bg-[#12100e]">
         <Nav />
-        <div className="flex flex-col items-center justify-center py-24 text-center px-4">
-          <p className="text-stone-400 mb-4">Artist not found.</p>
-          <Link href="/" className="text-amber-400 hover:text-amber-300 text-sm">← Back to Discover</Link>
+        <div className="mx-auto max-w-4xl px-4 py-6">
+          <button onClick={() => navigate(-1 as never)} className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors">
+            <ChevronLeft size={15} /> Back
+          </button>
+
+          {dbProfile.bannerUrl && (
+            <div className="relative h-40 w-full overflow-hidden rounded-2xl mb-4">
+              <img src={dbProfile.bannerUrl} alt="Cover" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#12100e]/80 to-transparent" />
+            </div>
+          )}
+
+          <div className="flex items-start gap-4 mb-6">
+            <img src={avatar} alt={name} className="h-20 w-20 rounded-full object-cover border-2 border-amber-500/40 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-serif text-2xl font-bold text-amber-100">{name}</h1>
+                {isOwn && <Link href="/edit-profile"><span className="rounded-full border border-stone-700 px-3 py-1 text-xs text-stone-400 hover:border-amber-500/50 hover:text-amber-300 transition-colors">Edit Profile</span></Link>}
+              </div>
+              {dbProfile.handle && <p className="text-sm text-stone-500 mt-0.5">@{dbProfile.handle}</p>}
+              {dbProfile.bio && <p className="text-sm text-stone-300 mt-2 leading-relaxed">{dbProfile.bio}</p>}
+              <div className="flex flex-wrap gap-3 mt-3 text-xs text-stone-500">
+                {dbProfile.medium && <span className="flex items-center gap-1"><Hammer size={11} className="text-amber-500" />{dbProfile.medium}</span>}
+                {dbProfile.location && <span className="flex items-center gap-1"><MapPin size={11} />{dbProfile.location}</span>}
+                {dbProfile.website && <a href={dbProfile.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-amber-400 hover:text-amber-300"><ExternalLink size={11} />{dbProfile.website.replace(/^https?:\/\//, "")}</a>}
+              </div>
+              <div className="flex gap-4 mt-3 text-sm">
+                <span><span className="font-bold text-stone-100">{dbFollowerCount.toLocaleString()}</span> <span className="text-stone-500">followers</span></span>
+                <span><span className="font-bold text-stone-100">{dbProfile.followingCount}</span> <span className="text-stone-500">following</span></span>
+                <span><span className="font-bold text-stone-100">{dbPosts.length}</span> <span className="text-stone-500">posts</span></span>
+              </div>
+            </div>
+            {!isOwn && (
+              <button
+                onClick={handleDbFollow}
+                className={`shrink-0 rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                  dbFollowing
+                    ? "border border-stone-600 text-stone-400 hover:border-rose-500 hover:text-rose-400"
+                    : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                }`}
+              >
+                {dbFollowing ? "Following" : "Follow"}
+              </button>
+            )}
+          </div>
+
+          {dbPosts.length > 0 ? (
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Posts</h2>
+              <div className="grid grid-cols-3 gap-2">
+                {dbPosts.map((p) => (
+                  <Link key={p.id} href={`/posts/db-${p.id}`}>
+                    <div className="group relative aspect-square overflow-hidden rounded-xl bg-stone-800 cursor-pointer">
+                      {p.thumbnailUrl ? (
+                        <img src={p.thumbnailUrl} alt={p.caption} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <Flame size={24} className="text-stone-600" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-[10px] text-white font-medium truncate">{p.caption}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Flame size={32} className="text-stone-700 mb-3" />
+              <p className="text-stone-500 text-sm">No posts yet</p>
+            </div>
+          )}
         </div>
       </div>
     );
