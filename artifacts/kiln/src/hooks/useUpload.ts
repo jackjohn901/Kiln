@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 
 export interface UploadResult {
-  objectPath: string;
   servingUrl: string;
 }
 
@@ -16,38 +15,20 @@ export function useUpload() {
     setError(null);
 
     try {
-      const metaRes = await fetch("/api/storage/uploads/request-url", {
+      const res = await fetch("/api/storage/uploads", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type,
-        }),
-      });
-
-      if (!metaRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = (await metaRes.json()) as {
-        uploadURL: string;
-        objectPath: string;
-      };
-
-      setProgress(30);
-
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
         headers: { "Content-Type": file.type },
         body: file,
       });
 
-      if (!uploadRes.ok) throw new Error("Upload to storage failed");
+      if (!res.ok) {
+        const msg = await res.text().catch(() => "Upload failed");
+        throw new Error(msg);
+      }
 
       setProgress(100);
-
-      return {
-        objectPath,
-        servingUrl: `/api/storage${objectPath}`,
-      };
+      const { servingUrl } = (await res.json()) as { servingUrl: string };
+      return { servingUrl };
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       setError(msg);

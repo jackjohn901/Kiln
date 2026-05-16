@@ -30,6 +30,20 @@ router.post(
   },
 );
 
+router.post(
+  "/storage/uploads",
+  async (req: Request, res: Response) => {
+    const contentType = (req.headers["content-type"] ?? "application/octet-stream").split(";")[0].trim();
+    try {
+      const objectPath = await storage.uploadStream(req, contentType);
+      res.json({ servingUrl: `/api/storage${objectPath}` });
+    } catch (err) {
+      req.log.error({ err }, "storage: stream upload failed");
+      res.status(500).json({ error: "Upload failed" });
+    }
+  },
+);
+
 router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const relPath = "/" + (req.params as Record<string, string>)["path"];
