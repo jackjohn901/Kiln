@@ -23,6 +23,7 @@ import CommissionModal from "@/components/CommissionModal";
 import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
 import { getPosts } from "@/data/posts";
+import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 
 function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
   const seed = getArtistById(id) ?? seedArtists.find((a) => a.id === id);
@@ -103,6 +104,17 @@ function buildGrid(artist: Artist): GridItem[] {
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
 
 function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
+  const [videoSrc, setVideoSrc] = useState<string>("");
+
+  useEffect(() => {
+    if (!item.isVideo || item.videoId || !item.mediaUrl) return;
+    if (isIdbUrl(item.mediaUrl)) {
+      resolveMediaUrl(item.mediaUrl).then(setVideoSrc).catch(() => setVideoSrc(""));
+    } else {
+      setVideoSrc(item.mediaUrl);
+    }
+  }, [item]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -120,15 +132,21 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
               className="h-full w-full" allow="autoplay; encrypted-media" allowFullScreen
             />
           </div>
-        ) : item.isVideo && item.mediaUrl ? (
+        ) : item.isVideo ? (
           <div className="overflow-hidden rounded-2xl bg-black">
-            <video
-              src={item.mediaUrl}
-              controls
-              autoPlay
-              playsInline
-              className="max-h-[75vh] w-full object-contain"
-            />
+            {videoSrc ? (
+              <video
+                src={videoSrc}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[75vh] w-full object-contain"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-48 text-stone-500 text-sm">
+                Loading video…
+              </div>
+            )}
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl bg-stone-900">

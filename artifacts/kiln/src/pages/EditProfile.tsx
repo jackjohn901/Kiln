@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Save, User, Camera, Globe, Instagram, MapPin, Layers, AlignLeft } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -9,6 +9,15 @@ const MEDIUM_OPTIONS = [
   "Blacksmithing", "Metal Forging", "Bronze Casting", "Fiber Arts", "Weaving",
   "Enamel", "Wood Turning", "Stone Carving", "Mosaic", "Leather", "Jewelry",
 ];
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
 
 export default function EditProfile() {
   const { profile, setProfile } = useProfile();
@@ -31,6 +40,8 @@ export default function EditProfile() {
   );
 
   const [saved, setSaved] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   if (!profile) {
     return (
@@ -41,6 +52,20 @@ export default function EditProfile() {
         </div>
       </div>
     );
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    setForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+  }
+
+  async function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    setForm((prev) => ({ ...prev, coverUrl: dataUrl }));
   }
 
   function toggleMedium(m: string) {
@@ -95,39 +120,63 @@ export default function EditProfile() {
           <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5 space-y-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-stone-600">Images</p>
 
+            {/* Avatar picker */}
             <div className="flex items-center gap-4">
-              <div className="relative">
-                {form.avatarUrl ? (
-                  <img src={form.avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover border-2 border-amber-500/30" />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-stone-800 border-2 border-stone-700">
-                    <User size={24} className="text-stone-600" />
-                  </div>
-                )}
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="relative shrink-0 group"
+              >
+                <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-dashed border-stone-600 group-hover:border-amber-400/60 transition-colors bg-stone-800">
+                  {form.avatarUrl ? (
+                    <img src={form.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <User size={24} className="text-stone-600" />
+                    </div>
+                  )}
+                </div>
                 <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 border-2 border-[#12100e]">
                   <Camera size={11} className="text-stone-950" />
                 </div>
-              </div>
-              <div className="flex-1">
-                <label className="mb-1 block text-xs font-medium text-stone-500">Avatar URL</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={form.avatarUrl}
-                  onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
-                  className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
-                />
+              </button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <div>
+                <p className="text-sm font-medium text-stone-300">Profile photo</p>
+                <p className="text-xs text-stone-600">Tap the circle to choose a photo</p>
               </div>
             </div>
 
+            {/* Cover image picker */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-500">Cover image URL</label>
+              <p className="mb-2 text-xs font-medium text-stone-500">Cover image</p>
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                className="relative w-full h-24 overflow-hidden rounded-xl border-2 border-dashed border-stone-600 hover:border-amber-400/60 transition-colors bg-stone-800 group"
+              >
+                {form.coverUrl ? (
+                  <img src={form.coverUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                    <Camera size={20} className="text-stone-600 group-hover:text-amber-400/60 transition-colors" />
+                    <span className="text-xs text-stone-700">Click to upload cover photo</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+              </button>
               <input
-                type="url"
-                placeholder="https://..."
-                value={form.coverUrl}
-                onChange={(e) => setForm({ ...form, coverUrl: e.target.value })}
-                className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverChange}
               />
             </div>
           </div>

@@ -18,6 +18,7 @@ import NotificationPanel from "@/components/NotificationPanel";
 import Stories from "@/components/Stories";
 import VideoAnnotations, { TECHNIQUE_ANNOTATIONS } from "@/components/VideoAnnotations";
 import { SEED_KILN_STATUSES, getFiringETA } from "@/data/kilnStatuses";
+import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -314,13 +315,28 @@ function ReelCard({
   }, [isActive]);
   const reelAnnotations = TECHNIQUE_ANNOTATIONS[reel.technique] ?? [];
 
+  // Resolve idb:// video URLs from IndexedDB
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(
+    reel.videoUrl && !isIdbUrl(reel.videoUrl) ? reel.videoUrl : null
+  );
+  useEffect(() => {
+    if (!reel.videoUrl) return;
+    if (!isIdbUrl(reel.videoUrl)) { setResolvedVideoUrl(reel.videoUrl); return; }
+    let objectUrl: string | null = null;
+    resolveMediaUrl(reel.videoUrl).then((url) => {
+      objectUrl = url;
+      setResolvedVideoUrl(url);
+    }).catch(() => setResolvedVideoUrl(null));
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [reel.videoUrl]);
+
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
-      {reel.videoUrl ? (
+      {resolvedVideoUrl ? (
         /* ── HTML5 video for user-uploaded content ── */
         <video
-          key={reel.videoUrl}
-          src={reel.videoUrl}
+          key={resolvedVideoUrl}
+          src={resolvedVideoUrl}
           autoPlay={isActive}
           muted
           loop

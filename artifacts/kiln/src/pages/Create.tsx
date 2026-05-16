@@ -13,6 +13,7 @@ import { useSocial } from "@/contexts/SocialContext";
 import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { useUpload } from "@/hooks/useUpload";
+import { storeBlob } from "@/lib/videoDB";
 
 function captureVideoThumbnail(src: string): Promise<string> {
   return new Promise((resolve) => {
@@ -203,25 +204,21 @@ export default function Create() {
     }
     setPublishing(true);
     try {
-      // Capture video thumbnail before upload (blob URL still valid here)
       let thumbnailUrl: string | undefined;
-      if (mediaType === "video" && previewUrl) {
-        thumbnailUrl = await captureVideoThumbnail(previewUrl) || undefined;
-      }
-
       let mediaUrl = previewUrl;
-      if (file) {
+
+      if (file && mediaType === "video") {
+        // Capture thumbnail while the blob URL is still valid
+        thumbnailUrl = await captureVideoThumbnail(previewUrl) || undefined;
+        // Store video in IndexedDB — works reliably without cloud storage
+        mediaUrl = await storeBlob(file);
+      } else if (file) {
+        // Images: try server upload, fall back to base64
         try {
           const result = await upload(file);
           mediaUrl = result.servingUrl;
         } catch {
-          if (file.type.startsWith("image/")) {
-            // Images: fall back to base64 so the post persists across navigation
-            try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
-          } else {
-            // Videos are too large for localStorage — upload must succeed
-            throw new Error("Video upload failed. Please check your connection and try again.");
-          }
+          try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
         }
       }
 
