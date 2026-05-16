@@ -1,5 +1,4 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { Readable } from "stream";
 import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 
@@ -36,19 +35,38 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const relPath = "/" + (req.params as Record<string, string>)["path"];
     const objectPath = `/objects${relPath}`;
     const file = await storage.getObjectEntityFile(objectPath);
-    const response = await storage.downloadObject(file, 31536000);
-    res.setHeader(
-      "Content-Type",
-      response.headers.get("content-type") ?? "application/octet-stream",
-    );
+
+    const [metadata] = await file.getMetadata();
+    const contentType = (metadata.contentType as string) || "application/octet-stream";
+    const fileSize = metadata.size ? Number(metadata.size) : null;
+
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=31536000");
-    if (response.body) {
-      Readable.fromWeb(
-        response.body as Parameters<typeof Readable.fromWeb>[0],
-      ).pipe(res);
-    } else {
-      res.end();
+    res.setHeader("Accept-Ranges", "bytes");
+
+    const rangeHeader = req.headers.range;
+
+    if (rangeHeader && fileSize) {
+      const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+      if (match) {
+        const start = match[1] ? parseInt(match[1], 10) : 0;
+        const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+        const clampedEnd = Math.min(end, fileSize - 1);
+        const chunkSize = clampedEnd - start + 1;
+
+        res.status(206);
+        res.setHeader("Content-Range", `bytes ${start}-${clampedEnd}/${fileSize}`);
+        res.setHeader("Content-Length", String(chunkSize));
+
+        file.createReadStream({ start, end: clampedEnd }).pipe(res);
+        return;
+      }
     }
+
+    if (fileSize) {
+      res.setHeader("Content-Length", String(fileSize));
+    }
+    file.createReadStream().pipe(res);
   } catch (err) {
     if (err instanceof ObjectNotFoundError) {
       res.status(404).json({ error: "Not found" });

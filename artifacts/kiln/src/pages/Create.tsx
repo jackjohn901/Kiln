@@ -165,8 +165,13 @@ export default function Create() {
           const result = await upload(file);
           mediaUrl = result.servingUrl;
         } catch {
-          // fall back to base64 data URL so the post persists across navigation
-          try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
+          if (file.type.startsWith("image/")) {
+            // Images: fall back to base64 so the post persists across navigation
+            try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
+          } else {
+            // Videos are too large for localStorage — upload must succeed
+            throw new Error("Video upload failed. Please check your connection and try again.");
+          }
         }
       }
 
@@ -177,7 +182,9 @@ export default function Create() {
           const r = await upload(extraFile);
           extraUrls.push(r.servingUrl);
         } catch {
-          try { extraUrls.push(await fileToDataUrl(extraFile)); } catch { /* skip */ }
+          if (extraFile.type.startsWith("image/")) {
+            try { extraUrls.push(await fileToDataUrl(extraFile)); } catch { /* skip */ }
+          }
         }
       }
 

@@ -174,7 +174,7 @@ function BottomTab() {
       {tabs.map(({ href, icon: Icon, label }, i) => {
         if (i === 2) {
           return (
-            <Link key={href} href={href} className="flex flex-col items-center">
+            <Link key={`tab-${i}`} href={href} className="flex flex-col items-center">
               <div className="flex h-9 w-16 items-center justify-center rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 shadow-lg shadow-amber-500/30">
                 <Plus size={20} className="font-bold text-stone-950" />
               </div>
@@ -183,7 +183,7 @@ function BottomTab() {
         }
         const isActive = href === "/" ? location === "/" : location.startsWith(href);
         return (
-          <Link key={href} href={href} className="relative flex min-w-[44px] flex-col items-center gap-0.5">
+          <Link key={`tab-${i}`} href={href} className="relative flex min-w-[44px] flex-col items-center gap-0.5">
             {Icon && <Icon size={22} className={isActive ? "text-amber-400" : "text-stone-500"} />}
             {label === "Home" && unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-500 text-[8px] font-bold text-stone-950 flex items-center justify-center">
