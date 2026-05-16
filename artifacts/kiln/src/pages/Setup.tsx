@@ -67,12 +67,13 @@ export default function Setup() {
     }));
   }
 
-  function handlePublish() {
+  async function handlePublish() {
     if (!form.name || !form.handle) return;
+    const handle = form.handle.replace(/^@/, "");
     setProfile({
-      id: form.handle.replace(/^@/, ""),
+      id: handle,
       name: form.name,
-      handle: form.handle.replace(/^@/, ""),
+      handle,
       bio: form.bio,
       mediums: form.mediums,
       location: form.location,
@@ -82,6 +83,20 @@ export default function Setup() {
       coverUrl: avatarPreview || "",
       isCustom: true,
     });
+    fetch("/api/me/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        displayName: form.name,
+        handle,
+        bio: form.bio,
+        medium: form.mediums[0] ?? null,
+        location: form.location,
+        website: form.website,
+        avatarUrl: avatarPreview || null,
+      }),
+    }).catch(() => {});
     setStep("done");
   }
 

@@ -424,6 +424,15 @@ export default function ArtistProfile() {
                 <Link href="/create" className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
                   <Plus size={14} /> Post
                 </Link>
+                <Link href="/create-listing" className="flex items-center gap-1.5 rounded-full border border-amber-500/40 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors">
+                  <ShoppingBag size={12} /> List
+                </Link>
+                <Link href="/create-drop" className="flex items-center gap-1.5 rounded-full border border-orange-500/40 px-3 py-1.5 text-xs font-medium text-orange-400 hover:bg-orange-500/10 transition-colors">
+                  <Zap size={12} /> Drop
+                </Link>
+                <Link href="/create-workshop" className="flex items-center gap-1.5 rounded-full border border-purple-500/40 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-500/10 transition-colors">
+                  <Hammer size={12} /> Workshop
+                </Link>
                 <Link href="/edit-profile" className="rounded-full border border-white/15 px-3 py-1.5 text-sm text-stone-300 hover:border-amber-400/40 transition-colors">
                   Edit Profile
                 </Link>

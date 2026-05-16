@@ -99,6 +99,9 @@ import GhostMode from "@/pages/GhostMode";
 import TasteGraph from "@/pages/TasteGraph";
 import CraftHours from "@/pages/CraftHours";
 import TechniqueGenetics from "@/pages/TechniqueGenetics";
+import CreateListing from "@/pages/CreateListing";
+import CreateDrop from "@/pages/CreateDrop";
+import CreateWorkshop from "@/pages/CreateWorkshop";
 
 const queryClient = new QueryClient();
 
@@ -261,6 +264,9 @@ function Router() {
       <Route path="/taste-graph" component={TasteGraph} />
       <Route path="/craft-hours" component={CraftHours} />
       <Route path="/technique-genetics" component={TechniqueGenetics} />
+      <Route path="/create-listing" component={CreateListing} />
+      <Route path="/create-drop" component={CreateDrop} />
+      <Route path="/create-workshop" component={CreateWorkshop} />
       <Route component={NotFound} />
     </Switch>
   );

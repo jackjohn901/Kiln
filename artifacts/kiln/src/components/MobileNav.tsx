@@ -46,6 +46,9 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "Create",
     items: [
+      { href: "/create-listing", icon: ShoppingBag, label: "List a Piece" },
+      { href: "/create-drop", icon: Zap, label: "Schedule a Drop" },
+      { href: "/create-workshop", icon: BookOpen, label: "Create Workshop" },
       { href: "/analytics", icon: BarChart2, label: "Analytics" },
       { href: "/earnings", icon: DollarSign, label: "Earnings" },
       { href: "/inventory", icon: Archive, label: "Inventory" },
