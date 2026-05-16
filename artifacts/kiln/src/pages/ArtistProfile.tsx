@@ -364,13 +364,25 @@ export default function ArtistProfile() {
     );
   }
 
-  // Merge in the user's own localStorage posts when viewing own profile
-  const ownLocalPosts = isOwn
-    ? getPosts().filter((p) => p.artistId === (profile?.id ?? "") || p.artistId === (id ?? ""))
-    : [];
-  const ownLocalGridItems: GridItem[] = ownLocalPosts.map((p) => ({
+  // Reactively load own localStorage posts so the grid updates immediately after posting
+  const [localPosts, setLocalPosts] = useState(() =>
+    isOwn ? getPosts().filter((p) => p.artistId === (profile?.id ?? "") || p.artistId === (id ?? "")) : []
+  );
+  useEffect(() => {
+    if (!isOwn) return;
+    const reload = () =>
+      setLocalPosts(getPosts().filter((p) => p.artistId === (profile?.id ?? "") || p.artistId === (id ?? "")));
+    window.addEventListener("kiln:post-added", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("kiln:post-added", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, [isOwn, profile?.id, id]);
+
+  const ownLocalGridItems: GridItem[] = localPosts.map((p) => ({
     id: p.id,
-    imageUrl: p.mediaUrl,
+    imageUrl: p.thumbnailUrl || (p.type === "image" ? p.mediaUrl : ""),
     caption: p.caption,
     isVideo: p.type === "video",
     isProcess: p.type === "video",

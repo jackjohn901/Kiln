@@ -14,6 +14,26 @@ import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { useUpload } from "@/hooks/useUpload";
 
+function captureVideoThumbnail(src: string): Promise<string> {
+  return new Promise((resolve) => {
+    const vid = document.createElement("video");
+    vid.muted = true;
+    vid.playsInline = true;
+    vid.src = src;
+    vid.onloadeddata = () => {
+      const w = Math.min(vid.videoWidth || 640, 640);
+      const h = vid.videoHeight ? Math.round(w * vid.videoHeight / vid.videoWidth) : 360;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.drawImage(vid, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.75));
+    };
+    vid.onerror = () => resolve("");
+  });
+}
+
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -183,6 +203,12 @@ export default function Create() {
     }
     setPublishing(true);
     try {
+      // Capture video thumbnail before upload (blob URL still valid here)
+      let thumbnailUrl: string | undefined;
+      if (mediaType === "video" && previewUrl) {
+        thumbnailUrl = await captureVideoThumbnail(previewUrl) || undefined;
+      }
+
       let mediaUrl = previewUrl;
       if (file) {
         try {
@@ -220,6 +246,7 @@ export default function Create() {
         artistAvatarUrl: profile.avatarUrl ?? "",
         type: mediaType,
         mediaUrl,
+        thumbnailUrl,
         mediaUrls: extraUrls.length > 0 ? [mediaUrl, ...extraUrls] : undefined,
         caption: caption || technique,
         tags: [
@@ -235,6 +262,7 @@ export default function Create() {
         saves: 0,
         patronOnly: isPatronOnly || undefined,
       });
+      window.dispatchEvent(new CustomEvent("kiln:post-added"));
 
       // Persist to the real database so the post appears in the global feed
       fetch("/api/posts", {
