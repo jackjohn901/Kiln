@@ -114,6 +114,7 @@ export default function MobileNav() {
 
   const totalBadge = unreadCount + unreadMessageCount;
   const profileHref = profile ? `/artists/${profile.id}` : "/setup";
+  const createHref = profile ? "/create" : "/setup";
   const isMoreActive = showMore || (
     !PRIMARY_TABS.some(t => t.href === "/" ? location === "/" : location.startsWith(t.href)) &&
     !location.startsWith("/artists/")
@@ -123,13 +124,14 @@ export default function MobileNav() {
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-white/10 bg-[#12100e]/95 backdrop-blur-md safe-area-pb">
         <div className="flex items-center justify-around h-16 px-1">
-          {PRIMARY_TABS.map(({ href, icon: Icon, label, accent }) => {
-            const isActive = href === "/"
+          {PRIMARY_TABS.map(({ href: tabHref, icon: Icon, label, accent }) => {
+            const href = accent ? createHref : tabHref;
+            const isActive = tabHref === "/"
               ? (location === "/" || location === "")
-              : location.startsWith(href);
+              : location.startsWith(tabHref);
 
             return (
-              <Link key={href} href={href}>
+              <Link key={tabHref} href={href}>
                 <button
                   className={`relative flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all ${
                     accent
