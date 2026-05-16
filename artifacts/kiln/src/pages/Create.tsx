@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
-  Sparkles, Share2, Plus, Crown,
+  Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
@@ -61,7 +61,7 @@ const STAGES = [
   "Polishing", "Assembly", "Final Reveal",
 ];
 
-type Step = "upload" | "edit" | "details" | "done";
+type Step = "upload" | "edit" | "preview" | "details" | "done";
 
 export default function Create() {
   const [, navigate] = useLocation();
@@ -343,9 +343,13 @@ export default function Create() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {step !== "upload" && (
+            {step !== "upload" && step !== "preview" && (
               <button
-                onClick={() => setStep(step === "details" ? "edit" : "upload")}
+                onClick={() => {
+                  if (step === "details") setStep("preview");
+                  else if (step === "edit") setStep("upload");
+                  else setStep("upload");
+                }}
                 className="text-stone-500 hover:text-amber-300 transition-colors"
               >
                 <ChevronLeft size={20} />
@@ -353,27 +357,34 @@ export default function Create() {
             )}
             <div>
               <h1 className="font-serif text-xl text-amber-100">
-                {step === "upload" ? "Share your process" : step === "edit" ? "Edit" : "Details"}
+                {step === "upload" ? "Share your process"
+                  : step === "edit" ? "Edit"
+                  : step === "preview" ? "Preview"
+                  : "Details"}
               </h1>
               <p className="text-xs text-stone-500">
-                {step === "upload"
-                  ? "Show what you're making and how you're making it"
-                  : step === "edit"
-                  ? "Enhance your photo or add music"
+                {step === "upload" ? "Show what you're making and how you're making it"
+                  : step === "edit" ? "Enhance your photo or add music"
+                  : step === "preview" ? "This is how your post will look in the feed"
                   : "Caption and publish"}
               </p>
             </div>
           </div>
           {/* Step dots */}
           <div className="flex gap-1.5">
-            {(["upload", "edit", "details"] as Step[]).map((s) => (
-              <div
-                key={s}
-                className={`h-1.5 rounded-full transition-all ${
-                  s === step ? "w-4 bg-amber-400" : (["upload", "edit", "details"] as string[]).indexOf(s) < (["upload", "edit", "details"] as string[]).indexOf(step as string) ? "w-1.5 bg-amber-500/50" : "w-1.5 bg-stone-700"
-                }`}
-              />
-            ))}
+            {(["upload", "edit", "preview", "details"] as Step[]).map((s) => {
+              const order = ["upload", "edit", "preview", "details"];
+              const cur = order.indexOf(step);
+              const idx = order.indexOf(s);
+              return (
+                <div
+                  key={s}
+                  className={`h-1.5 rounded-full transition-all ${
+                    s === step ? "w-4 bg-amber-400" : idx < cur ? "w-1.5 bg-amber-500/50" : "w-1.5 bg-stone-700"
+                  }`}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -520,15 +531,130 @@ export default function Create() {
             )}
 
             <button
-              onClick={() => setStep("details")}
+              onClick={() => setStep("preview")}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
             >
-              Next: Add details <ChevronRight size={16} />
+              Preview <ChevronRight size={16} />
             </button>
           </div>
         )}
 
-        {/* STEP 3: Details */}
+        {/* STEP 3: Preview */}
+        {step === "preview" && previewUrl && (
+          <div className="space-y-4">
+            {/* Phone-frame preview */}
+            <div className="mx-auto max-w-xs">
+              <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-widest text-stone-600">
+                Feed preview
+              </p>
+              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl"
+                style={{ aspectRatio: "9/16" }}>
+                {/* Media */}
+                {mediaType === "image" ? (
+                  <img
+                    src={previewUrl}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{ filter: filterCss || undefined }}
+                  />
+                ) : (
+                  <video
+                    src={previewUrl}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-black/30 pointer-events-none" />
+
+                {/* Right-side action buttons */}
+                <div className="absolute right-3 bottom-28 flex flex-col items-center gap-5">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                      <Heart size={18} className="text-white" />
+                    </div>
+                    <span className="text-[10px] text-white/60">0</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                      <MessageCircle size={18} className="text-white" />
+                    </div>
+                    <span className="text-[10px] text-white/60">0</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                      <Bookmark size={18} className="text-white" />
+                    </div>
+                    <span className="text-[10px] text-white/60">0</span>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                    <Share2 size={18} className="text-white" />
+                  </div>
+                </div>
+
+                {/* Bottom info overlay */}
+                <div className="absolute bottom-0 left-0 right-12 p-4 space-y-2">
+                  {/* Artist row */}
+                  <div className="flex items-center gap-2">
+                    {profile?.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover border border-white/20" />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-300">
+                        {profile?.name?.charAt(0) ?? "?"}
+                      </div>
+                    )}
+                    <span className="text-sm font-semibold text-white">@{profile?.handle ?? "you"}</span>
+                    {technique && (
+                      <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                        {technique}
+                      </span>
+                    )}
+                  </div>
+                  {/* Caption preview */}
+                  {caption ? (
+                    <p className="text-xs text-white/80 leading-relaxed line-clamp-2">{caption}</p>
+                  ) : (
+                    <p className="text-xs text-white/30 italic">Caption will appear here…</p>
+                  )}
+                  {/* Music bar */}
+                  {selectedTrack && (
+                    <div className="flex items-center gap-1.5">
+                      <Music size={11} className="text-amber-300 shrink-0" />
+                      <p className="text-[10px] text-white/60 truncate">{selectedTrack.title} — {selectedTrack.artist}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* "New" badge */}
+                <div className="absolute top-3 left-3">
+                  <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-stone-950">NEW</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep("edit")}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-3 text-sm font-medium text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+              >
+                <ChevronLeft size={15} /> Edit
+              </button>
+              <button
+                onClick={() => setStep("details")}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+              >
+                Add caption <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: Details */}
         {step === "details" && (
           <div className="space-y-4">
             {/* Preview thumbnail */}
