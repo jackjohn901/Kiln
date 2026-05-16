@@ -13,6 +13,14 @@ import postsRouter from "./posts";
 import socialRouter from "./social";
 import notificationsRouter from "./notifications";
 import messagesRouter from "./messages";
+import shopRouter from "./shop";
+import workshopsRouter from "./workshops";
+import commissionsRouter from "./commissions";
+import guildsRouter from "./guilds";
+import dropsRouter from "./drops";
+import auctionsRouter from "./auctions";
+import patronsRouter from "./patrons";
+import discoverRouter from "./discover";
 
 const router: IRouter = Router();
 
@@ -30,5 +38,13 @@ router.use(postsRouter);
 router.use(socialRouter);
 router.use(notificationsRouter);
 router.use(messagesRouter);
+router.use(shopRouter);
+router.use(workshopsRouter);
+router.use(commissionsRouter);
+router.use(guildsRouter);
+router.use(dropsRouter);
+router.use(auctionsRouter);
+router.use(patronsRouter);
+router.use(discoverRouter);
 
 export default router;

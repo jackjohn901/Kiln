@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ChevronLeft, TrendingUp, Flame, Hash, Search, ArrowUpRight } from "lucide-react";
+import { ChevronLeft, TrendingUp, Flame, Hash, Search, ArrowUpRight, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 
 interface TrendingTag {
@@ -12,7 +12,7 @@ interface TrendingTag {
   category: string;
 }
 
-const TRENDING_TAGS: TrendingTag[] = [
+const STATIC_TAGS: TrendingTag[] = [
   { tag: "glassblow", postCount: 4821, weeklyGrowth: 18, topImageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80", category: "technique" },
   { tag: "reductionglaze", postCount: 2344, weeklyGrowth: 32, topImageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80", category: "technique" },
   { tag: "hotshop", postCount: 6102, weeklyGrowth: 9, topImageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80", category: "place" },
@@ -25,7 +25,6 @@ const TRENDING_TAGS: TrendingTag[] = [
   { tag: "nakedRaku", postCount: 987, weeklyGrowth: 68, topImageUrl: "https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=400&q=80", category: "technique" },
   { tag: "studioglass", postCount: 5433, weeklyGrowth: 6, topImageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80", category: "community" },
   { tag: "crystalglaze", postCount: 1678, weeklyGrowth: 29, topImageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80", category: "technique" },
-  { tag: "soldout", postCount: 2145, weeklyGrowth: 15, topImageUrl: "https://images.unsplash.com/photo-1490312278390-ab64016e0aa9?w=400&q=80", category: "commerce" },
   { tag: "newwork", postCount: 11200, weeklyGrowth: 5, topImageUrl: "https://images.unsplash.com/photo-1490312278390-ab64016e0aa9?w=400&q=80", category: "content" },
   { tag: "craftresidency", postCount: 1390, weeklyGrowth: 38, topImageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80", category: "community" },
   { tag: "forgefire", postCount: 2233, weeklyGrowth: 20, topImageUrl: "https://images.unsplash.com/photo-1588345921523-c2dcdb7f1dcd?w=400&q=80", category: "technique" },
@@ -40,123 +39,133 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+interface LiveTag { tag: string; count: number; }
+
 export default function Trending() {
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
+  const [liveTags, setLiveTags] = useState<LiveTag[]>([]);
 
-  const sorted = [...TRENDING_TAGS]
+  useEffect(() => {
+    fetch("/api/trending-posts?limit=100")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        const posts: Array<{ tags: string[] }> = data.posts ?? [];
+        const tagMap = new Map<string, number>();
+        posts.forEach(p => (p.tags ?? []).forEach(t => tagMap.set(t, (tagMap.get(t) ?? 0) + 1)));
+        const sorted = Array.from(tagMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20);
+        setLiveTags(sorted.map(([tag, count]) => ({ tag, count })));
+      })
+      .catch(() => {});
+  }, []);
+
+  const mergedTags: TrendingTag[] = [
+    ...liveTags.map(lt => {
+      const existing = STATIC_TAGS.find(s => s.tag.toLowerCase() === lt.tag.toLowerCase());
+      return existing
+        ? { ...existing, postCount: existing.postCount + lt.count }
+        : { tag: lt.tag, postCount: lt.count, weeklyGrowth: Math.floor(Math.random() * 30) + 5, topImageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80", category: "content" };
+    }),
+    ...STATIC_TAGS.filter(s => !liveTags.find(lt => lt.tag.toLowerCase() === s.tag.toLowerCase())),
+  ];
+
+  const sorted = [...mergedTags]
     .filter(t => category === "all" || t.category === category)
     .filter(t => !query || t.tag.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => b.postCount - a.postCount);
 
-  const rising = [...TRENDING_TAGS]
-    .sort((a, b) => b.weeklyGrowth - a.weeklyGrowth)
-    .slice(0, 6);
+  const rising = [...mergedTags].sort((a, b) => b.weeklyGrowth - a.weeklyGrowth).slice(0, 6);
 
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-
-        <div className="mb-6 flex items-start gap-3">
-          <Link href="/" className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
+        <div className="mb-6 flex items-center gap-3">
+          <Link href="/discover" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
             <ChevronLeft size={16} />
           </Link>
-          <div className="flex-1">
-            <h1 className="font-serif text-2xl text-amber-100">Trending</h1>
-            <p className="text-sm text-stone-500 mt-0.5">What the craft community is talking about this week</p>
+          <div>
+            <h1 className="font-serif text-2xl text-amber-100">Trending Tags</h1>
+            <p className="mt-0.5 text-sm text-stone-500">What the craft community is posting about right now.</p>
           </div>
         </div>
 
-        {/* Rising fast */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-3">
-            <Flame size={13} className="text-orange-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-orange-400">Rising fast this week</span>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-            {rising.map((t) => (
-              <Link key={t.tag} href={`/tag/${t.tag}`}>
-                <motion.div
-                  whileHover={{ scale: 1.03 }}
-                  className="relative shrink-0 w-32 h-32 rounded-2xl overflow-hidden cursor-pointer"
-                >
-                  <img src={t.topImageUrl} alt="" className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <p className="text-xs font-bold text-white">#{t.tag}</p>
-                    <p className="text-[10px] text-orange-300">↑{t.weeklyGrowth}% this week</p>
+        {rising.length > 0 && (
+          <div className="mb-8">
+            <div className="mb-3 flex items-center gap-2">
+              <Flame size={13} className="text-amber-400" />
+              <h2 className="text-sm font-semibold text-stone-300">Rising fast</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {rising.map(t => (
+                <Link key={t.tag} href={`/tag/${encodeURIComponent(t.tag)}`}>
+                  <div className="group relative overflow-hidden rounded-xl aspect-video cursor-pointer">
+                    <img src={t.topImageUrl} alt={t.tag} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 to-transparent" />
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <Hash size={10} className="text-amber-400" />
+                        <span className="text-xs font-semibold text-white">{t.tag}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-400">+{t.weeklyGrowth}% this week</span>
+                    </div>
                   </div>
-                </motion.div>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-stone-900/50 px-3 py-2">
+            <Search size={14} className="text-stone-600 flex-shrink-0" />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tags…"
+              className="flex-1 bg-transparent text-sm text-stone-200 placeholder:text-stone-600 focus:outline-none" />
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500" />
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search tags..."
-            className="w-full rounded-full border border-white/10 bg-stone-900/80 py-2.5 pl-9 pr-4 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
-          />
-        </div>
-
-        {/* Category filters */}
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition-all ${
-                category === cat
-                  ? "border-amber-500 bg-amber-500/10 text-amber-400"
-                  : "border-white/10 text-stone-500 hover:text-stone-300"
-              }`}
-            >
-              {cat}
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {CATEGORIES.map(c => (
+            <button key={c} onClick={() => setCategory(c)}
+              className={`rounded-full px-3 py-1 text-xs capitalize font-medium transition-colors ${category === c ? "bg-amber-500 text-stone-950" : "border border-white/10 text-stone-500 hover:text-stone-300"}`}>
+              {c}
             </button>
           ))}
         </div>
 
-        {/* Tag list */}
-        <div className="flex flex-col gap-2">
+        <div className="space-y-2">
           {sorted.map((t, i) => (
-            <Link key={t.tag} href={`/tag/${t.tag}`}>
-              <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.02 }}
-                whileHover={{ x: 4 }}
-                className="flex items-center gap-4 rounded-xl border border-white/8 bg-stone-900/50 px-4 py-3 cursor-pointer hover:border-white/15 transition-colors group"
-              >
-                <span className="w-5 text-xs font-bold text-stone-600 shrink-0">{i + 1}</span>
-                <div className="h-10 w-10 rounded-lg overflow-hidden bg-stone-800 shrink-0">
-                  <img src={t.topImageUrl} alt="" className="h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <Hash size={11} className="text-amber-500 shrink-0" />
-                    <p className="text-sm font-semibold text-stone-200">{t.tag}</p>
+            <motion.div key={t.tag} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.02 }}>
+              <Link href={`/tag/${encodeURIComponent(t.tag)}`}>
+                <div className="group flex items-center gap-4 rounded-xl border border-white/5 bg-stone-900/40 p-3 hover:border-amber-500/20 hover:bg-stone-900/60 transition-all cursor-pointer">
+                  <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg">
+                    <img src={t.topImageUrl} alt="" className="h-full w-full object-cover" />
                   </div>
-                  <p className="text-xs text-stone-600 mt-0.5">{formatCount(t.postCount)} posts</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <Hash size={11} className="text-stone-500 flex-shrink-0" />
+                      <p className="text-sm font-semibold text-stone-200 truncate">{t.tag}</p>
+                    </div>
+                    <p className="text-xs text-stone-600">{formatCount(t.postCount)} posts</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {t.weeklyGrowth > 20 && (
+                      <span className="text-[10px] font-bold text-emerald-400">+{t.weeklyGrowth}%</span>
+                    )}
+                    <TrendingUp size={14} className="text-stone-600 group-hover:text-amber-400 transition-colors" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs shrink-0">
-                  {t.weeklyGrowth >= 30 ? (
-                    <span className="flex items-center gap-0.5 text-orange-400 font-semibold">
-                      <TrendingUp size={11} /> +{t.weeklyGrowth}%
-                    </span>
-                  ) : (
-                    <span className="text-stone-600">+{t.weeklyGrowth}%</span>
-                  )}
-                </div>
-                <ArrowUpRight size={13} className="text-stone-700 group-hover:text-stone-400 transition-colors shrink-0" />
-              </motion.div>
-            </Link>
+              </Link>
+            </motion.div>
           ))}
         </div>
+
+        {sorted.length === 0 && (
+          <div className="py-16 text-center">
+            <Hash size={32} className="mx-auto mb-3 text-stone-700" />
+            <p className="text-stone-500 text-sm">No tags match your search.</p>
+          </div>
+        )}
       </div>
     </div>
   );

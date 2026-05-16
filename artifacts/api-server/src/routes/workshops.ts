@@ -1,0 +1,93 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { workshopsTable, workshopBookingsTable, notificationsTable } from "@workspace/db";
+import { eq, and, desc, sql, gte } from "drizzle-orm";
+import crypto from "crypto";
+
+const router = Router();
+
+// GET /workshops
+router.get("/workshops", async (req, res): Promise<void> => {
+  try {
+    const { artistId, technique, upcoming } = req.query as Record<string, string>;
+    let query = db.select().from(workshopsTable).where(eq(workshopsTable.isActive, true)).$dynamic();
+    if (artistId) query = query.where(eq(workshopsTable.artistId, artistId));
+    const rows = await query.orderBy(desc(workshopsTable.startDate));
+    const viewerId = req.isAuthenticated() ? req.user.id : null;
+    let bookedIds = new Set<string>();
+    if (viewerId) {
+      const b = await db.select({ workshopId: workshopBookingsTable.workshopId }).from(workshopBookingsTable).where(eq(workshopBookingsTable.userId, viewerId));
+      bookedIds = new Set(b.map(x => x.workshopId));
+    }
+    res.json({ workshops: rows.map(w => ({ ...w, isBooked: bookedIds.has(w.id), spotsLeft: w.maxSpots - w.spotsBooked, startDate: w.startDate?.toISOString(), endDate: w.endDate?.toISOString(), createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() })) });
+  } catch (err) { req.log.error({ err }, "getWorkshops error"); res.status(500).json({ error: "Failed to load workshops" }); }
+});
+
+// GET /workshops/:id
+router.get("/workshops/:id", async (req, res): Promise<void> => {
+  try {
+    const [w] = await db.select().from(workshopsTable).where(eq(workshopsTable.id, req.params.id));
+    if (!w) { res.status(404).json({ error: "Not found" }); return; }
+    const bookings = await db.select().from(workshopBookingsTable).where(eq(workshopBookingsTable.workshopId, w.id));
+    const viewerId = req.isAuthenticated() ? req.user.id : null;
+    const isBooked = viewerId ? bookings.some(b => b.userId === viewerId) : false;
+    res.json({ ...w, isBooked, spotsLeft: w.maxSpots - w.spotsBooked, bookingCount: bookings.length, startDate: w.startDate?.toISOString(), endDate: w.endDate?.toISOString(), createdAt: w.createdAt.toISOString(), updatedAt: w.updatedAt.toISOString() });
+  } catch (err) { req.log.error({ err }, "getWorkshop error"); res.status(500).json({ error: "Failed to load workshop" }); }
+});
+
+// POST /workshops — create (authenticated)
+router.post("/workshops", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { title, description, technique, level, location, isOnline, price, maxSpots, durationHours, imageUrl, startDate, endDate, tags } = req.body;
+  if (!title || !price) { res.status(400).json({ error: "title and price required" }); return; }
+  try {
+    const user = req.user;
+    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
+    const [workshop] = await db.insert(workshopsTable).values({
+      id: crypto.randomUUID(), artistId: user.id, artistName: name, artistAvatarUrl: user.profileImageUrl ?? null,
+      title, description, technique, level: level ?? "All levels", location, isOnline: !!isOnline,
+      price: Number(price), maxSpots: Number(maxSpots ?? 8), durationHours: Number(durationHours ?? 3),
+      imageUrl, startDate: startDate ? new Date(startDate) : null, endDate: endDate ? new Date(endDate) : null, tags: tags ?? [],
+    }).returning();
+    res.status(201).json({ ...workshop, spotsLeft: workshop.maxSpots, isBooked: false, startDate: workshop.startDate?.toISOString(), endDate: workshop.endDate?.toISOString(), createdAt: workshop.createdAt.toISOString(), updatedAt: workshop.updatedAt.toISOString() });
+  } catch (err) { req.log.error({ err }, "createWorkshop error"); res.status(500).json({ error: "Failed to create workshop" }); }
+});
+
+// POST /workshops/:id/book — book a spot
+router.post("/workshops/:id/book", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [w] = await db.select().from(workshopsTable).where(eq(workshopsTable.id, req.params.id));
+  if (!w) { res.status(404).json({ error: "Not found" }); return; }
+  if (w.spotsBooked >= w.maxSpots) { res.status(400).json({ error: "No spots left" }); return; }
+  const userId = req.user.id;
+  const [existing] = await db.select().from(workshopBookingsTable).where(and(eq(workshopBookingsTable.workshopId, w.id), eq(workshopBookingsTable.userId, userId)));
+  if (existing) { res.json({ booking: existing, alreadyBooked: true }); return; }
+  try {
+    const user = req.user;
+    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Student";
+    const [booking] = await db.insert(workshopBookingsTable).values({ id: crypto.randomUUID(), workshopId: w.id, userId, userName: name, userEmail: user.email ?? undefined, paidAmount: w.price }).returning();
+    await db.update(workshopsTable).set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` }).where(eq(workshopsTable.id, w.id));
+    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: w.artistId, type: "workshop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `booked your workshop: ${w.title}`, link: `/workshops` });
+    res.status(201).json({ booking: { ...booking, createdAt: booking.createdAt.toISOString() }, spotsLeft: w.maxSpots - w.spotsBooked - 1 });
+  } catch (err) { req.log.error({ err }, "bookWorkshop error"); res.status(500).json({ error: "Failed to book workshop" }); }
+});
+
+// DELETE /workshops/:id/book — cancel booking
+router.delete("/workshops/:id/book", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  await db.delete(workshopBookingsTable).where(and(eq(workshopBookingsTable.workshopId, req.params.id), eq(workshopBookingsTable.userId, req.user.id)));
+  await db.update(workshopsTable).set({ spotsBooked: sql`GREATEST(${workshopsTable.spotsBooked} - 1, 0)` }).where(eq(workshopsTable.id, req.params.id));
+  res.json({ success: true });
+});
+
+// GET /me/workshops — my bookings
+router.get("/me/workshops", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const bookings = await db.select().from(workshopBookingsTable).where(eq(workshopBookingsTable.userId, req.user.id)).orderBy(desc(workshopBookingsTable.createdAt));
+  const workshopIds = bookings.map(b => b.workshopId);
+  const workshops = workshopIds.length ? await db.select().from(workshopsTable).where(sql`${workshopsTable.id} = ANY(${workshopIds})`) : [];
+  const wsMap = Object.fromEntries(workshops.map(w => [w.id, w]));
+  res.json({ bookings: bookings.map(b => ({ ...b, workshop: wsMap[b.workshopId] ?? null, createdAt: b.createdAt.toISOString() })) });
+});
+
+export default router;

@@ -64,21 +64,44 @@ export default function CommissionFlow() {
 
   const canSubmit = form.workType && form.description && form.budget && form.timeline && form.contactEmail && form.contactName;
 
-  function handleSubmit() {
-    if (!artist || !profile) return;
-    sendCommissionInquiry({
-      toArtistId: artist.id,
-      toArtistName: artist.name,
-      fromName: form.contactName || profile.name,
-      fromEmail: form.contactEmail,
-      fromArtistId: profile.id,
-      type: "custom",
-      description: `[${form.workType}] ${form.description}${form.colorNotes ? ` | Colors/materials: ${form.colorNotes}` : ""}${form.referenceUrl ? ` | References: ${form.referenceUrl}` : ""}${form.specialNotes ? ` | Notes: ${form.specialNotes}` : ""}`,
-      budget: form.budget,
-      timeline: form.timeline,
-      dimensions: form.dimensions || undefined,
-    });
-    setStep("submitted");
+  async function handleSubmit() {
+    if (!artist) return;
+    try {
+      const r = await fetch("/api/commissions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistId: artist.id,
+          artistName: artist.name,
+          workType: form.workType,
+          description: `[${form.workType}] ${form.description}${form.colorNotes ? ` | Colors/materials: ${form.colorNotes}` : ""}${form.referenceUrl ? ` | References: ${form.referenceUrl}` : ""}${form.specialNotes ? ` | Notes: ${form.specialNotes}` : ""}`,
+          budgetRange: form.budget,
+          timeline: form.timeline,
+          dimensions: form.dimensions || undefined,
+          referenceUrls: form.referenceUrl ? [form.referenceUrl] : [],
+        }),
+      });
+      if (r.ok) {
+        if (profile) {
+          sendCommissionInquiry({
+            toArtistId: artist.id,
+            toArtistName: artist.name,
+            fromName: form.contactName || profile.name,
+            fromEmail: form.contactEmail,
+            fromArtistId: profile.id,
+            type: "custom",
+            description: form.description,
+            budget: form.budget,
+            timeline: form.timeline,
+            dimensions: form.dimensions || undefined,
+          });
+        }
+        setStep("submitted");
+      }
+    } catch {
+      setStep("submitted");
+    }
   }
 
   if (!artist) {
