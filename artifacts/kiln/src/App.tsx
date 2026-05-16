@@ -102,6 +102,7 @@ import TechniqueGenetics from "@/pages/TechniqueGenetics";
 import CreateListing from "@/pages/CreateListing";
 import CreateDrop from "@/pages/CreateDrop";
 import CreateWorkshop from "@/pages/CreateWorkshop";
+import MusicStudio from "@/pages/MusicStudio";
 
 const queryClient = new QueryClient();
 
@@ -268,6 +269,7 @@ function Router() {
       <Route path="/create-listing" component={CreateListing} />
       <Route path="/create-drop" component={CreateDrop} />
       <Route path="/create-workshop" component={CreateWorkshop} />
+      <Route path="/music-studio" component={MusicStudio} />
       <Route component={NotFound} />
       </Switch>
     </>

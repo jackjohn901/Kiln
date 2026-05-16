@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Play, Pause, Check, Music, Search, Upload, X, FileAudio } from "lucide-react";
-import { musicTracks, formatDuration, type MusicTrack } from "@/data/music";
+import { useLocation } from "wouter";
+import { Play, Pause, Check, Music, Search, Upload, X, FileAudio, Music2, ExternalLink } from "lucide-react";
+import { musicTracks, GENRES, CRAFT_MOODS, formatDuration, type MusicTrack } from "@/data/music";
+import { getCommunityBeats, type CommunityBeat } from "@/lib/communityBeats";
 
-const GENRES = ["All", "Ambient", "Classical", "Electronic", "Jazz", "Orchestral", "World"] as const;
-
-// ─── Waveform animation ───────────────────────────────────────────────────────
+// ── Waveform animation ────────────────────────────────────────────────────────
 
 function Waveform({ playing }: { playing: boolean }) {
   return (
@@ -21,17 +21,235 @@ function Waveform({ playing }: { playing: boolean }) {
           }}
         />
       ))}
-      <style>{`
-        @keyframes waveBar {
-          from { transform: scaleY(0.4); }
-          to   { transform: scaleY(1); }
-        }
-      `}</style>
+      <style>{`@keyframes waveBar { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }`}</style>
     </div>
   );
 }
 
-// ─── Upload tab ───────────────────────────────────────────────────────────────
+// ── Mini beat grid ─────────────────────────────────────────────────────────────
+
+const TRACK_COLORS = [
+  "bg-amber-500",  // Kick
+  "bg-orange-500", // Snare
+  "bg-yellow-400", // Hi-Hat
+  "bg-lime-500",   // Open Hat
+  "bg-teal-500",   // Bass
+  "bg-sky-500",    // Melody
+];
+
+function MiniGrid({ pattern }: { pattern: boolean[][] }) {
+  return (
+    <div className="flex flex-col gap-[2px]">
+      {pattern.map((row, ti) => (
+        <div key={ti} className="flex gap-[2px]">
+          {row.map((on, si) => (
+            <div key={si} className={`h-1.5 w-2 rounded-[2px] ${on ? TRACK_COLORS[ti] : "bg-stone-700"}`} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Community beat synth (inline, for preview) ────────────────────────────────
+
+function previewBeat(beat: CommunityBeat): () => void {
+  const ctx = new AudioContext();
+  let step = 0;
+  let nextTime = ctx.currentTime + 0.05;
+  const stepDur = 60 / beat.bpm / 4;
+
+  function triggerTrack(ti: number, time: number) {
+    switch (ti) {
+      case 0: { // Kick
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.4);
+        g.gain.setValueAtTime(1.1, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+        osc.start(time); osc.stop(time + 0.4); break;
+      }
+      case 1: { // Snare
+        const sz = Math.ceil(ctx.sampleRate * 0.15);
+        const buf = ctx.createBuffer(1, sz, ctx.sampleRate);
+        const d = buf.getChannelData(0); for (let i = 0; i < sz; i++) d[i] = Math.random() * 2 - 1;
+        const n = ctx.createBufferSource(); n.buffer = buf;
+        const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 1200;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.7, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+        n.connect(f); f.connect(g); g.connect(ctx.destination); n.start(time); n.stop(time + 0.15); break;
+      }
+      case 2: case 3: { // Hi-hat / Open hat
+        const dur = ti === 3 ? 0.3 : 0.04;
+        const sz = Math.ceil(ctx.sampleRate * dur);
+        const buf = ctx.createBuffer(1, sz, ctx.sampleRate);
+        const d = buf.getChannelData(0); for (let i = 0; i < sz; i++) d[i] = Math.random() * 2 - 1;
+        const n = ctx.createBufferSource(); n.buffer = buf;
+        const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 9000;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.4, time); g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+        n.connect(f); f.connect(g); g.connect(ctx.destination); n.start(time); n.stop(time + dur); break;
+      }
+      case 4: { // Bass
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = "sawtooth"; osc.frequency.setValueAtTime(60, time);
+        g.gain.setValueAtTime(0.35, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+        osc.connect(g); g.connect(ctx.destination); osc.start(time); osc.stop(time + 0.25); break;
+      }
+      case 5: { // Melody
+        const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = "triangle"; osc.frequency.setValueAtTime(scale[step % scale.length], time);
+        g.gain.setValueAtTime(0.25, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+        osc.connect(g); g.connect(ctx.destination); osc.start(time); osc.stop(time + 0.2); break;
+      }
+    }
+  }
+
+  const intervals: number[] = [];
+  const id = window.setInterval(() => {
+    while (nextTime < ctx.currentTime + 0.12) {
+      beat.pattern.forEach((row, ti) => { if (row[step]) triggerTrack(ti, nextTime); });
+      nextTime += stepDur;
+      step = (step + 1) % 16;
+    }
+  }, 25);
+  intervals.push(id);
+
+  return () => { intervals.forEach(clearInterval); ctx.close(); };
+}
+
+// ── Community tab ─────────────────────────────────────────────────────────────
+
+interface CommunityTabProps {
+  selectedTrackId: string | null;
+  onSelect: (track: MusicTrack | null) => void;
+}
+
+function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
+  const [, setLocation] = useLocation();
+  const [beats, setBeats] = useState<CommunityBeat[]>([]);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => { setBeats(getCommunityBeats()); }, []);
+
+  function togglePreview(beat: CommunityBeat) {
+    if (stopRef.current) { stopRef.current(); stopRef.current = null; setPreviewId(null); }
+    if (previewId === beat.id) return;
+    setPreviewId(beat.id);
+    stopRef.current = previewBeat(beat);
+    setTimeout(() => { if (stopRef.current) { stopRef.current(); stopRef.current = null; setPreviewId(null); } }, 8000);
+  }
+
+  useEffect(() => () => { stopRef.current?.(); }, []);
+
+  function selectBeat(beat: CommunityBeat) {
+    stopRef.current?.(); stopRef.current = null; setPreviewId(null);
+    const track: MusicTrack = {
+      id: `beat-${beat.id}`,
+      title: beat.title,
+      artist: beat.artistName,
+      genre: "Electronic",
+      mood: "Original",
+      craftMood: "Studio Vibes",
+      bpm: beat.bpm,
+      duration: 0,
+      url: `beat://${beat.id}`,
+      license: beat.license === "free" ? "Free" : beat.license === "community" ? "$1" : "$5",
+    };
+    const isSelected = selectedTrackId === track.id;
+    onSelect(isSelected ? null : track);
+  }
+
+  if (beats.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 text-stone-600">
+          <Music2 size={20} />
+        </div>
+        <p className="text-sm text-stone-500">No community beats yet.</p>
+        <p className="text-xs text-stone-700 max-w-[220px]">
+          Create your own loops in Music Studio and license them to other Kiln creators.
+        </p>
+        <button
+          onClick={() => setLocation("/music-studio")}
+          className="mt-1 flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+        >
+          Open Music Studio <ExternalLink size={11} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-stone-600">{beats.length} beat{beats.length !== 1 ? "s" : ""} from Kiln creators</p>
+        <button
+          onClick={() => setLocation("/music-studio")}
+          className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-300 transition-colors"
+        >
+          Create yours <ExternalLink size={10} />
+        </button>
+      </div>
+
+      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+        {beats.map((beat) => {
+          const id = `beat-${beat.id}`;
+          const isSelected = selectedTrackId === id;
+          const isPreviewing = previewId === beat.id;
+          return (
+            <div
+              key={beat.id}
+              className={`rounded-xl border p-3 transition-colors ${isSelected ? "border-amber-500/30 bg-amber-500/10" : "border-stone-700/60 bg-stone-900/60 hover:border-stone-600"}`}
+            >
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => togglePreview(beat)}
+                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                    isPreviewing ? "border-amber-400 bg-amber-400/20 text-amber-400" : "border-stone-700 bg-stone-800 text-stone-400 hover:border-amber-500/50 hover:text-amber-300"
+                  }`}
+                >
+                  {isPreviewing ? <Waveform playing={true} /> : <Play size={13} />}
+                </button>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm font-medium truncate ${isSelected ? "text-amber-200" : "text-stone-200"}`}>{beat.title}</p>
+                    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] capitalize ${
+                      beat.license === "free" ? "border-emerald-500/30 text-emerald-400" : beat.license === "community" ? "border-amber-500/30 text-amber-400" : "border-purple-500/30 text-purple-400"
+                    }`}>
+                      {beat.license === "free" ? "Free" : beat.license === "community" ? "$1" : "$5"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500">{beat.artistName} · {beat.bpm} BPM</p>
+                  <div className="mt-2">
+                    <MiniGrid pattern={beat.pattern} />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => selectBeat(beat)}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                    isSelected ? "border-amber-400 bg-amber-400 text-stone-950" : "border-stone-600 text-stone-500 hover:border-amber-500/60 hover:text-amber-400"
+                  }`}
+                >
+                  <Check size={12} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-center text-[10px] text-stone-700">
+        Community beats are synthesized in real-time using the Web Audio API.
+      </p>
+    </div>
+  );
+}
+
+// ── Upload tab ────────────────────────────────────────────────────────────────
 
 interface UploadTabProps {
   selectedTrackId: string | null;
@@ -45,38 +263,25 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
   const [error, setError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
   const isCustomSelected = selectedTrackId?.startsWith("custom-") ?? false;
 
-  function stopAudio() {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setPlaying(false);
-    setProgress(0);
-  }
+  function stopAudio() { audioRef.current?.pause(); setPlaying(false); setProgress(0); }
 
   function handleFile(file: File) {
-    const allowed = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/mp4", "audio/m4a", "audio/aac", "audio/ogg", "audio/flac"];
-    const isAudio = file.type.startsWith("audio/") || allowed.some((t) => file.type === t);
-    if (!isAudio) {
-      setError("Please upload an audio file (MP3, WAV, M4A, AAC, FLAC)");
-      return;
-    }
+    const isAudio = file.type.startsWith("audio/");
+    if (!isAudio) { setError("Please upload an audio file (MP3, WAV, M4A, AAC, FLAC)"); return; }
     setError("");
     stopAudio();
-
     const blobUrl = URL.createObjectURL(file);
     const audio = new Audio(blobUrl);
-
     audio.addEventListener("loadedmetadata", () => {
-      const name = file.name.replace(/\.[^.]+$/, "");
       const track: MusicTrack = {
         id: `custom-${Date.now()}`,
-        title: name,
+        title: file.name.replace(/\.[^.]+$/, ""),
         artist: "Your upload",
         genre: "Electronic",
         mood: "Original",
+        craftMood: "Studio Vibes",
         bpm: 0,
         duration: Math.round(audio.duration) || 0,
         url: blobUrl,
@@ -84,45 +289,33 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
       };
       setCustomTrack(track);
       audioRef.current = audio;
-      audio.addEventListener("timeupdate", () => {
-        if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100);
-      });
+      audio.addEventListener("timeupdate", () => { if (audio.duration) setProgress((audio.currentTime / audio.duration) * 100); });
       audio.addEventListener("ended", () => { setPlaying(false); setProgress(0); });
     });
-
-    audio.addEventListener("error", () => {
-      setError("Could not load this audio file. Try a different format.");
-    });
-
+    audio.addEventListener("error", () => setError("Could not load this audio file."));
     audio.load();
   }
 
   function togglePlay() {
     const audio = audioRef.current;
     if (!audio || !customTrack) return;
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-    } else {
-      audio.play().then(() => setPlaying(true)).catch(() => {});
-    }
+    if (playing) { audio.pause(); setPlaying(false); }
+    else { audio.play().then(() => setPlaying(true)).catch(() => {}); }
   }
 
   function removeTrack() {
     stopAudio();
     if (audioRef.current?.src) URL.revokeObjectURL(audioRef.current.src);
-    setCustomTrack(null);
-    onSelect(null);
+    setCustomTrack(null); onSelect(null);
   }
 
-  useEffect(() => () => { stopAudio(); }, []);
+  useEffect(() => () => stopAudio(), []);
 
   return (
     <div className="space-y-4">
-      {/* Drop zone */}
       {!customTrack && (
         <div
-          className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-stone-700 bg-stone-900/40 px-6 py-10 transition-colors hover:border-amber-500/40 cursor-pointer"
+          className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-stone-700 bg-stone-900/40 px-6 py-10 cursor-pointer hover:border-amber-500/40 transition-colors"
           onClick={() => fileRef.current?.click()}
           onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
           onDragOver={(e) => e.preventDefault()}
@@ -132,97 +325,55 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
           </div>
           <div className="text-center">
             <p className="text-sm font-medium text-stone-300">Drop your audio file here</p>
-            <p className="mt-1 text-xs text-stone-600">MP3, WAV, M4A, AAC, FLAC · up to 50 MB</p>
+            <p className="mt-1 text-xs text-stone-600">MP3, WAV, M4A, AAC, FLAC</p>
           </div>
           <button className="rounded-full bg-stone-800 px-4 py-1.5 text-xs font-medium text-stone-300 hover:bg-stone-700 transition-colors">
-            <Upload size={11} className="mr-1.5 inline" />
-            Choose file
+            <Upload size={11} className="mr-1.5 inline" /> Choose file
           </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-          />
+          <input ref={fileRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
         </div>
       )}
 
-      {error && (
-        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
-      )}
+      {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>}
 
-      {/* Loaded track preview */}
       {customTrack && (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-xl border border-stone-700 bg-stone-900 px-4 py-3">
-            {/* Play button */}
-            <button
-              onClick={togglePlay}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600 bg-stone-800 text-stone-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors"
-            >
+            <button onClick={togglePlay} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600 bg-stone-800 text-stone-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors">
               {playing ? <Waveform playing={true} /> : <Play size={15} />}
             </button>
-
-            {/* Track info */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-stone-200 truncate">{customTrack.title}</p>
               <p className="text-xs text-stone-500">Your upload · {customTrack.duration > 0 ? formatDuration(customTrack.duration) : "—"}</p>
-              {/* Progress bar */}
               <div className="mt-1.5 h-1 rounded-full bg-stone-700 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-amber-400 transition-all duration-200"
-                  style={{ width: `${progress}%` }}
-                />
+                <div className="h-full rounded-full bg-amber-400 transition-all duration-200" style={{ width: `${progress}%` }} />
               </div>
             </div>
-
-            {/* Remove */}
-            <button
-              onClick={removeTrack}
-              className="text-stone-600 hover:text-red-400 transition-colors"
-            >
-              <X size={15} />
-            </button>
+            <button onClick={removeTrack} className="text-stone-600 hover:text-red-400 transition-colors"><X size={15} /></button>
           </div>
-
-          {/* Use this track / change file */}
           <div className="flex gap-2">
             <button
               onClick={() => { stopAudio(); onSelect(customTrack); }}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold transition-colors ${
-                isCustomSelected
-                  ? "bg-amber-500/20 border border-amber-500/40 text-amber-300"
-                  : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                isCustomSelected ? "bg-amber-500/20 border border-amber-500/40 text-amber-300" : "bg-amber-500 text-stone-950 hover:bg-amber-400"
               }`}
             >
               {isCustomSelected ? <><Check size={14} /> Using this track</> : "Use this track"}
             </button>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="rounded-full border border-stone-700 px-4 py-2.5 text-xs text-stone-400 hover:border-amber-500/30 transition-colors"
-            >
+            <button onClick={() => fileRef.current?.click()} className="rounded-full border border-stone-700 px-4 py-2.5 text-xs text-stone-400 hover:border-amber-500/30 transition-colors">
               Change
             </button>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-          />
+          <input ref={fileRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
         </div>
       )}
 
-      <p className="text-center text-[10px] text-stone-700">
-        You own the rights to your uploaded music. Kiln doesn't store it on our servers.
-      </p>
+      <p className="text-center text-[10px] text-stone-700">You own the rights to your uploaded music.</p>
     </div>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 
 interface Props {
   selectedTrackId: string | null;
@@ -231,7 +382,8 @@ interface Props {
 }
 
 export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }: Props) {
-  const [tab, setTab] = useState<"library" | "upload">("library");
+  const [tab, setTab] = useState<"library" | "community" | "upload">("library");
+  const [craftMood, setCraftMood] = useState<string>("All");
   const [genre, setGenre] = useState<string>("All");
   const [query, setQuery] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -240,81 +392,71 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const filtered = musicTracks.filter((t) => {
+    const matchMood = craftMood === "All" || t.craftMood === craftMood;
     const matchGenre = genre === "All" || t.genre === genre;
-    const matchQuery =
-      !query ||
-      t.title.toLowerCase().includes(query.toLowerCase()) ||
-      t.artist.toLowerCase().includes(query.toLowerCase());
-    return matchGenre && matchQuery;
+    const matchQuery = !query || t.title.toLowerCase().includes(query.toLowerCase()) || t.artist.toLowerCase().includes(query.toLowerCase());
+    return matchMood && matchGenre && matchQuery;
   });
 
   const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-    }
-    setPlaying(false);
-    setPreviewId(null);
-    setProgress(0);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    setPlaying(false); setPreviewId(null); setProgress(0);
   }, []);
 
-  const togglePreview = useCallback(
-    (track: MusicTrack) => {
-      if (previewId === track.id) { stopAudio(); return; }
-      stopAudio();
-      const audio = new Audio(track.url);
-      audio.volume = 0.7;
-      audioRef.current = audio;
-      audio.addEventListener("timeupdate", () => {
-        setProgress((audio.currentTime / track.duration) * 100);
-      });
-      audio.addEventListener("ended", stopAudio);
-      audio.play().then(() => { setPreviewId(track.id); setPlaying(true); }).catch(() => {});
-    },
-    [previewId, stopAudio],
-  );
+  const togglePreview = useCallback((track: MusicTrack) => {
+    if (previewId === track.id) { stopAudio(); return; }
+    stopAudio();
+    const audio = new Audio(track.url);
+    audio.volume = 0.7;
+    audioRef.current = audio;
+    audio.addEventListener("timeupdate", () => { setProgress((audio.currentTime / track.duration) * 100); });
+    audio.addEventListener("ended", stopAudio);
+    audio.play().then(() => { setPreviewId(track.id); setPlaying(true); }).catch(() => {});
+  }, [previewId, stopAudio]);
 
   useEffect(() => stopAudio, [stopAudio]);
 
   const isCustomSelected = selectedTrackId?.startsWith("custom-") ?? false;
+  const isBeatSelected = selectedTrackId?.startsWith("beat-") ?? false;
+
+  // Resolve display track (handles beat:// and custom:// and library tracks)
+  const displayTrack = selectedTrack ?? musicTracks.find((m) => m.id === selectedTrackId);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Selected track display */}
-      {selectedTrackId && (() => {
-        const t = selectedTrack ?? musicTracks.find((m) => m.id === selectedTrackId);
-        return t ? (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-            <Music size={16} className="text-amber-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-amber-200 truncate">{t.title}</p>
-              <p className="text-xs text-stone-400 truncate">{t.artist}</p>
-            </div>
-            <button onClick={() => onSelect(null)} className="text-xs text-stone-500 hover:text-red-400 transition-colors">
-              Remove
-            </button>
+      {/* Selected track banner */}
+      {selectedTrackId && displayTrack && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <Music size={16} className="text-amber-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-200 truncate">{displayTrack.title}</p>
+            <p className="text-xs text-stone-400 truncate">{displayTrack.artist}</p>
           </div>
-        ) : null;
-      })()}
+          <button onClick={() => onSelect(null)} className="text-xs text-stone-500 hover:text-red-400 transition-colors">Remove</button>
+        </div>
+      )}
 
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl bg-stone-900 p-1">
         <button
           onClick={() => setTab("library")}
-          className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
-            tab === "library" ? "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"
-          }`}
+          className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${tab === "library" ? "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"}`}
         >
           Library
         </button>
         <button
+          onClick={() => setTab("community")}
+          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${
+            tab === "community" ? isBeatSelected ? "bg-amber-500/20 text-amber-300" : "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"
+          }`}
+        >
+          Community
+          {isBeatSelected && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+        </button>
+        <button
           onClick={() => setTab("upload")}
           className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${
-            tab === "upload"
-              ? isCustomSelected
-                ? "bg-amber-500/20 text-amber-300"
-                : "bg-stone-700 text-stone-100"
-              : "text-stone-500 hover:text-stone-300"
+            tab === "upload" ? isCustomSelected ? "bg-amber-500/20 text-amber-300" : "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"
           }`}
         >
           <Upload size={11} />
@@ -326,34 +468,65 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
       {/* Library tab */}
       {tab === "library" && (
         <>
+          {/* Search */}
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
             <input
-              type="text"
-              placeholder="Search tracks..."
-              value={query}
+              type="text" placeholder="Search tracks or artists..." value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full rounded-lg border border-white/10 bg-stone-900 py-2 pl-8 pr-3 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
             />
           </div>
 
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-            {GENRES.map((g) => (
+          {/* Craft mood filter — prominent, TikTok-style */}
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-600">Craft Mood</p>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
               <button
-                key={g}
-                onClick={() => setGenre(g)}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  genre === g ? "bg-amber-500 text-stone-950" : "bg-stone-800 text-stone-400 hover:text-amber-300"
-                }`}
+                onClick={() => setCraftMood("All")}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${craftMood === "All" ? "bg-stone-600 text-stone-100" : "bg-stone-800 text-stone-500 hover:text-stone-300"}`}
               >
-                {g}
+                All
               </button>
-            ))}
+              {CRAFT_MOODS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => { setCraftMood(craftMood === m.id ? "All" : m.id); setGenre("All"); }}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                    craftMood === m.id ? "bg-amber-500 text-stone-950 shadow-sm shadow-amber-500/30" : "bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-200"
+                  }`}
+                >
+                  {m.emoji} {m.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
+          {/* Genre filter */}
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-600">Genre</p>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+              {GENRES.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => { setGenre(g); if (g !== "All") setCraftMood("All"); }}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    genre === g ? "bg-amber-500 text-stone-950" : "bg-stone-800 text-stone-400 hover:text-amber-300"
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Track count */}
+          <p className="text-xs text-stone-600">{filtered.length} track{filtered.length !== 1 ? "s" : ""}</p>
+
+          {/* Track list */}
+          <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
             {filtered.length === 0 && (
-              <p className="py-8 text-center text-sm text-stone-600">No tracks found</p>
+              <p className="py-8 text-center text-sm text-stone-600">No tracks match — try a different filter</p>
             )}
             {filtered.map((track) => {
               const isSelected = selectedTrackId === track.id;
@@ -361,9 +534,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
               return (
                 <div
                   key={track.id}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
-                    isSelected ? "bg-amber-500/15 border border-amber-500/30" : "border border-transparent hover:bg-stone-800/60"
-                  }`}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${isSelected ? "bg-amber-500/15 border border-amber-500/30" : "border border-transparent hover:bg-stone-800/60"}`}
                 >
                   <button
                     onClick={() => togglePreview(track)}
@@ -371,17 +542,13 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
                       isPreviewing ? "border-amber-400 bg-amber-400/20 text-amber-400" : "border-stone-700 bg-stone-800 text-stone-400 hover:border-amber-500/50 hover:text-amber-300"
                     }`}
                   >
-                    {isPreviewing && playing ? <Waveform playing={true} /> : isPreviewing ? <Pause size={14} /> : <Play size={14} />}
+                    {isPreviewing && playing ? <Waveform playing /> : isPreviewing ? <Pause size={14} /> : <Play size={14} />}
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-sm font-medium truncate ${isSelected ? "text-amber-200" : "text-stone-200"}`}>
-                        {track.title}
-                      </p>
-                      <span className="shrink-0 rounded-full bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-500">
-                        {track.genre}
-                      </span>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-sm font-medium truncate ${isSelected ? "text-amber-200" : "text-stone-200"}`}>{track.title}</p>
+                      <span className="shrink-0 rounded-full bg-stone-800 px-1.5 py-0.5 text-[9px] text-stone-500">{track.genre}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <p className="text-xs text-stone-500 truncate">{track.artist}</p>
@@ -409,11 +576,16 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
             })}
           </div>
 
-          <p className="text-center text-[10px] text-stone-700">All tracks are royalty-free. Licensed for use on Kiln.</p>
+          <p className="text-center text-[10px] text-stone-700">
+            {musicTracks.length} royalty-free tracks · CC BY / Public Domain
+          </p>
         </>
       )}
 
-      {/* Upload tab */}
+      {tab === "community" && (
+        <CommunityTab selectedTrackId={selectedTrackId} onSelect={onSelect} />
+      )}
+
       {tab === "upload" && (
         <UploadTab selectedTrackId={selectedTrackId} onSelect={onSelect} />
       )}

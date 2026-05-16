@@ -495,6 +495,21 @@ export default function Create() {
               />
             )}
 
+            {/* Music Studio shortcut */}
+            <button
+              onClick={() => navigate("/music-studio")}
+              className="flex w-full items-center justify-between rounded-xl border border-dashed border-stone-700 px-4 py-2.5 text-left hover:border-amber-500/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎹</span>
+                <div>
+                  <p className="text-xs font-medium text-stone-300">Music Studio</p>
+                  <p className="text-[10px] text-stone-600">Build your own beat &amp; license it to other creators</p>
+                </div>
+              </div>
+              <ChevronRight size={13} className="text-stone-600" />
+            </button>
+
             {/* Carousel strip — only for image posts */}
             {mediaType === "image" && (
               <div>
