@@ -36,7 +36,12 @@ interface FeedInteractions {
 
 function readInteractions(): FeedInteractions {
   try {
-    return JSON.parse(localStorage.getItem(INTERACTIONS_KEY) ?? "{}");
+    const raw = JSON.parse(localStorage.getItem(INTERACTIONS_KEY) ?? "{}");
+    return {
+      likedTechniques: raw.likedTechniques ?? {},
+      savedTechniques: raw.savedTechniques ?? {},
+      watchedArtists: raw.watchedArtists ?? {},
+    };
   } catch {
     return { likedTechniques: {}, savedTechniques: {}, watchedArtists: {} };
   }

@@ -166,9 +166,10 @@ function TitleSetter() {
 
 function Router() {
   return (
-    <Switch>
+    <>
       <TitleSetter />
-      <Route path="/" component={Feed} />
+      <Switch>
+        <Route path="/" component={Feed} />
       <Route path="/discover" component={Discover} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:id" component={ArtistProfile} />
@@ -268,7 +269,8 @@ function Router() {
       <Route path="/create-drop" component={CreateDrop} />
       <Route path="/create-workshop" component={CreateWorkshop} />
       <Route component={NotFound} />
-    </Switch>
+      </Switch>
+    </>
   );
 }
 
