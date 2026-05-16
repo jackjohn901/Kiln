@@ -75,16 +75,40 @@ export default function Create() {
   const [crossPost, setCrossPost] = useState({ instagram: false, tiktok: false });
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
+  const [durationError, setDurationError] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const additionalInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_VIDEO_SECONDS = 60;
+
   const handleFile = useCallback((f: File) => {
+    setDurationError("");
     const isVid = f.type.startsWith("video/");
-    setFile(f);
-    setMediaType(isVid ? "video" : "image");
-    setPreviewUrl(URL.createObjectURL(f));
-    setStep("edit");
+    if (isVid) {
+      const url = URL.createObjectURL(f);
+      const vid = document.createElement("video");
+      vid.preload = "metadata";
+      vid.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        if (vid.duration > MAX_VIDEO_SECONDS) {
+          setDurationError(
+            `Videos must be ${MAX_VIDEO_SECONDS} seconds or less. Yours is ${Math.round(vid.duration)}s — trim it and try again.`
+          );
+          return;
+        }
+        setFile(f);
+        setMediaType("video");
+        setPreviewUrl(URL.createObjectURL(f));
+        setStep("edit");
+      };
+      vid.src = url;
+    } else {
+      setFile(f);
+      setMediaType("image");
+      setPreviewUrl(URL.createObjectURL(f));
+      setStep("edit");
+    }
   }, []);
 
   const onDrop = useCallback(
@@ -367,7 +391,7 @@ export default function Create() {
                 <p className="mt-1 text-sm text-stone-600">
                   Process videos, work-in-progress shots, studio moments
                 </p>
-                <p className="mt-0.5 text-xs text-stone-700">MP4, MOV, JPG, PNG, WEBP</p>
+                <p className="mt-0.5 text-xs text-stone-700">MP4, MOV, JPG, PNG, WEBP · Videos up to 60s</p>
               </div>
               <button className="rounded-full bg-stone-800 px-5 py-2 text-sm font-medium text-stone-300 hover:bg-stone-700 transition-colors">
                 <Upload size={14} className="mr-1.5 inline" />
@@ -381,6 +405,17 @@ export default function Create() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
               />
             </div>
+
+            {/* Duration error */}
+            {durationError && (
+              <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+                <span className="mt-0.5 text-red-400 text-lg">⏱</span>
+                <div>
+                  <p className="text-sm font-medium text-red-400">Video too long</p>
+                  <p className="mt-0.5 text-xs text-red-400/80">{durationError}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
