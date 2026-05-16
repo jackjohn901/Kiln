@@ -160,7 +160,7 @@ function BottomTab() {
   const tabs = [
     { href: "/", icon: Home, label: "Home" },
     { href: "/discover", icon: Users, label: "Discover" },
-    { href: "/create", icon: null, label: "" },
+    { href: profile ? "/create" : "/setup", icon: null, label: "" },
     { href: "/shop", icon: ShoppingBag, label: "Shop" },
     { href: profile ? `/artists/${profile.id}` : "/setup", icon: User, label: "Profile" },
   ];
