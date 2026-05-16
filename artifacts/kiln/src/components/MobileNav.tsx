@@ -21,7 +21,6 @@ const PRIMARY_TABS = [
   { href: "/", icon: Home, label: "Home" },
   { href: "/discover", icon: Compass, label: "Discover" },
   { href: "/create", icon: Plus, label: "Create", accent: true },
-  { href: "/shop", icon: ShoppingBag, label: "Shop" },
 ];
 
 interface NavItem { href: string; icon: React.ElementType; label: string }
@@ -32,6 +31,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/notifications", icon: Bell, label: "Notifications" },
       { href: "/messages", icon: MessageCircle, label: "Messages" },
+      { href: "/shop", icon: ShoppingBag, label: "Shop" },
       { href: "/saved", icon: Bookmark, label: "Saved" },
       { href: "/orders", icon: Package, label: "Orders" },
       { href: "/cart", icon: ShoppingCart, label: "Cart" },
@@ -115,9 +115,10 @@ export default function MobileNav() {
   const totalBadge = unreadCount + unreadMessageCount;
   const profileHref = profile ? `/artists/${profile.id}` : "/setup";
   const createHref = profile ? "/create" : "/setup";
+  const isProfileActive = location.startsWith("/artists/") || location === "/setup" || location === "/edit-profile";
   const isMoreActive = showMore || (
     !PRIMARY_TABS.some(t => t.href === "/" ? location === "/" : location.startsWith(t.href)) &&
-    !location.startsWith("/artists/")
+    !isProfileActive
   );
 
   return (
@@ -147,15 +148,34 @@ export default function MobileNav() {
                       {label}
                     </span>
                   )}
-                  {href === "/shop" && itemCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-stone-950">
-                      {itemCount}
-                    </span>
-                  )}
                 </button>
               </Link>
             );
           })}
+
+          {/* Profile tab */}
+          <Link href={profileHref}>
+            <button
+              className={`relative flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all ${
+                isProfileActive ? "text-amber-400" : "text-stone-500"
+              }`}
+            >
+              {profile?.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt=""
+                  className={`h-7 w-7 rounded-full object-cover transition-all ${
+                    isProfileActive ? "ring-2 ring-amber-400" : "ring-1 ring-white/20"
+                  }`}
+                />
+              ) : (
+                <User size={20} strokeWidth={isProfileActive ? 2.5 : 1.8} />
+              )}
+              <span className={`text-[10px] font-medium ${isProfileActive ? "text-amber-400" : "text-stone-600"}`}>
+                Profile
+              </span>
+            </button>
+          </Link>
 
           {/* More button */}
           <button
