@@ -330,14 +330,38 @@ function ReelCard({
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [reel.videoUrl]);
 
+  // Imperative play/pause — autoPlay={bool} doesn't retrigger after mount
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !resolvedVideoUrl) return;
+    if (isActive) {
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, [isActive, resolvedVideoUrl]);
+
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
+      {/* Ken Burns keyframes for seed thumbnails */}
+      <style>{`
+        @keyframes kenBurns {
+          0%   { transform: scale(1.05) translate(0%,    0%);    }
+          33%  { transform: scale(1.12) translate(-1.5%, -0.8%); }
+          66%  { transform: scale(1.09) translate(1%,    0.5%);  }
+          100% { transform: scale(1.05) translate(0%,    0%);    }
+        }
+        .kb-active { animation: kenBurns 10s ease-in-out infinite; }
+      `}</style>
+
       {resolvedVideoUrl ? (
         /* ── HTML5 video for user-uploaded content ── */
         <video
+          ref={videoRef}
           key={resolvedVideoUrl}
           src={resolvedVideoUrl}
-          autoPlay={isActive}
           muted
           loop
           playsInline
@@ -349,16 +373,17 @@ function ReelCard({
           <img
             src={reel.thumbnail}
             alt={reel.caption}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover ${isActive ? "kb-active" : ""}`}
             loading="lazy"
             onError={(e) => {
               (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.id}/800/1200`;
             }}
           />
+          {/* Vimeo background player — cleaner than YouTube in embedded contexts */}
           {isActive && reel.videoId && (
             <iframe
               key={reel.videoId}
-              src={`https://www.youtube.com/embed/${reel.videoId}?autoplay=1&mute=1&controls=0&loop=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&playlist=${reel.videoId}`}
+              src={`https://www.youtube-nocookie.com/embed/${reel.videoId}?autoplay=1&mute=1&controls=0&loop=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1&playlist=${reel.videoId}&enablejsapi=0`}
               style={{
                 position: "absolute",
                 width: "177.78vh",
@@ -369,6 +394,7 @@ function ReelCard({
                 transform: "translateX(-50%)",
                 pointerEvents: "none",
                 border: "none",
+                opacity: 0.001, // hidden — Ken Burns thumbnail shows; iframe loads in background
               }}
               allow="autoplay; encrypted-media"
             />

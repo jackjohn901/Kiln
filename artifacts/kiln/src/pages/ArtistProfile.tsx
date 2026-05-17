@@ -7,7 +7,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -24,6 +24,7 @@ import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
 import { getPosts } from "@/data/posts";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
+import { getCommunityBeats, type CommunityBeat, LICENSE_LABELS, LICENSE_COLORS } from "@/lib/communityBeats";
 
 function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
   const seed = getArtistById(id) ?? seedArtists.find((a) => a.id === id);
@@ -198,7 +199,23 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold" | "dna";
+type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold" | "dna" | "sounds";
+
+// ── Mini beat grid for Sounds tab ─────────────────────────────────────────────
+const BEAT_TRACK_COLORS = ["bg-amber-500","bg-orange-500","bg-yellow-400","bg-lime-500","bg-teal-500","bg-sky-500"];
+function BeatMiniGrid({ pattern }: { pattern: boolean[][] }) {
+  return (
+    <div className="flex flex-col gap-[2px]">
+      {pattern.map((row, ti) => (
+        <div key={ti} className="flex gap-[2px]">
+          {row.map((on, si) => (
+            <div key={si} className={`h-1.5 w-[9px] rounded-[2px] ${on ? BEAT_TRACK_COLORS[ti] : "bg-stone-700"}`} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface DbUserProfile {
   userId: string;
@@ -740,6 +757,7 @@ export default function ArtistProfile() {
               { key: "bio", icon: BookOpen, label: "Bio" },
               { key: "cv", icon: Award, label: "CV" },
               { key: "dna", icon: Activity, label: "DNA" },
+              { key: "sounds", icon: Music2, label: "Sounds" },
             ] as { key: Tab; icon: React.ElementType; label: string }[]
           ).map(({ key, icon: Icon, label }) => (
             <button
@@ -1284,6 +1302,88 @@ export default function ArtistProfile() {
                     Craft DNA is a transparent representation of artistic identity — not a ranking. Scores are generated from exhibition records, teaching history, community engagement, and work breadth. No hidden signals.
                   </p>
                 </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Sounds tab ── */}
+          {tab === "sounds" && (() => {
+            const allBeats = getCommunityBeats();
+            const artistBeats = allBeats.filter(
+              (b) => b.artistHandle === id || b.artistHandle === artist.id
+            );
+            const totalPlays = artistBeats.reduce((sum, b) => sum + b.usedCount, 0);
+            return (
+              <div className="space-y-5 py-2">
+                {/* Header stats */}
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex-1 text-center">
+                    <div className="text-xl font-black text-amber-300">{artistBeats.length}</div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">Sounds Made</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-stone-900/40 px-4 py-3 flex-1 text-center">
+                    <div className="text-xl font-black text-stone-200">{totalPlays}</div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">Times Used</div>
+                  </div>
+                  {isOwn && (
+                    <Link href="/music-studio" className="rounded-2xl border border-white/8 bg-stone-900/40 px-4 py-3 flex-1 text-center hover:border-amber-500/30 transition-colors">
+                      <div className="text-xl font-black text-amber-300">+</div>
+                      <div className="text-[10px] text-stone-500 mt-0.5">New Beat</div>
+                    </Link>
+                  )}
+                </div>
+
+                {artistBeats.length === 0 ? (
+                  <div className="py-10 text-center space-y-3">
+                    <Music2 size={32} className="mx-auto text-stone-700" />
+                    <p className="text-sm text-stone-600">No original sounds yet.</p>
+                    {isOwn && (
+                      <Link href="/music-studio" className="inline-block mt-1 rounded-xl bg-amber-500/10 border border-amber-500/20 px-5 py-2 text-sm text-amber-300 hover:bg-amber-500/20 transition-colors">
+                        Open Music Studio →
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {artistBeats.map((beat) => (
+                      <div key={beat.id} className="rounded-2xl border border-white/8 bg-stone-900/40 p-4 flex items-center gap-4">
+                        {/* Beat grid preview */}
+                        <div className="shrink-0">
+                          <BeatMiniGrid pattern={beat.pattern} />
+                        </div>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold text-stone-100 truncate">{beat.title}</span>
+                            <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${LICENSE_COLORS[beat.license]}`}>
+                              {LICENSE_LABELS[beat.license]}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-stone-500">
+                            <span>{beat.bpm} BPM</span>
+                            <span>·</span>
+                            <span>{beat.usedCount} uses</span>
+                            <span>·</span>
+                            <span>{new Date(beat.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                          </div>
+                        </div>
+                        {/* Use button */}
+                        <button className="shrink-0 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/20 transition-colors">
+                          Use
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Placeholder seed sounds for non-own profiles */}
+                {!isOwn && artistBeats.length === 0 && (
+                  <div className="rounded-2xl border border-white/8 bg-stone-900/30 p-5 text-center">
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      {artist.name.split(" ")[0]} hasn't published any original sounds to the community yet. Check back soon.
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })()}

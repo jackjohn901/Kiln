@@ -520,6 +520,57 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
             </div>
           </div>
 
+          {/* Trending shelf — shown only when no active filters */}
+          {craftMood === "All" && genre === "All" && !query && (() => {
+            const trending = [
+              musicTracks.find(t => t.id === "equatorial-complex"),
+              musicTracks.find(t => t.id === "lost-frontier"),
+              musicTracks.find(t => t.id === "tempting-secrets"),
+              musicTracks.find(t => t.id === "space-jazz"),
+              musicTracks.find(t => t.id === "inner-light"),
+              musicTracks.find(t => t.id === "impact-moderato"),
+            ].filter(Boolean) as MusicTrack[];
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-600">🔥 Trending in Craft</p>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {trending.map((track) => {
+                    const isSelected = selectedTrackId === track.id;
+                    const isPreviewing = previewId === track.id;
+                    const moodEmoji = CRAFT_MOODS.find(m => m.id === track.craftMood)?.emoji ?? "🎵";
+                    return (
+                      <button
+                        key={track.id}
+                        onClick={() => onSelect(isSelected ? null : track)}
+                        className={`shrink-0 flex flex-col gap-1.5 rounded-xl border p-3 w-28 text-left transition-all ${
+                          isSelected
+                            ? "border-amber-500/40 bg-amber-500/15"
+                            : "border-stone-700/60 bg-stone-900/60 hover:border-amber-500/30"
+                        }`}
+                      >
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-full text-base ${isSelected ? "bg-amber-500/20" : "bg-stone-800"}`}>
+                          {isPreviewing && playing ? <Waveform playing /> : moodEmoji}
+                        </div>
+                        <p className={`text-[11px] font-semibold leading-tight line-clamp-2 ${isSelected ? "text-amber-200" : "text-stone-200"}`}>{track.title}</p>
+                        <div className="flex items-center justify-between mt-auto">
+                          <span className="text-[9px] text-stone-600">{track.bpm} BPM</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePreview(track); }}
+                            className="text-stone-500 hover:text-amber-400 transition-colors"
+                          >
+                            {isPreviewing ? <Pause size={10} /> : <Play size={10} />}
+                          </button>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Track count */}
           <p className="text-xs text-stone-600">{filtered.length} track{filtered.length !== 1 ? "s" : ""}</p>
 
