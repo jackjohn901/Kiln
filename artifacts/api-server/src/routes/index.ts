@@ -55,6 +55,9 @@ import studioMapRouter from "./studio-map";
 import trendingPostsRouter from "./trending-posts";
 import userPaymentSettingsRouter from "./user-payment-settings";
 import beatLicensesRouter from "./beat-licenses";
+import collectorPortalRouter from "./collector-portal";
+import opportunitySavesRouter from "./opportunity-saves";
+import priceAlertsRouter from "./price-alerts";
 
 const router: IRouter = Router();
 
@@ -114,5 +117,8 @@ router.use(studioMapRouter);
 router.use(trendingPostsRouter);
 router.use(userPaymentSettingsRouter);
 router.use(beatLicensesRouter);
+router.use(collectorPortalRouter);
+router.use(opportunitySavesRouter);
+router.use(priceAlertsRouter);
 
 export default router;

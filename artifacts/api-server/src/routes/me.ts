@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { ordersTable } from "@workspace/db";
+import { ordersTable, verificationApplicationsTable, userSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { logger } from "../lib/logger";
@@ -118,6 +118,80 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
     logger.error({ err }, "me/orders/bulk error");
     res.status(500).json({ error: "Failed to create orders" });
   }
+});
+
+// POST /me/listing-waitlist/:id — toggle listing waitlist (stored in user_settings JSON)
+router.post("/me/listing-waitlist/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+  const listingId = req.params.id;
+  try {
+    const [row] = await db.select({ settings: userSettingsTable.settings })
+      .from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
+    const settings = (row?.settings ?? {}) as Record<string, unknown>;
+    const waitlist: string[] = Array.isArray(settings.listingWaitlist) ? (settings.listingWaitlist as string[]) : [];
+    const isOnWaitlist = waitlist.includes(listingId);
+    const next = isOnWaitlist ? waitlist.filter(id => id !== listingId) : [...waitlist, listingId];
+    const newSettings = { ...settings, listingWaitlist: next };
+    if (row) {
+      await db.update(userSettingsTable).set({ settings: newSettings }).where(eq(userSettingsTable.userId, userId));
+    } else {
+      await db.insert(userSettingsTable).values({ userId, settings: newSettings, shippingSettings: {}, paymentSettings: {} });
+    }
+    res.json({ onWaitlist: !isOnWaitlist });
+  } catch (err) {
+    logger.error({ err }, "listing-waitlist POST error");
+    res.status(500).json({ error: "Failed to update waitlist" });
+  }
+});
+
+// POST /me/verification-application — submit or update a verification application
+router.post("/me/verification-application", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+  const { website, instagram, yearsActive, exhibitions, galleries, statement } = req.body as {
+    website?: string; instagram?: string; yearsActive?: number;
+    exhibitions?: string; galleries?: string; statement?: string;
+  };
+  try {
+    const [row] = await db.insert(verificationApplicationsTable)
+      .values({
+        id: crypto.randomUUID(),
+        userId,
+        website: website ?? null,
+        instagram: instagram ?? null,
+        yearsActive: typeof yearsActive === "number" ? yearsActive : null,
+        exhibitions: exhibitions ?? null,
+        galleries: galleries ?? null,
+        statement: statement ?? null,
+        status: "pending",
+      })
+      .onConflictDoUpdate({
+        target: [verificationApplicationsTable.userId],
+        set: {
+          website: website ?? null,
+          instagram: instagram ?? null,
+          yearsActive: typeof yearsActive === "number" ? yearsActive : null,
+          exhibitions: exhibitions ?? null,
+          galleries: galleries ?? null,
+          statement: statement ?? null,
+          status: "pending",
+        },
+      })
+      .returning();
+    res.json(row);
+  } catch (err) {
+    logger.error({ err }, "verification-application POST error");
+    res.status(500).json({ error: "Failed to submit application" });
+  }
+});
+
+// GET /me/verification-application — check existing application
+router.get("/me/verification-application", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [row] = await db.select().from(verificationApplicationsTable)
+    .where(eq(verificationApplicationsTable.userId, req.user.id));
+  res.json(row ?? null);
 });
 
 export default router;

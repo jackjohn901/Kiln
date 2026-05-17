@@ -145,8 +145,38 @@ export default function TasteGraph() {
   });
   const [activeSection, setActiveSection] = useState<"graph" | "sliders" | "matches">("graph");
   const [autoComputed, setAutoComputed] = useState(false);
+  const weightsRef = useRef(weights);
+  useEffect(() => { weightsRef.current = weights; }, [weights]);
 
-  useEffect(() => { saveWeights(weights); }, [weights]);
+  useEffect(() => {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const tw = data?.settings?.tasteWeights;
+        if (tw && typeof tw === "object") {
+          setWeights(prev => ({ ...prev, ...tw }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    saveWeights(weights);
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch("/api/me/settings", { credentials: "include" });
+        if (!r.ok) return;
+        const data = await r.json();
+        await fetch("/api/me/settings", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ settings: { ...(data.settings ?? {}), tasteWeights: weightsRef.current } }),
+        });
+      } catch { /* ignore, localStorage already saved */ }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [weights]);
 
   function autoCompute() {
     const computed = computeFromActivity(reelLikes, reelSaves);

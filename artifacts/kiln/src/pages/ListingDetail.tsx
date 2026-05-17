@@ -179,8 +179,15 @@ const WAITLIST_KEY = "kiln_listing_waitlist_v1";
 function getWaitlisted(): string[] {
   try { return JSON.parse(localStorage.getItem(WAITLIST_KEY) ?? "[]"); } catch { return []; }
 }
-function setWaitlisted(ids: string[]) {
-  localStorage.setItem(WAITLIST_KEY, JSON.stringify(ids));
+function setWaitlistedLocal(ids: string[]) {
+  try { localStorage.setItem(WAITLIST_KEY, JSON.stringify(ids)); } catch {}
+}
+const PRICE_ALERTS_KEY = "kiln_price_alerts_v1";
+function getPriceAlerts(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(PRICE_ALERTS_KEY) ?? "{}"); } catch { return {}; }
+}
+function setPriceAlertsLocal(a: Record<string, number>) {
+  try { localStorage.setItem(PRICE_ALERTS_KEY, JSON.stringify(a)); } catch {}
 }
 
 const PLAN_OPTIONS = [
@@ -212,10 +219,10 @@ export default function ListingDetail() {
   const [showPriceAlert, setShowPriceAlert] = useState(false);
   const [priceAlertTarget, setPriceAlertTarget] = useState("");
   const [priceAlertSaved, setPriceAlertSaved] = useState(() => {
-    try { const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}"); return id ? !!a[id] : false; } catch { return false; }
+    const a = getPriceAlerts(); return id ? !!a[id] : false;
   });
   const [priceAlertValue, setPriceAlertValue] = useState(() => {
-    try { const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}"); return id && a[id] ? String(a[id]) : ""; } catch { return ""; }
+    const a = getPriceAlerts(); return id && a[id] ? String(a[id]) : "";
   });
   const [selectedImg, setSelectedImg] = useState(0);
   const [selectedEdition, setSelectedEdition] = useState("Original");
@@ -234,6 +241,31 @@ export default function ListingDetail() {
   const [onWaitlist, setOnWaitlist] = useState(() =>
     id ? getWaitlisted().includes(id) : false
   );
+
+  useEffect(() => {
+    if (!id) return;
+    fetch("/api/me/price-alerts", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.alerts) return;
+        setPriceAlertsLocal(data.alerts);
+        if (data.alerts[id]) {
+          setPriceAlertSaved(true);
+          setPriceAlertValue(String(data.alerts[id]));
+        }
+      })
+      .catch(() => {});
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const wl: string[] = Array.isArray(data?.settings?.listingWaitlist) ? data.settings.listingWaitlist : [];
+        if (wl.length) {
+          setWaitlistedLocal(wl);
+          if (wl.includes(id)) setOnWaitlist(true);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
 
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
@@ -280,13 +312,10 @@ export default function ListingDetail() {
 
   function handleWaitlist() {
     const current = getWaitlisted();
-    if (onWaitlist) {
-      setWaitlisted(current.filter((i) => i !== id));
-      setOnWaitlist(false);
-    } else {
-      setWaitlisted([...current, id!]);
-      setOnWaitlist(true);
-    }
+    const next = onWaitlist ? current.filter((i) => i !== id) : [...current, id!];
+    setWaitlistedLocal(next);
+    setOnWaitlist(!onWaitlist);
+    fetch(`/api/me/listing-waitlist/${id}`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
   function handleSendOffer() {
@@ -1034,7 +1063,7 @@ export default function ListingDetail() {
                 </button>
               </div>
               <p className="text-sm text-stone-400">
-                We'll notify you if this piece drops below your target price. Alerts are stored locally.
+                We'll notify you if this piece drops below your target price.
               </p>
               {priceAlertSaved ? (
                 <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-center">
@@ -1042,11 +1071,12 @@ export default function ListingDetail() {
                   <p className="text-sm text-emerald-400 font-medium">Alert set for &lt;${parseInt(priceAlertValue).toLocaleString()}</p>
                   <button
                     onClick={() => {
-                      const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}");
+                      const a = getPriceAlerts();
                       delete a[id!];
-                      localStorage.setItem("kiln_price_alerts_v1", JSON.stringify(a));
+                      setPriceAlertsLocal(a);
                       setPriceAlertSaved(false);
                       setPriceAlertValue("");
+                      fetch(`/api/me/price-alerts/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
                     }}
                     className="mt-2 text-xs text-stone-500 hover:text-stone-300 underline"
                   >
@@ -1073,12 +1103,19 @@ export default function ListingDetail() {
                     disabled={!priceAlertTarget || parseInt(priceAlertTarget) <= 0}
                     onClick={() => {
                       if (!priceAlertTarget || !id) return;
-                      const a = JSON.parse(localStorage.getItem("kiln_price_alerts_v1") ?? "{}");
-                      a[id] = parseInt(priceAlertTarget);
-                      localStorage.setItem("kiln_price_alerts_v1", JSON.stringify(a));
+                      const targetPrice = parseInt(priceAlertTarget);
+                      const a = getPriceAlerts();
+                      a[id] = targetPrice;
+                      setPriceAlertsLocal(a);
                       setPriceAlertSaved(true);
                       setPriceAlertValue(priceAlertTarget);
                       setShowPriceAlert(false);
+                      fetch(`/api/me/price-alerts/${id}`, {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ targetPrice }),
+                      }).catch(() => {});
                     }}
                     className="w-full rounded-full bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >

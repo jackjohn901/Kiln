@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Clock, DollarSign, ChevronLeft, Star, Search, CheckCircle, ChevronDown, CalendarPlus } from "lucide-react";
@@ -37,47 +37,61 @@ function formatDeadline(deadline: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const SAVED_KEY = "kiln_saved_opps";
-const APPLIED_KEY = "kiln_opps_applied";
-
-function getSaved(): string[] {
-  try { return JSON.parse(localStorage.getItem(SAVED_KEY) ?? "[]"); } catch { return []; }
-}
-function setSaved(ids: string[]) {
-  try { localStorage.setItem(SAVED_KEY, JSON.stringify(ids)); } catch {}
-}
-
 type ApplicationStatus = "not-applied" | "applied" | "submitted" | "accepted" | "declined";
 
-function getApplications(): Record<string, ApplicationStatus> {
-  try { return JSON.parse(localStorage.getItem(APPLIED_KEY) ?? "{}"); } catch { return {}; }
-}
-function saveApplications(apps: Record<string, ApplicationStatus>) {
-  try { localStorage.setItem(APPLIED_KEY, JSON.stringify(apps)); } catch {}
-}
+const SAVED_KEY = "kiln_saved_opps";
+const APPLIED_KEY = "kiln_opps_applied";
 
 export default function OpportunityBoard() {
   const [filter, setFilter] = useState<OpportunityType | "all">("all");
   const [query, setQuery] = useState("");
-  const [saved, setSavedState] = useState<string[]>(getSaved);
+  const [saved, setSavedState] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(SAVED_KEY) ?? "[]"); } catch { return []; }
+  });
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [applications, setApplications] = useState<Record<string, ApplicationStatus>>(getApplications);
+  const [applications, setApplications] = useState<Record<string, ApplicationStatus>>(() => {
+    try { return JSON.parse(localStorage.getItem(APPLIED_KEY) ?? "{}"); } catch { return {}; }
+  });
   const [showApplied, setShowApplied] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/me/opportunity-saves", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        if (data.savedIds?.length) {
+          setSavedState(data.savedIds);
+          try { localStorage.setItem(SAVED_KEY, JSON.stringify(data.savedIds)); } catch {}
+        }
+        if (data.applications && Object.keys(data.applications).length) {
+          setApplications(prev => ({ ...prev, ...data.applications }));
+          try { localStorage.setItem(APPLIED_KEY, JSON.stringify({ ...JSON.parse(localStorage.getItem(APPLIED_KEY) ?? "{}"), ...data.applications })); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   function setAppStatus(id: string, status: ApplicationStatus) {
     setApplications(prev => {
       const next = { ...prev, [id]: status };
-      saveApplications(next);
+      try { localStorage.setItem(APPLIED_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
+    fetch(`/api/me/opportunity-status/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    }).catch(() => {});
   }
 
   function toggleSave(id: string) {
     setSavedState((prev) => {
       const next = prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id];
-      setSaved(next);
+      try { localStorage.setItem(SAVED_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
+    fetch(`/api/me/opportunity-saves/${id}`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
   const filtered = OPPORTUNITIES.filter((o) => {
@@ -131,9 +145,9 @@ export default function OpportunityBoard() {
               onClick={() => setFilter(key)}
               className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
                 filter === key
-                  ? TYPE_COLORS[key].replace("text-", "bg-").replace(/bg-\S+\/10/, "").replace("border-", "") + " bg-amber-500 text-stone-950 border-amber-500"
+                  ? "!bg-amber-500 !text-stone-950 !border-amber-500"
                   : "border-white/10 text-stone-500 hover:border-white/20 hover:text-stone-300"
-              } ${filter === key ? "!bg-amber-500 !text-stone-950 !border-amber-500" : ""}`}
+              }`}
             >
               {label}
             </button>
@@ -177,7 +191,6 @@ export default function OpportunityBoard() {
                       <option value="submitted">Submitted</option>
                       <option value="accepted">Accepted ✓</option>
                       <option value="declined">Declined</option>
-                      <option value="not-applied">Remove</option>
                     </select>
                   </div>
                 ))}
@@ -188,15 +201,13 @@ export default function OpportunityBoard() {
 
         {/* Featured */}
         {featured.length > 0 && (
-          <div className="mb-8">
+          <div className="mb-6">
             <div className="mb-3 flex items-center gap-2">
-              <Star size={12} className="text-amber-400" fill="currentColor" />
-              <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Featured</span>
+              <Star size={12} className="text-amber-400" />
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Featured</span>
             </div>
             <div className="flex flex-col gap-3">
-              {featured.map((opp) => (
-                <OppCard key={opp.id} opp={opp} saved={saved.includes(opp.id)} onSave={() => toggleSave(opp.id)} expanded={expanded === opp.id} onExpand={() => setExpanded(expanded === opp.id ? null : opp.id)} appStatus={applications[opp.id] ?? "not-applied"} onSetStatus={s => setAppStatus(opp.id, s)} />
-              ))}
+              {featured.map(opp => <OppCard key={opp.id} opp={opp} saved={saved} applications={applications} onToggleSave={toggleSave} onSetStatus={setAppStatus} expanded={expanded} onExpand={setExpanded} />)}
             </div>
           </div>
         )}
@@ -204,35 +215,7 @@ export default function OpportunityBoard() {
         {/* Rest */}
         {rest.length > 0 && (
           <div className="flex flex-col gap-3">
-            {rest.map((opp) => (
-              <OppCard key={opp.id} opp={opp} saved={saved.includes(opp.id)} onSave={() => toggleSave(opp.id)} expanded={expanded === opp.id} onExpand={() => setExpanded(expanded === opp.id ? null : opp.id)} appStatus={applications[opp.id] ?? "not-applied"} onSetStatus={s => setAppStatus(opp.id, s)} />
-            ))}
-          </div>
-        )}
-
-        {/* Saved section */}
-        {saved.length > 0 && filter === "all" && !query && (
-          <div className="mt-10 border-t border-white/8 pt-8">
-            <p className="mb-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
-              <BookmarkCheck size={12} className="inline mr-1.5 text-amber-400" />
-              Saved ({saved.length})
-            </p>
-            <div className="flex flex-col gap-2">
-              {OPPORTUNITIES.filter((o) => saved.includes(o.id)).map((opp) => (
-                <div key={opp.id} className="flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-stone-200 truncate">{opp.title}</p>
-                    <p className="text-xs text-stone-500">{opp.organization}</p>
-                  </div>
-                  <span className={`text-xs ${urgencyColor(daysUntilDeadline(opp.deadline))}`}>
-                    {opp.deadline === "Rolling" ? "Rolling" : `${daysUntilDeadline(opp.deadline)}d`}
-                  </span>
-                  <button onClick={() => toggleSave(opp.id)} className="text-amber-400 hover:text-stone-400 transition-colors">
-                    <BookmarkCheck size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            {rest.map(opp => <OppCard key={opp.id} opp={opp} saved={saved} applications={applications} onToggleSave={toggleSave} onSetStatus={setAppStatus} expanded={expanded} onExpand={setExpanded} />)}
           </div>
         )}
       </div>
@@ -240,164 +223,96 @@ export default function OpportunityBoard() {
   );
 }
 
-const APP_STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string }> = {
-  "not-applied": { label: "Mark Applied", color: "text-stone-500 hover:text-amber-400" },
-  applied: { label: "Applied ✓", color: "text-amber-400" },
-  submitted: { label: "Submitted", color: "text-sky-400" },
-  accepted: { label: "Accepted 🎉", color: "text-emerald-400" },
-  declined: { label: "Declined", color: "text-stone-500" },
-};
+type OppType = (typeof OPPORTUNITIES)[number];
 
-function downloadCalendar(opp: typeof OPPORTUNITIES[0]) {
-  if (opp.deadline === "Rolling") return;
-  const d = new Date(opp.deadline);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const dateStr = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-  const nextDay = new Date(d); nextDay.setDate(nextDay.getDate() + 1);
-  const nextStr = `${nextDay.getFullYear()}${pad(nextDay.getMonth() + 1)}${pad(nextDay.getDate())}`;
-  const ics = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Kiln//Opportunity Board//EN",
-    "BEGIN:VEVENT",
-    `UID:${opp.id}@kiln.art`,
-    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
-    `DTSTART;VALUE=DATE:${dateStr}`,
-    `DTEND;VALUE=DATE:${nextStr}`,
-    `SUMMARY:Deadline: ${opp.title}`,
-    `DESCRIPTION:${opp.organization}\\n${opp.url}`,
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ].join("\r\n");
-  const blob = new Blob([ics], { type: "text/calendar" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${opp.id}-deadline.ics`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function OppCard({ opp, saved, onSave, expanded, onExpand, appStatus, onSetStatus }: {
-  opp: typeof OPPORTUNITIES[0];
-  saved: boolean;
-  onSave: () => void;
-  expanded: boolean;
-  onExpand: () => void;
-  appStatus: ApplicationStatus;
-  onSetStatus: (s: ApplicationStatus) => void;
+function OppCard({
+  opp, saved, applications, onToggleSave, onSetStatus, expanded, onExpand
+}: {
+  opp: OppType;
+  saved: string[];
+  applications: Record<string, ApplicationStatus>;
+  onToggleSave: (id: string) => void;
+  onSetStatus: (id: string, s: ApplicationStatus) => void;
+  expanded: string | null;
+  onExpand: (id: string | null) => void;
 }) {
+  const isSaved = saved.includes(opp.id);
+  const appStatus = applications[opp.id];
   const days = daysUntilDeadline(opp.deadline);
+  const isOpen = expanded === opp.id;
 
   return (
-    <motion.div
-      layout
-      className={`overflow-hidden rounded-2xl border transition-all ${opp.featured ? "border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-stone-900/80" : "border-white/8 bg-stone-900/60"}`}
-    >
-      <div className="w-full cursor-pointer px-5 py-4 text-left" onClick={onExpand}>
+    <motion.div layout className={`rounded-2xl border transition-colors ${isOpen ? "border-amber-500/30 bg-stone-900/80" : "border-white/8 bg-stone-900/40"}`}>
+      <button className="w-full text-left p-4" onClick={() => onExpand(isOpen ? null : opp.id)}>
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${TYPE_COLORS[opp.type]}`}>
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${TYPE_COLORS[opp.type]}`}>
                 {TYPE_LABELS[opp.type]}
               </span>
-              {opp.featured && (
-                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400">
-                  <Star size={9} fill="currentColor" /> Featured
+              {opp.featured && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">Featured</span>}
+              {appStatus && appStatus !== "not-applied" && (
+                <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                  {appStatus.charAt(0).toUpperCase() + appStatus.slice(1)}
                 </span>
               )}
             </div>
-            <h3 className="text-sm font-bold text-amber-100 leading-snug">{opp.title}</h3>
-            <p className="text-xs text-stone-500 mt-0.5">{opp.organization}</p>
+            <p className="text-sm font-semibold text-stone-100 truncate">{opp.title}</p>
+            <p className="text-xs text-stone-500">{opp.organization}</p>
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onSave(); }}
-            className={`mt-0.5 shrink-0 transition-colors ${saved ? "text-amber-400" : "text-stone-600 hover:text-stone-400"}`}
-          >
-            {saved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
-          </button>
+          <div className="shrink-0 flex flex-col items-end gap-1">
+            <button onClick={(e) => { e.stopPropagation(); onToggleSave(opp.id); }}
+              className={`p-1.5 rounded-full transition-colors ${isSaved ? "text-amber-400" : "text-stone-600 hover:text-stone-400"}`}>
+              {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+            </button>
+            <ChevronDown size={12} className={`text-stone-600 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </div>
         </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-stone-500">
-          <span className="flex items-center gap-1">
-            <MapPin size={11} /> {opp.location}
-          </span>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-stone-500">
+          <span className="flex items-center gap-1"><MapPin size={10} />{opp.location}</span>
           <span className={`flex items-center gap-1 ${urgencyColor(days)}`}>
-            <Clock size={11} />
-            {opp.deadline === "Rolling" ? "Rolling deadline" : days !== null && days <= 0 ? "Deadline passed" : days === 1 ? "Due tomorrow!" : days !== null && days <= 7 ? `${days} days left!` : `Due ${formatDeadline(opp.deadline)}`}
+            <Clock size={10} />
+            {days === null ? "Rolling" : days <= 0 ? "Closed" : `${days}d left — ${formatDeadline(opp.deadline)}`}
           </span>
-          {opp.stipend && (
-            <span className="flex items-center gap-1 text-emerald-400">
-              <DollarSign size={11} /> {opp.stipend}
-            </span>
-          )}
+          {opp.stipend && <span className="flex items-center gap-1 text-emerald-400"><DollarSign size={10} />{opp.stipend}</span>}
         </div>
-
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {opp.medium.slice(0, 4).map((m) => (
-            <span key={m} className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400">{m}</span>
-          ))}
-        </div>
-      </div>
+      </button>
 
       <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-white/8 px-5 py-4">
-              <p className="text-sm text-stone-300 leading-relaxed mb-4">{opp.description}</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <a
-                  href={opp.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
-                >
-                  Apply / Learn more <ExternalLink size={13} />
+        {isOpen && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden px-4 pb-4 space-y-3">
+            <p className="text-sm text-stone-400 leading-relaxed">{opp.description}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {opp.medium.map(m => (
+                <span key={m} className="rounded-full bg-stone-800 px-2.5 py-0.5 text-[11px] text-stone-400">{m}</span>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {opp.url && (
+                <a href={opp.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-bold text-stone-950 hover:bg-amber-400 transition-colors">
+                  <ExternalLink size={11} /> Apply
                 </a>
-                {opp.deadline !== "Rolling" && (
-                  <button
-                    onClick={e => { e.stopPropagation(); downloadCalendar(opp); }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-colors"
-                  >
-                    <CalendarPlus size={12} /> Add to calendar
-                  </button>
-                )}
-                {/* Application status tracker */}
-                <div className="flex items-center gap-2">
-                  {appStatus === "not-applied" ? (
-                    <button
-                      onClick={e => { e.stopPropagation(); onSetStatus("applied"); }}
-                      className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-stone-500 hover:border-amber-500/30 hover:text-amber-400 transition-colors"
-                    >
-                      <CheckCircle size={11} /> Track application
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <span className={`text-xs font-semibold ${APP_STATUS_CONFIG[appStatus].color}`}>
-                        {APP_STATUS_CONFIG[appStatus].label}
-                      </span>
-                      <select
-                        value={appStatus}
-                        onChange={e => { e.stopPropagation(); onSetStatus(e.target.value as ApplicationStatus); }}
-                        onClick={e => e.stopPropagation()}
-                        className="rounded-lg border border-white/10 bg-stone-800 px-2 py-1 text-[10px] text-stone-400 focus:outline-none"
-                      >
-                        <option value="applied">Applied</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="accepted">Accepted</option>
-                        <option value="declined">Declined</option>
-                        <option value="not-applied">Remove</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
+              {!appStatus || appStatus === "not-applied" ? (
+                <button onClick={() => onSetStatus(opp.id, "applied")}
+                  className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-stone-400 hover:text-stone-200 transition-colors">
+                  <CalendarPlus size={11} /> Track application
+                </button>
+              ) : (
+                <select
+                  value={appStatus}
+                  onChange={e => onSetStatus(opp.id, e.target.value as ApplicationStatus)}
+                  onClick={e => e.stopPropagation()}
+                  className="rounded-full border border-white/10 bg-stone-800 px-3 py-2 text-xs text-stone-300 focus:outline-none"
+                >
+                  <option value="applied">Applied</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="accepted">Accepted ✓</option>
+                  <option value="declined">Declined</option>
+                </select>
+              )}
             </div>
           </motion.div>
         )}

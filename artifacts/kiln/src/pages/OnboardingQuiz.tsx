@@ -59,17 +59,36 @@ export default function OnboardingQuiz() {
     );
   }
 
+  function syncPrefsToApi(prefs: object) {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        return fetch("/api/me/settings", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ settings: { ...(data.settings ?? {}), onboardingPrefs: prefs } }),
+        });
+      })
+      .catch(() => {});
+  }
+
   function handleNext() {
     if (step === "techniques") {
       setStep("vibes");
     } else {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ techniques: selectedTechniques, vibes: selectedVibes, setAt: new Date().toISOString() }));
+      const prefs = { techniques: selectedTechniques, vibes: selectedVibes, setAt: new Date().toISOString() };
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      syncPrefsToApi(prefs);
       navigate("/");
     }
   }
 
   function handleSkip() {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ techniques: [], vibes: [], setAt: new Date().toISOString() }));
+    const prefs = { techniques: [], vibes: [], setAt: new Date().toISOString() };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    syncPrefsToApi(prefs);
     navigate("/");
   }
 

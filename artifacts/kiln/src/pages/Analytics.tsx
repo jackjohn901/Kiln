@@ -259,7 +259,7 @@ export default function Analytics() {
                 const BASE = [0.05,0.04,0.03,0.04,0.08,0.14,0.18,0.22,0.26,0.30,0.34,0.38,0.42,0.44,0.46,0.48,0.56,0.72,0.88,0.96,0.90,0.78,0.60,0.32];
                 const WEEKEND_BOOST = di === 0 || di === 6 ? 0.12 : 0;
                 const WEEKDAY_LUNCH = (di >= 1 && di <= 5) ? [0,0,0,0,0,0,0,0,0,0,0,0.15,0.18,0.15,0,0,0,0,0,0,0,0,0,0] : new Array(24).fill(0);
-                const hourly = BASE.map((v, hi) => Math.min(1, v + WEEKEND_BOOST + (WEEKDAY_LUNCH[hi] ?? 0) + (Math.random() * 0.05)));
+                const hourly = BASE.map((v, hi) => Math.min(1, v + WEEKEND_BOOST + (WEEKDAY_LUNCH[hi] ?? 0) + (((di * 7 + hi * 3) % 17) / 17) * 0.05));
                 const shown = [0,3,6,9,12,15,18,21].map((hi) => hourly[hi]);
                 return (
                   <div key={day} className="flex items-center mb-1">
