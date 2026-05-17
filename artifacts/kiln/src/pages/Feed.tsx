@@ -22,6 +22,7 @@ import Stories from "@/components/Stories";
 import VideoAnnotations, { TECHNIQUE_ANNOTATIONS } from "@/components/VideoAnnotations";
 import { SEED_KILN_STATUSES, getFiringETA } from "@/data/kilnStatuses";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
+import MuxPlayer from "@mux/mux-player-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ function userPostsToReels(): Reel[] {
       id: post.id,
       videoId: "",
       videoUrl: post.type === "video" ? post.mediaUrl : undefined,
+      muxPlaybackId: post.muxPlaybackId,
       artistId: post.artistId,
       artistName: post.artistName,
       technique: post.tags[0] ?? "Studio Craft",
@@ -380,7 +382,19 @@ function ReelCard({
         .kb-active { animation: kenBurns 10s ease-in-out infinite; }
       `}</style>
 
-      {resolvedVideoUrl ? (
+      {reel.muxPlaybackId ? (
+        /* ── Mux player for transcoded uploads ── */
+        <MuxPlayer
+          playbackId={reel.muxPlaybackId}
+          streamType="on-demand"
+          autoPlay
+          muted={!videoAudioOn || !musicUnlocked}
+          loop
+          playsInline
+          paused={!isActive}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : resolvedVideoUrl ? (
         /* ── HTML5 video for user-uploaded content ── */
         <video
           ref={videoRef}

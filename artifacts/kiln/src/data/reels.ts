@@ -6,6 +6,7 @@ export interface Reel {
   id: string;
   videoId: string;
   videoUrl?: string;
+  muxPlaybackId?: string;
   artistId: string;
   artistName: string;
   technique: string;

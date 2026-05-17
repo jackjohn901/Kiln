@@ -17,6 +17,7 @@ export interface Post {
   comments: number;
   saves: number;
   patronOnly?: boolean;
+  muxPlaybackId?: string;
 }
 
 export interface Draft {
