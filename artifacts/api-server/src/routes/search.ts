@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, profilesTable, listingsTable, guildsTable, postsTable } from "@workspace/db";
-import { ilike, or, and, eq, isNull, lte, sql } from "drizzle-orm";
+import { ilike, or, and, isNull, lte, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -12,23 +12,32 @@ router.get("/search", async (req, res): Promise<void> => {
   }
   const like = `%${q}%`;
 
+  const artistVec = sql`to_tsvector('english', coalesce(${profilesTable.displayName},'') || ' ' || coalesce(${profilesTable.handle},'') || ' ' || coalesce(${profilesTable.bio},''))`;
+  const listingVec = sql`to_tsvector('english', coalesce(${listingsTable.title},'') || ' ' || coalesce(${listingsTable.description},''))`;
+  const guildVec = sql`to_tsvector('english', coalesce(${guildsTable.name},'') || ' ' || coalesce(${guildsTable.description},''))`;
+  const postVec = sql`to_tsvector('english', coalesce(${postsTable.caption},''))`;
+  const tsq = sql`websearch_to_tsquery('english', ${q})`;
+
   try {
     const [artists, listings, guilds, posts] = await Promise.all([
       db.select().from(profilesTable)
-        .where(or(ilike(profilesTable.displayName, like), ilike(profilesTable.handle, like)))
+        .where(or(sql`${artistVec} @@ ${tsq}`, ilike(profilesTable.displayName, like), ilike(profilesTable.handle, like)))
+        .orderBy(sql`ts_rank(${artistVec}, ${tsq}) desc`)
         .limit(8),
       db.select().from(listingsTable)
-        .where(ilike(listingsTable.title, like))
+        .where(or(sql`${listingVec} @@ ${tsq}`, ilike(listingsTable.title, like)))
+        .orderBy(sql`ts_rank(${listingVec}, ${tsq}) desc`)
         .limit(8),
       db.select().from(guildsTable)
-        .where(or(ilike(guildsTable.name, like), ilike(guildsTable.description, like)))
+        .where(or(sql`${guildVec} @@ ${tsq}`, ilike(guildsTable.name, like), ilike(guildsTable.description, like)))
         .limit(6),
       db.select().from(postsTable)
         .where(and(
-          ilike(postsTable.caption, like),
-          eq(postsTable.isDraft, false),
+          or(sql`${postVec} @@ ${tsq}`, ilike(postsTable.caption, like)),
+          sql`${postsTable.isDraft} = false`,
           or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
         ))
+        .orderBy(sql`ts_rank(${postVec}, ${tsq}) desc`)
         .limit(6),
     ]);
     res.json({ artists, listings, guilds, posts });

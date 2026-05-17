@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Gift, CheckCircle, Flame, Send, Copy, Check } from "lucide-react";
@@ -13,22 +13,10 @@ const DESIGNS = [
   { id: "botanical", label: "Botanical", bg: "from-emerald-950 to-stone-900", accent: "text-emerald-300", emoji: "🌿" },
 ];
 
-const CODE_STORAGE_KEY = "kiln_gift_codes_v1";
-
-function generateCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 4 }, () =>
-    Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
-  ).join("-");
-}
-
-function loadCodes(): { code: string; amount: number; purchased: string; redeemed?: string }[] {
-  try { return JSON.parse(localStorage.getItem(CODE_STORAGE_KEY) ?? "[]"); } catch { return []; }
-}
-
-function saveCode(entry: { code: string; amount: number; purchased: string }) {
-  const existing = loadCodes();
-  localStorage.setItem(CODE_STORAGE_KEY, JSON.stringify([...existing, entry]));
+interface ApiGiftCard {
+  id: string; code: string; amount: number; designId: string;
+  recipientName: string | null; recipientEmail: string | null;
+  redeemedByUserId: string | null; redeemedAt: string | null; createdAt: string;
 }
 
 export default function GiftCards() {
@@ -45,26 +33,64 @@ export default function GiftCards() {
   const [redeemCode, setRedeemCode] = useState("");
   const [redeemResult, setRedeemResult] = useState<"success" | "invalid" | null>(null);
   const [activeTab, setActiveTab] = useState<"buy" | "redeem" | "mine">("buy");
+  const [myCodes, setMyCodes] = useState<ApiGiftCard[]>([]);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [redeemLoading, setRedeemLoading] = useState(false);
 
   const finalAmount = customAmount ? parseInt(customAmount, 10) || 0 : amount;
 
-  function handlePurchase() {
-    const code = generateCode();
-    setGeneratedCode(code);
-    saveCode({ code, amount: finalAmount, purchased: new Date().toISOString() });
-    setStep("done");
+  useEffect(() => {
+    if (activeTab !== "mine") return;
+    fetch("/api/gift-cards/mine", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { purchased?: ApiGiftCard[] } | null) => {
+        if (data?.purchased) setMyCodes(data.purchased);
+      })
+      .catch(() => {});
+  }, [activeTab]);
+
+  async function handlePurchase() {
+    setPurchaseLoading(true);
+    try {
+      const res = await fetch("/api/gift-cards", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: finalAmount,
+          designId: design.id,
+          recipientName: recipientName || undefined,
+          recipientEmail: recipientEmail || undefined,
+          message: message || undefined,
+        }),
+      });
+      const data = await res.json() as { card?: ApiGiftCard; error?: string };
+      if (res.ok && data.card) {
+        setGeneratedCode(data.card.code);
+        setStep("done");
+      }
+    } catch {}
+    setPurchaseLoading(false);
   }
 
-  function handleRedeem() {
-    const codes = loadCodes();
-    const match = codes.find((c) => c.code === redeemCode.toUpperCase() && !c.redeemed);
-    if (match) {
-      const updated = codes.map((c) => c.code === match.code ? { ...c, redeemed: new Date().toISOString() } : c);
-      localStorage.setItem(CODE_STORAGE_KEY, JSON.stringify(updated));
-      setRedeemResult("success");
-    } else {
+  async function handleRedeem() {
+    setRedeemLoading(true);
+    try {
+      const res = await fetch("/api/gift-cards/redeem", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: redeemCode }),
+      });
+      if (res.ok) {
+        setRedeemResult("success");
+      } else {
+        setRedeemResult("invalid");
+      }
+    } catch {
       setRedeemResult("invalid");
     }
+    setRedeemLoading(false);
   }
 
   function handleCopy() {
@@ -73,8 +99,6 @@ export default function GiftCards() {
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
   }
-
-  const myCodes = loadCodes();
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-200 pb-24">
@@ -247,8 +271,8 @@ export default function GiftCards() {
               </div>
             </div>
 
-            <button onClick={handlePurchase} className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
-              Purchase gift card
+            <button onClick={handlePurchase} disabled={purchaseLoading} className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-60">
+              {purchaseLoading ? "Processing…" : "Purchase gift card"}
             </button>
             <button onClick={() => setStep("configure")} className="w-full rounded-full border border-white/10 py-2.5 text-sm text-stone-400 hover:text-stone-200 transition-colors">
               ← Edit
@@ -334,10 +358,10 @@ export default function GiftCards() {
 
             <button
               onClick={handleRedeem}
-              disabled={redeemCode.length < 4}
+              disabled={redeemCode.length < 4 || redeemLoading}
               className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
             >
-              Redeem gift card
+              {redeemLoading ? "Redeeming…" : "Redeem gift card"}
             </button>
           </div>
         )}
@@ -351,16 +375,17 @@ export default function GiftCards() {
                 <p className="text-sm text-stone-500">No gift cards purchased yet.</p>
               </div>
             )}
-            {myCodes.map((code) => (
-              <div key={code.code} className="rounded-2xl bg-stone-900 border border-white/5 p-4">
+            {myCodes.map((card) => (
+              <div key={card.id} className="rounded-2xl bg-stone-900 border border-white/5 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-mono text-sm font-bold text-amber-300 tracking-wider">{code.code}</p>
+                    <p className="font-mono text-sm font-bold text-amber-300 tracking-wider">{card.code}</p>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      ${code.amount} · Purchased {new Date(code.purchased).toLocaleDateString()}
+                      ${card.amount} · Purchased {new Date(card.createdAt).toLocaleDateString()}
+                      {card.recipientName && ` · For ${card.recipientName}`}
                     </p>
                   </div>
-                  {code.redeemed ? (
+                  {card.redeemedAt ? (
                     <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] font-bold text-stone-500">Redeemed</span>
                   ) : (
                     <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">Active</span>

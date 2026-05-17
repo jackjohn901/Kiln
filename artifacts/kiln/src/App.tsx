@@ -120,6 +120,7 @@ import Badges from "@/pages/Badges";
 import Search from "@/pages/Search";
 import AdminReports from "@/pages/AdminReports";
 import PushPrompt from "@/components/PushPrompt";
+import OnboardingModal from "@/components/OnboardingModal";
 
 const queryClient = new QueryClient();
 
@@ -321,6 +322,7 @@ function Router() {
       <Route component={NotFound} />
       </Switch>
       <PushPrompt />
+      <OnboardingModal />
     </>
   );
 }

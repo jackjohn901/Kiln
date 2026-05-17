@@ -62,6 +62,7 @@ import reportsRouter from "./reports";
 import pushRouter from "./push";
 import adminRouter from "./admin";
 import analyticsRouter from "./analytics";
+import giftCardsRouter from "./gift-cards";
 
 const router: IRouter = Router();
 
@@ -128,5 +129,6 @@ router.use(reportsRouter);
 router.use(pushRouter);
 router.use(adminRouter);
 router.use(analyticsRouter);
+router.use(giftCardsRouter);
 
 export default router;

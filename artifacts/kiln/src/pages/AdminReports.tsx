@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, ChevronDown } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,19 @@ interface Report {
   createdAt: string;
 }
 
+interface VerificationApp {
+  id: string;
+  userId: string;
+  website: string | null;
+  instagram: string | null;
+  yearsActive: number | null;
+  exhibitions: string | null;
+  galleries: string | null;
+  statement: string | null;
+  status: string;
+  submittedAt: string;
+}
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Flag }> = {
   pending:    { label: "Pending",    color: "text-amber-400",  icon: AlertTriangle },
   reviewed:   { label: "Reviewed",   color: "text-sky-400",    icon: Eye },
@@ -25,10 +38,15 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 export default function AdminReports() {
   useMeta({ title: "Moderation Queue" });
   const { user } = useAuth();
+  const [section, setSection] = useState<"reports" | "verifications">("reports");
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("pending");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [verifications, setVerifications] = useState<VerificationApp[]>([]);
+  const [vFilter, setVFilter] = useState("pending");
+  const [vLoading, setVLoading] = useState(false);
+  const [vUpdating, setVUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -61,6 +79,27 @@ export default function AdminReports() {
     }
   }
 
+  useEffect(() => {
+    if (section !== "verifications") return;
+    setVLoading(true);
+    fetch(`/api/admin/verifications?status=${vFilter}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { applications?: VerificationApp[] } | null) => setVerifications(data?.applications ?? []))
+      .catch(() => setVerifications([]))
+      .finally(() => setVLoading(false));
+  }, [section, vFilter]);
+
+  async function updateVerification(id: string, action: "approve" | "reject") {
+    setVUpdating(id);
+    try {
+      const res = await fetch(`/api/admin/verifications/${id}/${action}`, {
+        method: "PATCH", credentials: "include",
+      });
+      if (res.ok) setVerifications(prev => prev.filter(v => v.id !== id));
+    } catch {}
+    setVUpdating(null);
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen bg-[#12100e] flex items-center justify-center">
@@ -78,12 +117,23 @@ export default function AdminReports() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Flag size={18} className="text-amber-400" />
-            <h1 className="font-serif text-2xl text-amber-100">Moderation Queue</h1>
+            <h1 className="font-serif text-2xl text-amber-100">Admin Panel</h1>
           </div>
-          <p className="text-sm text-stone-500">Review and action user-submitted content reports.</p>
+          <p className="text-sm text-stone-500">Moderation and verification management.</p>
         </div>
 
-        {/* Filter tabs */}
+        {/* Section switcher */}
+        <div className="flex gap-2 mb-6">
+          <button onClick={() => setSection("reports")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "reports" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+            <Flag size={13} /> Reports
+          </button>
+          <button onClick={() => setSection("verifications")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "verifications" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+            <BadgeCheck size={13} /> Verify Artists
+          </button>
+        </div>
+
+        {/* Reports section */}
+        {section === "reports" && (<>
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {filters.map((f) => {
             const cfg = STATUS_CONFIG[f];
@@ -105,7 +155,6 @@ export default function AdminReports() {
           })}
         </div>
 
-        {/* Loading */}
         {loading && (
           <div className="flex flex-col gap-3">
             {[1,2,3].map((i) => (
@@ -114,7 +163,6 @@ export default function AdminReports() {
           </div>
         )}
 
-        {/* Empty */}
         {!loading && reports.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <CheckCircle size={36} className="text-stone-600 mb-3" />
@@ -123,7 +171,6 @@ export default function AdminReports() {
           </div>
         )}
 
-        {/* Report cards */}
         <div className="space-y-3">
           {reports.map((r) => {
             const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG["pending"];
@@ -206,6 +253,82 @@ export default function AdminReports() {
             );
           })}
         </div>
+        </>)}
+
+        {/* Verifications section */}
+        {section === "verifications" && (<>
+          <div className="flex gap-2 mb-6">
+            {["pending", "approved", "rejected"].map((f) => (
+              <button key={f} onClick={() => setVFilter(f)}
+                className={`shrink-0 capitalize rounded-full px-3 py-1.5 text-xs font-medium transition-all ${vFilter === f ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+                {f}
+              </button>
+            ))}
+          </div>
+
+          {vLoading && (
+            <div className="flex flex-col gap-3">
+              {[1,2,3].map((i) => <div key={i} className="h-32 rounded-2xl bg-stone-900 animate-pulse" />)}
+            </div>
+          )}
+
+          {!vLoading && verifications.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <BadgeCheck size={36} className="text-stone-600 mb-3" />
+              <p className="text-stone-400 font-medium">No {vFilter} applications</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {verifications.map((v) => (
+              <div key={v.id} className="rounded-2xl border border-white/8 bg-stone-900 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-mono text-stone-600">{v.userId.slice(0, 16)}…</p>
+                    {v.statement && (
+                      <p className="text-sm text-stone-300 mt-1 line-clamp-2">"{v.statement}"</p>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                      {v.yearsActive != null && <span className="text-[11px] text-stone-500">{v.yearsActive}y active</span>}
+                      {v.website && <a href={v.website} target="_blank" rel="noopener" className="text-[11px] text-amber-500 hover:underline truncate max-w-[140px]">{v.website}</a>}
+                      {v.instagram && <span className="text-[11px] text-stone-500">@{v.instagram}</span>}
+                    </div>
+                    {v.exhibitions && <p className="text-[11px] text-stone-600 mt-0.5">Exhibitions: {v.exhibitions.slice(0, 80)}</p>}
+                  </div>
+                  <p className="text-[10px] text-stone-600 shrink-0">
+                    {new Date(v.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </p>
+                </div>
+
+                {v.status === "pending" && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                    <button
+                      onClick={() => updateVerification(v.id, "approve")}
+                      disabled={vUpdating === v.id}
+                      className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                    >
+                      <BadgeCheck size={11} /> Approve
+                    </button>
+                    <button
+                      onClick={() => updateVerification(v.id, "reject")}
+                      disabled={vUpdating === v.id}
+                      className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-40"
+                    >
+                      <X size={11} /> Reject
+                    </button>
+                  </div>
+                )}
+                {v.status !== "pending" && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                    <span className={`text-xs font-medium ${v.status === "approved" ? "text-emerald-400" : "text-rose-400"}`}>
+                      {v.status === "approved" ? "✓ Approved" : "✗ Rejected"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>)}
       </div>
     </div>
   );

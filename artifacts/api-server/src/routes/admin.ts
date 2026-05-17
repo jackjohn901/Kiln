@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, reportsTable } from "@workspace/db";
+import { db, reportsTable, verificationApplicationsTable, profilesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -61,6 +61,82 @@ router.patch("/admin/reports/:id", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.updateReport error");
     res.status(500).json({ error: "Failed to update report" });
+  }
+});
+
+// GET /admin/verifications?status=pending|approved|rejected
+router.get("/admin/verifications", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const status = String(req.query["status"] ?? "pending");
+  const limit = Math.min(Number(req.query["limit"] ?? 50), 200);
+
+  try {
+    const applications = await db.select()
+      .from(verificationApplicationsTable)
+      .where(eq(verificationApplicationsTable.status, status))
+      .orderBy(desc(verificationApplicationsTable.submittedAt))
+      .limit(limit);
+
+    res.json({
+      applications: applications.map((a) => ({
+        ...a,
+        submittedAt: a.submittedAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin.getVerifications error");
+    res.status(500).json({ error: "Failed to fetch applications" });
+  }
+});
+
+// PATCH /admin/verifications/:id/approve
+router.patch("/admin/verifications/:id/approve", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  try {
+    const [app] = await db.update(verificationApplicationsTable)
+      .set({ status: "approved" })
+      .where(eq(verificationApplicationsTable.id, req.params.id))
+      .returning();
+
+    if (!app) { res.status(404).json({ error: "Application not found" }); return; }
+
+    await db.update(profilesTable)
+      .set({ isVerified: true })
+      .where(eq(profilesTable.userId, app.userId));
+
+    res.json({ success: true, userId: app.userId });
+  } catch (err) {
+    req.log.error({ err }, "admin.approveVerification error");
+    res.status(500).json({ error: "Failed to approve" });
+  }
+});
+
+// PATCH /admin/verifications/:id/reject
+router.patch("/admin/verifications/:id/reject", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  try {
+    const [app] = await db.update(verificationApplicationsTable)
+      .set({ status: "rejected" })
+      .where(eq(verificationApplicationsTable.id, req.params.id))
+      .returning();
+
+    if (!app) { res.status(404).json({ error: "Application not found" }); return; }
+
+    await db.update(profilesTable)
+      .set({ isVerified: false })
+      .where(eq(profilesTable.userId, app.userId));
+
+    res.json({ success: true, userId: app.userId });
+  } catch (err) {
+    req.log.error({ err }, "admin.rejectVerification error");
+    res.status(500).json({ error: "Failed to reject" });
   }
 });
 

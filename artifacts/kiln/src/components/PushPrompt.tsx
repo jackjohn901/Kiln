@@ -27,18 +27,29 @@ export default function PushPrompt() {
       const permission = await Notification.requestPermission();
       if (permission === "granted" && "serviceWorker" in navigator) {
         try {
-          const reg = await navigator.serviceWorker.ready;
-          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true }).catch(() => null);
-          if (sub) {
-            await fetch("/api/push/subscribe", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(sub.toJSON()),
-            }).catch(() => {});
+          const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+          const reg = await navigator.serviceWorker.register(swUrl, { scope: import.meta.env.BASE_URL });
+          await navigator.serviceWorker.ready;
+
+          const vapidRes = await fetch("/api/push/vapid-key", { credentials: "include" }).catch(() => null);
+          const { publicKey } = vapidRes?.ok ? await vapidRes.json() as { publicKey: string } : { publicKey: "" };
+
+          if (publicKey) {
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: publicKey,
+            }).catch(() => null);
+            if (sub) {
+              await fetch("/api/push/subscribe", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(sub.toJSON()),
+              }).catch(() => {});
+            }
           }
         } catch {
-          // service worker push subscribe may fail without a VAPID key — that's OK
+          // service worker push subscribe may fail in dev context — that's OK
         }
       }
     } catch {}

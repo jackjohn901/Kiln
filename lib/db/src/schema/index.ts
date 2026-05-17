@@ -49,3 +49,4 @@ export * from "./price_alerts";
 export * from "./verification_applications";
 export * from "./reports";
 export * from "./push_subscriptions";
+export * from "./giftCards";
