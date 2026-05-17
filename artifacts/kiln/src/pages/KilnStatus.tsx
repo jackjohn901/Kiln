@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Flame, Clock, Box, CheckCircle, X, Plus, Thermometer, Wind } from "lucide-react";
@@ -142,10 +142,42 @@ function FiringCard({ status, isMine = false, onClear }: {
   );
 }
 
+interface ApiFiring {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatarUrl: string | null;
+  kilnName: string;
+  cone: string;
+  fuel: string;
+  notes: string;
+  isPublic: boolean;
+  startedAt: string;
+  estimatedHours: number;
+  completedAt: string | null;
+  clearedAt: string | null;
+}
+
+function apiFiringToStatus(f: ApiFiring): KilnFiringStatus {
+  return {
+    artistId: f.userId,
+    artistName: f.userName,
+    avatarUrl: f.userAvatarUrl ?? "",
+    cone: f.cone,
+    fuel: f.fuel,
+    pieces: 0,
+    notes: f.notes || undefined,
+    startedAt: f.startedAt,
+    estimatedHours: f.estimatedHours,
+  };
+}
+
 export default function KilnStatus() {
   const { following } = useSocial();
   const { profile } = useProfile();
   const [myStatus, setMyStatus] = useState<KilnFiringStatus | null>(() => getUserKilnStatus());
+  const [myFiringId, setMyFiringId] = useState<string | null>(null);
+  const [apiFirings, setApiFirings] = useState<ApiFiring[]>([]);
   const [showForm, setShowForm] = useState(false);
 
   const [cone, setCone] = useState(CONE_OPTIONS[1]!);
@@ -154,17 +186,38 @@ export default function KilnStatus() {
   const [notes, setNotes] = useState("");
   const [estimatedHours, setEstimatedHours] = useState(8);
 
-  const followedFirings = SEED_KILN_STATUSES.filter((s) => following.includes(s.artistId));
-  const otherFirings = SEED_KILN_STATUSES.filter((s) => !following.includes(s.artistId));
+  useEffect(() => {
+    fetch("/api/kiln-firings", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ community: ApiFiring[]; mine: ApiFiring[] }> : null)
+      .then(data => {
+        if (!data) return;
+        setApiFirings(data.community);
+        if (data.mine.length > 0) {
+          const latest = data.mine[0]!;
+          setMyFiringId(latest.id);
+          setMyStatus(apiFiringToStatus(latest));
+          saveUserKilnStatus(apiFiringToStatus(latest));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  function startFiring() {
+  const apiIds = new Set(apiFirings.map(f => f.userId));
+  const followedFirings = [
+    ...apiFirings.filter(f => following.includes(f.userId)).map(apiFiringToStatus),
+    ...SEED_KILN_STATUSES.filter(s => following.includes(s.artistId) && !apiIds.has(s.artistId)),
+  ];
+  const otherFirings = [
+    ...apiFirings.filter(f => !following.includes(f.userId) && f.userId !== (profile?.id ?? "")).map(apiFiringToStatus),
+    ...SEED_KILN_STATUSES.filter(s => !following.includes(s.artistId) && !apiIds.has(s.artistId)),
+  ];
+
+  async function startFiring() {
     const status: KilnFiringStatus = {
       artistId: profile?.id ?? "__current_user__",
       artistName: profile?.name ?? "You",
       avatarUrl: profile?.avatarUrl ?? "",
-      cone,
-      fuel,
-      pieces,
+      cone, fuel, pieces,
       notes: notes.trim() || undefined,
       startedAt: new Date().toISOString(),
       estimatedHours,
@@ -172,11 +225,26 @@ export default function KilnStatus() {
     saveUserKilnStatus(status);
     setMyStatus(status);
     setShowForm(false);
+    try {
+      const res = await fetch("/api/kiln-firings", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cone, fuel, notes: notes.trim(), estimatedHours, kilnName: "Studio Kiln" }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as ApiFiring;
+        setMyFiringId(saved.id);
+      }
+    } catch { /* optimistic */ }
   }
 
-  function clearStatus() {
+  async function clearStatus() {
     saveUserKilnStatus(null);
     setMyStatus(null);
+    if (myFiringId) {
+      fetch(`/api/kiln-firings/${myFiringId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+      setMyFiringId(null);
+    }
   }
 
   return (

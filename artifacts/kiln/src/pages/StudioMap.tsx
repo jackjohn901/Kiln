@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { MapPin, List, Map as MapIcon, Users, X, ExternalLink, CheckCircle, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -73,10 +73,34 @@ export default function StudioMap() {
   const [selectedPin, setSelectedPin] = useState<ArtistPin | null>(null);
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const [mediumFilter, setMediumFilter] = useState("All");
+  const [pins, setPins] = useState<ArtistPin[]>(PINS);
   const { getArtistCommissionStatus } = useSocial();
   const mapRef = useRef<HTMLDivElement>(null);
 
-  const filtered = mediumFilter === "All" ? PINS : PINS.filter((p) => p.mediumCategory === mediumFilter);
+  // Augment with real profiles from API
+  useEffect(() => {
+    fetch("/api/studio-map", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ artists: Array<{ userId: string; displayName: string; avatarUrl: string | null; location: string | null; medium: string | null; handle: string | null }> }> : null)
+      .then(data => {
+        if (!data?.artists?.length) return;
+        const existingIds = new Set(PINS.map(p => p.id));
+        const newPins: ArtistPin[] = data.artists
+          .filter(a => a.location && !existingIds.has(a.userId))
+          .map(a => ({
+            id: a.userId,
+            name: a.displayName,
+            medium: (a.medium ?? "Other").split(",")[0].trim(),
+            location: a.location!,
+            avatarUrl: a.avatarUrl ?? `https://picsum.photos/seed/${a.userId}/80/80`,
+            coords: getCoords(a.location!),
+            mediumCategory: getMedium(a.medium ?? "Other"),
+          }));
+        if (newPins.length > 0) setPins(prev => [...prev, ...newPins]);
+      })
+      .catch(() => {});
+  }, []);
+
+  const filtered = mediumFilter === "All" ? pins : pins.filter((p) => p.mediumCategory === mediumFilter);
 
   const cs = selectedPin ? getArtistCommissionStatus(selectedPin.id) : "closed";
   const csColor = cs === "open" ? "text-emerald-400" : cs === "waitlisted" ? "text-amber-400" : "text-stone-500";

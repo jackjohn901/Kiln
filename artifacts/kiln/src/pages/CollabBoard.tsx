@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Plus, Users, MapPin, Clock, Tag, X, Check, Flame, MessageCircle } from "lucide-react";
@@ -148,14 +148,31 @@ export default function CollabBoard() {
     tags: "",
   });
 
-  function toggleInterest(id: string) {
+  useEffect(() => {
+    fetch("/api/collab-board", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ posts: CollabPost[] }> : null)
+      .then(data => {
+        if (data?.posts?.length) {
+          const apiIds = new Set(data.posts.map(p => p.id));
+          const seeds = SEED_COLLABS.filter(s => !apiIds.has(s.id));
+          setCollabs([...data.posts, ...seeds]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function toggleInterest(id: string) {
     setCollabs(prev => prev.map(c => c.id === id ? { ...c, interested: !c.interested, responses: c.interested ? c.responses - 1 : c.responses + 1 } : c));
+    try {
+      await fetch(`/api/collab-board/${id}/interest`, { method: "POST", credentials: "include" });
+    } catch { /* optimistic */ }
   }
 
-  function submitPost() {
+  async function submitPost() {
     if (!form.title.trim() || !profile) return;
+    const tempId = `collab-${Date.now()}`;
     const newPost: CollabPost = {
-      id: `collab-${Date.now()}`,
+      id: tempId,
       authorId: profile.id,
       authorName: profile.name,
       authorAvatarUrl: profile.avatarUrl,
@@ -170,12 +187,25 @@ export default function CollabBoard() {
       responses: 0,
       interested: false,
     };
-    const stored = collabs.filter(c => !SEED_COLLABS.find(s => s.id === c.id));
-    const next = [newPost, ...stored];
-    try { localStorage.setItem(COLLAB_KEY, JSON.stringify(next)); } catch {}
-    setCollabs([newPost, ...collabs]);
+    setCollabs(prev => [newPost, ...prev]);
     setShowForm(false);
     setForm({ title: "", description: "", seeking: [], offering: "", location: "", remote: false, tags: "" });
+    try {
+      const res = await fetch("/api/collab-board", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newPost.title, description: newPost.description,
+          seeking: newPost.seeking, offering: newPost.offering,
+          location: newPost.location, remote: newPost.remote,
+          tags: newPost.tags,
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as CollabPost;
+        setCollabs(prev => prev.map(c => c.id === tempId ? { ...saved, interested: false } : c));
+      }
+    } catch { /* optimistic stays */ }
   }
 
   const filtered = collabs.filter(c => {

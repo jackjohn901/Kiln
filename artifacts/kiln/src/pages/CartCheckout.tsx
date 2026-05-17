@@ -45,21 +45,24 @@ const DEMO_PAYMENTS: Record<string, Partial<ArtistPayments>> = {
   "default": { venmo: "@artist", cashapp: "$artist" },
 };
 
-function getArtistPayments(artistId: string): ArtistPayments {
-  // Check if this is the logged-in user's own listings (use their saved settings)
+function getDemoPayments(artistId: string): ArtistPayments {
   const saved = readPaymentSettings();
   const hasSaved = saved.stripeLink || saved.venmo || saved.cashapp || saved.paypalMe;
   if (hasSaved) return saved;
-
-  // Fall back to demo stubs
   const demo = DEMO_PAYMENTS[artistId] ?? DEMO_PAYMENTS["default"];
-  return {
-    stripeLink: demo.stripeLink ?? "",
-    venmo: demo.venmo ?? "",
-    cashapp: demo.cashapp ?? "",
-    paypalMe: demo.paypalMe ?? "",
-    notes: demo.notes ?? "",
-  };
+  return { stripeLink: demo.stripeLink ?? "", venmo: demo.venmo ?? "", cashapp: demo.cashapp ?? "", paypalMe: demo.paypalMe ?? "", notes: demo.notes ?? "" };
+}
+
+async function fetchArtistPayments(artistId: string): Promise<ArtistPayments> {
+  try {
+    const res = await fetch(`/api/users/${artistId}/payment-settings`, { credentials: "include" });
+    if (res.ok) {
+      const data = await res.json() as ArtistPayments;
+      const hasReal = data.stripeLink || data.venmo || data.cashapp || data.paypalMe;
+      if (hasReal) return data;
+    }
+  } catch { /* fall through */ }
+  return getDemoPayments(artistId);
 }
 
 export default function CartCheckout() {
@@ -88,29 +91,49 @@ export default function CartCheckout() {
     }
   }, []);
 
-  // Build artist groups when entering pay step
+  // Build artist groups when entering pay step — fetch real payment settings from API
   useEffect(() => {
     if (step !== "pay") return;
-    const map = new Map<string, ArtistGroup>();
-    for (const { listing, quantity } of items) {
-      const aid = listing.artistId;
-      if (!map.has(aid)) {
-        const artist = ALL_ARTISTS.find((a) => a.id === aid);
-        map.set(aid, {
-          artistId: aid,
-          artistName: artist?.name ?? aid,
-          avatarUrl: artist?.images?.[0]?.url,
-          items: [],
-          subtotal: 0,
-          payments: getArtistPayments(aid),
-          paid: false,
-        });
-      }
-      const g = map.get(aid)!;
-      g.items.push({ listing, quantity });
-      g.subtotal += listing.price * quantity;
-    }
-    setGroups(Array.from(map.values()));
+    const artistIds = [...new Set(items.map(i => i.listing.artistId))];
+    Promise.all(artistIds.map(aid => fetchArtistPayments(aid).then(payments => ({ aid, payments }))))
+      .then(results => {
+        const paymentMap = new Map(results.map(r => [r.aid, r.payments]));
+        const map = new Map<string, ArtistGroup>();
+        for (const { listing, quantity } of items) {
+          const aid = listing.artistId;
+          if (!map.has(aid)) {
+            const artist = ALL_ARTISTS.find((a) => a.id === aid);
+            map.set(aid, {
+              artistId: aid,
+              artistName: artist?.name ?? aid,
+              avatarUrl: artist?.images?.[0]?.url,
+              items: [],
+              subtotal: 0,
+              payments: paymentMap.get(aid) ?? getDemoPayments(aid),
+              paid: false,
+            });
+          }
+          const g = map.get(aid)!;
+          g.items.push({ listing, quantity });
+          g.subtotal += listing.price * quantity;
+        }
+        setGroups(Array.from(map.values()));
+      })
+      .catch(() => {
+        // Fallback: build groups with demo payments
+        const map = new Map<string, ArtistGroup>();
+        for (const { listing, quantity } of items) {
+          const aid = listing.artistId;
+          if (!map.has(aid)) {
+            const artist = ALL_ARTISTS.find((a) => a.id === aid);
+            map.set(aid, { artistId: aid, artistName: artist?.name ?? aid, avatarUrl: artist?.images?.[0]?.url, items: [], subtotal: 0, payments: getDemoPayments(aid), paid: false });
+          }
+          const g = map.get(aid)!;
+          g.items.push({ listing, quantity });
+          g.subtotal += listing.price * quantity;
+        }
+        setGroups(Array.from(map.values()));
+      });
   }, [step, items]);
 
   function togglePaid(artistId: string) {

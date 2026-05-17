@@ -131,12 +131,30 @@ export default function Parliament() {
     streak.current * 4 + 8
   );
 
+  // Load live proposals from API, fall back to seeds
+  useEffect(() => {
+    fetch("/api/parliament/proposals", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ proposals: Array<Proposal & { myVote: string | null }> }> : null)
+      .then(data => {
+        if (!data?.proposals?.length) return;
+        // Merge API votes back into local state
+        const apiVotes: Record<string, string> = {};
+        data.proposals.forEach(p => { if (p.myVote) apiVotes[p.id] = p.myVote; });
+        setState(prev => ({ ...prev, myVotes: { ...apiVotes, ...prev.myVotes } }));
+        // Combine API proposals with seeds (seeds fill in if API has none)
+        const apiIds = new Set(data.proposals.map(p => p.id));
+        const seeds = SEED_PROPOSALS.filter(s => !apiIds.has(s.id));
+        setProposals([...data.proposals, ...seeds]);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => { saveState(state); }, [state]);
 
-  function submitProposal() {
+  async function submitProposal() {
     const opts = proposeOptions.map(o => o.trim()).filter(Boolean);
     if (!proposeTitle.trim() || opts.length < 2) return;
-    const newProposal: Proposal = {
+    const optimistic: Proposal = {
       id: `prop-user-${Date.now()}`,
       title: proposeTitle.trim(),
       description: proposeDesc.trim() || "A community proposal.",
@@ -147,14 +165,27 @@ export default function Parliament() {
       proposedBy: "You",
       proposedByAvatar: "",
     };
-    setProposals(prev => [newProposal, ...prev]);
-    setProposeTitle("");
-    setProposeDesc("");
-    setProposeOptions(["", ""]);
-    setShowPropose(false);
+    setProposals(prev => [optimistic, ...prev]);
+    setProposeTitle(""); setProposeDesc(""); setProposeOptions(["", ""]); setShowPropose(false);
+    try {
+      const res = await fetch("/api/parliament/proposals", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: optimistic.title, description: optimistic.description,
+          category: optimistic.category,
+          options: opts,
+          endsAt: optimistic.endsAt,
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as Proposal;
+        setProposals(prev => prev.map(p => p.id === optimistic.id ? saved : p));
+      }
+    } catch { /* optimistic stays */ }
   }
 
-  function castVote(proposalId: string, optionId: string) {
+  async function castVote(proposalId: string, optionId: string) {
     if (state.myVotes[proposalId]) return;
     setProposals(prev => prev.map(p => p.id !== proposalId ? p : {
       ...p,
@@ -172,6 +203,11 @@ export default function Parliament() {
       totalVoices: prev.totalVoices + 1,
       options: prev.options.map(o => o.id === optionId ? { ...o, votes: o.votes + 1 } : o),
     } : prev);
+    fetch(`/api/parliament/proposals/${proposalId}/vote`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ optionId }),
+    }).catch(() => {});
   }
 
   return (

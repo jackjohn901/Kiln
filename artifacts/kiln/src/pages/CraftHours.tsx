@@ -97,6 +97,7 @@ function Ring({ progress, size = 100, stroke = 8, color = "#f59e0b" }: { progres
 
 export default function CraftHours() {
   const [state, setState] = useState<CraftHoursState>(readState);
+  const [apiLoaded, setApiLoaded] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [showGoal, setShowGoal] = useState(false);
   const [logForm, setLogForm] = useState({ hours: "", minutes: "0", technique: "Glass Blowing", note: "" });
@@ -105,6 +106,21 @@ export default function CraftHours() {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerTechnique, setTimerTechnique] = useState("Glass Blowing");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Load from API on mount
+  useEffect(() => {
+    fetch("/api/craft-hours", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ logs: HourLog[]; goal: { hoursPerWeek: number; startedAt: string } | null }> : null)
+      .then(data => {
+        if (!data) return;
+        const logs = data.logs.length ? data.logs : SEED_STATE.logs;
+        const goal = data.goal ?? SEED_STATE.goal;
+        setState({ logs, goal, longestStreak: 0, totalHours: 0 });
+        setGoalInput(goal.hoursPerWeek.toString());
+        setApiLoaded(true);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (timerRunning) {
@@ -132,34 +148,56 @@ export default function CraftHours() {
     setShowLog(true);
   }
 
-  useEffect(() => { saveState(state); }, [state]);
+  // Persist to localStorage as backup when not authed
+  useEffect(() => { if (!apiLoaded) saveState(state); }, [state, apiLoaded]);
 
   const thisWeek = hoursThisWeek(state.logs);
   const totalHours = state.logs.reduce((s, l) => s + l.hours + l.minutes / 60, 0);
   const progress = thisWeek / state.goal.hoursPerWeek;
   const goalMet = progress >= 1;
 
-  function addLog() {
+  async function addLog() {
     const h = parseInt(logForm.hours) || 0;
     const m = parseInt(logForm.minutes) || 0;
     if (!h && !m) return;
+    const tempId = genId();
     const log: HourLog = {
-      id: genId(),
+      id: tempId,
       date: new Date().toISOString().slice(0, 10),
-      hours: h,
-      minutes: m,
+      hours: h, minutes: m,
       technique: logForm.technique,
       note: logForm.note,
     };
     setState(prev => ({ ...prev, logs: [log, ...prev.logs], totalHours: prev.totalHours + h + m / 60 }));
     setLogForm({ hours: "", minutes: "0", technique: "Glass Blowing", note: "" });
     setShowLog(false);
+    try {
+      const res = await fetch("/api/craft-hours/logs", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: log.date, hours: h, minutes: m, technique: log.technique, note: log.note }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as HourLog;
+        setState(prev => ({ ...prev, logs: prev.logs.map(l => l.id === tempId ? saved : l) }));
+      }
+    } catch { /* optimistic */ }
   }
 
-  function updateGoal() {
+  async function updateGoal() {
     const h = parseInt(goalInput) || 10;
     setState(prev => ({ ...prev, goal: { hoursPerWeek: h, startedAt: prev.goal.startedAt } }));
     setShowGoal(false);
+    fetch("/api/craft-hours/goal", {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hoursPerWeek: h }),
+    }).catch(() => {});
+  }
+
+  async function deleteLog(id: string) {
+    setState(prev => ({ ...prev, logs: prev.logs.filter(l => l.id !== id) }));
+    fetch(`/api/craft-hours/logs/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
   }
 
   const recentLogs = state.logs.slice(0, 10);

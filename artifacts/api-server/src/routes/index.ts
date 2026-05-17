@@ -47,6 +47,14 @@ import beatsRouter from "./beats";
 import userSettingsRouter from "./user-settings";
 import serverCartRouter from "./server-cart";
 import digitalDownloadsRouter from "./digital-downloads";
+import collabBoardRouter from "./collab-board";
+import kilnFiringsRouter from "./kiln-firings";
+import craftHoursRouter from "./craft-hours";
+import parliamentRouter from "./parliament";
+import studioMapRouter from "./studio-map";
+import trendingPostsRouter from "./trending-posts";
+import userPaymentSettingsRouter from "./user-payment-settings";
+import beatLicensesRouter from "./beat-licenses";
 
 const router: IRouter = Router();
 
@@ -98,5 +106,13 @@ router.use(beatsRouter);
 router.use(userSettingsRouter);
 router.use(serverCartRouter);
 router.use(digitalDownloadsRouter);
+router.use(collabBoardRouter);
+router.use(kilnFiringsRouter);
+router.use(craftHoursRouter);
+router.use(parliamentRouter);
+router.use(studioMapRouter);
+router.use(trendingPostsRouter);
+router.use(userPaymentSettingsRouter);
+router.use(beatLicensesRouter);
 
 export default router;

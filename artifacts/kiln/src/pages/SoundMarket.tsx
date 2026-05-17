@@ -373,11 +373,41 @@ export default function SoundMarket() {
     return [...userBeats, ...seeds].sort((a, b) => b.usedCount - a.usedCount);
   })();
 
-  useEffect(() => { setLicenses(getLicenses()); }, []);
+  // Load licenses — try API first, fall back to localStorage
+  useEffect(() => {
+    fetch("/api/beats/licenses", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ licenses: Array<{ beatId: string; licenseType: string; beatTitle: string; creatorHandle: string; createdAt: string }> }> : null)
+      .then(data => {
+        if (data?.licenses?.length) {
+          const apiLicenses: BeatLicense[] = data.licenses.map(l => ({
+            id: l.beatId,
+            beatId: l.beatId,
+            beatTitle: l.beatTitle,
+            creatorHandle: l.creatorHandle,
+            creatorName: l.creatorHandle,
+            licenseType: l.licenseType as BeatLicense["licenseType"],
+            price: 0,
+            licenseeHandle: myHandle,
+            licenseeName: profile?.name ?? "You",
+            licensedAt: l.createdAt,
+            postCount: 0,
+          }));
+          setLicenses(apiLicenses);
+        } else {
+          setLicenses(getLicenses());
+        }
+      })
+      .catch(() => setLicenses(getLicenses()));
+  }, [myHandle, profile?.name]);
 
   // Reload licenses when modal closes
   useEffect(() => {
-    if (!licenseModal) setLicenses(getLicenses());
+    if (!licenseModal) {
+      fetch("/api/beats/licenses", { credentials: "include" })
+        .then(r => r.ok ? r.json() as Promise<{ licenses: Array<{ beatId: string; licenseType: string; beatTitle: string; creatorHandle: string; createdAt: string }> }> : null)
+        .then(data => { if (!data?.licenses?.length) setLicenses(getLicenses()); })
+        .catch(() => setLicenses(getLicenses()));
+    }
   }, [licenseModal]);
 
   const stopPreview = useCallback(() => {
@@ -407,24 +437,32 @@ export default function SoundMarket() {
 
   function confirmLicense() {
     if (!licenseModal) return;
+    const beat = licenseModal;
     const license: BeatLicense = {
       id: randomId(),
-      beatId:         licenseModal.id,
-      beatTitle:      licenseModal.title,
-      creatorHandle:  licenseModal.artistHandle,
-      creatorName:    licenseModal.artistName,
-      licenseType:    licenseModal.license,
-      price:          licenseModal.price,
+      beatId:         beat.id,
+      beatTitle:      beat.title,
+      creatorHandle:  beat.artistHandle,
+      creatorName:    beat.artistName,
+      licenseType:    beat.license,
+      price:          beat.price,
       licenseeHandle: myHandle,
       licenseeName:   profile?.name ?? "You",
       licensedAt:     new Date().toISOString(),
       postCount:      0,
     };
+    // Optimistic: save locally first
     addLicense(license);
     setLicenses(getLicenses());
-    setSuccessId(licenseModal.id);
+    setSuccessId(beat.id);
     setLicenseModal(null);
     setTimeout(() => setSuccessId(null), 3000);
+    // Persist to API
+    fetch(`/api/beats/${beat.id}/license`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ licenseType: beat.license, pricePaid: beat.price }),
+    }).catch(() => {});
   }
 
   function useInPost(beat: CommunityBeat) {
