@@ -24,6 +24,11 @@ export const listingsTable = pgTable("listings", {
   tags: text("tags").array().default([]),
   viewCount: integer("view_count").notNull().default(0),
   wishlistCount: integer("wishlist_count").notNull().default(0),
+  isResale: boolean("is_resale").notNull().default(false),
+  originalArtistId: varchar("original_artist_id", { length: 255 }),
+  originalArtistName: varchar("original_artist_name", { length: 255 }),
+  originalListingId: varchar("original_listing_id", { length: 36 }),
+  royaltyPercent: integer("royalty_percent").notNull().default(10),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -206,10 +206,35 @@ export default function Stories() {
   const { profile } = useProfile();
   const [viewing, setViewing] = useState<number | null>(null);
   const [seen, setSeen] = useState<Set<string>>(new Set());
+  const [allStories, setAllStories] = useState<StoryItem[]>(STORIES);
+
+  // Fetch real stories from API and merge with static stories
+  useEffect(() => {
+    fetch("/api/stories/feed", { credentials: "include" })
+      .then(r => r.json())
+      .then((d: { groups?: Array<{ authorId: string; authorName: string; authorAvatarUrl: string | null; stories: Array<{ id: string; mediaUrl: string; caption: string | null; }> }> }) => {
+        if (!d.groups?.length) return;
+        // Convert API groups to StoryItem format, prepend to static stories
+        const apiItems: StoryItem[] = d.groups
+          .filter(g => !STORIES.some(s => s.artistId === g.authorId)) // avoid duplicates
+          .map(g => ({
+            artistId: g.authorId,
+            artistName: g.authorName,
+            avatarUrl: g.authorAvatarUrl ?? `https://picsum.photos/seed/${g.authorId}/80/80`,
+            imageUrl: g.stories[0]?.mediaUrl ?? `https://picsum.photos/seed/${g.authorId}/800/1400`,
+            text: g.stories[0]?.caption ?? "Studio update",
+            medium: "Craft",
+          }));
+        if (apiItems.length > 0) setAllStories([...apiItems, ...STORIES]);
+      })
+      .catch(() => {}); // graceful fallback to static
+  }, []);
 
   function openStory(i: number) {
     setViewing(i);
-    setSeen((s) => new Set(s).add(STORIES[i].artistId));
+    setSeen((s) => new Set(s).add(allStories[i].artistId));
+    // Mark viewed in API
+    fetch(`/api/stories/${allStories[i].artistId}/view`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
   return (
@@ -239,7 +264,7 @@ export default function Stories() {
         )}
 
         {/* Artist stories */}
-        {STORIES.map((story, i) => {
+        {allStories.map((story, i) => {
           const isSeen = seen.has(story.artistId);
           return (
             <button key={story.artistId} onClick={() => openStory(i)} className="shrink-0 flex flex-col items-center gap-1.5">
@@ -262,7 +287,7 @@ export default function Stories() {
       <AnimatePresence>
         {viewing !== null && (
           <StoryViewer
-            stories={STORIES}
+            stories={allStories}
             startIndex={viewing}
             onClose={() => setViewing(null)}
           />

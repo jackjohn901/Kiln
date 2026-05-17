@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -193,8 +193,18 @@ export default function ListingDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { addItem, isInCart } = useCart();
-  const { getReviews, addReview, sendCommissionInquiry } = useSocial();
+  const { sendCommissionInquiry } = useSocial();
   const { profile } = useProfile();
+  const [apiReviews, setApiReviews] = useState<Array<{ id: string; reviewerId: string; reviewerName: string; reviewerAvatarUrl: string | null; rating: number; body: string | null; isVerifiedPurchase: boolean; createdAt: string; }>>([]);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/reviews/listing/${id}`).then(r => r.json()).then(d => {
+      setApiReviews(d.reviews ?? []);
+      setReviewsLoaded(true);
+    }).catch(() => setReviewsLoaded(true));
+  }, [id]);
 
   const { isWishlisted, toggleWishlist } = useWishlist();
   const wishlisted = id ? isWishlisted(id) : false;
@@ -229,8 +239,31 @@ export default function ListingDetail() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [apiListing, setApiListing] = useState<import("@/data/listings").Listing | null>(null);
+  const [listingLoading, setListingLoading] = useState(false);
 
-  const listing = findListing(id ?? "");
+  const staticListing = findListing(id ?? "");
+  useEffect(() => {
+    if (staticListing || !id) return;
+    setListingLoading(true);
+    fetch(`/api/listings/${id}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.id) {
+          setApiListing({
+            id: d.id, artistId: d.artistId, title: d.title,
+            year: d.year != null ? String(d.year) : "",
+            medium: d.medium ?? "", dimensions: d.dimensions ?? "",
+            price: d.price ?? 0, imageUrl: d.imageUrl ?? null,
+            available: d.isAvailable ?? true,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setListingLoading(false));
+  }, [id, staticListing]);
+
+  const listing = staticListing ?? apiListing;
   const gallery = useMemo(() => buildGallery(listing?.imageUrl ?? null), [listing?.imageUrl]);
   const priceHistory = useMemo(() => listing ? generatePriceHistory(listing) : [], [listing]);
 
@@ -303,15 +336,20 @@ export default function ListingDetail() {
     }, 1800);
   }
 
-  function handleSubmitReview() {
+  async function handleSubmitReview() {
     if (!listing || reviewRating === 0) return;
-    addReview({
-      listingId: listing.id,
-      fromName: profile?.name ?? "Anonymous Collector",
-      fromAvatarUrl: `https://picsum.photos/seed/${profile?.handle ?? "anon"}/60/60`,
-      rating: reviewRating,
-      text: reviewText,
-    });
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetId: listing.id, targetType: "listing", rating: reviewRating, body: reviewText }),
+      });
+      const data = await res.json();
+      if (data.id) {
+        setApiReviews(prev => [data, ...prev]);
+      }
+    } catch {}
     setReviewSubmitted(true);
     setShowReviewForm(false);
     setReviewRating(0);
@@ -319,6 +357,14 @@ export default function ListingDetail() {
   }
 
   if (!listing) {
+    if (listingLoading) {
+      return (
+        <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-4">
+          <Nav />
+          <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-4">
         <Nav />
@@ -337,7 +383,7 @@ export default function ListingDetail() {
   const avatar = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${listing.artistId}/200/200`;
   const related = getRelated(listing);
   const inCart = isInCart(listing.id);
-  const reviews = getReviews(listing.id);
+  const reviews = apiReviews;
   const avgRating = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const suggestedOffer = Math.round(listing.price * 0.85 / 100) * 100;
   const priceGrowth = priceHistory.length > 1
@@ -785,19 +831,19 @@ export default function ListingDetail() {
                 <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   className="rounded-2xl border border-white/8 bg-stone-900/40 p-5">
                   <div className="flex items-start gap-3">
-                    <img src={r.fromAvatarUrl} alt={r.fromName}
+                    <img src={r.reviewerAvatarUrl ?? `https://picsum.photos/seed/${r.id}/60/60`} alt={r.reviewerName}
                       className="h-9 w-9 rounded-full object-cover border border-white/10 shrink-0"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/60/60`; }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-stone-200">{r.fromName}</p>
+                        <p className="text-sm font-medium text-stone-200">{r.reviewerName}</p>
                         <span className="text-[10px] text-stone-600">
                           {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                         </span>
                       </div>
                       <StarRow rating={r.rating} size={12} />
-                      {r.text && <p className="mt-2 text-sm text-stone-400 leading-relaxed">{r.text}</p>}
+                      {r.body && <p className="mt-2 text-sm text-stone-400 leading-relaxed">{r.body}</p>}
                     </div>
                   </div>
                 </motion.div>

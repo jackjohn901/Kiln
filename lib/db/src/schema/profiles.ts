@@ -20,6 +20,10 @@ export const profilesTable = pgTable("profiles", {
   kilnStatus: varchar("kiln_status", { length: 255 }),
   generation: integer("generation"),
   mentorId: varchar("mentor_id", { length: 255 }),
+  isVerifiedCollector: boolean("is_verified_collector").notNull().default(false),
+  totalSpentCents: integer("total_spent_cents").notNull().default(0),
+  broadcastSubscriberCount: integer("broadcast_subscriber_count").notNull().default(0),
+  linkInBioSlug: varchar("link_in_bio_slug", { length: 100 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

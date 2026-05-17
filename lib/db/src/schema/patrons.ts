@@ -26,17 +26,5 @@ export const patronSubscriptionsTable = pgTable("patron_subscriptions", {
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
 });
 
-export const tipsTable = pgTable("tips", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  fromId: varchar("from_id", { length: 255 }).notNull(),
-  fromName: varchar("from_name", { length: 255 }).notNull(),
-  toId: varchar("to_id", { length: 255 }).notNull(),
-  toName: varchar("to_name", { length: 255 }).notNull(),
-  amount: integer("amount").notNull(),
-  message: text("message"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export type PatronTier = typeof patronTiersTable.$inferSelect;
 export type PatronSubscription = typeof patronSubscriptionsTable.$inferSelect;
-export type Tip = typeof tipsTable.$inferSelect;

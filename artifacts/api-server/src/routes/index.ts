@@ -22,6 +22,15 @@ import dropsRouter from "./drops";
 import auctionsRouter from "./auctions";
 import patronsRouter from "./patrons";
 import discoverRouter from "./discover";
+import storiesRouter from "./stories";
+import tipsRouter from "./tips";
+import reviewsRouter from "./reviews";
+import campaignsRouter from "./campaigns";
+import broadcastsRouter from "./broadcasts";
+import resaleRouter from "./resale";
+import boostsRouter from "./boosts";
+import linkInBioRouter from "./link-in-bio";
+import subscriptionBoxesRouter from "./subscription-boxes";
 
 const router: IRouter = Router();
 
@@ -48,5 +57,14 @@ router.use(auctionsRouter);
 router.use(patronsRouter);
 router.use(discoverRouter);
 router.use(searchRouter);
+router.use(storiesRouter);
+router.use(tipsRouter);
+router.use(reviewsRouter);
+router.use(campaignsRouter);
+router.use(broadcastsRouter);
+router.use(resaleRouter);
+router.use(boostsRouter);
+router.use(linkInBioRouter);
+router.use(subscriptionBoxesRouter);
 
 export default router;

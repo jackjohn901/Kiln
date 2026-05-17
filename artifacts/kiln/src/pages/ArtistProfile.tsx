@@ -363,16 +363,23 @@ export default function ArtistProfile() {
               </div>
             </div>
             {!isOwn && (
-              <button
-                onClick={handleDbFollow}
-                className={`shrink-0 rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                  dbFollowing
-                    ? "border border-stone-600 text-stone-400 hover:border-rose-500 hover:text-rose-400"
-                    : "bg-amber-500 text-stone-950 hover:bg-amber-400"
-                }`}
-              >
-                {dbFollowing ? "Following" : "Follow"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDbFollow}
+                  className={`shrink-0 rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                    dbFollowing
+                      ? "border border-stone-600 text-stone-400 hover:border-rose-500 hover:text-rose-400"
+                      : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                  }`}
+                >
+                  {dbFollowing ? "Following" : "Follow"}
+                </button>
+                <Link href={`/broadcasts/${id}`}
+                  className="shrink-0 rounded-full px-3 py-2 text-sm border border-white/10 text-stone-400 hover:border-amber-500/30 hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                  Channel
+                </Link>
+              </div>
             )}
           </div>
 

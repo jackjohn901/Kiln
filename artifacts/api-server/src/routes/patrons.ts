@@ -55,13 +55,19 @@ router.get("/me/subscriptions", async (req, res): Promise<void> => {
 });
 
 // POST /tips — send a tip
+// POST /tips is now handled by /api/tips/checkout (new tips route)
+// Legacy quick-tip endpoint kept for backwards compat
 router.post("/tips", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { toId, toName, amount, message } = req.body;
   if (!toId || !amount) { res.status(400).json({ error: "toId and amount required" }); return; }
   const user = req.user;
   const fromName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone";
-  const [tip] = await db.insert(tipsTable).values({ id: crypto.randomUUID(), fromId: user.id, fromName, toId, toName: toName ?? "Artist", amount: Number(amount), message }).returning();
+  const amountCents = Math.round(Number(amount) * 100);
+  const [tip] = await db.insert(tipsTable).values({
+    id: crypto.randomUUID(), fromUserId: user.id, fromUserName: fromName,
+    toUserId: toId, toUserName: toName ?? "Artist", amountCents, message, status: "completed",
+  }).returning();
   await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: toId, type: "tip", fromId: user.id, fromName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a $${amount} tip${message ? `: "${message}"` : ""}`, link: `/earnings` });
   res.status(201).json({ ...tip, createdAt: tip.createdAt.toISOString() });
 });
@@ -71,13 +77,13 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
   const [tips, subs] = await Promise.all([
-    db.select().from(tipsTable).where(eq(tipsTable.toId, userId)).orderBy(desc(tipsTable.createdAt)),
+    db.select().from(tipsTable).where(eq(tipsTable.toUserId, userId)).orderBy(desc(tipsTable.createdAt)),
     db.select().from(patronSubscriptionsTable).where(and(eq(patronSubscriptionsTable.artistId, userId), eq(patronSubscriptionsTable.status, "active"))),
   ]);
-  const tipTotal = tips.reduce((s, t) => s + t.amount, 0);
+  const tipTotal = tips.reduce((s, t) => s + t.amountCents, 0);
   const monthlySubscriptions = subs.reduce((s, sub) => s + sub.amount, 0);
   const earnings = [
-    ...tips.map(t => ({ id: t.id, type: "tip" as const, label: `Tip from ${t.fromName}`, sublabel: t.message ?? "", amount: t.amount, date: t.createdAt.toISOString() })),
+    ...tips.map(t => ({ id: t.id, type: "tip" as const, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "", amount: t.amountCents, date: t.createdAt.toISOString() })),
     ...subs.map(s => ({ id: s.id, type: "subscription" as const, label: `Patron subscription`, sublabel: `$${s.amount}/mo`, amount: s.amount, date: s.startedAt.toISOString() })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   res.json({ earnings, totals: { tips: tipTotal, subscriptions: monthlySubscriptions, total: tipTotal + monthlySubscriptions } });

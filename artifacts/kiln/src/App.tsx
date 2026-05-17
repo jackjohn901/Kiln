@@ -105,6 +105,16 @@ import CreateWorkshop from "@/pages/CreateWorkshop";
 import MusicStudio from "@/pages/MusicStudio";
 import SoundMarket from "@/pages/SoundMarket";
 import CartSuccess from "@/pages/CartSuccess";
+import Campaigns from "@/pages/Campaigns";
+import CreateCampaign from "@/pages/CreateCampaign";
+import CampaignDetail from "@/pages/CampaignDetail";
+import BroadcastChannel from "@/pages/BroadcastChannel";
+import ResaleMarket from "@/pages/ResaleMarket";
+import BoostPost from "@/pages/BoostPost";
+import LinkInBio from "@/pages/LinkInBio";
+import LinkInBioPublic from "@/pages/LinkInBioPublic";
+import SubscriptionBoxes from "@/pages/SubscriptionBoxes";
+import CreateSubscriptionBox from "@/pages/CreateSubscriptionBox";
 
 const queryClient = new QueryClient();
 
@@ -274,6 +284,17 @@ function Router() {
       <Route path="/create-workshop" component={CreateWorkshop} />
       <Route path="/music-studio" component={MusicStudio} />
       <Route path="/sound-market" component={SoundMarket} />
+      <Route path="/campaigns" component={Campaigns} />
+      <Route path="/campaigns/create" component={CreateCampaign} />
+      <Route path="/campaigns/:id" component={CampaignDetail} />
+      <Route path="/broadcasts/:artistId" component={BroadcastChannel} />
+      <Route path="/resale" component={ResaleMarket} />
+      <Route path="/boost" component={BoostPost} />
+      <Route path="/boost/:postId" component={BoostPost} />
+      <Route path="/link-in-bio" component={LinkInBio} />
+      <Route path="/link/:slug" component={LinkInBioPublic} />
+      <Route path="/subscription-boxes" component={SubscriptionBoxes} />
+      <Route path="/subscription-boxes/create" component={CreateSubscriptionBox} />
       <Route component={NotFound} />
       </Switch>
     </>
