@@ -91,12 +91,20 @@ interface ApiPost {
   createdAt: string;
 }
 
+interface EarningTotals {
+  tips: number;
+  subscriptions: number;
+  sales: number;
+  total: number;
+}
+
 export default function Analytics() {
   const { profile } = useProfile();
   const { commissions, receivedInquiries } = useSocial();
   const [period, setPeriod] = useState<Period>("1y");
   const [apiPosts, setApiPosts] = useState<ApiPost[]>([]);
   const [apiFollowers, setApiFollowers] = useState<number | null>(null);
+  const [earningTotals, setEarningTotals] = useState<EarningTotals | null>(null);
 
   useEffect(() => {
     fetch("/api/me/posts", { credentials: "include" })
@@ -106,6 +114,10 @@ export default function Analytics() {
     fetch("/api/me/profile", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.followerCount != null) setApiFollowers(data.followerCount); })
+      .catch(() => {});
+    fetch("/api/me/earnings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.totals) setEarningTotals(data.totals); })
       .catch(() => {});
   }, []);
 
@@ -136,7 +148,7 @@ export default function Analytics() {
   const prevR = REVENUE_DATA[REVENUE_DATA.length - 2];
   const revenueChange = Math.round(((lastR - prevR) / prevR) * 100);
 
-  const totalRevenue = REVENUE_DATA.reduce((a, b) => a + b, 0);
+  const totalRevenue = earningTotals?.total ?? REVENUE_DATA.reduce((a, b) => a + b, 0);
 
   return (
     <div className="min-h-screen bg-[#12100e]">

@@ -31,8 +31,16 @@ export default function ApplyVerified() {
 
   const alreadyVerified = profile && isVerified(profile.id);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    try {
+      await fetch("/api/me/verification-application", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...form, appliedAt: new Date().toISOString() }),
+      });
+    } catch {}
     setStep("submitted");
   }
 

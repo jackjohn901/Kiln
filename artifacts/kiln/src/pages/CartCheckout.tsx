@@ -153,6 +153,19 @@ export default function CartCheckout() {
       });
       const data = await res.json();
       if (data.url) {
+        try {
+          localStorage.setItem("kiln_pre_checkout", JSON.stringify({
+            sessionId: data.sessionId,
+            items: items.map(({ listing, quantity }) => ({
+              title: listing.title as string,
+              amount: (listing.price as number) * quantity,
+              sellerId: (listing as unknown as Record<string, unknown>).artistId as string | undefined,
+              imageUrl: (listing.imageUrl as string | undefined) ?? undefined,
+              type: "listing",
+              refId: listing.id as string,
+            })),
+          }));
+        } catch {}
         window.location.href = data.url;
       } else {
         throw new Error(data.error ?? "Checkout failed");

@@ -1,43 +1,27 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Package, Plus, Edit2, Check, X, Eye, EyeOff,
-  DollarSign, Image, Trash2, Save, ToggleLeft, ToggleRight,
+  DollarSign, Image, Trash2, Loader2,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
-import { listings as ALL_LISTINGS, formatPrice, type Listing } from "@/data/listings";
-import { artists } from "@/data/artists";
-import { seedArtists } from "@/data/seedArtists";
+import { formatPrice } from "@/data/listings";
 
-const OVERRIDES_KEY = "kiln_inventory_overrides_v1";
-const NEW_KEY = "kiln_inventory_new_v1";
-
-interface ListingOverride {
-  available?: boolean;
-  price?: number;
-  title?: string;
-}
-
-function readOverrides(): Record<string, ListingOverride> {
-  try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY) ?? "{}"); } catch { return {}; }
-}
-function writeOverrides(o: Record<string, ListingOverride>) {
-  try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); } catch {}
-}
-
-function readNew(): Listing[] {
-  try { return JSON.parse(localStorage.getItem(NEW_KEY) ?? "[]"); } catch { return []; }
-}
-function writeNew(items: Listing[]) {
-  try { localStorage.setItem(NEW_KEY, JSON.stringify(items)); } catch {}
-}
-
-const ALL_ARTISTS = [...artists, ...seedArtists];
-
-function getListingsForArtist(artistId: string): Listing[] {
-  return ALL_LISTINGS.filter((l) => l.artistId === artistId);
+interface ApiListing {
+  id: string;
+  artistId: string;
+  title: string;
+  medium: string | null;
+  year: number | null;
+  dimensions: string | null;
+  price: number;
+  isSold: boolean;
+  isAvailable: boolean;
+  imageUrl: string | null;
+  technique: string | null;
+  description: string | null;
 }
 
 interface NewListingForm {
@@ -53,8 +37,8 @@ const EMPTY_FORM: NewListingForm = { title: "", medium: "", year: new Date().get
 
 export default function InventoryManager() {
   const { profile } = useProfile();
-  const [overrides, setOverrides] = useState<Record<string, ListingOverride>>(readOverrides);
-  const [newListings, setNewListings] = useState<Listing[]>(readNew);
+  const [apiListings, setApiListings] = useState<ApiListing[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
   const [editTitle, setEditTitle] = useState("");
@@ -62,82 +46,107 @@ export default function InventoryManager() {
   const [form, setForm] = useState<NewListingForm>(EMPTY_FORM);
   const [filter, setFilter] = useState<"all" | "available" | "sold">("all");
   const [saved, setSaved] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Use any artist as demo if no profile
-  const artistId = profile?.id ?? artists[0].id;
-  const artistName = ALL_ARTISTS.find((a) => a.id === artistId)?.name ?? "You";
-
-  const baseListings = useMemo(() => getListingsForArtist(artistId), [artistId]);
-  const allListings: Listing[] = useMemo(() => [...baseListings, ...newListings.filter((l) => l.artistId === artistId)], [baseListings, newListings, artistId]);
-
-  function effective(listing: Listing): Listing {
-    const ov = overrides[listing.id] ?? {};
-    return { ...listing, ...ov };
-  }
+  useEffect(() => {
+    fetch("/api/me/listings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const displayed = useMemo(() => {
-    const effected = allListings.map(effective);
-    if (filter === "available") return effected.filter((l) => l.available);
-    if (filter === "sold") return effected.filter((l) => !l.available);
-    return effected;
-  }, [allListings, overrides, filter]);
+    if (filter === "available") return apiListings.filter(l => l.isAvailable && !l.isSold);
+    if (filter === "sold") return apiListings.filter(l => l.isSold || !l.isAvailable);
+    return apiListings;
+  }, [apiListings, filter]);
 
-  function toggleAvailable(id: string, current: boolean) {
-    const next = { ...overrides, [id]: { ...(overrides[id] ?? {}), available: !current } };
-    setOverrides(next);
-    writeOverrides(next);
-    setSaved(id);
-    setTimeout(() => setSaved(null), 1500);
+  async function toggleAvailable(id: string, current: boolean) {
+    setSaved(null);
+    try {
+      const r = await fetch(`/api/listings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ isAvailable: !current }),
+      });
+      if (r.ok) {
+        setApiListings(prev => prev.map(l => l.id === id ? { ...l, isAvailable: !current } : l));
+        setSaved(id);
+        setTimeout(() => setSaved(null), 1500);
+      }
+    } catch {}
   }
 
-  function startEdit(listing: Listing) {
-    const eff = effective(listing);
+  function startEdit(listing: ApiListing) {
     setEditingId(listing.id);
-    setEditPrice(String(eff.price));
-    setEditTitle(eff.title);
+    setEditPrice(String(listing.price));
+    setEditTitle(listing.title);
   }
 
-  function saveEdit(id: string) {
+  async function saveEdit(id: string) {
     const price = parseFloat(editPrice);
     if (isNaN(price) || price <= 0) return;
-    const next = { ...overrides, [id]: { ...(overrides[id] ?? {}), price, title: editTitle } };
-    setOverrides(next);
-    writeOverrides(next);
+    setSaving(true);
+    try {
+      const r = await fetch(`/api/listings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ price: Math.round(price), title: editTitle }),
+      });
+      if (r.ok) {
+        setApiListings(prev => prev.map(l => l.id === id ? { ...l, price: Math.round(price), title: editTitle } : l));
+        setSaved(id);
+        setTimeout(() => setSaved(null), 1500);
+      }
+    } catch {}
     setEditingId(null);
-    setSaved(id);
-    setTimeout(() => setSaved(null), 1500);
+    setSaving(false);
   }
 
-  function addListing() {
+  async function addListing() {
     const price = parseFloat(form.price);
     if (!form.title || isNaN(price)) return;
-    const newItem: Listing = {
-      id: `custom-${Date.now()}`,
-      artistId,
-      title: form.title,
-      medium: form.medium || "Mixed media",
-      year: form.year || String(new Date().getFullYear()),
-      dimensions: form.dimensions || "Dimensions on request",
-      price: price,
-      available: true,
-      imageUrl: null,
-    };
-    const next = [...newListings, newItem];
-    setNewListings(next);
-    writeNew(next);
+    if (!profile) return;
+    setSaving(true);
+    try {
+      const r = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: form.title,
+          medium: form.medium || "Mixed media",
+          year: parseInt(form.year) || new Date().getFullYear(),
+          dimensions: form.dimensions || null,
+          description: form.description || null,
+          price: Math.round(price),
+          isAvailable: true,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json() as { listing?: ApiListing };
+        if (data.listing) setApiListings(prev => [data.listing!, ...prev]);
+      }
+    } catch {}
     setForm(EMPTY_FORM);
     setAddingNew(false);
+    setSaving(false);
   }
 
-  function deleteNew(id: string) {
-    const next = newListings.filter((l) => l.id !== id);
-    setNewListings(next);
-    writeNew(next);
+  async function deleteNew(id: string) {
+    try {
+      await fetch(`/api/listings/${id}`, { method: "DELETE", credentials: "include" });
+      setApiListings(prev => prev.filter(l => l.id !== id));
+    } catch {}
   }
 
-  const totalValue = displayed.filter((l) => l.available).reduce((s, l) => s + l.price, 0);
-  const soldCount = displayed.filter((l) => !l.available).length;
-  const availCount = displayed.filter((l) => l.available).length;
+  const totalValue = displayed.filter(l => l.isAvailable && !l.isSold).reduce((s, l) => s + l.price, 0);
+  const soldCount = displayed.filter(l => l.isSold || !l.isAvailable).length;
+  const availCount = displayed.filter(l => l.isAvailable && !l.isSold).length;
+
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -194,11 +203,17 @@ export default function InventoryManager() {
         </div>
 
         {/* Listings */}
+        {loading && (
+          <div className="flex items-center justify-center py-16 gap-3 text-stone-600">
+            <Loader2 size={18} className="animate-spin" />
+            <span className="text-sm">Loading your listings…</span>
+          </div>
+        )}
         <div className="space-y-2">
           <AnimatePresence>
-            {displayed.map((listing) => {
+            {!loading && displayed.map((listing) => {
               const isEditing = editingId === listing.id;
-              const isNew = newListings.some((n) => n.id === listing.id);
+              const isListed = listing.isAvailable && !listing.isSold;
               const justSaved = saved === listing.id;
 
               return (
@@ -208,13 +223,13 @@ export default function InventoryManager() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className={`rounded-2xl border ${listing.available ? "border-white/8 bg-stone-900/60" : "border-white/5 bg-stone-900/30"} overflow-hidden`}
+                  className={`rounded-2xl border ${isListed ? "border-white/8 bg-stone-900/60" : "border-white/5 bg-stone-900/30"} overflow-hidden`}
                 >
                   <div className="flex gap-3 p-4">
                     {/* Thumbnail */}
                     <div className={`h-16 w-16 shrink-0 rounded-xl overflow-hidden ${listing.imageUrl ? "" : "bg-stone-800 flex items-center justify-center"}`}>
                       {listing.imageUrl ? (
-                        <img src={listing.imageUrl} alt="" className={`h-full w-full object-cover ${!listing.available ? "opacity-50 grayscale" : ""}`} />
+                        <img src={listing.imageUrl} alt="" className={`h-full w-full object-cover ${!isListed ? "opacity-50 grayscale" : ""}`} />
                       ) : (
                         <Image size={18} className="text-stone-700" />
                       )}
@@ -244,10 +259,10 @@ export default function InventoryManager() {
                       ) : (
                         <>
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-sm font-medium line-clamp-1 ${listing.available ? "text-stone-200" : "text-stone-500"}`}>{listing.title}</p>
-                            {!listing.available && <span className="shrink-0 rounded-full bg-stone-800 px-2 py-0.5 text-[9px] text-stone-500 font-semibold uppercase tracking-wide">Sold</span>}
+                            <p className={`text-sm font-medium line-clamp-1 ${isListed ? "text-stone-200" : "text-stone-500"}`}>{listing.title}</p>
+                            {!isListed && <span className="shrink-0 rounded-full bg-stone-800 px-2 py-0.5 text-[9px] text-stone-500 font-semibold uppercase tracking-wide">{listing.isSold ? "Sold" : "Hidden"}</span>}
                           </div>
-                          <p className="text-xs text-stone-600 mt-0.5">{listing.medium.split(",")[0]} · {listing.year} · {listing.dimensions}</p>
+                          <p className="text-xs text-stone-600 mt-0.5">{(listing.medium ?? "—").split(",")[0]} · {listing.year ?? "—"} · {listing.dimensions ?? "—"}</p>
                           <p className="text-sm font-bold text-amber-300 mt-1">{formatPrice(listing.price)}</p>
                         </>
                       )}
@@ -257,8 +272,8 @@ export default function InventoryManager() {
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       {isEditing ? (
                         <>
-                          <button onClick={() => saveEdit(listing.id)} className="flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/25 transition-colors">
-                            <Save size={10} /> Save
+                          <button onClick={() => saveEdit(listing.id)} disabled={saving} className="flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/25 transition-colors">
+                            {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save
                           </button>
                           <button onClick={() => setEditingId(null)} className="p-1 rounded-full hover:bg-white/5 transition-colors">
                             <X size={13} className="text-stone-600" />
@@ -267,24 +282,22 @@ export default function InventoryManager() {
                       ) : (
                         <>
                           <button
-                            onClick={() => toggleAvailable(listing.id, listing.available)}
+                            onClick={() => toggleAvailable(listing.id, listing.isAvailable)}
                             className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
-                              listing.available
+                              isListed
                                 ? "border-emerald-500/30 bg-emerald-500/8 text-emerald-400 hover:bg-emerald-500/15"
                                 : "border-white/10 text-stone-500 hover:border-white/20"
                             }`}
                           >
-                            {listing.available ? <Eye size={9} /> : <EyeOff size={9} />}
-                            {listing.available ? "Listed" : "Hidden"}
+                            {isListed ? <Eye size={9} /> : <EyeOff size={9} />}
+                            {isListed ? "Listed" : "Hidden"}
                           </button>
                           <button onClick={() => startEdit(listing)} className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
                             <Edit2 size={12} className="text-stone-500" />
                           </button>
-                          {isNew && (
-                            <button onClick={() => deleteNew(listing.id)} className="p-1.5 rounded-full hover:bg-red-500/10 transition-colors">
-                              <Trash2 size={12} className="text-stone-700 hover:text-red-400" />
-                            </button>
-                          )}
+                          <button onClick={() => deleteNew(listing.id)} className="p-1.5 rounded-full hover:bg-red-500/10 transition-colors">
+                            <Trash2 size={12} className="text-stone-700 hover:text-red-400" />
+                          </button>
                         </>
                       )}
                     </div>

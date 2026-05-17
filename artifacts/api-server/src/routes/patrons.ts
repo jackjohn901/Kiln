@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable } from "@workspace/db";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -72,21 +72,25 @@ router.post("/tips", async (req, res): Promise<void> => {
   res.status(201).json({ ...tip, createdAt: tip.createdAt.toISOString() });
 });
 
-// GET /me/earnings — artist earnings summary
+// GET /me/earnings — artist earnings summary (tips + subscriptions + shop sales)
 router.get("/me/earnings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
-  const [tips, subs] = await Promise.all([
-    db.select().from(tipsTable).where(eq(tipsTable.toUserId, userId)).orderBy(desc(tipsTable.createdAt)),
-    db.select().from(patronSubscriptionsTable).where(and(eq(patronSubscriptionsTable.artistId, userId), eq(patronSubscriptionsTable.status, "active"))),
+  const [tips, subs, sales] = await Promise.all([
+    db.select().from(tipsTable).where(and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"))).orderBy(desc(tipsTable.createdAt)),
+    db.select().from(patronSubscriptionsTable).where(and(eq(patronSubscriptionsTable.artistId, userId), eq(patronSubscriptionsTable.status, "active"))).orderBy(desc(patronSubscriptionsTable.startedAt)),
+    db.select().from(ordersTable).where(and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]))).orderBy(desc(ordersTable.createdAt)),
   ]);
-  const tipTotal = tips.reduce((s, t) => s + t.amountCents, 0);
-  const monthlySubscriptions = subs.reduce((s, sub) => s + sub.amount, 0);
+  const tipTotal = tips.reduce((s, t) => s + t.amountCents / 100, 0);
+  const subTotal = subs.reduce((s, sub) => s + sub.amount / 100, 0);
+  const saleTotal = sales.reduce((s, o) => s + o.amount / 100, 0);
+  type EarningType = "tip" | "subscription" | "listing" | "drop" | "commission" | "workshop";
   const earnings = [
-    ...tips.map(t => ({ id: t.id, type: "tip" as const, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "", amount: t.amountCents, date: t.createdAt.toISOString() })),
-    ...subs.map(s => ({ id: s.id, type: "subscription" as const, label: `Patron subscription`, sublabel: `$${s.amount}/mo`, amount: s.amount, date: s.startedAt.toISOString() })),
+    ...tips.map(t => ({ id: t.id, type: "tip" as EarningType, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "via Kiln", amount: t.amountCents / 100, date: t.createdAt.toISOString() })),
+    ...subs.map(s => ({ id: s.id, type: "subscription" as EarningType, label: "Patron subscription", sublabel: s.subscriberName ?? "Patron", amount: s.amount / 100, date: s.startedAt.toISOString() })),
+    ...sales.map(o => ({ id: o.id, type: (["listing","drop","commission","workshop"].includes(o.type) ? o.type : "listing") as EarningType, label: o.title, sublabel: "Sale", amount: o.amount / 100, date: o.createdAt.toISOString() })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  res.json({ earnings, totals: { tips: tipTotal, subscriptions: monthlySubscriptions, total: tipTotal + monthlySubscriptions } });
+  res.json({ earnings, totals: { tips: tipTotal, subscriptions: subTotal, sales: saleTotal, total: tipTotal + subTotal + saleTotal } });
 });
 
 export default router;

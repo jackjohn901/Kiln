@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { CheckCircle, Package, ArrowRight } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -10,11 +10,25 @@ interface SessionData {
   amountTotal: number | null;
 }
 
+interface PreCheckout {
+  sessionId: string;
+  items: Array<{
+    title: string;
+    amount: number;
+    sellerId?: string;
+    type?: string;
+    refId?: string;
+    imageUrl?: string;
+  }>;
+}
+
 export default function CartSuccess() {
   const [, navigate] = useLocation();
   const { clearCart } = useCart();
   const [session, setSession] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [orderId, setOrderId] = useState<string>(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
+  const orderCreated = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -29,7 +43,43 @@ export default function CartSuccess() {
 
     fetch(`/api/stripe/session/${sessionId}`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => setSession(data))
+      .then(async (data: SessionData | null) => {
+        setSession(data);
+
+        if (orderCreated.current) return;
+        orderCreated.current = true;
+
+        try {
+          const raw = localStorage.getItem("kiln_pre_checkout");
+          const pre: PreCheckout | null = raw ? JSON.parse(raw) : null;
+
+          if (pre?.items?.length) {
+            const res = await fetch("/api/me/orders/bulk", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ stripeSessionId: sessionId, items: pre.items }),
+            });
+            if (res.ok) {
+              const d = await res.json() as { orderIds?: string[] };
+              if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
+              localStorage.removeItem("kiln_pre_checkout");
+            }
+          } else if (data?.amountTotal) {
+            await fetch("/api/me/orders", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                title: "Shop purchase",
+                amount: data.amountTotal / 100,
+                stripeSessionId: sessionId,
+                type: "listing",
+              }),
+            });
+          }
+        } catch {}
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -41,8 +91,6 @@ export default function CartSuccess() {
       </div>
     );
   }
-
-  const orderId = "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -80,14 +128,14 @@ export default function CartSuccess() {
         </div>
 
         <div className="flex gap-3 justify-center">
-          <Link href="/shop">
+          <Link href="/orders">
             <button className="flex items-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
-              Continue Shopping <ArrowRight size={14} />
+              View Orders <ArrowRight size={14} />
             </button>
           </Link>
-          <Link href="/">
+          <Link href="/shop">
             <button className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors">
-              Back to Feed
+              Continue Shopping
             </button>
           </Link>
         </div>

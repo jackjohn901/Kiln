@@ -57,8 +57,29 @@ router.post("/listings", async (req, res): Promise<void> => {
       title, description, medium, technique, dimensions, weight, year: year ? Number(year) : null,
       edition, imageUrl, imageUrls: imageUrls ?? [], price: Number(price), shipsFrom, shipsTo: shipsTo ?? [], tags: tags ?? [],
     }).returning();
-    res.status(201).json({ ...listing, createdAt: listing.createdAt.toISOString(), updatedAt: listing.updatedAt.toISOString() });
+    res.status(201).json({ listing: { ...listing, createdAt: listing.createdAt.toISOString(), updatedAt: listing.updatedAt.toISOString() } });
   } catch (err) { req.log.error({ err }, "createListing error"); res.status(500).json({ error: "Failed to create listing" }); }
+});
+
+// PATCH /listings/:id — update price, title, availability (owner only)
+router.patch("/listings/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, req.params.id));
+  if (!listing || listing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+  const { title, price, isAvailable, isSold, medium, dimensions, description } = req.body as {
+    title?: string; price?: number; isAvailable?: boolean; isSold?: boolean;
+    medium?: string; dimensions?: string; description?: string;
+  };
+  const updates: Partial<typeof listing> = { updatedAt: new Date() };
+  if (title !== undefined) updates.title = title;
+  if (price !== undefined) updates.price = Math.round(Number(price));
+  if (isAvailable !== undefined) updates.isAvailable = Boolean(isAvailable);
+  if (isSold !== undefined) updates.isSold = Boolean(isSold);
+  if (medium !== undefined) updates.medium = medium;
+  if (dimensions !== undefined) updates.dimensions = dimensions;
+  if (description !== undefined) updates.description = description;
+  const [updated] = await db.update(listingsTable).set(updates).where(eq(listingsTable.id, req.params.id)).returning();
+  res.json({ listing: { ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() } });
 });
 
 // DELETE /listings/:id

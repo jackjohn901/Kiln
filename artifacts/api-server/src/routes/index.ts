@@ -31,6 +31,7 @@ import resaleRouter from "./resale";
 import boostsRouter from "./boosts";
 import linkInBioRouter from "./link-in-bio";
 import subscriptionBoxesRouter from "./subscription-boxes";
+import meRouter from "./me";
 
 const router: IRouter = Router();
 
@@ -66,5 +67,6 @@ router.use(resaleRouter);
 router.use(boostsRouter);
 router.use(linkInBioRouter);
 router.use(subscriptionBoxesRouter);
+router.use(meRouter);
 
 export default router;
