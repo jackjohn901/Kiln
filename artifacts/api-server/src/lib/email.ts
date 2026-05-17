@@ -13,7 +13,7 @@ async function getResendApiKey(): Promise<string | null> {
       const resp = await fetch(
         `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=resend`,
         {
-          headers: { Accept: "application/json", X_REPLIT_TOKEN: xReplitToken },
+          headers: { Accept: "application/json", "X-Replit-Token": xReplitToken },
           signal: AbortSignal.timeout(5_000),
         }
       );
