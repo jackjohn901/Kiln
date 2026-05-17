@@ -10,12 +10,26 @@ const MEDIUM_OPTIONS = [
   "Enamel", "Wood Turning", "Stone Carving", "Mosaic", "Leather", "Jewelry",
 ];
 
-function fileToDataUrl(file: File): Promise<string> {
+function resizeImage(file: File, maxPx: number, quality = 0.82): Promise<string> {
   return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.onerror = reject;
-    r.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
   });
 }
 
@@ -57,14 +71,14 @@ export default function EditProfile() {
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
+    const dataUrl = await resizeImage(file, 400);
     setForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
   }
 
   async function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
+    const dataUrl = await resizeImage(file, 1200, 0.80);
     setForm((prev) => ({ ...prev, coverUrl: dataUrl }));
   }
 
