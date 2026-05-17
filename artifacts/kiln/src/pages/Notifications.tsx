@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: string; bg: string }> = {
   follow:       { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },
@@ -47,8 +48,29 @@ function groupByDate(notifs: KilnNotification[]): Array<{ label: string; items: 
 
 export default function Notifications() {
   const { notifications, markRead, markAllRead } = useSocial();
+  const { subscribe } = useWebSocket();
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [apiNotifications, setApiNotifications] = useState<KilnNotification[]>([]);
+
+  const addLiveNotification = useCallback((evt: Record<string, unknown>) => {
+    const n = evt as { text?: string; link?: string; fromId?: string; fromName?: string; fromAvatarUrl?: string; notifType?: string };
+    setApiNotifications((prev) => [{
+      id: `ws-${Date.now()}`,
+      type: (n.notifType as KilnNotification["type"]) ?? "follow",
+      fromId: n.fromId ?? "",
+      fromName: n.fromName ?? "",
+      fromAvatarUrl: n.fromAvatarUrl ?? "",
+      text: n.text ?? "You have a new notification",
+      link: n.link ?? undefined,
+      read: false,
+      createdAt: new Date().toISOString(),
+    }, ...prev]);
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribe("notification", addLiveNotification);
+    return unsub;
+  }, [subscribe, addLiveNotification]);
 
   useEffect(() => {
     fetch("/api/notifications", { credentials: "include" })

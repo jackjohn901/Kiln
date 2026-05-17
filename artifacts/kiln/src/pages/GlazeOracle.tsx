@@ -115,7 +115,38 @@ export default function GlazeOracle() {
     send(parts);
   }
 
-  useEffect(() => { saveFormulas(formulas); }, [formulas]);
+  useEffect(() => {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { settings?: Record<string, unknown> } | null) => {
+        const saved = data?.settings?.["glazeFormulas"] as SavedFormula[] | undefined;
+        if (Array.isArray(saved) && saved.length > 0) {
+          setFormulas(saved);
+          saveFormulas(saved);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    saveFormulas(formulas);
+    const t = setTimeout(() => {
+      fetch("/api/me/settings", { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then((data: { settings?: Record<string, unknown> } | null) => {
+          const s = data?.settings ?? {};
+          return fetch("/api/me/settings", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ settings: { ...s, glazeFormulas: formulas } }),
+          });
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [formulas]);
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
   async function send(text?: string) {

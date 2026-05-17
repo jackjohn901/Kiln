@@ -17,12 +17,10 @@ function hasReported(postId: string): boolean {
   try {
     const ids: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
     return ids.includes(postId);
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
-function saveReport(postId: string) {
+function markReportedLocal(postId: string) {
   try {
     const ids: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
     if (!ids.includes(postId)) ids.push(postId);
@@ -40,11 +38,30 @@ export default function ReportModal({ postId, artistName, onClose }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [other, setOther] = useState("");
   const [submitted, setSubmitted] = useState(hasReported(postId));
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
-    if (!selected) return;
-    saveReport(postId);
-    setSubmitted(true);
+  async function handleSubmit() {
+    if (!selected || submitting) return;
+    setSubmitting(true);
+    try {
+      await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          targetType: "post",
+          targetId: postId,
+          reason: selected,
+          otherText: selected === "Other" ? other.trim() : undefined,
+        }),
+      });
+    } catch {
+      // still show success — report saved locally
+    } finally {
+      markReportedLocal(postId);
+      setSubmitted(true);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -123,11 +140,11 @@ export default function ReportModal({ postId, artistName, onClose }: Props) {
 
               <button
                 onClick={handleSubmit}
-                disabled={!selected || (selected === "Other" && !other.trim())}
+                disabled={!selected || (selected === "Other" && !other.trim()) || submitting}
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-rose-500 py-2.5 text-sm font-semibold text-white transition-all hover:bg-rose-400 disabled:opacity-40"
               >
                 <Flag size={14} />
-                Submit Report
+                {submitting ? "Submitting…" : "Submit Report"}
               </button>
             </>
           )}

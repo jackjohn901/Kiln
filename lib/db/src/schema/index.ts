@@ -47,3 +47,5 @@ export * from "./collector_portal";
 export * from "./opportunity_saves";
 export * from "./price_alerts";
 export * from "./verification_applications";
+export * from "./reports";
+export * from "./push_subscriptions";

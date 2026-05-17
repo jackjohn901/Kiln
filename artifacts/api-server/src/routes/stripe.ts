@@ -1,4 +1,7 @@
 import { Router, type IRouter } from 'express';
+import { db } from "@workspace/db";
+import { ordersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 
@@ -124,6 +127,46 @@ router.get('/stripe/session/:sessionId', async (req, res): Promise<void> => {
   } catch (err: any) {
     logger.error({ err }, 'Stripe session retrieve error');
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/stripe/webhook', async (req, res): Promise<void> => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env['STRIPE_WEBHOOK_SECRET'];
+
+  let event: { type: string; data: { object: Record<string, unknown> } };
+  try {
+    const stripe = await getUncachableStripeClient();
+    if (webhookSecret && sig && Buffer.isBuffer(req.body)) {
+      event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret) as unknown as typeof event;
+    } else {
+      event = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as typeof event;
+    }
+  } catch (err: unknown) {
+    logger.warn({ err }, 'Stripe webhook signature verification failed');
+    res.status(400).json({ error: 'Invalid webhook' }); return;
+  }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as {
+        id: string; payment_status: string;
+        metadata?: { platform?: string; orderId?: string };
+        customer_email?: string | null;
+      };
+      if (session.payment_status === 'paid' && session.metadata?.platform === 'kiln') {
+        if (session.metadata?.orderId) {
+          await db.update(ordersTable)
+            .set({ status: 'paid' })
+            .where(eq(ordersTable.id, session.metadata.orderId));
+        }
+        logger.info({ sessionId: session.id }, 'Stripe checkout completed');
+      }
+    }
+    res.json({ received: true });
+  } catch (err) {
+    logger.error({ err }, 'Stripe webhook handling error');
+    res.status(500).json({ error: 'Webhook handling failed' });
   }
 });
 

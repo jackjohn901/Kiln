@@ -49,3 +49,10 @@ externalPort = 3002
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BGopyL4kUYZyNJkNbgWUCCYMi0SWUvM2-ksRfFfSfx-57cQfDckw3coRE_omYDW6PLBhsMNGshGZwUQgUZoVGds"
+VAPID_PRIVATE_KEY = "9mj-21MNtdhcI03D8V5MP0kcZa4X2tnNKkKjyLSkrS8"
+VAPID_EMAIL = "mailto:hello@kilnfire.app"

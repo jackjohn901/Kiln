@@ -154,26 +154,40 @@ router.post("/posts/:postId/save", async (req, res): Promise<void> => {
   }
 });
 
-// GET /posts/:postId/comments
+// GET /posts/:postId/comments — returns top-level comments with nested replies
 router.get("/posts/:postId/comments", async (req, res) => {
   try {
     const { postId } = req.params;
-    const comments = await db.select().from(commentsTable)
+    const all = await db.select().from(commentsTable)
       .where(eq(commentsTable.postId, postId))
       .orderBy(desc(commentsTable.createdAt));
-    res.json({ comments: comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() })) });
+
+    const topLevel = all.filter((c) => !c.parentCommentId);
+    const replyMap = new Map<string, typeof all>();
+    for (const c of all) {
+      if (c.parentCommentId) {
+        if (!replyMap.has(c.parentCommentId)) replyMap.set(c.parentCommentId, []);
+        replyMap.get(c.parentCommentId)!.push(c);
+      }
+    }
+    const enriched = topLevel.map((c) => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+      replies: (replyMap.get(c.id) ?? []).map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), replies: [] })),
+    }));
+    res.json({ comments: enriched });
   } catch (err) {
     req.log.error({ err }, "getComments error");
     res.status(500).json({ error: "Failed to load comments" });
   }
 });
 
-// POST /posts/:postId/comments
+// POST /posts/:postId/comments — supports optional parentId for replies
 router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const { postId } = req.params;
-  const { text } = req.body;
+  const { text, parentId } = req.body as { text?: string; parentId?: string };
   if (!text?.trim()) { res.status(400).json({ error: "text required" }); return; }
 
   try {
@@ -186,30 +200,40 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
       authorName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist",
       authorAvatarUrl: user.profileImageUrl ?? null,
       text: text.trim(),
+      parentCommentId: parentId ?? null,
     }).returning();
 
-    await db.update(postsTable)
-      .set({ commentCount: sql`${postsTable.commentCount} + 1` })
-      .where(eq(postsTable.id, postId));
-
-    // Notify post author
-    const [post] = await db.select({ authorId: postsTable.authorId }).from(postsTable).where(eq(postsTable.id, postId));
-    if (post && post.authorId !== user.id) {
-      await db.insert(notificationsTable).values({
-        id: crypto.randomUUID(),
-        userId: post.authorId,
-        type: "comment",
-        fromId: user.id,
-        fromName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone",
-        fromAvatarUrl: user.profileImageUrl ?? null,
-        text: `commented: "${text.trim().substring(0, 50)}"`,
-        link: `/post/${postId}`,
-      });
-      broadcast(post.authorId, { type: "comment", postId, commentId: id, authorId: user.id });
-      broadcast(post.authorId, { type: "notification", userId: post.authorId, text: "Someone commented on your post", link: `/post/${postId}` });
+    if (parentId) {
+      await db.update(commentsTable)
+        .set({ replyCount: sql`${commentsTable.replyCount} + 1` })
+        .where(eq(commentsTable.id, parentId));
+    } else {
+      await db.update(postsTable)
+        .set({ commentCount: sql`${postsTable.commentCount} + 1` })
+        .where(eq(postsTable.id, postId));
     }
 
-    res.status(201).json({ ...comment, createdAt: comment.createdAt.toISOString() });
+    // Notify post author (only for top-level comments)
+    if (!parentId) {
+      const [post] = await db.select({ authorId: postsTable.authorId }).from(postsTable).where(eq(postsTable.id, postId));
+      if (post && post.authorId !== user.id) {
+        const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone";
+        await db.insert(notificationsTable).values({
+          id: crypto.randomUUID(),
+          userId: post.authorId,
+          type: "comment",
+          fromId: user.id,
+          fromName: authorName,
+          fromAvatarUrl: user.profileImageUrl ?? null,
+          text: `commented: "${text.trim().substring(0, 50)}"`,
+          link: `/post/${postId}`,
+        });
+        broadcast(post.authorId, { type: "comment", postId, commentId: id, authorId: user.id });
+        broadcast(post.authorId, { type: "notification", userId: post.authorId, text: `${authorName} commented on your post`, link: `/post/${postId}` });
+      }
+    }
+
+    res.status(201).json({ comment: { ...comment, createdAt: comment.createdAt.toISOString(), replies: [] } });
   } catch (err) {
     req.log.error({ err }, "addComment error");
     res.status(500).json({ error: "Failed to add comment" });

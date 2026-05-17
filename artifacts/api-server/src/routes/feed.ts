@@ -1,34 +1,62 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, likesTable, savesTable, followsTable } from "@workspace/db";
+import { postsTable, likesTable, savesTable, followsTable, userSettingsTable } from "@workspace/db";
 import { desc, lt, eq, and, inArray } from "drizzle-orm";
 
 const router = Router();
 
+function hotnessScore(
+  likeCount: number,
+  commentCount: number,
+  saveCount: number,
+  createdAt: Date,
+  tasteBonus = 0,
+): number {
+  const ageHours = (Date.now() - createdAt.getTime()) / 3600000;
+  const engagement = likeCount * 3 + commentCount * 5 + saveCount * 4;
+  return ((engagement + 1) * (1 + tasteBonus)) / Math.pow(ageHours + 2, 0.8);
+}
+
 router.get("/feed", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 20, 50);
-    const cursor = req.query.cursor as string | undefined;
+    const page = Math.max(Number(req.query.page) || 0, 0);
+    const userId = req.isAuthenticated() ? req.user.id : null;
 
-    const where = cursor ? lt(postsTable.createdAt, new Date(cursor)) : undefined;
+    let preferredTechniques: string[] = [];
+    if (userId) {
+      const [settings] = await db.select({ settings: userSettingsTable.settings })
+        .from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, userId));
+      const s = (settings?.settings ?? {}) as Record<string, unknown>;
+      if (Array.isArray(s["techniques"])) {
+        preferredTechniques = s["techniques"] as string[];
+      }
+    }
 
-    const posts = await db
+    const POOL_SIZE = 200;
+    const pool = await db
       .select()
       .from(postsTable)
-      .where(where)
+      .where(eq(postsTable.isDraft, false))
       .orderBy(desc(postsTable.createdAt))
-      .limit(limit + 1);
+      .limit(POOL_SIZE);
 
-    const hasMore = posts.length > limit;
-    const page = hasMore ? posts.slice(0, limit) : posts;
+    const scored = pool.map((p) => {
+      const technique = p.technique?.toLowerCase() ?? "";
+      const tasteBonus = preferredTechniques.some(
+        (t) => technique.includes(t.toLowerCase()),
+      ) ? 0.25 : 0;
+      return { ...p, _score: hotnessScore(p.likeCount, p.commentCount, p.saveCount, p.createdAt, tasteBonus) };
+    }).sort((a, b) => b._score - a._score);
 
-    const userId = req.isAuthenticated() ? req.user.id : null;
+    const slice = scored.slice(page * limit, (page + 1) * limit);
+    const hasMore = scored.length > (page + 1) * limit;
 
     let likedIds = new Set<string>();
     let savedIds = new Set<string>();
-
-    if (userId && page.length > 0) {
-      const postIds = page.map((p) => p.id);
+    if (userId && slice.length > 0) {
+      const postIds = slice.map((p) => p.id);
       const [likes, saves] = await Promise.all([
         db.select({ postId: likesTable.postId }).from(likesTable)
           .where(and(eq(likesTable.userId, userId), inArray(likesTable.postId, postIds))),
@@ -39,18 +67,16 @@ router.get("/feed", async (req, res) => {
       savedIds = new Set(saves.map((s) => s.postId));
     }
 
-    const enriched = page.map((post) => ({
-      ...post,
-      tags: post.tags ?? [],
-      isLiked: likedIds.has(post.id),
-      isSaved: savedIds.has(post.id),
-      createdAt: post.createdAt.toISOString(),
-    }));
-
     res.json({
-      posts: enriched,
+      posts: slice.map(({ _score: _, ...p }) => ({
+        ...p,
+        tags: p.tags ?? [],
+        isLiked: likedIds.has(p.id),
+        isSaved: savedIds.has(p.id),
+        createdAt: p.createdAt.toISOString(),
+      })),
       hasMore,
-      nextCursor: hasMore ? page[page.length - 1].createdAt.toISOString() : null,
+      nextCursor: hasMore ? String(page + 1) : null,
     });
   } catch (err) {
     req.log.error({ err }, "getFeed error");
@@ -58,7 +84,6 @@ router.get("/feed", async (req, res) => {
   }
 });
 
-// GET /feed/following — posts from users the current user follows
 router.get("/feed/following", async (req, res) => {
   if (!req.isAuthenticated()) { res.json({ posts: [], hasMore: false, nextCursor: null }); return; }
   try {
@@ -76,13 +101,14 @@ router.get("/feed/following", async (req, res) => {
       res.json({ posts: [], hasMore: false, nextCursor: null }); return;
     }
 
-    const conditions = [inArray(postsTable.authorId, followingIds)];
-    if (cursor) conditions.push(lt(postsTable.createdAt, new Date(cursor)));
+    const whereClause = cursor
+      ? and(inArray(postsTable.authorId, followingIds), eq(postsTable.isDraft, false), lt(postsTable.createdAt, new Date(cursor)))
+      : and(inArray(postsTable.authorId, followingIds), eq(postsTable.isDraft, false));
 
     const posts = await db
       .select()
       .from(postsTable)
-      .where(and(...(conditions as [any, ...any[]])))
+      .where(whereClause)
       .orderBy(desc(postsTable.createdAt))
       .limit(limit + 1);
 

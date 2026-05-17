@@ -10,6 +10,8 @@ export const commentsTable = pgTable("comments", {
   authorAvatarUrl: text("author_avatar_url"),
   text: text("text").notNull(),
   likeCount: integer("like_count").notNull().default(0),
+  replyCount: integer("reply_count").notNull().default(0),
+  parentCommentId: varchar("parent_comment_id", { length: 36 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
