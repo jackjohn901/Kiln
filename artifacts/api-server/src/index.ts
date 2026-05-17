@@ -6,6 +6,7 @@ import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 import { seedDatabase } from "./lib/seed";
 import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
+import { startStoryExpiry } from "./lib/storyExpiry";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -48,6 +49,7 @@ if (Number.isNaN(port) || port <= 0) {
   await initStripe();
   await seedDatabase();
   startScheduledPostsPublisher();
+  startStoryExpiry();
 
   const server = createServer(app);
   setupWebSocket(server);

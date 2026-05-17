@@ -105,6 +105,10 @@ export default function Analytics() {
   const [apiPosts, setApiPosts] = useState<ApiPost[]>([]);
   const [apiFollowers, setApiFollowers] = useState<number | null>(null);
   const [earningTotals, setEarningTotals] = useState<EarningTotals | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<{
+    totalPosts: number; totalLikes: number; totalComments: number;
+    totalSaves: number; followerCount: number; topPosts: ApiPost[];
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/me/posts", { credentials: "include" })
@@ -118,6 +122,10 @@ export default function Analytics() {
     fetch("/api/me/earnings", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.totals) setEarningTotals(data.totals); })
+      .catch(() => {});
+    fetch("/api/analytics/me", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.totalPosts != null) setAnalyticsData(data); })
       .catch(() => {});
   }, []);
 
@@ -175,10 +183,10 @@ export default function Analytics() {
 
         {/* KPI grid */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard label="Followers" value={(apiFollowers ?? lastF).toLocaleString()} change={followerChange} icon={Users} color="bg-sky-500/10 text-sky-400" />
-          <KpiCard label="Total likes" value={apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0).toLocaleString() : `${(VIEW_DATA[VIEW_DATA.length - 1] / 1000).toFixed(1)}k`} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
-          <KpiCard label="Total saves" value={apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.saveCount, 0).toLocaleString() : "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
-          <KpiCard label="Posts" value={apiPosts.length > 0 ? String(apiPosts.length) : String(lastF > 0 ? 13 : 0)} sub="Published" icon={TrendingUp} color="bg-emerald-500/10 text-emerald-400" />
+          <KpiCard label="Followers" value={(analyticsData?.followerCount ?? apiFollowers ?? lastF).toLocaleString()} change={followerChange} icon={Users} color="bg-sky-500/10 text-sky-400" />
+          <KpiCard label="Total likes" value={(analyticsData?.totalLikes ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
+          <KpiCard label="Total saves" value={(analyticsData?.totalSaves ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.saveCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
+          <KpiCard label="Posts" value={String(analyticsData?.totalPosts ?? apiPosts.length)} sub="Published" icon={TrendingUp} color="bg-emerald-500/10 text-emerald-400" />
         </div>
 
         {/* Follower chart */}
@@ -430,13 +438,11 @@ export default function Analytics() {
         {/* Top posts */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <h2 className="mb-4 text-sm font-bold text-stone-200">Top Performing Posts</h2>
-          {apiPosts.length === 0 ? (
+          {(analyticsData?.topPosts ?? apiPosts).length === 0 ? (
             <p className="text-sm text-stone-500 text-center py-6">No posts yet — share your craft to see analytics here.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {[...apiPosts]
-                .sort((a, b) => b.likeCount - a.likeCount)
-                .slice(0, 6)
+              {(analyticsData?.topPosts ?? [...apiPosts].sort((a, b) => b.likeCount - a.likeCount).slice(0, 6))
                 .map((post, i) => (
                   <div key={post.id} className="rounded-xl bg-stone-800/40 px-3 py-2.5">
                     <div className="flex items-center gap-3">

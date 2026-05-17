@@ -25,6 +25,7 @@ import DropModal from "@/components/DropModal";
 import { getPosts } from "@/data/posts";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 import { getCommunityBeats, type CommunityBeat, LICENSE_LABELS, LICENSE_COLORS } from "@/lib/communityBeats";
+import { useMeta } from "@/hooks/useMeta";
 
 function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
   const seed = getArtistById(id) ?? seedArtists.find((a) => a.id === id);
@@ -272,6 +273,11 @@ export default function ArtistProfile() {
   const [dbFollowerCount, setDbFollowerCount] = useState(0);
   const [profileStreak, setProfileStreak] = useState<{ currentStreak: number; longestStreak: number } | null>(null);
   const [profileBadges, setProfileBadges] = useState<{ id: string; name: string; icon: string; rarity: string }[]>([]);
+
+  const metaName = artist?.name ?? dbProfile?.displayName ?? undefined;
+  const metaAvatar = artist?.images?.[0]?.url ?? dbProfile?.avatarUrl ?? undefined;
+  const metaBio = artist?.bio ?? dbProfile?.bio ?? undefined;
+  useMeta({ title: metaName, description: metaBio, image: metaAvatar });
 
   useEffect(() => {
     if (!id) return;

@@ -61,6 +61,7 @@ import priceAlertsRouter from "./price-alerts";
 import reportsRouter from "./reports";
 import pushRouter from "./push";
 import adminRouter from "./admin";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -126,5 +127,6 @@ router.use(priceAlertsRouter);
 router.use(reportsRouter);
 router.use(pushRouter);
 router.use(adminRouter);
+router.use(analyticsRouter);
 
 export default router;

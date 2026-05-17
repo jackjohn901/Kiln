@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, Flame } from "lucid
 import Nav from "@/components/Nav";
 import { workshops } from "@/data/workshops";
 import { useProfile } from "@/contexts/ProfileContext";
+import ReviewsSection from "@/components/ReviewsSection";
 
 type Step = "info" | "confirm";
 
@@ -249,6 +250,12 @@ export default function WorkshopCheckout() {
             </div>
           </div>
         </div>
+
+        {workshopId && (
+          <div className="mt-10">
+            <ReviewsSection targetId={workshopId} targetType="workshop" />
+          </div>
+        )}
       </div>
     </div>
   );

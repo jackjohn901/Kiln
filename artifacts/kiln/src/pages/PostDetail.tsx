@@ -13,6 +13,7 @@ import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
+import { useMeta } from "@/hooks/useMeta";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -59,6 +60,12 @@ export default function PostDetail() {
   const [dbPost, setDbPost] = useState<DbPost | null>(null);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbLiked, setDbLiked] = useState(false);
+
+  useMeta({
+    title: dbPost?.caption ? dbPost.caption.slice(0, 80) : undefined,
+    description: dbPost?.caption ?? undefined,
+    image: dbPost?.thumbnailUrl ?? undefined,
+  });
   const [dbSaved, setDbSaved] = useState(false);
   const [dbLikeCount, setDbLikeCount] = useState(0);
   const [dbSaveCount, setDbSaveCount] = useState(0);

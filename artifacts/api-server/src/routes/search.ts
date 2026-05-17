@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, profilesTable, listingsTable, guildsTable, postsTable } from "@workspace/db";
-import { ilike, or } from "drizzle-orm";
+import { ilike, or, and, eq, isNull, lte, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -24,7 +24,11 @@ router.get("/search", async (req, res): Promise<void> => {
         .where(or(ilike(guildsTable.name, like), ilike(guildsTable.description, like)))
         .limit(6),
       db.select().from(postsTable)
-        .where(ilike(postsTable.caption, like))
+        .where(and(
+          ilike(postsTable.caption, like),
+          eq(postsTable.isDraft, false),
+          or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
+        ))
         .limit(6),
     ]);
     res.json({ artists, listings, guilds, posts });

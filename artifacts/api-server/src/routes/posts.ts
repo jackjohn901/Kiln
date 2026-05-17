@@ -4,7 +4,7 @@ import {
   postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable,
 } from "@workspace/db";
 import { sendEmail, newCommentEmail } from "../lib/email";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 import { updateStreak } from "./streaks";
@@ -245,6 +245,43 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
           .from(profilesTable).where(eq(profilesTable.userId, post.authorId)).limit(1)
           .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }).catch(() => {}); })
           .catch(() => {});
+      }
+    }
+
+    // Detect @mentions and notify mentioned users (cap at 5 unique handles)
+    const mentionHandles = [
+      ...new Set([...text.matchAll(/@(\w+)/g)].map((m) => m[1].toLowerCase())),
+    ].slice(0, 5);
+    if (mentionHandles.length > 0) {
+      try {
+        const [postRow] = await db
+          .select({ authorId: postsTable.authorId })
+          .from(postsTable)
+          .where(eq(postsTable.id, postId))
+          .limit(1);
+        const postAuthorId = postRow?.authorId;
+        const authorName =
+          [user.firstName, user.lastName].filter(Boolean).join(" ") || "Someone";
+        const mentionedProfiles = await db
+          .select({ userId: profilesTable.userId })
+          .from(profilesTable)
+          .where(inArray(profilesTable.handle, mentionHandles));
+        for (const mp of mentionedProfiles) {
+          if (mp.userId === user.id) continue;
+          if (mp.userId === postAuthorId) continue; // already notified as post author
+          await db.insert(notificationsTable).values({
+            id: crypto.randomUUID(),
+            userId: mp.userId,
+            type: "mention",
+            fromId: user.id,
+            fromName: authorName,
+            fromAvatarUrl: user.profileImageUrl ?? null,
+            text: `mentioned you: "${text.trim().substring(0, 50)}"`,
+            link: `/post/${postId}`,
+          });
+        }
+      } catch {
+        // mention notifications are non-critical
       }
     }
 

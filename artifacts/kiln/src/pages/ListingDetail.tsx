@@ -17,6 +17,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import ARPreview from "@/components/ARPreview";
+import ReviewsSection from "@/components/ReviewsSection";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -1042,6 +1043,12 @@ export default function ListingDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {id && (
+        <div className="mx-auto max-w-4xl px-4 pb-10">
+          <ReviewsSection targetId={id} targetType="listing" />
+        </div>
+      )}
 
       {/* Price alert modal */}
       <AnimatePresence>

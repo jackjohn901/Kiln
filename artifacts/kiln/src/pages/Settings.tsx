@@ -36,6 +36,8 @@ interface KilnSettings {
   notif_workshops: boolean;
   notif_drops: boolean;
   notif_email_digest: boolean;
+  notif_email_follows: boolean;
+  notif_email_comments: boolean;
   privacy_profile_public: boolean;
   privacy_show_location: boolean;
   privacy_allow_messages: boolean;
@@ -62,6 +64,8 @@ function defaultSettings(): KilnSettings {
     notif_workshops: true,
     notif_drops: true,
     notif_email_digest: false,
+    notif_email_follows: false,
+    notif_email_comments: false,
     privacy_profile_public: true,
     privacy_show_location: true,
     privacy_allow_messages: true,
@@ -87,11 +91,13 @@ export default function Settings() {
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
   const [shippingSaved, setShippingSaved] = useState(false);
+  const [contactEmail, setContactEmail] = useState("");
+  const [emailSaved, setEmailSaved] = useState(false);
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null }> : null)
       .then(data => {
         if (!data) return;
         if (data.settings && Object.keys(data.settings).length > 0) {
@@ -106,6 +112,7 @@ export default function Settings() {
           setPayments(s => ({ ...s, ...data.paymentSettings }));
           savePaymentSettings({ ...data.paymentSettings } as ArtistPayments);
         }
+        if (data.contactEmail) setContactEmail(data.contactEmail);
       })
       .catch(() => { /* use localStorage cache */ });
   }, []);
@@ -134,6 +141,17 @@ export default function Settings() {
       }
       return next;
     });
+  }
+
+  function saveContactEmail(email: string) {
+    fetch("/api/me/settings", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactEmail: email }),
+    })
+      .then(() => { setEmailSaved(true); setTimeout(() => setEmailSaved(false), 2000); })
+      .catch(() => {});
   }
 
   function saveShipping(next: ShippingSettings) {
@@ -259,6 +277,23 @@ export default function Settings() {
             <Toggle settingKey="notif_drops" label="Drop alerts" desc="New drops from artists you follow" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Email</p>
             <Toggle settingKey="notif_email_digest" label="Weekly digest" desc="Top posts, opportunities, and updates" />
+            <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
+            <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
+            <div className="py-3">
+              <p className="text-sm text-stone-200 mb-1">Notification email address</p>
+              <p className="text-xs text-stone-600 mb-2">Where we send email alerts. Never shown publicly.</p>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  onBlur={(e) => saveContactEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="flex-1 min-w-0 rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                />
+                {emailSaved && <span className="text-xs text-emerald-400 shrink-0">Saved ✓</span>}
+              </div>
+            </div>
           </div>
         )}
 

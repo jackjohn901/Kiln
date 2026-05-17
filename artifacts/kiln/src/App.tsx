@@ -119,6 +119,7 @@ import Referrals from "@/pages/Referrals";
 import Badges from "@/pages/Badges";
 import Search from "@/pages/Search";
 import AdminReports from "@/pages/AdminReports";
+import PushPrompt from "@/components/PushPrompt";
 
 const queryClient = new QueryClient();
 
@@ -319,6 +320,7 @@ function Router() {
       <Route path="/admin/reports" component={AdminReports} />
       <Route component={NotFound} />
       </Switch>
+      <PushPrompt />
     </>
   );
 }
