@@ -175,32 +175,6 @@ export class ObjectStorageService {
     return `/objects/${entityId}`;
   }
 
-  async uploadStream(
-    stream: NodeJS.ReadableStream,
-    contentType: string
-  ): Promise<string> {
-    const objectId = randomUUID();
-    const privateObjectDir = this.getPrivateObjectDir();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
-    const { bucketName, objectName } = parseObjectPath(fullPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-
-    const writeStream = file.createWriteStream({
-      metadata: { contentType },
-      resumable: false,
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      stream.pipe(writeStream);
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-      (stream as NodeJS.EventEmitter).on("error", reject);
-    });
-
-    return `/objects/uploads/${objectId}`;
-  }
-
   async trySetObjectEntityAclPolicy(
     rawPath: string,
     aclPolicy: ObjectAclPolicy
