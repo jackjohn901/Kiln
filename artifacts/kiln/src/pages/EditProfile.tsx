@@ -109,7 +109,7 @@ export default function EditProfile() {
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
-      <div className="mx-auto max-w-xl px-4 py-8">
+      <div className="mx-auto max-w-xl px-4 py-8 pb-28 md:pb-8">
         <div className="mb-8">
           <h1 className="font-serif text-2xl font-bold text-amber-100">Edit Profile</h1>
           <p className="text-sm text-stone-500">Changes are saved to your device</p>
