@@ -33,7 +33,8 @@ async function refreshIfExpired(
   const now = Math.floor(Date.now() / 1000);
   if (!session.expires_at || now <= session.expires_at) return session;
 
-  if (!session.refresh_token) return null;
+  // No refresh token — session TTL (7 days) is the real expiry control; keep the session alive
+  if (!session.refresh_token) return session;
 
   try {
     const config = await getOidcConfig();
