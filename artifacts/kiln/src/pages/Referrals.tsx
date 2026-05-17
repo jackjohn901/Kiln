@@ -27,6 +27,16 @@ export default function Referrals() {
   const [redeemMsg, setRedeemMsg] = useState("");
 
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem("kiln_referral_code");
+      if (stored) {
+        setRedeemCode(stored);
+        localStorage.removeItem("kiln_referral_code");
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     fetch("/api/me/referral", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)

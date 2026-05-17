@@ -7,6 +7,7 @@ import {
 import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
 import Comments from "@/components/Comments";
+import PollBlock, { type Poll } from "@/components/PollBlock";
 import { getReelById, ALL_REELS, TECHNIQUE_COLORS } from "@/data/reels";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -61,6 +62,7 @@ export default function PostDetail() {
   const [dbSaved, setDbSaved] = useState(false);
   const [dbLikeCount, setDbLikeCount] = useState(0);
   const [dbSaveCount, setDbSaveCount] = useState(0);
+  const [poll, setPoll] = useState<{ poll: Poll; pollId: string; initialVoteOptionId: string | null } | null>(null);
 
   const isDbPost = id ? id.startsWith("db-") : false;
   const rawPostId = isDbPost ? id!.slice(3) : id ?? "";
@@ -68,7 +70,7 @@ export default function PostDetail() {
   useEffect(() => {
     if (!isDbPost) return;
     setDbLoading(true);
-    fetch(`/api/posts/${rawPostId}`)
+    fetch(`/api/posts/${rawPostId}`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : Promise.reject(r.status))
       .then((data) => {
         const p: DbPost = data.post;
@@ -80,6 +82,29 @@ export default function PostDetail() {
       })
       .catch(() => setDbPost(null))
       .finally(() => setDbLoading(false));
+
+    fetch(`/api/posts/${rawPostId}/poll`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.poll) return;
+        const ap = data.poll;
+        const options = (ap.options as string[]).map((text: string, i: number) => ({
+          id: String(i),
+          text,
+          votes: (ap.voteCounts as number[])[i] ?? 0,
+        }));
+        setPoll({
+          poll: {
+            id: ap.id,
+            question: ap.question,
+            options,
+            endsAt: ap.endsAt ?? new Date(Date.now() + 86400000 * 7).toISOString(),
+          },
+          pollId: ap.id,
+          initialVoteOptionId: ap.userVote !== null && ap.userVote !== undefined ? String(ap.userVote) : null,
+        });
+      })
+      .catch(() => {});
   }, [rawPostId, isDbPost]);
 
   async function handleDbLike() {
@@ -219,6 +244,16 @@ export default function PostDetail() {
                   </button>
                 </div>
               </div>
+
+              {poll && (
+                <div className="mt-4">
+                  <PollBlock
+                    poll={poll.poll}
+                    pollId={poll.pollId}
+                    initialVoteOptionId={poll.initialVoteOptionId}
+                  />
+                </div>
+              )}
 
               {showComments && (
                 <Comments

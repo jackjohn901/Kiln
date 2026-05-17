@@ -7,6 +7,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 import { updateStreak } from "./streaks";
+import { awardBadge } from "./badges";
 
 const router = Router();
 
@@ -35,6 +36,18 @@ router.post("/posts", async (req, res): Promise<void> => {
     }).returning();
 
     updateStreak(user.id).catch(() => {});
+
+    db.select({ count: sql`COUNT(*)` })
+      .from(postsTable)
+      .where(and(eq(postsTable.authorId, user.id), eq(postsTable.isDraft, false)))
+      .then(([row]) => {
+        const n = Number(row?.count ?? 0);
+        if (n === 1) awardBadge(user.id, "first_post").catch(() => {});
+        else if (n === 10) awardBadge(user.id, "ten_posts").catch(() => {});
+        else if (n === 100) awardBadge(user.id, "hundred_posts").catch(() => {});
+      })
+      .catch(() => {});
+
     res.status(201).json({ ...post, tags: post.tags ?? [], isLiked: false, isSaved: false, createdAt: post.createdAt.toISOString() });
   } catch (err) {
     req.log.error({ err }, "createPost error");

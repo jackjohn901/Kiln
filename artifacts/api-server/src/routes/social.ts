@@ -6,6 +6,7 @@ import {
 import { eq, and, sql, or, ilike, inArray, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
+import { awardBadge } from "./badges";
 
 const router = Router();
 
@@ -66,10 +67,16 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
     const [profile] = await db.select({ followerCount: profilesTable.followerCount })
       .from(profilesTable).where(eq(profilesTable.userId, followingId));
 
+    const newCount = profile?.followerCount ?? 0;
+    if (newCount === 1) awardBadge(followingId, "first_follower").catch(() => {});
+    else if (newCount === 100) awardBadge(followingId, "hundred_followers").catch(() => {});
+    else if (newCount === 1000) awardBadge(followingId, "thousand_followers").catch(() => {});
+    else if (newCount === 10000) awardBadge(followingId, "ten_thousand_followers").catch(() => {});
+
     broadcast(followingId, { type: "follow", followerId, followingId });
     broadcast(followingId, { type: "notification", userId: followingId, text: "Someone started following you", link: `/profile/${followerId}` });
 
-    res.json({ following: true, followerCount: profile?.followerCount ?? 0 });
+    res.json({ following: true, followerCount: newCount });
   } catch (err) {
     req.log.error({ err }, "toggleFollow error");
     res.status(500).json({ error: "Failed to toggle follow" });

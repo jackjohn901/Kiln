@@ -270,6 +270,8 @@ export default function ArtistProfile() {
   const [dbPosts, setDbPosts] = useState<DbUserPost[]>([]);
   const [dbFollowing, setDbFollowing] = useState(false);
   const [dbFollowerCount, setDbFollowerCount] = useState(0);
+  const [profileStreak, setProfileStreak] = useState<{ currentStreak: number; longestStreak: number } | null>(null);
+  const [profileBadges, setProfileBadges] = useState<{ id: string; name: string; icon: string; rarity: string }[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -287,6 +289,14 @@ export default function ArtistProfile() {
     fetch(`/api/users/${id}/posts`)
       .then((r) => r.ok ? r.json() : { posts: [] })
       .then((data) => setDbPosts(data.posts ?? []))
+      .catch(() => {});
+    fetch(`/api/users/${id}/streak`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setProfileStreak(data); })
+      .catch(() => {});
+    fetch(`/api/users/${id}/badges`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.badges) setProfileBadges(data.badges); })
       .catch(() => {});
   }, [id]);
 
@@ -731,6 +741,37 @@ export default function ArtistProfile() {
             </div>
           )}
         </div>
+
+        {/* Streak + earned badges */}
+        {((profileStreak?.currentStreak ?? 0) > 0 || profileBadges.length > 0) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {(profileStreak?.currentStreak ?? 0) > 0 && (
+              <div className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1">
+                <Flame size={13} className="text-amber-400" />
+                <span className="text-xs font-semibold text-amber-300">
+                  {profileStreak!.currentStreak} day streak
+                </span>
+              </div>
+            )}
+            {profileBadges.slice(0, 5).map((b) => (
+              <Link key={b.id} href="/badges">
+                <span
+                  title={b.name}
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-stone-800 border border-white/10 text-base hover:border-amber-500/40 transition-colors"
+                >
+                  {b.icon}
+                </span>
+              </Link>
+            ))}
+            {profileBadges.length > 5 && (
+              <Link href="/badges">
+                <span className="text-xs text-stone-500 hover:text-amber-400 transition-colors">
+                  +{profileBadges.length - 5} more
+                </span>
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Story highlights (series) */}
         {artist.series.length > 0 && (

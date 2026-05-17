@@ -131,6 +131,19 @@ function applyThemeFromSettings() {
 }
 applyThemeFromSettings();
 
+function RefCapture() {
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref && ref.trim()) {
+        localStorage.setItem("kiln_referral_code", ref.trim().toUpperCase());
+      }
+    } catch {}
+  }, []);
+  return null;
+}
+
 function TitleSetter() {
   const [location] = useLocation();
   useEffect(() => {
@@ -183,6 +196,7 @@ function Router() {
   return (
     <>
       <TitleSetter />
+      <RefCapture />
       <Switch>
         <Route path="/" component={Feed} />
       <Route path="/discover" component={Discover} />

@@ -157,7 +157,12 @@ export default function Notifications() {
                         </div>
 
                         {/* Content */}
-                        <div className="min-w-0 flex-1" onClick={() => markRead(n.id)}>
+                        <div className="min-w-0 flex-1" onClick={() => {
+                          markRead(n.id);
+                          if (n.id.startsWith("api-")) {
+                            fetch(`/api/notifications/${n.id.slice(4)}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
+                          }
+                        }}>
                           {n.link ? (
                             <Link href={n.link} className="block">
                               <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>

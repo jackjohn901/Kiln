@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -74,15 +74,58 @@ const STATUS_CONFIG: Record<PostStatus, { label: string; color: string }> = {
   failed: { label: "Failed", color: "text-red-400" },
 };
 
+function apiDraftToPost(d: Record<string, unknown>): ScheduledPost {
+  const caption = String(d.caption ?? "");
+  const scheduledAt = d.scheduledAt ? String(d.scheduledAt) : new Date().toISOString();
+  const inFuture = new Date(scheduledAt).getTime() > Date.now();
+  const technique = d.technique ? String(d.technique) : undefined;
+  return {
+    id: String(d.id),
+    type: d.videoUrl ? "reel" : d.thumbnailUrl ? "photo" : "journal",
+    title: caption.split("\n")[0].slice(0, 60) || "Untitled",
+    caption,
+    scheduledAt,
+    status: inFuture ? "scheduled" : "published",
+    hashtags: Array.isArray(d.tags) ? (d.tags as string[]) : [],
+    thumbnailColor: COLORS[Math.abs(String(d.id).charCodeAt(0) % COLORS.length)],
+    technique,
+  };
+}
+
 export default function PostScheduler() {
   const [posts, setPosts] = useState<ScheduledPost[]>(() => {
     const stored = readPosts();
     return stored.length > 0 ? stored : SEED_POSTS;
   });
+  const [apiLoaded, setApiLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<PostStatus | "all">("all");
   const [composing, setComposing] = useState(false);
   const [editing, setEditing] = useState<ScheduledPost | null>(null);
   const [draft, setDraft] = useState<Partial<ScheduledPost>>({});
+
+  // Load real scheduled drafts from the API on mount
+  useEffect(() => {
+    fetch("/api/me/drafts", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.drafts) return;
+        const apiPosts: ScheduledPost[] = (data.drafts as Record<string, unknown>[])
+          .filter((d) => d.scheduledAt)
+          .map(apiDraftToPost);
+        if (apiPosts.length === 0) return;
+        setPosts((prev) => {
+          const localIds = new Set(prev.filter((p) => p.id.startsWith("seed-") || p.id.startsWith("post-")).map((p) => p.id));
+          const merged = [
+            ...apiPosts,
+            ...prev.filter((p) => localIds.has(p.id)),
+          ];
+          return merged;
+        });
+      })
+      .catch(() => {})
+      .finally(() => setApiLoaded(true));
+  }, []);
 
   const visible = filter === "all" ? posts : posts.filter((p) => p.status === filter);
   const counts = { draft: 0, scheduled: 0, published: 0, failed: 0 };
@@ -105,15 +148,48 @@ export default function PostScheduler() {
     setComposing(true);
   }
 
-  function savePost() {
+  async function savePost() {
     const now = new Date().toISOString();
+    const scheduledAt = draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : now;
+    const caption = [draft.title, draft.caption].filter(Boolean).join("\n");
     const isNew = !editing;
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/me/drafts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftId: editing && !editing.id.startsWith("seed-") && !editing.id.startsWith("post-") ? editing.id : undefined,
+          caption,
+          technique: draft.technique ?? null,
+          tags: draft.hashtags ?? [],
+          scheduledAt,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const saved = apiDraftToPost(data.draft as Record<string, unknown>);
+        setPosts((prev) => {
+          if (isNew) return [saved, ...prev.filter((p) => !p.id.startsWith("seed-"))];
+          return prev.map((p) => p.id === editing?.id ? saved : p);
+        });
+        setComposing(false);
+        setEditing(null);
+        setDraft({});
+        return;
+      }
+    } catch { /* fall through to localStorage */ }
+    finally { setSaving(false); }
+
+    // Fallback: localStorage
     const finalPost: ScheduledPost = {
       id: editing?.id ?? `post-${Date.now()}`,
       type: (draft.type ?? "reel") as PostType,
       title: draft.title ?? "",
       caption: draft.caption ?? "",
-      scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : now,
+      scheduledAt,
       status: (draft.status ?? "scheduled") as PostStatus,
       hashtags: draft.hashtags ?? [],
       thumbnailColor: draft.thumbnailColor ?? COLORS[0],
@@ -129,18 +205,30 @@ export default function PostScheduler() {
     setDraft({});
   }
 
-  function deletePost(id: string) {
+  async function deletePost(id: string) {
+    const isApiPost = !id.startsWith("seed-") && !id.startsWith("post-");
+    if (isApiPost) {
+      await fetch(`/api/me/drafts/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+    }
     setPosts((prev) => {
       const next = prev.filter((p) => p.id !== id);
-      savePosts(next);
+      savePosts(next.filter((p) => p.id.startsWith("seed-") || p.id.startsWith("post-")));
       return next;
     });
   }
 
-  function publishNow(id: string) {
+  async function publishNow(id: string) {
+    const isApiPost = !id.startsWith("seed-") && !id.startsWith("post-");
+    if (isApiPost) {
+      const res = await fetch(`/api/me/drafts/${id}/publish`, { method: "POST", credentials: "include" }).catch(() => null);
+      if (res?.ok) {
+        setPosts((prev) => prev.map((p) => p.id === id ? { ...p, status: "published" as PostStatus, scheduledAt: new Date().toISOString() } : p));
+        return;
+      }
+    }
     setPosts((prev) => {
       const next = prev.map((p) => p.id === id ? { ...p, status: "published" as PostStatus, scheduledAt: new Date().toISOString() } : p);
-      savePosts(next);
+      savePosts(next.filter((p) => p.id.startsWith("seed-") || p.id.startsWith("post-")));
       return next;
     });
   }

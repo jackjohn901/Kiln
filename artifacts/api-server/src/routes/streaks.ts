@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { streaksTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { awardBadge } from "./badges";
 
 const router = Router();
 
@@ -22,6 +23,10 @@ export async function updateStreak(userId: string): Promise<void> {
   await db.update(streaksTable)
     .set({ currentStreak: newStreak, longestStreak: longest, lastPostDate: today, updatedAt: new Date() })
     .where(eq(streaksTable.userId, userId));
+
+  if (newStreak >= 100) awardBadge(userId, "streak_100").catch(() => {});
+  else if (newStreak >= 30) awardBadge(userId, "streak_30").catch(() => {});
+  else if (newStreak >= 7) awardBadge(userId, "streak_7").catch(() => {});
 }
 
 router.get("/me/streak", async (req, res): Promise<void> => {

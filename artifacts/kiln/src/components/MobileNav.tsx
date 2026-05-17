@@ -101,6 +101,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/events", icon: CalendarDays, label: "Events" },
       { href: "/opportunities", icon: Briefcase, label: "Opportunities" },
       { href: "/leaderboard", icon: Award, label: "Leaderboard" },
+      { href: "/badges", icon: Trophy, label: "Badges" },
+      { href: "/referrals", icon: UserCircle2, label: "Invite Artists" },
       { href: "/parliament", icon: Vote, label: "Parliament" },
       { href: "/lineage", icon: GitBranch, label: "Craft Lineage" },
     ],
