@@ -11,6 +11,8 @@ import ReportModal from "@/components/ReportModal";
 import BoardSavePicker from "@/components/BoardSavePicker";
 import { ParsedCaption } from "@/lib/parseCaption";
 import { getTrackById } from "@/data/music";
+import { getCommunityBeats } from "@/lib/communityBeats";
+import { createBeatLooper } from "@/lib/beatSynth";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import Comments from "@/components/Comments";
@@ -718,7 +720,9 @@ function ReelCard({
 
 export default function Feed() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef        = useRef<HTMLAudioElement | null>(null);
+  const beatLooperRef   = useRef<{ stop: () => void } | null>(null);
+  const activeReelRef   = useRef<Reel | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [musicMuted, setMusicMuted] = useState(false);
@@ -890,37 +894,82 @@ export default function Feed() {
     }
   }, [feedTab, techniqueFilter]);
 
-  // Music: switch track when active reel changes
+  // Keep activeReelRef in sync so mute effect can read it without a stale closure
+  useEffect(() => { activeReelRef.current = activeReel ?? null; }, [activeReel]);
+
+  // Music: switch track (or beat) when the active reel changes
   useEffect(() => {
+    // Tear down whatever was playing before
+    beatLooperRef.current?.stop();
+    beatLooperRef.current = null;
+    audioRef.current?.pause();
+
     if (!activeReel || !musicUnlocked) return;
-    const track = getTrackById(activeReel.musicTrackId);
+
+    const tid = activeReel.musicTrackId ?? "";
+
+    if (tid.startsWith("beat-")) {
+      // ── Community beat: synthesise via Web Audio ──────────────────────────
+      if (musicMuted) return;
+      const beatId = tid.replace(/^beat-/, "");
+      const beat   = getCommunityBeats().find((b) => b.id === beatId);
+      if (!beat) return;
+      beatLooperRef.current = createBeatLooper(beat);
+      return () => {
+        beatLooperRef.current?.stop();
+        beatLooperRef.current = null;
+      };
+    }
+
+    // ── Library track: HTML5 Audio ────────────────────────────────────────
+    const track = getTrackById(tid);
     if (!track) return;
     if (!audioRef.current) {
       audioRef.current = new Audio(track.url);
-      audioRef.current.loop = true;
+      audioRef.current.loop   = true;
       audioRef.current.volume = 0.65;
     } else {
       audioRef.current.pause();
-      audioRef.current.src = track.url;
+      audioRef.current.src  = track.url;
       audioRef.current.load();
-      audioRef.current.loop = true;
+      audioRef.current.loop   = true;
       audioRef.current.volume = 0.65;
     }
     if (!musicMuted) audioRef.current.play().catch(() => {});
     return () => { audioRef.current?.pause(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, musicUnlocked, activeReel]);
 
+  // Mute / unmute — handles both HTML5 audio and beat loopers
   useEffect(() => {
-    if (!audioRef.current || !musicUnlocked) return;
-    if (musicMuted) {
-      audioRef.current.pause();
+    if (!musicUnlocked) return;
+    const tid = activeReelRef.current?.musicTrackId ?? "";
+
+    if (tid.startsWith("beat-")) {
+      if (musicMuted) {
+        beatLooperRef.current?.stop();
+        beatLooperRef.current = null;
+      } else if (!beatLooperRef.current) {
+        const beatId = tid.replace(/^beat-/, "");
+        const beat   = getCommunityBeats().find((b) => b.id === beatId);
+        if (beat) beatLooperRef.current = createBeatLooper(beat);
+      }
     } else {
-      audioRef.current.play().catch(() => {});
+      if (!audioRef.current) return;
+      if (musicMuted) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(() => {});
+      }
     }
   }, [musicMuted, musicUnlocked]);
 
+  // Cleanup on unmount
   useEffect(() => {
-    return () => { audioRef.current?.pause(); };
+    return () => {
+      audioRef.current?.pause();
+      beatLooperRef.current?.stop();
+    };
   }, []);
 
   // Keyboard shortcuts
