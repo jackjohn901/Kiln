@@ -6,6 +6,7 @@ import {
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
   SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown, GitBranch,
+  Mic, MicOff,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
 import BoardSavePicker from "@/components/BoardSavePicker";
@@ -284,6 +285,8 @@ function ReelCard({
   isActive,
   musicMuted,
   onToggleMusic,
+  videoAudioOn,
+  onToggleVideoAudio,
   onComment,
   onNotInterested,
   onMoreLikeThis,
@@ -292,6 +295,8 @@ function ReelCard({
   isActive: boolean;
   musicMuted: boolean;
   onToggleMusic: () => void;
+  videoAudioOn: boolean;
+  onToggleVideoAudio: () => void;
   onComment: (reelId: string, artistName: string) => void;
   onNotInterested: () => void;
   onMoreLikeThis: () => void;
@@ -345,6 +350,19 @@ function ReelCard({
     }
   }, [isActive, resolvedVideoUrl]);
 
+  // Original audio volume: blend with music track when both are on
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (!videoAudioOn) {
+      v.volume = 0;
+      return;
+    }
+    const hasMusicTrack = !!(reel.musicTrackId);
+    // Duck original audio to 25% when a music layer is active on top
+    v.volume = (hasMusicTrack && !musicMuted) ? 0.25 : 1.0;
+  }, [videoAudioOn, musicMuted, isActive, reel.musicTrackId]);
+
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
       {/* Ken Burns keyframes for seed thumbnails */}
@@ -364,7 +382,6 @@ function ReelCard({
           ref={videoRef}
           key={resolvedVideoUrl}
           src={resolvedVideoUrl}
-          muted
           loop
           playsInline
           poster={reel.thumbnail}
@@ -619,7 +636,17 @@ function ReelCard({
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
 
-        {/* Music toggle */}
+        {/* Original audio toggle */}
+        <button onClick={onToggleVideoAudio} className="flex flex-col items-center gap-1">
+          {videoAudioOn ? (
+            <Mic size={20} className="text-white" />
+          ) : (
+            <MicOff size={20} className="text-white/40" />
+          )}
+          <span className={`text-[9px] ${videoAudioOn ? "text-white/70" : "text-white/30"}`}>Original</span>
+        </button>
+
+        {/* Music layer toggle */}
         <button onClick={onToggleMusic} className="flex flex-col items-center gap-1">
           {musicMuted ? (
             <VolumeX size={22} className="text-white/60" />
@@ -726,6 +753,7 @@ export default function Feed() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [musicMuted, setMusicMuted] = useState(false);
+  const [videoAudioOn, setVideoAudioOn] = useState(true);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
   const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");
   const [techniqueFilter, setTechniqueFilter] = useState<string | null>(null);
@@ -1234,6 +1262,8 @@ export default function Feed() {
               isActive={i === activeIndex}
               musicMuted={musicMuted}
               onToggleMusic={handleToggleMusic}
+              videoAudioOn={videoAudioOn}
+              onToggleVideoAudio={() => setVideoAudioOn((v) => !v)}
               onComment={(id, name) => setCommentReel({ id, artistName: name })}
               onNotInterested={() => handleNotInterested(reel.id)}
               onMoreLikeThis={() => handleMoreLikeThis(reel.technique)}

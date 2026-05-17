@@ -150,17 +150,21 @@ export function createBeatLooper(
   beat: CommunityBeat,
   opts: { onStep?: (step: number) => void } = {},
 ): { stop: () => void } {
-  const ctx   = new AudioContext();
-  const steps = beat.pattern[0]?.length ?? 16;
-  const stepDur  = 60 / beat.bpm / 4;
-  const swing    = beat.swing ?? 0;
+  const ctx = new AudioContext();
+  // Immediately resume — browsers suspend AudioContext until a user gesture fires
+  ctx.resume().catch(() => {});
+
+  const steps   = beat.pattern[0]?.length ?? 16;
+  const stepDur = 60 / beat.bpm / 4;
+  const swing   = beat.swing ?? 0;
 
   let step     = 0;
-  let nextTime = ctx.currentTime + 0.05;
+  let nextTime = ctx.currentTime; // start from right now, no artificial offset
   const uiTimers: ReturnType<typeof setTimeout>[] = [];
 
   function schedule() {
-    while (nextTime < ctx.currentTime + 0.15) {
+    // 250 ms lookahead: large enough to cover any JS timer jitter
+    while (nextTime < ctx.currentTime + 0.25) {
       const swingOffset = step % 2 === 1 ? swing * stepDur : 0;
       const t = nextTime + swingOffset;
       beat.pattern.forEach((row, ti) => {
@@ -175,7 +179,10 @@ export function createBeatLooper(
     }
   }
 
-  const interval = window.setInterval(schedule, 25);
+  // Pre-fill the first 250 ms of audio immediately so there is zero audible gap
+  schedule();
+  // Then keep refilling every 10 ms — tight interval prevents choppiness
+  const interval = window.setInterval(schedule, 10);
 
   return {
     stop() {
