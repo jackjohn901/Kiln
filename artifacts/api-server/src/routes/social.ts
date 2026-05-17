@@ -4,6 +4,7 @@ import {
   followsTable, profilesTable, notificationsTable, postsTable,
 } from "@workspace/db";
 import { eq, and, sql, or, ilike, inArray, desc } from "drizzle-orm";
+import { sendEmail, newFollowerEmail } from "../lib/email";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 import { awardBadge } from "./badges";
@@ -75,6 +76,13 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
 
     broadcast(followingId, { type: "follow", followerId, followingId });
     broadcast(followingId, { type: "notification", userId: followingId, text: "Someone started following you", link: `/profile/${followerId}` });
+
+    // Email notification (fire-and-forget — skipped if Resend not configured or no contactEmail)
+    const followerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "Someone";
+    db.select({ contactEmail: profilesTable.contactEmail })
+      .from(profilesTable).where(eq(profilesTable.userId, followingId)).limit(1)
+      .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }).catch(() => {}); })
+      .catch(() => {});
 
     res.json({ following: true, followerCount: newCount });
   } catch (err) {
@@ -207,6 +215,7 @@ router.get("/me/profile", async (req, res): Promise<void> => {
         userId,
         displayName: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
         avatarUrl: user.profileImageUrl ?? null,
+        contactEmail: user.email ?? null,
       }).returning();
       res.json({ ...created, isFollowing: false, createdAt: created.createdAt.toISOString() }); return;
     }

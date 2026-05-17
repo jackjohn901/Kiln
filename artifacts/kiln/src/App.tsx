@@ -117,6 +117,8 @@ import SubscriptionBoxes from "@/pages/SubscriptionBoxes";
 import CreateSubscriptionBox from "@/pages/CreateSubscriptionBox";
 import Referrals from "@/pages/Referrals";
 import Badges from "@/pages/Badges";
+import Search from "@/pages/Search";
+import AdminReports from "@/pages/AdminReports";
 
 const queryClient = new QueryClient();
 
@@ -313,6 +315,8 @@ function Router() {
       <Route path="/subscription-boxes/create" component={CreateSubscriptionBox} />
       <Route path="/referrals" component={Referrals} />
       <Route path="/badges" component={Badges} />
+      <Route path="/search" component={Search} />
+      <Route path="/admin/reports" component={AdminReports} />
       <Route component={NotFound} />
       </Switch>
     </>

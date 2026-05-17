@@ -60,6 +60,7 @@ import opportunitySavesRouter from "./opportunity-saves";
 import priceAlertsRouter from "./price-alerts";
 import reportsRouter from "./reports";
 import pushRouter from "./push";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -124,5 +125,6 @@ router.use(opportunitySavesRouter);
 router.use(priceAlertsRouter);
 router.use(reportsRouter);
 router.use(pushRouter);
+router.use(adminRouter);
 
 export default router;

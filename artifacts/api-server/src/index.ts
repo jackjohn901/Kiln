@@ -5,6 +5,7 @@ import { setupWebSocket } from "./lib/websocket";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 import { seedDatabase } from "./lib/seed";
+import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -46,6 +47,7 @@ if (Number.isNaN(port) || port <= 0) {
 (async () => {
   await initStripe();
   await seedDatabase();
+  startScheduledPostsPublisher();
 
   const server = createServer(app);
   setupWebSocket(server);

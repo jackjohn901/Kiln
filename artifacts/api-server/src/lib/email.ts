@@ -92,6 +92,36 @@ const btn = (href: string, label: string) =>
 const card = (content: string) =>
   `<div style="background:#292524;border-radius:12px;padding:20px;margin:16px 0;">${content}</div>`;
 
+export function newFollowerEmail(followerName: string): string {
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Follower</h1>
+    ${card(`<p style="margin:0;"><strong>${followerName}</strong> is now following your work on Kiln.</p>`)}
+    ${btn(`${BASE_URL}/me`, "View your profile")}
+  `);
+}
+
+export function newCommentEmail(commenterName: string, postCaption: string, postId: string): string {
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Comment</h1>
+    ${card(`
+      <p style="margin:0 0 8px;"><strong>${commenterName}</strong> commented on your post:</p>
+      <p style="margin:0;color:#78716c;font-style:italic;">"${postCaption.slice(0, 80)}…"</p>
+    `)}
+    ${btn(`${BASE_URL}/posts/${postId}`, "See the comment")}
+  `);
+}
+
+export function newPatronEmail(patronName: string, tierName: string): string {
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Patron! 🌟</h1>
+    ${card(`
+      <p style="margin:0 0 8px;"><strong>${patronName}</strong> just subscribed to your <strong style="color:#fcd34d;">${tierName}</strong> tier.</p>
+      <p style="margin:0;color:#78716c;">Your patron community is growing. Keep creating amazing work!</p>
+    `)}
+    ${btn(`${BASE_URL}/earnings`, "View your patrons")}
+  `);
+}
+
 export function newCommissionEmail(clientName: string, workType: string, description: string): string {
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Commission Request</h1>

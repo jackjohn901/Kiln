@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  postsTable, likesTable, savesTable, commentsTable, notificationsTable,
+  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable,
 } from "@workspace/db";
+import { sendEmail, newCommentEmail } from "../lib/email";
 import { eq, and, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
@@ -15,8 +16,14 @@ const router = Router();
 router.post("/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly } = req.body;
+  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, isDraft } = req.body as {
+    caption?: string; videoUrl?: string; thumbnailUrl?: string; technique?: string; medium?: string;
+    tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; isDraft?: boolean;
+  };
   if (!caption) { res.status(400).json({ error: "caption required" }); return; }
+
+  const schedDate = scheduledAt ? new Date(scheduledAt) : null;
+  const asDraft = isDraft ?? (schedDate ? true : false);
 
   try {
     const id = crypto.randomUUID();
@@ -33,6 +40,8 @@ router.post("/posts", async (req, res): Promise<void> => {
       medium: medium ?? null,
       tags: tags ?? [],
       isPatronOnly: isPatronOnly ?? false,
+      isDraft: asDraft,
+      scheduledAt: schedDate,
     }).returning();
 
     updateStreak(user.id).catch(() => {});
@@ -230,6 +239,12 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
         });
         broadcast(post.authorId, { type: "comment", postId, commentId: id, authorId: user.id });
         broadcast(post.authorId, { type: "notification", userId: post.authorId, text: `${authorName} commented on your post`, link: `/post/${postId}` });
+
+        // Email notification (fire-and-forget)
+        db.select({ contactEmail: profilesTable.contactEmail })
+          .from(profilesTable).where(eq(profilesTable.userId, post.authorId)).limit(1)
+          .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }).catch(() => {}); })
+          .catch(() => {});
       }
     }
 

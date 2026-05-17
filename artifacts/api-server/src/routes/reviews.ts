@@ -34,7 +34,7 @@ router.post("/reviews", async (req, res): Promise<void> => {
     reviewerAvatarUrl: user.profileImageUrl ?? null, targetId, targetType,
     rating, title, body, isVerifiedPurchase: false,
   }).returning();
-  res.status(201).json({ ...review, createdAt: review.createdAt.toISOString(), updatedAt: review.updatedAt.toISOString() });
+  res.status(201).json({ review: { ...review, createdAt: review.createdAt.toISOString(), updatedAt: review.updatedAt.toISOString() } });
 });
 
 // POST /reviews/:id/respond — artist responds to review

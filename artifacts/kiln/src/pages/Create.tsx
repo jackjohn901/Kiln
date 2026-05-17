@@ -105,6 +105,7 @@ export default function Create() {
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
   const [durationError, setDurationError] = useState("");
+  const [scheduledAt, setScheduledAt] = useState<string>("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const additionalInputRef = useRef<HTMLInputElement>(null);
@@ -289,6 +290,8 @@ export default function Create() {
           technique: technique || null,
           tags: [...(technique ? [technique] : []), ...(stage ? [stage] : []), ...tags],
           isPatronOnly,
+          scheduledAt: scheduledAt || null,
+          isDraft: scheduledAt ? true : false,
         }),
       }).catch(() => {});
 
@@ -962,6 +965,40 @@ export default function Create() {
               )}
             </div>
 
+            {/* Schedule for later */}
+            <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-4">
+              <button
+                onClick={() => setScheduledAt(scheduledAt ? "" : new Date(Date.now() + 3600000).toISOString().slice(0, 16))}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar size={14} className={scheduledAt ? "text-amber-400" : "text-stone-500"} />
+                  <div>
+                    <p className={`text-sm font-medium ${scheduledAt ? "text-amber-200" : "text-stone-300"}`}>Schedule for later</p>
+                    <p className="text-xs text-stone-600">Set a future date and time for this post to go live</p>
+                  </div>
+                </div>
+                <div className={`h-5 w-9 rounded-full transition-colors ${scheduledAt ? "bg-amber-500" : "bg-stone-700"} relative`}>
+                  <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${scheduledAt ? "translate-x-4" : "translate-x-0.5"}`} />
+                </div>
+              </button>
+              {scheduledAt && (
+                <div className="mt-3 pt-3 border-t border-white/8">
+                  <label className="mb-1 block text-xs font-medium text-stone-500">Publish date &amp; time</label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                    className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                  />
+                  <p className="mt-1.5 text-xs text-amber-600/80">
+                    This post will be saved as a draft and published automatically at the scheduled time.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Upload progress */}
             {uploading && (
               <div className="rounded-xl bg-stone-900/60 p-3">
@@ -984,7 +1021,7 @@ export default function Create() {
               className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-all disabled:opacity-50"
             >
               {publishing ? <Loader2 size={16} className="animate-spin" /> : <Flame size={16} />}
-              {publishing ? "Publishing…" : "Post to Kiln"}
+              {publishing ? (scheduledAt ? "Scheduling…" : "Publishing…") : (scheduledAt ? `Schedule for ${new Date(scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Post to Kiln")}
             </button>
 
             <button

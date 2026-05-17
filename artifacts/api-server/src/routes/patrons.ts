@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable } from "@workspace/db";
+import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable } from "@workspace/db";
+import { sendEmail, newPatronEmail } from "../lib/email";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -44,6 +45,13 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
   await db.insert(patronSubscriptionsTable).values({ id: crypto.randomUUID(), tierId: tier.id, artistId: tier.artistId, subscriberId: userId, subscriberName: name, amount: tier.price, status: "active" });
   await db.update(patronTiersTable).set({ subscriberCount: sql`${patronTiersTable.subscriberCount} + 1` }).where(eq(patronTiersTable.id, tier.id));
   await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: tier.artistId, type: "subscription", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `subscribed to your ${tier.name} tier`, link: `/patrons` });
+
+  // Email notification (fire-and-forget)
+  db.select({ contactEmail: profilesTable.contactEmail })
+    .from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1)
+    .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }).catch(() => {}); })
+    .catch(() => {});
+
   res.json({ subscribed: true });
 });
 
