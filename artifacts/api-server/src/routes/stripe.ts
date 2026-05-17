@@ -63,6 +63,55 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
   }
 });
 
+router.post('/stripe/subscription-checkout', async (req, res): Promise<void> => {
+  try {
+    const { artistId, tierId, tierLabel, amount, customerEmail, successPath, cancelPath } = req.body as {
+      artistId?: string;
+      tierId?: string;
+      tierLabel: string;
+      amount: number;
+      customerEmail?: string;
+      successPath?: string;
+      cancelPath?: string;
+    };
+
+    if (!tierLabel || !amount) {
+      res.status(400).json({ error: 'tierLabel and amount required' }); return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+
+    const baseUrl = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : `http://localhost:${process.env.PORT ?? 5000}`;
+
+    const basePath = process.env.BASE_PATH ?? '';
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: customerEmail,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          unit_amount: Math.round(amount * 100),
+          product_data: { name: tierLabel },
+          recurring: { interval: 'month' },
+        },
+        quantity: 1,
+      }],
+      mode: 'subscription',
+      success_url: `${baseUrl}${basePath}${successPath ?? '/'}?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${basePath}${cancelPath ?? '/'}`,
+      metadata: { platform: 'kiln', artistId: artistId ?? '', tierId: tierId ?? '' },
+    });
+
+    res.json({ url: session.url, sessionId: session.id });
+  } catch (err: any) {
+    logger.error({ err }, 'Stripe subscription checkout error');
+    res.status(500).json({ error: err.message ?? 'Checkout failed' });
+  }
+});
+
 router.get('/stripe/session/:sessionId', async (req, res): Promise<void> => {
   try {
     const stripe = await getUncachableStripeClient();

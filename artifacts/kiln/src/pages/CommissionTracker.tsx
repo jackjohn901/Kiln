@@ -63,6 +63,37 @@ function CommissionCard({ commission, isArtist, onUpdate }: { commission: Commis
   const [updating, setUpdating] = useState(false);
   const progressIndex = getMilestoneIndex(commission);
 
+  async function handlePayDeposit() {
+    if (!commission.quotedPrice) return;
+    setUpdating(true);
+    try {
+      const depositAmount = Math.round(commission.quotedPrice * 0.3);
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          items: [{
+            name: `Deposit — ${commission.workType ?? "Custom Commission"}`,
+            price: depositAmount,
+            quantity: 1,
+            artistName: commission.artistName,
+          }],
+          successPath: `/commission-tracker?deposit_paid=${commission.id}`,
+          cancelPath: "/commission-tracker",
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setUpdating(false);
+      }
+    } catch {
+      setUpdating(false);
+    }
+  }
+
   const updateCommission = async (updates: Partial<Commission>) => {
     setUpdating(true);
     try {
@@ -163,6 +194,13 @@ function CommissionCard({ commission, isArtist, onUpdate }: { commission: Commis
               {updating ? "..." : "Mark Deposit Received"}
             </button>
           )}
+
+          {!isArtist && commission.status === "accepted" && !commission.depositPaid && !!commission.quotedPrice && (
+            <button onClick={handlePayDeposit} disabled={updating}
+              className="w-full rounded-full bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300 py-2 hover:bg-amber-500/30 transition-colors disabled:opacity-50">
+              {updating ? "Redirecting…" : `Pay Deposit (30% · $${Math.round(commission.quotedPrice * 0.3).toLocaleString()})`}
+            </button>
+          )}
         </div>
       )}
     </motion.div>
@@ -180,6 +218,14 @@ export default function CommissionTracker() {
       .then(data => setCommissions(data.commissions ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Handle return from Stripe deposit payment
+    const params = new URLSearchParams(window.location.search);
+    const depositPaidId = params.get("deposit_paid");
+    if (depositPaidId) {
+      setCommissions(prev => prev.map(c => c.id === depositPaidId ? { ...c, depositPaid: true } : c));
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
 
   const handleUpdate = (id: string, updates: Partial<Commission>) => {

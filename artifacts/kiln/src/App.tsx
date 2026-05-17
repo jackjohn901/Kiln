@@ -104,6 +104,7 @@ import CreateDrop from "@/pages/CreateDrop";
 import CreateWorkshop from "@/pages/CreateWorkshop";
 import MusicStudio from "@/pages/MusicStudio";
 import SoundMarket from "@/pages/SoundMarket";
+import CartSuccess from "@/pages/CartSuccess";
 
 const queryClient = new QueryClient();
 
@@ -221,6 +222,7 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/cart" component={Cart} />
       <Route path="/cart/checkout" component={CartCheckout} />
+      <Route path="/cart/success" component={CartSuccess} />
       <Route path="/collab" component={CollabBoard} />
       <Route path="/trending" component={Trending} />
       <Route path="/assistant" component={CraftAssistant} />

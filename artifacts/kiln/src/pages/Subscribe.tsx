@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { Heart, Check, Star, Flame, Lock } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -61,6 +61,8 @@ export default function Subscribe() {
   const { isSubscribed, subscribe, unsubscribe, isVerified } = useSocial();
   const [selectedTier, setSelectedTier] = useState("supporter");
   const [step, setStep] = useState<"select" | "confirm" | "done">("select");
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   const artist = ALL_ARTISTS.find(
     (a) => "id" in a && a.id === params.artistId
@@ -86,9 +88,48 @@ export default function Subscribe() {
   const alreadySubscribed = isSubscribed(artistId);
   const tier = TIERS.find((t) => t.id === selectedTier)!;
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("subscribed") === "1") {
+      subscribe(artistId, artistName, avatarUrl);
+      setStep("done");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [artistId]);
+
+  async function handleStripeSubscription() {
+    if (!profile) { navigate("/setup"); return; }
+    setCheckingOut(true);
+    setCheckoutError("");
+    try {
+      const res = await fetch("/api/stripe/subscription-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          artistId,
+          tierId: selectedTier,
+          tierLabel: `${tier.label} — ${artistName}`,
+          amount: tier.price,
+          successPath: `/subscribe/${artistId}`,
+          cancelPath: `/subscribe/${artistId}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error ?? "Checkout failed");
+      }
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : "Checkout failed. Please try again.");
+      setCheckingOut(false);
+    }
+  }
+
   function handleSubscribe() {
     if (!profile) { navigate("/setup"); return; }
-    if (step === "select") { setStep("confirm"); return; }
+    if (step === "select") { handleStripeSubscription(); return; }
     subscribe(artistId, artistName, avatarUrl);
     setStep("done");
   }
@@ -246,11 +287,13 @@ export default function Subscribe() {
 
         <button
           onClick={handleSubscribe}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+          disabled={checkingOut}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-50"
         >
           <Heart size={16} />
-          Support {artistName} for ${tier.price}/mo
+          {checkingOut ? "Redirecting to checkout…" : `Support ${artistName} for $${tier.price}/mo`}
         </button>
+        {checkoutError && <p className="text-center text-xs text-rose-400 mt-2">{checkoutError}</p>}
         <p className="text-center text-xs text-stone-600 mt-3">Cancel anytime. No commitment.</p>
       </div>
     </div>

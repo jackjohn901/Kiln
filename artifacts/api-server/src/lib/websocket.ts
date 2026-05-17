@@ -8,7 +8,8 @@ export type WsEvent =
   | { type: "follow"; followerId: string; followingId: string }
   | { type: "comment"; postId: string; commentId: string; authorId: string }
   | { type: "notification"; userId: string; text: string; link?: string }
-  | { type: "message"; threadId: string; senderId: string; recipientId: string };
+  | { type: "message"; threadId: string; senderId: string; recipientId: string }
+  | { type: "bid"; auctionId: string; currentBid: number; bidCount: number; bidderName: string };
 
 const clients = new Map<string, Set<WebSocket>>();
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, Flame } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -24,6 +24,15 @@ export default function WorkshopCheckout() {
   });
   const [processing, setProcessing] = useState(false);
   const [bookingId] = useState(() => `WS-${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
+  const [bookingError, setBookingError] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("booked") === "1") {
+      setStep("confirm");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   if (!workshop) {
     return (
@@ -57,10 +66,36 @@ export default function WorkshopCheckout() {
   }
 
   async function handleReserve() {
+    if (!workshop || !form.name || !form.email) return;
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1600));
-    setProcessing(false);
-    setStep("confirm");
+    setBookingError("");
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          items: [{
+            name: workshop.title,
+            price: workshop.price ?? 0,
+            quantity: 1,
+            artistName: workshop.artistName,
+          }],
+          customerEmail: form.email,
+          successPath: `/workshops/book/${workshop.id}?booked=1`,
+          cancelPath: `/workshops/book/${workshop.id}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error ?? "Checkout failed");
+      }
+    } catch (err) {
+      setBookingError(err instanceof Error ? err.message : "Checkout failed. Please try again.");
+      setProcessing(false);
+    }
   }
 
   if (step === "confirm") {
@@ -166,18 +201,16 @@ export default function WorkshopCheckout() {
               <textarea value={form.notes} onChange={(e) => field("notes", e.target.value)} rows={2} placeholder="Goals, physical limitations, specific questions…" className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none resize-none" />
             </div>
 
-            <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-2 text-xs text-stone-500">
-              <Flame size={10} className="inline mr-1 text-amber-400" />
-              This is a demo booking. No real payment is processed.
-            </div>
-
             <button
               onClick={handleReserve}
               disabled={processing || !form.name || !form.email}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
             >
-              {processing ? "Reserving…" : `Reserve My Spot · $${workshop.price}`}
+              {processing ? "Redirecting to checkout…" : `Pay & Reserve · $${workshop.price}`}
             </button>
+            {bookingError && (
+              <p className="text-center text-xs text-rose-400 mt-1">{bookingError}</p>
+            )}
           </div>
 
           {/* Workshop summary */}

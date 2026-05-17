@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import searchRouter from "./search";
 import instagramRouter from "./instagram";
 import storageRouter from "./storage";
 import craftAssistantRouter from "./craft-assistant";
@@ -46,5 +47,6 @@ router.use(dropsRouter);
 router.use(auctionsRouter);
 router.use(patronsRouter);
 router.use(discoverRouter);
+router.use(searchRouter);
 
 export default router;

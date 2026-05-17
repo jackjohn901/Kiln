@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Gavel, Clock, TrendingUp, X, AlertCircle, CheckCircle, Trophy, ChevronDown, ChevronUp } from "lucide-react";
@@ -237,6 +238,9 @@ export default function Auctions() {
   const [loading, setLoading] = useState(true);
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [tab, setTab] = useState<"live" | "all" | "ended">("live");
+  const { subscribe } = useWebSocket();
+  const selectedRef = useRef(selectedAuction);
+  selectedRef.current = selectedAuction;
 
   useEffect(() => {
     fetch("/api/auctions", { credentials: "include" })
@@ -245,6 +249,20 @@ export default function Auctions() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    return subscribe("bid", (event) => {
+      const e = event as { auctionId: string; currentBid: number; bidCount: number; bidderName: string };
+      setAuctions(prev => prev.map(a => a.id === e.auctionId
+        ? { ...a, currentBid: e.currentBid, bidCount: e.bidCount, currentBidderName: e.bidderName }
+        : a
+      ));
+      setSelectedAuction(prev => prev?.id === e.auctionId
+        ? { ...prev, currentBid: e.currentBid, bidCount: e.bidCount, currentBidderName: e.bidderName }
+        : prev
+      );
+    });
+  }, [subscribe]);
 
   const handleOpenBid = async (auction: Auction) => {
     try {

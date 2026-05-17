@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { commissionsTable, notificationsTable } from "@workspace/db";
+import { commissionsTable, notificationsTable, usersTable } from "@workspace/db";
 import { eq, or, desc } from "drizzle-orm";
 import crypto from "crypto";
+import { sendEmail, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
 
 const router = Router();
 
@@ -21,6 +22,10 @@ router.post("/commissions", async (req, res): Promise<void> => {
       referenceUrls: referenceUrls ?? [], status: "pending",
     }).returning();
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions` });
+    const [artistUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId));
+    if (artistUser?.email) {
+      sendEmail({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }).catch(() => {});
+    }
     res.status(201).json({ ...commission, createdAt: commission.createdAt.toISOString(), updatedAt: commission.updatedAt.toISOString() });
   } catch (err) { req.log.error({ err }, "createCommission error"); res.status(500).json({ error: "Failed to submit commission" }); }
 });
@@ -60,6 +65,10 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
   }).where(eq(commissionsTable.id, req.params.id)).returning();
   if (status && commission.clientId !== req.user.id) {
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: `updated your commission: ${status}`, link: `/commissions` });
+    const clientEmail = commission.clientEmail ?? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, commission.clientId)).then(r => r[0]?.email));
+    if (clientEmail) {
+      sendEmail({ to: clientEmail, subject: `Commission update from ${commission.artistName}`, html: commissionUpdateEmail(commission.artistName, status, commission.workType ?? "") }).catch(() => {});
+    }
   }
   res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), estimatedDelivery: updated.estimatedDelivery?.toISOString() ?? null });
 });

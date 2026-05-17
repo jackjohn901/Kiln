@@ -218,8 +218,13 @@ export default function Create() {
       if (file && mediaType === "video") {
         // Capture thumbnail while the blob URL is still valid
         thumbnailUrl = await captureVideoThumbnail(previewUrl) || undefined;
-        // Store video in IndexedDB — works reliably without cloud storage
-        mediaUrl = await storeBlob(file);
+        // Upload to server; fall back to IndexedDB if upload fails
+        try {
+          const result = await upload(file);
+          mediaUrl = result.servingUrl;
+        } catch {
+          mediaUrl = await storeBlob(file);
+        }
       } else if (file) {
         // Images: try server upload, fall back to base64
         try {
@@ -283,6 +288,20 @@ export default function Create() {
           isPatronOnly,
         }),
       }).catch(() => {});
+
+      // Instagram cross-post if enabled and media is server-hosted
+      if (crossPost.instagram && mediaUrl && !mediaUrl.startsWith("blob:") && !mediaUrl.startsWith("data:") && !mediaUrl.startsWith("idb:")) {
+        fetch("/api/instagram/post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            mediaUrl,
+            caption: `${caption || technique}${tags.map((t: string) => ` #${t.replace(/\s+/g, "")}`).join("")}`,
+            isVideo: mediaType === "video",
+          }),
+        }).catch(() => {});
+      }
 
       recordPost();
       setStep("done");

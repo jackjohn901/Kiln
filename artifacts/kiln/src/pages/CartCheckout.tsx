@@ -72,6 +72,8 @@ export default function CartCheckout() {
   const [isGift, setIsGift] = useState(false);
   const [giftRecipient, setGiftRecipient] = useState("");
   const [giftMessage, setGiftMessage] = useState("");
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
@@ -124,6 +126,41 @@ export default function CartCheckout() {
 
   function addrValid() {
     return addr.name && addr.email && addr.address && addr.city && addr.state && addr.zip;
+  }
+
+  async function handleStripeCheckout() {
+    if (!addrValid()) return;
+    setCheckingOut(true);
+    setCheckoutError("");
+    try {
+      const cartItems = items.map(({ listing, quantity }) => ({
+        name: listing.title as string,
+        price: listing.price as number,
+        quantity,
+        imageUrl: (listing.imageUrl as string | undefined) ?? undefined,
+        artistName: ((listing as unknown as Record<string, unknown>).artistName as string | undefined) ?? undefined,
+      }));
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          items: cartItems,
+          customerEmail: addr.email || undefined,
+          successPath: "/cart/success",
+          cancelPath: "/cart/checkout",
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error ?? "Checkout failed");
+      }
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : "Checkout failed. Please try again.");
+      setCheckingOut(false);
+    }
   }
 
   const STEPS: Step[] = ["address", "pay", "done"];
@@ -271,19 +308,28 @@ export default function CartCheckout() {
                     </div>
 
                     <button
-                      disabled={!addrValid()}
-                      onClick={() => setStep("pay")}
+                      disabled={!addrValid() || checkingOut}
+                      onClick={handleStripeCheckout}
                       className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Continue to payment <ArrowRight size={14} />
+                      {checkingOut ? "Redirecting to checkout…" : <><CreditCard size={14} /> Pay securely with Stripe</>}
                     </button>
+                    {checkoutError && (
+                      <p className="text-center text-xs text-rose-400 mt-2">{checkoutError}</p>
+                    )}
                   </div>
                 </motion.div>
               )}
 
-              {/* ── Step 2: Pay artists directly ── */}
+              {/* ── Step 2: Redirecting to Stripe ── */}
               {step === "pay" && (
-                <motion.div key="pay" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                <motion.div key="pay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-24 gap-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+                  <p className="text-stone-400 text-sm">Redirecting to secure checkout…</p>
+                </motion.div>
+              )}
+              {(false as boolean) && (
+                <motion.div key="_unused" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
 
                   <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex items-start gap-2">
                     <Info size={13} className="text-amber-400 mt-0.5 shrink-0" />

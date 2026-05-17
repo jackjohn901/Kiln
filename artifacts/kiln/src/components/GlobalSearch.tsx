@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Search, X, TrendingUp, ArrowRight, User, BookOpen, Wrench, MapPin, Flame, FlaskConical, ScrollText, Trophy } from "lucide-react";
+import { Search, X, TrendingUp, ArrowRight, User, BookOpen, Wrench, MapPin, Flame, FlaskConical, ScrollText, Trophy, ShoppingBag, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -23,6 +23,22 @@ interface DbProfile {
   followerCount: number;
 }
 
+interface DbListing {
+  id: string;
+  title: string;
+  price: number;
+  imageUrl: string | null;
+  artistName: string | null;
+}
+
+interface DbGuild {
+  id: string;
+  name: string;
+  slug: string;
+  technique: string | null;
+  memberCount: number;
+}
+
 const TRENDING = [
   "glass blowing", "raku", "Alex Bernstein", "celadon", "Seattle studio",
   "metal forging", "Lino Tagliapietra", "flameworking", "wood turning",
@@ -35,6 +51,8 @@ export default function GlobalSearch({ onClose }: Props) {
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dbProfiles, setDbProfiles] = useState<DbProfile[]>([]);
+  const [dbListings, setDbListings] = useState<DbListing[]>([]);
+  const [dbGuilds, setDbGuilds] = useState<DbGuild[]>([]);
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -45,12 +63,19 @@ export default function GlobalSearch({ onClose }: Props) {
 
   useEffect(() => {
     const q = query.trim();
-    if (!q) { setDbProfiles([]); return; }
+    if (!q) { setDbProfiles([]); setDbListings([]); setDbGuilds([]); return; }
     const timer = setTimeout(() => {
       fetch(`/api/users/search?q=${encodeURIComponent(q)}&limit=5`)
         .then((r) => r.ok ? r.json() : { profiles: [] })
         .then((data) => setDbProfiles(data.profiles ?? []))
         .catch(() => setDbProfiles([]));
+      fetch(`/api/search?q=${encodeURIComponent(q)}`)
+        .then((r) => r.ok ? r.json() : { listings: [], guilds: [] })
+        .then((data: { listings?: DbListing[]; guilds?: DbGuild[] }) => {
+          setDbListings((data.listings ?? []).slice(0, 4));
+          setDbGuilds((data.guilds ?? []).slice(0, 3));
+        })
+        .catch(() => {});
     }, 250);
     return () => clearTimeout(timer);
   }, [query]);
@@ -117,7 +142,7 @@ export default function GlobalSearch({ onClose }: Props) {
   const staticArtistIds = new Set(ALL_ARTISTS.map((a) => a.id));
   const dbOnlyProfiles = dbProfiles.filter((p) => !staticArtistIds.has(p.userId));
 
-  const hasResults = dbOnlyProfiles.length + artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length + challengeHits.length > 0;
+  const hasResults = dbOnlyProfiles.length + artistHits.length + techniqueHits.length + workshopHits.length + postHits.length + materialHits.length + seriesHits.length + challengeHits.length + dbListings.length + dbGuilds.length > 0;
 
   function go(href: string) { navigate(href); onClose(); }
 
@@ -308,6 +333,49 @@ export default function GlobalSearch({ onClose }: Props) {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-stone-200 truncate">{r.caption}</p>
                       <p className="text-xs text-stone-600 truncate">{r.artistName} · {r.technique}</p>
+                    </div>
+                    <ArrowRight size={13} className="text-stone-700 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* DB Listings */}
+            {dbListings.length > 0 && (
+              <div className="border-b border-white/5">
+                <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Shop</p>
+                {dbListings.map((l) => (
+                  <button key={l.id} onClick={() => go(`/shop/${l.id}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
+                  >
+                    {l.imageUrl
+                      ? <img src={l.imageUrl} alt={l.title} className="h-10 w-10 rounded-lg object-cover shrink-0 bg-stone-800" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-800"><ShoppingBag size={15} className="text-stone-500" /></div>
+                    }
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-stone-200 truncate">{l.title}</p>
+                      <p className="text-xs text-stone-600">{l.artistName ? `by ${l.artistName}` : ""}{l.price ? ` · $${Number(l.price).toLocaleString()}` : ""}</p>
+                    </div>
+                    <ArrowRight size={13} className="text-stone-700 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* DB Guilds */}
+            {dbGuilds.length > 0 && (
+              <div className="border-b border-white/5">
+                <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Guilds</p>
+                {dbGuilds.map((g) => (
+                  <button key={g.id} onClick={() => go(`/guilds/${g.slug}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+                      <Users size={15} className="text-amber-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-stone-200 truncate">{g.name}</p>
+                      <p className="text-xs text-stone-600">{g.technique ?? ""}{g.memberCount ? ` · ${g.memberCount.toLocaleString()} members` : ""}</p>
                     </div>
                     <ArrowRight size={13} className="text-stone-700 shrink-0" />
                   </button>
