@@ -557,9 +557,6 @@ function ReelCard({
         <button
           onClick={() => {
             toggleReelLike(reel.id);
-            if (reel.id.startsWith("db-")) {
-              fetch(`/api/posts/${reel.id.slice(3)}/like`, { method: "POST", credentials: "include" }).catch(() => {});
-            }
             // Record interaction for For You algorithm
             try {
               const data = readInteractions();
@@ -598,9 +595,6 @@ function ReelCard({
           onClick={() => {
             if (!saved) {
               toggleReelSave(reel.id);
-              if (reel.id.startsWith("db-")) {
-                fetch(`/api/posts/${reel.id.slice(3)}/save`, { method: "POST", credentials: "include" }).catch(() => {});
-              }
             }
             setShowBoardPicker(true);
             try {
@@ -761,6 +755,7 @@ export default function Feed() {
   const activeReelRef   = useRef<Reel | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
+  const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
   const [musicMuted, setMusicMuted] = useState(false);
   const [videoAudioOn, setVideoAudioOn] = useState(true);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
@@ -815,6 +810,37 @@ export default function Feed() {
       window.removeEventListener("kiln:post-added", reload);
     };
   }, []);
+
+  // Fetch posts from users I follow when the Following tab is active
+  useEffect(() => {
+    if (feedTab !== "following") return;
+    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
+    fetch("/api/feed/following?limit=20", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        if (!data?.posts?.length) return;
+        const apiReels: Reel[] = data.posts.map((p: any) => ({
+          id: `db-${p.id}`,
+          videoId: "",
+          videoUrl: p.videoUrl ?? undefined,
+          artistId: p.authorId ?? "unknown",
+          artistName: p.authorName ?? "Artist",
+          technique: p.technique ?? "Studio Craft",
+          location: "",
+          caption: p.caption ?? "",
+          craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
+          likes: p.likeCount ?? 0,
+          saves: p.saveCount ?? 0,
+          thumbnail: p.thumbnailUrl ?? undefined,
+          avatarUrl: p.authorAvatarUrl ?? undefined,
+          musicTrackId: defaultMusicId,
+          available: false,
+          patronOnly: p.isPatronOnly ?? false,
+        }));
+        setFollowingApiReels(apiReels);
+      })
+      .catch(() => {});
+  }, [feedTab]);
 
   // Fetch real posts from API and prepend to feed
   useEffect(() => {
@@ -871,7 +897,11 @@ export default function Feed() {
   // User's own posts always appear first (score 95)
   const baseReels = useMemo(() => {
     if (feedTab === "following") {
-      return [...userPostReels, ...ALL_REELS.filter((r) => following.includes(r.artistId))];
+      return [
+        ...followingApiReels,
+        ...userPostReels,
+        ...ALL_REELS.filter((r) => following.includes(r.artistId)),
+      ];
     }
     // Read current interaction data and quiz prefs each time
     const interactions = readInteractions();
@@ -891,7 +921,7 @@ export default function Feed() {
       ...userPostReels,
       ...scored.sort((a, b) => b.score - a.score).map((s) => s.reel),
     ];
-  }, [feedTab, following, userPostReels]);
+  }, [feedTab, following, userPostReels, followingApiReels]);
 
   const reels = useMemo(() => {
     const base = techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels;

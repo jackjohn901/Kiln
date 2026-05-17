@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { artists } from "@/data/artists";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface UserProfile {
   id: string;
@@ -42,12 +43,46 @@ function readStored(): UserProfile | null {
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<UserProfile | null>(readStored);
+  const { isAuthenticated, user } = useAuth();
+  const dbSynced = useRef(false);
 
   function setProfile(p: UserProfile | null) {
     setProfileState(p);
     if (p) localStorage.setItem("kiln_profile", JSON.stringify(p));
     else localStorage.removeItem("kiln_profile");
   }
+
+  // Ensure DB profile record exists and auto-populate local profile from it if needed
+  useEffect(() => {
+    if (!isAuthenticated || !user || dbSynced.current) return;
+    dbSynced.current = true;
+    fetch("/api/me/profile", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((dbProfile: { displayName?: string | null; handle?: string | null; bio?: string | null; medium?: string | null; location?: string | null; website?: string | null; avatarUrl?: string | null; bannerUrl?: string | null } | null) => {
+        if (!dbProfile) return;
+        setProfileState((prev) => {
+          if (prev) return prev; // already have a local profile, keep it
+          const name = dbProfile.displayName ?? dbProfile.handle ?? user.id;
+          if (!name) return prev;
+          const newProfile: UserProfile = {
+            id: user.id,
+            name,
+            handle: dbProfile.handle ?? user.id,
+            bio: dbProfile.bio ?? "",
+            mediums: dbProfile.medium ? [dbProfile.medium] : [],
+            location: dbProfile.location ?? "",
+            website: dbProfile.website ?? "",
+            instagram: "",
+            avatarUrl: dbProfile.avatarUrl ?? (user as { profileImageUrl?: string }).profileImageUrl ?? "",
+            coverUrl: dbProfile.bannerUrl ?? "",
+            isCustom: true,
+          };
+          localStorage.setItem("kiln_profile", JSON.stringify(newProfile));
+          return newProfile;
+        });
+      })
+      .catch(() => {});
+  }, [isAuthenticated, user]);
 
   function demoAs(artistId: string) {
     const artist = artists.find((a) => a.id === artistId);

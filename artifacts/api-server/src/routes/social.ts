@@ -254,4 +254,19 @@ router.get("/me/posts", async (req, res): Promise<void> => {
   }
 });
 
+// GET /me/following — list of userIds the current user follows
+router.get("/me/following", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.json({ followingIds: [] }); return; }
+  try {
+    const follows = await db
+      .select({ followingId: followsTable.followingId })
+      .from(followsTable)
+      .where(eq(followsTable.followerId, req.user.id));
+    res.json({ followingIds: follows.map((f) => f.followingId) });
+  } catch (err) {
+    req.log.error({ err }, "getMyFollowing error");
+    res.status(500).json({ error: "Failed to load following" });
+  }
+});
+
 export default router;

@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface KilnComment {
   id: string;
@@ -435,6 +436,7 @@ function genId(): string {
 
 export function SocialProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SocialState>(readState);
+  const { isAuthenticated } = useAuth();
 
   function update(updater: (prev: SocialState) => SocialState) {
     setState((prev) => {
@@ -443,6 +445,46 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }
+
+  // Sync from server on login: load real following IDs + notifications
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    fetch("/api/me/following", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { followingIds?: string[] } | null) => {
+        if (data?.followingIds?.length) {
+          update((s) => ({
+            ...s,
+            following: Array.from(new Set([...s.following, ...data.followingIds!])),
+          }));
+        }
+      })
+      .catch(() => {});
+
+    fetch("/api/notifications", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; read: boolean; createdAt: string }> } | null) => {
+        if (!data?.notifications?.length) return;
+        const apiNotifs: KilnNotification[] = data.notifications.map((n) => ({
+          id: n.id,
+          type: n.type as KilnNotification["type"],
+          fromId: n.fromId,
+          fromName: n.fromName,
+          fromAvatarUrl: n.fromAvatarUrl ?? "",
+          text: n.text,
+          link: n.link ?? undefined,
+          read: n.read,
+          createdAt: n.createdAt,
+        }));
+        update((s) => {
+          const apiIds = new Set(apiNotifs.map((n) => n.id));
+          const localOnly = s.notifications.filter((n) => !apiIds.has(n.id));
+          return { ...s, notifications: [...apiNotifs, ...localOnly] };
+        });
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   const followArtist = useCallback((artistId: string, artistName: string, avatarUrl: string) => {
     update((s) => ({
@@ -453,12 +495,12 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         ...s.notifications,
       ],
     }));
-    fetch(`/api/users/${artistId}/follow`, { method: "POST" }).catch(() => {});
+    fetch(`/api/users/${artistId}/follow`, { method: "POST", credentials: "include" }).catch(() => {});
   }, []);
 
   const unfollowArtist = useCallback((artistId: string) => {
     update((s) => ({ ...s, following: s.following.filter((id) => id !== artistId) }));
-    fetch(`/api/users/${artistId}/follow`, { method: "POST" }).catch(() => {});
+    fetch(`/api/users/${artistId}/follow`, { method: "POST", credentials: "include" }).catch(() => {});
   }, []);
 
   const isFollowing = useCallback((artistId: string) => state.following.includes(artistId), [state.following]);
@@ -466,6 +508,14 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const addComment = useCallback((postId: string, authorId: string, authorName: string, authorAvatar: string, text: string) => {
     const comment: KilnComment = { id: genId(), postId, authorId, authorName, authorAvatarUrl: authorAvatar, text, likes: 0, createdAt: new Date().toISOString() };
     update((s) => ({ ...s, comments: { ...s.comments, [postId]: [comment, ...(s.comments[postId] ?? [])] } }));
+    if (postId.startsWith("db-")) {
+      fetch(`/api/posts/${postId.slice(3)}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text }),
+      }).catch(() => {});
+    }
   }, []);
 
   const getComments = useCallback((postId: string) => state.comments[postId] ?? [], [state.comments]);
@@ -490,6 +540,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const markAllRead = useCallback(() => {
     update((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
+    fetch("/api/notifications/read-all", { method: "POST", credentials: "include" }).catch(() => {});
   }, []);
 
   const setMyCommissionStatus = useCallback((status: CommissionStatus) => {
@@ -527,10 +578,16 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const toggleReelLike = useCallback((reelId: string) => {
     update((s) => ({ ...s, reelLikes: { ...s.reelLikes, [reelId]: !s.reelLikes[reelId] } }));
+    if (reelId.startsWith("db-")) {
+      fetch(`/api/posts/${reelId.slice(3)}/like`, { method: "POST", credentials: "include" }).catch(() => {});
+    }
   }, []);
 
   const toggleReelSave = useCallback((reelId: string) => {
     update((s) => ({ ...s, reelSaves: { ...s.reelSaves, [reelId]: !s.reelSaves[reelId] } }));
+    if (reelId.startsWith("db-")) {
+      fetch(`/api/posts/${reelId.slice(3)}/save`, { method: "POST", credentials: "include" }).catch(() => {});
+    }
   }, []);
 
   const toggleReelRepost = useCallback((reelId: string, reel: { artistId: string; artistName: string; caption: string; thumbnail: string }) => {
