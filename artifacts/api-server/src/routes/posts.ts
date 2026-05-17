@@ -201,6 +201,74 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
   }
 });
 
+// GET /me/drafts — list my drafts
+router.get("/me/drafts", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const rows = await db.select().from(postsTable)
+      .where(and(eq(postsTable.authorId, req.user.id), eq(postsTable.isDraft, true)))
+      .orderBy(desc(postsTable.updatedAt));
+    res.json({ drafts: rows.map(p => ({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString(), updatedAt: p.updatedAt.toISOString(), scheduledAt: p.scheduledAt?.toISOString() ?? null })) });
+  } catch (err) { req.log.error({ err }, "getDrafts error"); res.status(500).json({ error: "Failed to load drafts" }); }
+});
+
+// POST /me/drafts — save a new draft (or update existing via body.draftId)
+router.post("/me/drafts", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, draftId } = req.body as {
+    caption?: string; videoUrl?: string; thumbnailUrl?: string; technique?: string; medium?: string;
+    tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; draftId?: string;
+  };
+  const user = req.user;
+  const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
+  try {
+    if (draftId) {
+      const [updated] = await db.update(postsTable).set({
+        caption: caption ?? "", videoUrl: videoUrl ?? null, thumbnailUrl: thumbnailUrl ?? null,
+        technique: technique ?? null, medium: medium ?? null, tags: tags ?? [],
+        isPatronOnly: isPatronOnly ?? false, scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+      }).where(and(eq(postsTable.id, draftId), eq(postsTable.authorId, user.id))).returning();
+      if (!updated) { res.status(404).json({ error: "Draft not found" }); return; }
+      res.json({ draft: { ...updated, tags: updated.tags ?? [], createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), scheduledAt: updated.scheduledAt?.toISOString() ?? null } });
+    } else {
+      const id = crypto.randomUUID();
+      const [draft] = await db.insert(postsTable).values({
+        id, authorId: user.id, authorName, authorAvatarUrl: user.profileImageUrl ?? null,
+        caption: caption ?? "", videoUrl: videoUrl ?? null, thumbnailUrl: thumbnailUrl ?? null,
+        technique: technique ?? null, medium: medium ?? null, tags: tags ?? [],
+        isPatronOnly: isPatronOnly ?? false, isDraft: true,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+      }).returning();
+      res.status(201).json({ draft: { ...draft, tags: draft.tags ?? [], createdAt: draft.createdAt.toISOString(), updatedAt: draft.updatedAt.toISOString(), scheduledAt: draft.scheduledAt?.toISOString() ?? null } });
+    }
+  } catch (err) { req.log.error({ err }, "saveDraft error"); res.status(500).json({ error: "Failed to save draft" }); }
+});
+
+// POST /me/drafts/:id/publish — publish a draft
+router.post("/me/drafts/:id/publish", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [existing] = await db.select({ authorId: postsTable.authorId, isDraft: postsTable.isDraft })
+      .from(postsTable).where(eq(postsTable.id, req.params.id));
+    if (!existing || existing.authorId !== req.user.id) { res.status(404).json({ error: "Draft not found" }); return; }
+    const [post] = await db.update(postsTable).set({ isDraft: false, scheduledAt: null })
+      .where(eq(postsTable.id, req.params.id)).returning();
+    res.json({ post: { ...post, tags: post.tags ?? [], createdAt: post.createdAt.toISOString() } });
+  } catch (err) { req.log.error({ err }, "publishDraft error"); res.status(500).json({ error: "Failed to publish draft" }); }
+});
+
+// DELETE /me/drafts/:id — delete a draft
+router.delete("/me/drafts/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [existing] = await db.select({ authorId: postsTable.authorId }).from(postsTable)
+      .where(and(eq(postsTable.id, req.params.id), eq(postsTable.isDraft, true)));
+    if (!existing || existing.authorId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+    await db.delete(postsTable).where(eq(postsTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) { req.log.error({ err }, "deleteDraft error"); res.status(500).json({ error: "Failed to delete draft" }); }
+});
+
 // GET /me/saves — logged-in user's saved posts
 router.get("/me/saves", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

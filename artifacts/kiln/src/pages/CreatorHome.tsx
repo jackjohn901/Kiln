@@ -37,6 +37,7 @@ export default function CreatorHome() {
 
   const [apiProfile, setApiProfile] = useState<{ followerCount: number; postCount: number } | null>(null);
   const [apiPosts, setApiPosts] = useState<Array<{ id: string; likeCount: number; commentCount: number; saveCount: number }>>([]);
+  const [apiEarnings, setApiEarnings] = useState<{ totalCents: number; monthCents: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/me/profile", { credentials: "include" })
@@ -47,6 +48,14 @@ export default function CreatorHome() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (Array.isArray(data?.posts)) setApiPosts(data.posts); })
       .catch(() => {});
+    fetch("/api/me/earnings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.totals) {
+          setApiEarnings({ totalCents: Math.round((data.totals.total ?? 0) * 100), monthCents: 0 });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Derived stats
@@ -54,14 +63,14 @@ export default function CreatorHome() {
     const reels = getReelsByArtist(artistId);
     const listings = getListingsByArtist(artistId);
     const followers = apiProfile?.followerCount ?? (3000 + (h % 47000));
-    const monthEarnings = 800 + (h % 8200);
+    const monthEarnings = apiEarnings ? apiEarnings.totalCents / 100 : 800 + (h % 8200);
     const totalEngagement = apiPosts.length > 0
       ? apiPosts.reduce((s, p) => s + p.likeCount + p.commentCount + p.saveCount, 0)
       : reels.reduce((s, r) => s + r.likes * 12, 0);
     const availListings = listings.filter((l) => l.available).length;
     const postCount = apiProfile?.postCount ?? (apiPosts.length || reels.length);
     return { followers, monthEarnings, views: totalEngagement, reels: postCount, availListings };
-  }, [artistId, h, apiProfile, apiPosts]);
+  }, [artistId, h, apiProfile, apiPosts, apiEarnings]);
 
   const workshops = useMemo(() => getWorkshopsByArtist(artistId).slice(0, 3), [artistId]);
   const reels = useMemo(() => getReelsByArtist(artistId).slice(0, 4), [artistId]);

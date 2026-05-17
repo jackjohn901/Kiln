@@ -120,6 +120,27 @@ export default function Messages() {
     }
   }, [activeApiThread, apiMessages.length]);
 
+  // Poll for new messages every 5 s when an API thread is active
+  useEffect(() => {
+    if (!activeApiThreadId) return;
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/messages/threads/${activeApiThreadId}`, { credentials: "include" });
+        if (r.ok) {
+          const d = await r.json() as { messages?: ApiMsg[] };
+          const incoming = [...(d.messages ?? [])].reverse();
+          setApiMessages(prev => {
+            if (incoming.length !== prev.length || incoming[incoming.length - 1]?.id !== prev[prev.length - 1]?.id) {
+              return incoming;
+            }
+            return prev;
+          });
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [activeApiThreadId]);
+
   const filtered = threads.filter((t) => t.participantName.toLowerCase().includes(search.toLowerCase()));
 
   function handleSend() {

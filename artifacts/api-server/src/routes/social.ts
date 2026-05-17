@@ -233,12 +233,12 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
   }
 });
 
-// GET /me/posts — logged-in user's posts
+// GET /me/posts — logged-in user's posts (excludes drafts)
 router.get("/me/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
     const posts = await db.select().from(postsTable)
-      .where(eq(postsTable.authorId, req.user.id))
+      .where(and(eq(postsTable.authorId, req.user.id), eq(postsTable.isDraft, false)))
       .orderBy(desc(postsTable.createdAt))
       .limit(30);
     res.json({
@@ -266,6 +266,41 @@ router.get("/me/following", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "getMyFollowing error");
     res.status(500).json({ error: "Failed to load following" });
+  }
+});
+
+// GET /me/followers — people who follow the current user
+router.get("/me/followers", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const follows = await db
+      .select({
+        followerId: followsTable.followerId,
+        createdAt: followsTable.createdAt,
+      })
+      .from(followsTable)
+      .where(eq(followsTable.followingId, req.user.id))
+      .orderBy(desc(followsTable.createdAt))
+      .limit(200);
+
+    const followerIds = follows.map(f => f.followerId);
+    const profiles = followerIds.length
+      ? await db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, avatarUrl: profilesTable.avatarUrl })
+          .from(profilesTable).where(inArray(profilesTable.userId, followerIds))
+      : [];
+    const profileMap = Object.fromEntries(profiles.map(p => [p.userId, p]));
+
+    res.json({
+      followers: follows.map(f => ({
+        followerId: f.followerId,
+        followerName: profileMap[f.followerId]?.displayName ?? null,
+        followerAvatarUrl: profileMap[f.followerId]?.avatarUrl ?? null,
+        createdAt: f.createdAt.toISOString(),
+      }))
+    });
+  } catch (err) {
+    req.log.error({ err }, "getMyFollowers error");
+    res.status(500).json({ error: "Failed to load followers" });
   }
 });
 

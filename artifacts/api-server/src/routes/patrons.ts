@@ -72,6 +72,28 @@ router.post("/tips", async (req, res): Promise<void> => {
   res.status(201).json({ ...tip, createdAt: tip.createdAt.toISOString() });
 });
 
+// GET /me/patrons — people who subscribe to me (as artist)
+router.get("/me/patrons", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const rows = await db.select({
+    id: patronSubscriptionsTable.id,
+    subscriberId: patronSubscriptionsTable.subscriberId,
+    subscriberName: patronSubscriptionsTable.subscriberName,
+    tierId: patronSubscriptionsTable.tierId,
+    amount: patronSubscriptionsTable.amount,
+    status: patronSubscriptionsTable.status,
+    startedAt: patronSubscriptionsTable.startedAt,
+  }).from(patronSubscriptionsTable)
+    .where(and(eq(patronSubscriptionsTable.artistId, req.user.id), eq(patronSubscriptionsTable.status, "active")))
+    .orderBy(desc(patronSubscriptionsTable.startedAt));
+  const tierIds = [...new Set(rows.map(r => r.tierId))];
+  const tiers = tierIds.length
+    ? await db.select({ id: patronTiersTable.id, name: patronTiersTable.name }).from(patronTiersTable).where(inArray(patronTiersTable.id, tierIds))
+    : [];
+  const tierMap = Object.fromEntries(tiers.map(t => [t.id, t.name]));
+  res.json({ patrons: rows.map(r => ({ ...r, tierName: tierMap[r.tierId] ?? null, startedAt: r.startedAt.toISOString() })) });
+});
+
 // GET /me/earnings — artist earnings summary (tips + subscriptions + shop sales)
 router.get("/me/earnings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

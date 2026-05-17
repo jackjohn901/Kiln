@@ -181,28 +181,31 @@ export default function Create() {
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
   }
 
-  function handleSaveDraft() {
+  async function handleSaveDraft() {
     if (!profile) return;
     setSavingDraft(true);
-    saveDraft({
-      type: mediaType,
-      mediaUrl: previewUrl,
-      caption,
-      technique,
-      stage,
-      tags,
-      seriesName,
-      isDrop,
-      dropPrice,
-      dropDate,
-      musicTrackId: selectedTrack?.id,
-      filter: filterSettings?.preset,
-    });
-    setTimeout(() => {
-      setSavingDraft(false);
-      setDraftSaved(true);
-      setTimeout(() => setDraftSaved(false), 2500);
-    }, 600);
+    // Persist to API (DB-backed)
+    try {
+      await fetch("/api/me/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          caption: caption || "",
+          videoUrl: mediaType === "video" ? previewUrl || null : null,
+          thumbnailUrl: mediaType === "image" ? previewUrl || null : null,
+          technique: technique || null,
+          tags,
+          isPatronOnly,
+        }),
+      });
+    } catch {
+      // fall back to localStorage on network error
+      saveDraft({ type: mediaType, mediaUrl: previewUrl, caption, technique, stage, tags, seriesName, isDrop, dropPrice, dropDate, musicTrackId: selectedTrack?.id, filter: filterSettings?.preset });
+    }
+    setSavingDraft(false);
+    setDraftSaved(true);
+    setTimeout(() => setDraftSaved(false), 2500);
   }
 
   async function handlePublish() {

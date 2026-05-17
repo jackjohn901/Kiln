@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, notificationsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -27,6 +27,19 @@ router.post("/notifications/read-all", async (req, res): Promise<void> => {
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "markAllRead error");
+    res.status(500).json({ error: "Failed to mark read" });
+  }
+});
+
+router.patch("/notifications/:id/read", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    await db.update(notificationsTable)
+      .set({ read: true })
+      .where(and(eq(notificationsTable.id, req.params.id), eq(notificationsTable.userId, req.user.id)));
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "markOneRead error");
     res.status(500).json({ error: "Failed to mark read" });
   }
 });

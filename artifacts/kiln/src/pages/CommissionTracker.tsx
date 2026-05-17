@@ -61,7 +61,25 @@ function getMilestoneIndex(commission: Commission): number {
 function CommissionCard({ commission, isArtist, onUpdate }: { commission: Commission; isArtist: boolean; onUpdate: (id: string, updates: Partial<Commission>) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
+  const [quotePrice, setQuotePrice] = useState(commission.quotedPrice?.toString() ?? "");
+  const [quoteNotes, setQuoteNotes] = useState(commission.artistNotes ?? "");
   const progressIndex = getMilestoneIndex(commission);
+
+  async function handleSubmitQuote() {
+    const price = parseFloat(quotePrice);
+    if (!price || price <= 0) return;
+    setUpdating(true);
+    try {
+      const r = await fetch(`/api/commissions/${commission.id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quotedPrice: price, artistNotes: quoteNotes || undefined }),
+      });
+      if (r.ok) { const data = await r.json(); onUpdate(commission.id, data); setShowQuoteForm(false); }
+    } catch {}
+    setUpdating(false);
+  }
 
   async function handlePayDeposit() {
     if (!commission.quotedPrice) return;
@@ -169,15 +187,53 @@ function CommissionCard({ commission, isArtist, onUpdate }: { commission: Commis
           )}
 
           {isArtist && commission.status === "pending" && (
-            <div className="flex gap-2">
-              <button onClick={() => updateCommission({ status: "accepted" })} disabled={updating}
-                className="flex-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs text-emerald-300 py-2 hover:bg-emerald-500/30 transition-colors disabled:opacity-50">
-                {updating ? "..." : "Accept"}
-              </button>
-              <button onClick={() => updateCommission({ status: "declined" })} disabled={updating}
-                className="flex-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 py-2 hover:bg-rose-500/20 transition-colors disabled:opacity-50">
-                Decline
-              </button>
+            <div className="space-y-3">
+              {!showQuoteForm ? (
+                <div className="rounded-xl bg-stone-800/50 p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-stone-600 mb-2">Respond to request</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowQuoteForm(true)} disabled={updating}
+                      className="flex-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300 py-2 hover:bg-amber-500/30 transition-colors">
+                      Quote & Accept
+                    </button>
+                    <button onClick={() => updateCommission({ status: "accepted" })} disabled={updating}
+                      className="flex-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs text-emerald-300 py-2 hover:bg-emerald-500/30 transition-colors disabled:opacity-50">
+                      {updating ? "..." : "Accept as-is"}
+                    </button>
+                    <button onClick={() => updateCommission({ status: "declined" })} disabled={updating}
+                      className="flex-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 py-2 hover:bg-rose-500/20 transition-colors disabled:opacity-50">
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-stone-800/50 p-3 space-y-3">
+                  <p className="text-[10px] uppercase tracking-wider text-stone-600">Send a Quote</p>
+                  <div>
+                    <label className="text-[10px] text-stone-500 mb-1 block">Your price (USD)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm">$</span>
+                      <input type="number" min="1" placeholder="0.00" value={quotePrice} onChange={e => setQuotePrice(e.target.value)}
+                        className="w-full rounded-lg border border-white/10 bg-stone-900 py-2 pl-7 pr-3 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-stone-500 mb-1 block">Notes for collector (optional)</label>
+                    <textarea rows={2} placeholder="Describe your process, timeline, or any questions…" value={quoteNotes} onChange={e => setQuoteNotes(e.target.value)}
+                      className="w-full rounded-lg border border-white/10 bg-stone-900 px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none resize-none" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleSubmitQuote} disabled={updating || !quotePrice}
+                      className="flex-1 rounded-full bg-amber-500 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 disabled:opacity-40 transition-colors">
+                      {updating ? "Sending…" : "Send Quote & Accept"}
+                    </button>
+                    <button onClick={() => setShowQuoteForm(false)}
+                      className="rounded-full border border-white/10 px-3 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

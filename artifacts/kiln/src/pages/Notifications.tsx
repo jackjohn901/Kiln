@@ -61,8 +61,8 @@ export default function Notifications() {
           fromId: (n.fromId as string) ?? "",
           fromName: (n.fromName as string) ?? "",
           fromAvatarUrl: (n.fromAvatarUrl as string) ?? "",
-          text: (n.message as string) ?? "You have a new notification",
-          link: n.postId ? `/post/${n.postId as string}` : undefined,
+          text: (n.text as string) ?? "You have a new notification",
+          link: (n.link as string | undefined) ?? undefined,
           read: (n.read as boolean) ?? false,
           createdAt: n.createdAt as string,
         })));

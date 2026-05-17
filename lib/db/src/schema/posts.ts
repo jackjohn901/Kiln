@@ -18,6 +18,8 @@ export const postsTable = pgTable("posts", {
   saveCount: integer("save_count").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
   isPatronOnly: boolean("is_patron_only").notNull().default(false),
+  isDraft: boolean("is_draft").notNull().default(false),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   craftScore: integer("craft_score"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
