@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
@@ -75,7 +75,15 @@ export default function Create() {
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
   const [filterCss, setFilterCss] = useState("");
-  const [selectedTrack, setSelectedTrack] = useState<MusicTrack | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<MusicTrack | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("kiln_pending_beat");
+      if (!raw) return null;
+      sessionStorage.removeItem("kiln_pending_beat");
+      const d = JSON.parse(raw) as { id: string; title: string; artist: string; url: string; license: string; bpm: number };
+      return { id: d.id, title: d.title, artist: d.artist, genre: "Electronic" as const, mood: "Original", craftMood: "Studio Vibes", bpm: d.bpm ?? 0, duration: 0, url: d.url, license: d.license };
+    } catch { return null; }
+  });
   const [showMusicPicker, setShowMusicPicker] = useState(false);
   const [caption, setCaption] = useState("");
   const [technique, setTechnique] = useState("");

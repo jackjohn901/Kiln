@@ -103,6 +103,7 @@ import CreateListing from "@/pages/CreateListing";
 import CreateDrop from "@/pages/CreateDrop";
 import CreateWorkshop from "@/pages/CreateWorkshop";
 import MusicStudio from "@/pages/MusicStudio";
+import SoundMarket from "@/pages/SoundMarket";
 
 const queryClient = new QueryClient();
 
@@ -270,6 +271,7 @@ function Router() {
       <Route path="/create-drop" component={CreateDrop} />
       <Route path="/create-workshop" component={CreateWorkshop} />
       <Route path="/music-studio" component={MusicStudio} />
+      <Route path="/sound-market" component={SoundMarket} />
       <Route component={NotFound} />
       </Switch>
     </>

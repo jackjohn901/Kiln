@@ -10,7 +10,7 @@ import {
   Zap, Gavel, BookMarked, Calendar, Mail, X, ChevronRight,
   Download, Grid3x3, SplitSquareHorizontal, Gift, Scissors,
   CheckSquare, UserCircle2, Calculator, Dna, GitBranch,
-  Vote, Ghost, Radar, Timer, Network,
+  Vote, Ghost, Radar, Timer, Network, Music2,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -49,6 +49,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/create-listing", icon: ShoppingBag, label: "List a Piece" },
       { href: "/create-drop", icon: Zap, label: "Schedule a Drop" },
       { href: "/create-workshop", icon: BookOpen, label: "Create Workshop" },
+      { href: "/music-studio", icon: Music2, label: "Music Studio" },
+      { href: "/sound-market", icon: Music2, label: "Sound Market" },
       { href: "/analytics", icon: BarChart2, label: "Analytics" },
       { href: "/earnings", icon: DollarSign, label: "Earnings" },
       { href: "/inventory", icon: Archive, label: "Inventory" },

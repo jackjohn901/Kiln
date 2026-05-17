@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Play, Pause, Check, Music, Search, Upload, X, FileAudio, Music2, ExternalLink } from "lucide-react";
+import { Play, Pause, Check, Music, Search, Upload, X, FileAudio, Music2, ExternalLink, Lock, ShoppingBag } from "lucide-react";
 import { musicTracks, GENRES, CRAFT_MOODS, formatDuration, type MusicTrack } from "@/data/music";
 import { getCommunityBeats, type CommunityBeat } from "@/lib/communityBeats";
+import { hasLicense } from "@/lib/beatLicenses";
+import { createBeatLooper } from "@/lib/beatSynth";
+import { useProfile } from "@/contexts/ProfileContext";
 
 // ── Waveform animation ────────────────────────────────────────────────────────
 
@@ -51,73 +54,6 @@ function MiniGrid({ pattern }: { pattern: boolean[][] }) {
   );
 }
 
-// ── Community beat synth (inline, for preview) ────────────────────────────────
-
-function previewBeat(beat: CommunityBeat): () => void {
-  const ctx = new AudioContext();
-  let step = 0;
-  let nextTime = ctx.currentTime + 0.05;
-  const stepDur = 60 / beat.bpm / 4;
-
-  function triggerTrack(ti: number, time: number) {
-    switch (ti) {
-      case 0: { // Kick
-        const osc = ctx.createOscillator(), g = ctx.createGain();
-        osc.connect(g); g.connect(ctx.destination);
-        osc.frequency.setValueAtTime(150, time);
-        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.4);
-        g.gain.setValueAtTime(1.1, time);
-        g.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
-        osc.start(time); osc.stop(time + 0.4); break;
-      }
-      case 1: { // Snare
-        const sz = Math.ceil(ctx.sampleRate * 0.15);
-        const buf = ctx.createBuffer(1, sz, ctx.sampleRate);
-        const d = buf.getChannelData(0); for (let i = 0; i < sz; i++) d[i] = Math.random() * 2 - 1;
-        const n = ctx.createBufferSource(); n.buffer = buf;
-        const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 1200;
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.7, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
-        n.connect(f); f.connect(g); g.connect(ctx.destination); n.start(time); n.stop(time + 0.15); break;
-      }
-      case 2: case 3: { // Hi-hat / Open hat
-        const dur = ti === 3 ? 0.3 : 0.04;
-        const sz = Math.ceil(ctx.sampleRate * dur);
-        const buf = ctx.createBuffer(1, sz, ctx.sampleRate);
-        const d = buf.getChannelData(0); for (let i = 0; i < sz; i++) d[i] = Math.random() * 2 - 1;
-        const n = ctx.createBufferSource(); n.buffer = buf;
-        const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 9000;
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.4, time); g.gain.exponentialRampToValueAtTime(0.001, time + dur);
-        n.connect(f); f.connect(g); g.connect(ctx.destination); n.start(time); n.stop(time + dur); break;
-      }
-      case 4: { // Bass
-        const osc = ctx.createOscillator(), g = ctx.createGain();
-        osc.type = "sawtooth"; osc.frequency.setValueAtTime(60, time);
-        g.gain.setValueAtTime(0.35, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
-        osc.connect(g); g.connect(ctx.destination); osc.start(time); osc.stop(time + 0.25); break;
-      }
-      case 5: { // Melody
-        const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
-        const osc = ctx.createOscillator(), g = ctx.createGain();
-        osc.type = "triangle"; osc.frequency.setValueAtTime(scale[step % scale.length], time);
-        g.gain.setValueAtTime(0.25, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-        osc.connect(g); g.connect(ctx.destination); osc.start(time); osc.stop(time + 0.2); break;
-      }
-    }
-  }
-
-  const intervals: number[] = [];
-  const id = window.setInterval(() => {
-    while (nextTime < ctx.currentTime + 0.12) {
-      beat.pattern.forEach((row, ti) => { if (row[step]) triggerTrack(ti, nextTime); });
-      nextTime += stepDur;
-      step = (step + 1) % 16;
-    }
-  }, 25);
-  intervals.push(id);
-
-  return () => { intervals.forEach(clearInterval); ctx.close(); };
-}
-
 // ── Community tab ─────────────────────────────────────────────────────────────
 
 interface CommunityTabProps {
@@ -127,24 +63,27 @@ interface CommunityTabProps {
 
 function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
   const [, setLocation] = useLocation();
+  const { profile } = useProfile();
   const [beats, setBeats] = useState<CommunityBeat[]>([]);
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const stopRef = useRef<(() => void) | null>(null);
+  const stopperRef = useRef<{ stop: () => void } | null>(null);
+
+  const myHandle = profile?.handle ?? "me";
 
   useEffect(() => { setBeats(getCommunityBeats()); }, []);
 
   function togglePreview(beat: CommunityBeat) {
-    if (stopRef.current) { stopRef.current(); stopRef.current = null; setPreviewId(null); }
+    if (stopperRef.current) { stopperRef.current.stop(); stopperRef.current = null; setPreviewId(null); }
     if (previewId === beat.id) return;
     setPreviewId(beat.id);
-    stopRef.current = previewBeat(beat);
-    setTimeout(() => { if (stopRef.current) { stopRef.current(); stopRef.current = null; setPreviewId(null); } }, 8000);
+    stopperRef.current = createBeatLooper(beat);
+    setTimeout(() => { if (stopperRef.current) { stopperRef.current.stop(); stopperRef.current = null; setPreviewId(null); } }, 8000);
   }
 
-  useEffect(() => () => { stopRef.current?.(); }, []);
+  useEffect(() => () => { stopperRef.current?.stop(); }, []);
 
   function selectBeat(beat: CommunityBeat) {
-    stopRef.current?.(); stopRef.current = null; setPreviewId(null);
+    stopperRef.current?.stop(); stopperRef.current = null; setPreviewId(null);
     const track: MusicTrack = {
       id: `beat-${beat.id}`,
       title: beat.title,
@@ -169,28 +108,46 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
         </div>
         <p className="text-sm text-stone-500">No community beats yet.</p>
         <p className="text-xs text-stone-700 max-w-[220px]">
-          Create your own loops in Music Studio and license them to other Kiln creators.
+          Browse the Sound Market for beats from other creators, or make your own in Music Studio.
         </p>
-        <button
-          onClick={() => setLocation("/music-studio")}
-          className="mt-1 flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-        >
-          Open Music Studio <ExternalLink size={11} />
-        </button>
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => setLocation("/sound-market")}
+            className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+          >
+            <ShoppingBag size={11} /> Sound Market
+          </button>
+          <button
+            onClick={() => setLocation("/music-studio")}
+            className="flex items-center gap-1.5 rounded-full border border-stone-700 px-4 py-2 text-xs font-semibold text-stone-400 hover:border-amber-500/30 hover:text-amber-300 transition-colors"
+          >
+            <Music2 size={11} /> Create Beat
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
+      {/* Header with Sound Market link */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-stone-600">{beats.length} beat{beats.length !== 1 ? "s" : ""} from Kiln creators</p>
-        <button
-          onClick={() => setLocation("/music-studio")}
-          className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-300 transition-colors"
-        >
-          Create yours <ExternalLink size={10} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setLocation("/sound-market")}
+            className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-300 transition-colors"
+          >
+            <ShoppingBag size={9} /> Sound Market
+          </button>
+          <span className="text-stone-700">·</span>
+          <button
+            onClick={() => setLocation("/music-studio")}
+            className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition-colors"
+          >
+            Create <ExternalLink size={9} />
+          </button>
+        </div>
       </div>
 
       <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -198,6 +155,10 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
           const id = `beat-${beat.id}`;
           const isSelected = selectedTrackId === id;
           const isPreviewing = previewId === beat.id;
+          const isLicensed = hasLicense(beat.id, myHandle);
+          const isOwn = beat.artistHandle === myHandle;
+          const canUse = isOwn || isLicensed || beat.license === "free";
+
           return (
             <div
               key={beat.id}
@@ -214,13 +175,19 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
                 </button>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className={`text-sm font-medium truncate ${isSelected ? "text-amber-200" : "text-stone-200"}`}>{beat.title}</p>
-                    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] capitalize ${
+                    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] ${
                       beat.license === "free" ? "border-emerald-500/30 text-emerald-400" : beat.license === "community" ? "border-amber-500/30 text-amber-400" : "border-purple-500/30 text-purple-400"
                     }`}>
                       {beat.license === "free" ? "Free" : beat.license === "community" ? "$1" : "$5"}
                     </span>
+                    {isLicensed && !isOwn && (
+                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-400">Licensed ✓</span>
+                    )}
+                    {isOwn && (
+                      <span className="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/10 px-1.5 py-0.5 text-[9px] text-sky-400">Yours</span>
+                    )}
                   </div>
                   <p className="text-xs text-stone-500">{beat.artistName} · {beat.bpm} BPM</p>
                   <div className="mt-2">
@@ -228,14 +195,24 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => selectBeat(beat)}
-                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                    isSelected ? "border-amber-400 bg-amber-400 text-stone-950" : "border-stone-600 text-stone-500 hover:border-amber-500/60 hover:text-amber-400"
-                  }`}
-                >
-                  <Check size={12} />
-                </button>
+                {canUse ? (
+                  <button
+                    onClick={() => selectBeat(beat)}
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                      isSelected ? "border-amber-400 bg-amber-400 text-stone-950" : "border-stone-600 text-stone-500 hover:border-amber-500/60 hover:text-amber-400"
+                    }`}
+                  >
+                    <Check size={12} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setLocation(`/sound-market`)}
+                    title={`License this beat for ${beat.license === "community" ? "$1" : "$5"} in Sound Market`}
+                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                  >
+                    <Lock size={11} />
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -243,7 +220,7 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
       </div>
 
       <p className="text-center text-[10px] text-stone-700">
-        Community beats are synthesized in real-time using the Web Audio API.
+        Beats are synthesized live · <button className="text-amber-600 hover:text-amber-400 transition-colors" onClick={() => setLocation("/sound-market")}>Browse Sound Market</button>
       </p>
     </div>
   );
