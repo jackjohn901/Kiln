@@ -41,11 +41,32 @@ export function getCommunityBeats(): CommunityBeat[] {
 export function saveCommunityBeat(beat: CommunityBeat): void {
   const beats = getCommunityBeats().filter((b) => b.id !== beat.id);
   localStorage.setItem(KEY, JSON.stringify([beat, ...beats]));
+  fetch("/api/beats", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: beat.title, bpm: beat.bpm, steps: beat.steps ?? 16,
+      pattern: beat.pattern, trackCount: beat.trackCount ?? 10,
+      trackVolumes: beat.trackVolumes ?? [], trackMutes: beat.trackMutes ?? [],
+      melodyNotes: beat.melodyNotes ?? [], bassNotes: beat.bassNotes ?? [],
+      chordNotes: beat.chordNotes ?? [], swing: beat.swing ?? 0,
+      reverb: beat.reverb ? 0.5 : 0,
+      license: beat.license, price: beat.price ?? 0, isPublic: true,
+    }),
+  }).then(r => r.ok ? r.json() as Promise<{ id: string }> : null)
+    .then(saved => {
+      if (!saved) return;
+      const updated = getCommunityBeats().map(b => b.id === beat.id ? { ...b, id: saved.id } : b);
+      localStorage.setItem(KEY, JSON.stringify(updated));
+    })
+    .catch(() => {});
 }
 
 export function deleteCommunityBeat(id: string): void {
   const beats = getCommunityBeats().filter((b) => b.id !== id);
   localStorage.setItem(KEY, JSON.stringify(beats));
+  fetch(`/api/beats/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
 }
 
 export function incrementUsed(id: string): void {

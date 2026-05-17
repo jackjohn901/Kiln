@@ -218,7 +218,7 @@ function AddRecipeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Gl
   const [notes, setNotes] = useState("");
   const [done, setDone] = useState(false);
 
-  function submit() {
+  async function submit() {
     if (!name.trim()) return;
     const r: GlazeRecipe = {
       id: `user-${hash(name + Date.now())}`,
@@ -229,6 +229,14 @@ function AddRecipeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Gl
       authorName: "You",
       tags: [cone, atmosphere], seedLikes: 0, seedSaves: 0,
     };
+    try {
+      const res = await fetch("/api/glaze-library", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: r.name, description: r.description, cone, atmosphere, colorFamily: "multi", swatch: r.swatch, notes: r.notes, tags: r.tags }),
+      });
+      if (res.ok) { const saved = await res.json() as GlazeRecipe; onAdd({ ...r, id: saved.id }); setDone(true); return; }
+    } catch { /* fall through */ }
     onAdd(r);
     setDone(true);
   }
@@ -408,6 +416,7 @@ export default function GlazeLibrary() {
       writeSet(LIKES_KEY, next);
       return next;
     });
+    fetch(`/api/glaze-library/${id}/like`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
   function toggleSave(id: string) {
@@ -417,6 +426,7 @@ export default function GlazeLibrary() {
       writeSet(SAVES_KEY, next);
       return next;
     });
+    fetch(`/api/glaze-library/${id}/save`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
   const allRecipes = useMemo(() => [...userRecipes, ...RECIPES], [userRecipes]);

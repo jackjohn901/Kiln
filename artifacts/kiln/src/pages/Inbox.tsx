@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Inbox as InboxIcon, Check, X, Clock, ChevronRight, MessageCircle, DollarSign, Layers, RefreshCw } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -39,11 +39,47 @@ function timeAgo(iso: string): string {
 export default function Inbox() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { receivedInquiries, commissions, acceptInquiry, declineInquiry, quoteInquiry } = useSocial();
+  const { receivedInquiries: socialReceived, commissions: socialSent, acceptInquiry: socialAccept, declineInquiry: socialDecline, quoteInquiry } = useSocial();
   const [tab, setTab] = useState<"received" | "sent">("received");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [quotingId, setQuotingId] = useState<string | null>(null);
   const [quoteForm, setQuoteForm] = useState({ price: "", paymentSchedule: "", deliveryDate: "", terms: "" });
+  const [apiReceived, setApiReceived] = useState<typeof socialReceived>([]);
+  const [apiSent, setApiSent] = useState<typeof socialSent>([]);
+
+  useEffect(() => {
+    fetch("/api/me/commissions/received", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ commissions: typeof socialReceived }> : null)
+      .then(data => { if (data?.commissions?.length) setApiReceived(data.commissions); })
+      .catch(() => {});
+    fetch("/api/me/commissions", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ commissions: typeof socialSent }> : null)
+      .then(data => { if (data?.commissions?.length) setApiSent(data.commissions); })
+      .catch(() => {});
+  }, []);
+
+  const receivedInquiries = apiReceived.length ? apiReceived : socialReceived;
+  const commissions = apiSent.length ? apiSent : socialSent;
+
+  async function acceptInquiry(id: string) {
+    socialAccept(id);
+    await fetch(`/api/commissions/${id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "accepted" }),
+    }).catch(() => {});
+    setApiReceived(prev => prev.map(i => i.id === id ? { ...i, status: "accepted" as const } : i));
+  }
+
+  async function declineInquiry(id: string) {
+    socialDecline(id);
+    await fetch(`/api/commissions/${id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "declined" }),
+    }).catch(() => {});
+    setApiReceived(prev => prev.map(i => i.id === id ? { ...i, status: "declined" as const } : i));
+  }
 
   if (!profile) {
     return (

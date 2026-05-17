@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Package, Plus, Search, Tag, MapPin, Clock, MessageCircle, Heart, Filter, X, Star } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -113,15 +113,17 @@ function timeAgo(ts: number) {
 
 export default function MaterialExchange() {
   const { profile } = useProfile();
-  const [listings, setListings] = useState<MaterialListing[]>(() => {
-    try {
-      const saved = localStorage.getItem("kiln_material_exchange");
-      return saved ? [...JSON.parse(saved), ...SEED] : SEED;
-    } catch { return SEED; }
-  });
+  const [listings, setListings] = useState<MaterialListing[]>(SEED);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<Category | "all">("all");
   const [typeFilter, setTypeFilter] = useState<ListingType | "all">("all");
+
+  useEffect(() => {
+    fetch("/api/material-exchange")
+      .then(r => r.ok ? r.json() as Promise<{ listings: MaterialListing[] }> : null)
+      .then(data => { if (data?.listings?.length) setListings([...data.listings, ...SEED]); })
+      .catch(() => {});
+  }, []);
   const [showPost, setShowPost] = useState(false);
   const [form, setForm] = useState({
     type: "sell" as ListingType, category: "clay" as Category,
@@ -141,9 +143,10 @@ export default function MaterialExchange() {
     setListings((prev) => prev.map((l) =>
       l.id === id ? { ...l, liked: !l.liked, likes: l.liked ? l.likes - 1 : l.likes + 1 } : l
     ));
+    fetch(`/api/material-exchange/${id}/like`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
-  function handlePost() {
+  async function handlePost() {
     if (!form.title || !form.description || !form.quantity || !form.location) return;
     const newListing: MaterialListing = {
       id: `ml-${Date.now()}`,
@@ -162,12 +165,26 @@ export default function MaterialExchange() {
       postedAt: Date.now(),
       likes: 0,
     };
-    const updated = [newListing, ...listings];
-    setListings(updated);
-    const custom = updated.filter((l) => l.userId === "me");
-    localStorage.setItem("kiln_material_exchange", JSON.stringify(custom));
+    setListings(prev => [newListing, ...prev]);
     setShowPost(false);
     setForm({ type: "sell", category: "clay", title: "", description: "", price: "", tradeFor: "", quantity: "", location: "", condition: "good" });
+    try {
+      const res = await fetch("/api/material-exchange", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: form.type, category: form.category, title: form.title,
+          description: form.description,
+          price: form.type === "sell" && form.price ? Math.round(parseFloat(form.price) * 100) : null,
+          tradeFor: form.type === "trade" ? form.tradeFor : null,
+          quantity: form.quantity, location: form.location, condition: form.condition,
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as MaterialListing;
+        setListings(prev => prev.map(l => l.id === newListing.id ? { ...saved, liked: false, likes: 0, postedAt: Date.now() } : l));
+      }
+    } catch { /* optimistic update remains */ }
   }
 
   return (

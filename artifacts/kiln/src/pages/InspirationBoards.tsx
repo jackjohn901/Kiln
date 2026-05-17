@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import {
   Grid3x3, Plus, X, Edit3, Heart, Bookmark, Lock, Globe,
@@ -100,6 +100,13 @@ export default function InspirationBoards() {
   const { profile } = useProfile();
   const [boards, setBoards] = useState<Board[]>(initBoards);
   const [view, setView] = useState<"boards" | "discover" | "board-detail">("boards");
+
+  useEffect(() => {
+    fetch("/api/inspiration-boards", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ boards: Board[] }> : null)
+      .then(data => { if (data?.boards?.length) { setBoards(data.boards); writeBoards(data.boards); } })
+      .catch(() => {});
+  }, []);
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
@@ -114,29 +121,41 @@ export default function InspirationBoards() {
     writeBoards(updated);
   }
 
-  function createBoard() {
+  async function createBoard() {
     if (!newBoardName.trim()) return;
+    const tempId = genId();
     const board: Board = {
-      id: genId(),
+      id: tempId,
       name: newBoardName.trim(),
       description: newBoardDesc.trim(),
       isPrivate: newBoardPrivate,
-      coverUrl: "https://picsum.photos/seed/" + genId() + "/400/300",
+      coverUrl: "https://picsum.photos/seed/" + tempId + "/400/300",
       items: [],
       createdAt: new Date().toISOString(),
     };
-    const updated = [board, ...boards];
-    saveBoards(updated);
+    saveBoards([board, ...boards]);
     setNewBoardName(""); setNewBoardDesc(""); setNewBoardPrivate(false);
     setShowCreateModal(false);
+    try {
+      const res = await fetch("/api/inspiration-boards", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: board.name, description: board.description, isPrivate: board.isPrivate }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as Board;
+        setBoards(prev => prev.map(b => b.id === tempId ? { ...b, id: saved.id } : b));
+      }
+    } catch { /* keep optimistic */ }
   }
 
-  function deleteBoard(id: string) {
+  async function deleteBoard(id: string) {
     saveBoards(boards.filter((b) => b.id !== id));
     if (activeBoard?.id === id) { setActiveBoard(null); setView("boards"); }
+    fetch(`/api/inspiration-boards/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
   }
 
-  function addItemToBoard(boardId: string, item: BoardItem) {
+  async function addItemToBoard(boardId: string, item: BoardItem) {
     const updated = boards.map((b) =>
       b.id === boardId
         ? { ...b, items: b.items.some((i) => i.sourceId === item.sourceId) ? b.items : [item, ...b.items], coverUrl: b.items.length === 0 ? item.imageUrl : b.coverUrl }
@@ -145,9 +164,14 @@ export default function InspirationBoards() {
     saveBoards(updated);
     setAddedToBoards((prev) => new Set(prev).add(boardId));
     setTimeout(() => { setShowAddToBoard(null); setAddedToBoards(new Set()); }, 1200);
+    fetch(`/api/inspiration-boards/${boardId}/items`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl: item.imageUrl, title: item.title, artistName: item.artistName, artistId: item.artistId, sourceType: item.sourceType, sourceId: item.sourceId }),
+    }).catch(() => {});
   }
 
-  function removeItemFromBoard(boardId: string, itemId: string) {
+  async function removeItemFromBoard(boardId: string, itemId: string) {
     const updated = boards.map((b) =>
       b.id === boardId ? { ...b, items: b.items.filter((i) => i.id !== itemId) } : b
     );
@@ -155,6 +179,7 @@ export default function InspirationBoards() {
     if (activeBoard?.id === boardId) {
       setActiveBoard(updated.find((b) => b.id === boardId) ?? null);
     }
+    fetch(`/api/inspiration-boards/${boardId}/items/${itemId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
   }
 
   return (

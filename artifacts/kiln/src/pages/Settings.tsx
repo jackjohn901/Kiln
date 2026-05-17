@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -87,11 +87,46 @@ export default function Settings() {
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
   const [shippingSaved, setShippingSaved] = useState(false);
+  const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments }> : null)
+      .then(data => {
+        if (!data) return;
+        if (data.settings && Object.keys(data.settings).length > 0) {
+          setSettings(s => ({ ...s, ...data.settings }));
+          saveSettings({ ...defaultSettings(), ...data.settings });
+        }
+        if (data.shippingSettings && Object.keys(data.shippingSettings).length > 0) {
+          setShipping(s => ({ ...s, ...data.shippingSettings }));
+          saveShippingSettings({ ...defaultShipping(), ...data.shippingSettings });
+        }
+        if (data.paymentSettings && Object.keys(data.paymentSettings).length > 0) {
+          setPayments(s => ({ ...s, ...data.paymentSettings }));
+          savePaymentSettings({ ...data.paymentSettings } as ArtistPayments);
+        }
+      })
+      .catch(() => { /* use localStorage cache */ });
+  }, []);
+
+  function syncToServer(s: KilnSettings) {
+    if (syncTimeout.current) clearTimeout(syncTimeout.current);
+    syncTimeout.current = setTimeout(() => {
+      fetch("/api/me/settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: s }),
+      }).catch(() => { /* silent */ });
+    }, 800);
+  }
 
   function toggle(key: keyof KilnSettings) {
     setSettings((prev) => {
       const next = { ...prev, [key]: !prev[key] };
       saveSettings(next);
+      syncToServer(next);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
       if (key === "display_dark_mode") {
@@ -106,6 +141,11 @@ export default function Settings() {
     saveShippingSettings(next);
     setShippingSaved(true);
     setTimeout(() => setShippingSaved(false), 1800);
+    fetch("/api/me/settings", {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shippingSettings: next }),
+    }).catch(() => { /* silent */ });
   }
 
   const sections: { key: Section; icon: React.ElementType; label: string; desc: string }[] = [
@@ -122,6 +162,11 @@ export default function Settings() {
     savePaymentSettings(next);
     setPaymentSaved(true);
     setTimeout(() => setPaymentSaved(false), 1800);
+    fetch("/api/me/settings", {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentSettings: next }),
+    }).catch(() => { /* silent */ });
   }
 
   function Toggle({ settingKey, label, desc }: { settingKey: keyof KilnSettings; label: string; desc?: string }) {

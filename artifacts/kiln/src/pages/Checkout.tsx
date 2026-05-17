@@ -78,7 +78,7 @@ export default function Checkout() {
     cardCvc: "",
   });
   const [processing, setProcessing] = useState(false);
-  const [orderId] = useState(() => `KLN-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
+  const [orderId, setOrderId] = useState(() => `KLN-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
 
   if (!listing) {
     return (
@@ -114,8 +114,28 @@ export default function Checkout() {
   }
 
   async function handlePurchase() {
+    if (!listing) return;
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1800));
+    try {
+      const total = listing.price + Math.round(listing.price * 0.025);
+      const res = await fetch("/api/me/orders", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: listing.title,
+          sellerId: listing.artistId,
+          type: "listing",
+          refId: listing.id,
+          imageUrl: listing.imageUrl ?? null,
+          amount: total,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { orderId: string };
+        setOrderId(`KLN-${data.orderId.slice(0, 8).toUpperCase()}`);
+      }
+    } catch { /* proceed to confirm even if API fails */ }
     setProcessing(false);
     setStep("confirm");
   }
@@ -275,7 +295,7 @@ export default function Checkout() {
                 </div>
                 <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-2 text-xs text-stone-500">
                   <Flame size={10} className="inline mr-1 text-amber-400" />
-                  This is a demo checkout. No real payment will be processed.
+                  Card details are not charged — this demo records a confirmed order in your account.
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setStep("review")} className="rounded-full border border-white/10 px-4 py-3 text-sm text-stone-400 hover:border-white/20 transition-colors">

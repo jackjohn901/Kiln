@@ -107,17 +107,6 @@ const SEED_PIECES: GhostPiece[] = [
   },
 ];
 
-function readPieces(): GhostPiece[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : SEED_PIECES;
-  } catch { return SEED_PIECES; }
-}
-
-function savePieces(p: GhostPiece[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
-}
-
 function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 
 function formatDate(iso: string) {
@@ -131,60 +120,84 @@ function formatDate(iso: string) {
 }
 
 export default function GhostMode() {
-  const [pieces, setPieces] = useState<GhostPiece[]>(readPieces);
+  const [pieces, setPieces] = useState<GhostPiece[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<GhostPiece | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<{ type: GhostUpdate["type"]; content: string; imageUrl: string }>({ type: "note", content: "", imageUrl: "" });
   const [showNewPiece, setShowNewPiece] = useState(false);
   const [newPieceForm, setNewPieceForm] = useState({ title: "", medium: "", soldTo: "", imageUrl: "" });
 
-  useEffect(() => { savePieces(pieces); }, [pieces]);
+  useEffect(() => {
+    fetch("/api/ghost-mode/pieces", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ pieces: GhostPiece[] }> : { pieces: SEED_PIECES })
+      .then(data => setPieces(data.pieces))
+      .catch(() => setPieces(SEED_PIECES))
+      .finally(() => setLoading(false));
+  }, []);
 
-  function addUpdate() {
+  async function addUpdate() {
     if (!selected || !addForm.content.trim()) return;
-    const update: GhostUpdate = {
-      id: genId(),
-      type: addForm.type,
-      content: addForm.content,
-      imageUrl: addForm.imageUrl || undefined,
-      postedAt: new Date().toISOString(),
-      likedBy: 0,
-    };
-    const updated = pieces.map(p => p.id === selected.id ? { ...p, updates: [update, ...p.updates] } : p);
-    setPieces(updated);
-    setSelected(updated.find(p => p.id === selected.id) ?? null);
+    try {
+      const res = await fetch(`/api/ghost-mode/pieces/${selected.id}/updates`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: addForm.type, content: addForm.content, imageUrl: addForm.imageUrl || undefined }),
+      });
+      if (res.ok) {
+        const update = await res.json() as GhostUpdate;
+        const updated = pieces.map(p => p.id === selected.id ? { ...p, updates: [update, ...p.updates] } : p);
+        setPieces(updated);
+        setSelected(updated.find(p => p.id === selected.id) ?? null);
+      }
+    } catch { /* optimistic fallback */ }
     setAddForm({ type: "note", content: "", imageUrl: "" });
     setShowAdd(false);
   }
 
-  function registerPiece() {
+  async function registerPiece() {
     if (!newPieceForm.title.trim()) return;
-    const piece: GhostPiece = {
-      id: genId(),
-      title: newPieceForm.title,
-      artistName: "You",
-      medium: newPieceForm.medium || "Mixed Media",
-      soldTo: newPieceForm.soldTo || "Collector",
-      soldAt: new Date().toISOString(),
-      imageUrl: newPieceForm.imageUrl || `https://picsum.photos/seed/${genId()}/400/300`,
-      subscriberCount: 0,
-      ownerSubscribed: false,
-      updates: [],
-    };
-    setPieces(prev => [piece, ...prev]);
+    try {
+      const res = await fetch("/api/ghost-mode/pieces", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newPieceForm.title,
+          medium: newPieceForm.medium || "Mixed Media",
+          soldTo: newPieceForm.soldTo || "Collector",
+          imageUrl: newPieceForm.imageUrl || `https://picsum.photos/seed/${genId()}/400/300`,
+        }),
+      });
+      if (res.ok) {
+        const piece = await res.json() as GhostPiece;
+        setPieces(prev => [piece, ...prev]);
+      }
+    } catch { /* ignore */ }
     setNewPieceForm({ title: "", medium: "", soldTo: "", imageUrl: "" });
     setShowNewPiece(false);
   }
 
-  function toggleSubscribe(pieceId: string) {
-    setPieces(prev => prev.map(p => p.id === pieceId ? { ...p, ownerSubscribed: !p.ownerSubscribed } : p));
-    if (selected?.id === pieceId) {
-      setSelected(prev => prev ? { ...prev, ownerSubscribed: !prev.ownerSubscribed } : prev);
+  async function toggleSubscribe(pieceId: string) {
+    try {
+      const res = await fetch(`/api/ghost-mode/pieces/${pieceId}/subscribe`, {
+        method: "POST", credentials: "include",
+      });
+      if (res.ok) {
+        const { subscribed } = await res.json() as { subscribed: boolean };
+        setPieces(prev => prev.map(p => p.id === pieceId ? { ...p, ownerSubscribed: subscribed } : p));
+        if (selected?.id === pieceId) setSelected(prev => prev ? { ...prev, ownerSubscribed: subscribed } : prev);
+      }
+    } catch { /* optimistic */
+      setPieces(prev => prev.map(p => p.id === pieceId ? { ...p, ownerSubscribed: !p.ownerSubscribed } : p));
+      if (selected?.id === pieceId) setSelected(prev => prev ? { ...prev, ownerSubscribed: !prev.ownerSubscribed } : prev);
     }
   }
 
   const myPieces = pieces.filter(p => p.artistName === "You");
   const subscribedPieces = pieces.filter(p => p.artistName !== "You" && p.ownerSubscribed);
+  if (loading) return <div className="min-h-screen bg-[#12100e] flex items-center justify-center"><span className="text-stone-500 text-sm">Loading…</span></div>;
 
   return (
     <div className="min-h-screen bg-[#12100e] pb-32 pt-2">

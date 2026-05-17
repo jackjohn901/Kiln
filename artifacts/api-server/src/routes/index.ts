@@ -37,6 +37,16 @@ import badgesRouter from "./badges";
 import challengesRouter from "./challenges";
 import referralsRouter from "./referrals";
 import pollsRouter from "./polls";
+import ghostModeRouter from "./ghost-mode";
+import glazeLibraryRouter from "./glaze-library";
+import inspirationBoardsRouter from "./inspiration-boards";
+import craftCalendarRouter from "./craft-calendar";
+import materialExchangeRouter from "./material-exchange";
+import communityEventsRouter from "./community-events";
+import beatsRouter from "./beats";
+import userSettingsRouter from "./user-settings";
+import serverCartRouter from "./server-cart";
+import digitalDownloadsRouter from "./digital-downloads";
 
 const router: IRouter = Router();
 
@@ -78,5 +88,15 @@ router.use(badgesRouter);
 router.use(challengesRouter);
 router.use(referralsRouter);
 router.use(pollsRouter);
+router.use(ghostModeRouter);
+router.use(glazeLibraryRouter);
+router.use(inspirationBoardsRouter);
+router.use(craftCalendarRouter);
+router.use(materialExchangeRouter);
+router.use(communityEventsRouter);
+router.use(beatsRouter);
+router.use(userSettingsRouter);
+router.use(serverCartRouter);
+router.use(digitalDownloadsRouter);
 
 export default router;

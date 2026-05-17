@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import {
@@ -151,27 +151,43 @@ export default function CommunityEvents() {
   const { profile } = useProfile();
   const [rsvps, setRsvps] = useState<Set<string>>(readRsvps);
   const [customEvents, setCustomEvents] = useState<CommunityEvent[]>(readCustom);
+  const [apiEvents, setApiEvents] = useState<CommunityEvent[]>([]);
   const [filter, setFilter] = useState<"all" | EventType | EventMode>("all");
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const allEvents = [...SEED_EVENTS, ...customEvents].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  useEffect(() => {
+    fetch("/api/community-events", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ events: CommunityEvent[]; rsvps: string[] }> : null)
+      .then(data => {
+        if (!data) return;
+        setApiEvents(data.events);
+        if (data.rsvps?.length) setRsvps(new Set(data.rsvps));
+      })
+      .catch(() => {});
+  }, []);
+
+  const allEvents = [...SEED_EVENTS, ...apiEvents, ...customEvents]
+    .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const filtered = allEvents.filter((e) => {
     if (filter === "all") return true;
     return e.type === filter || e.mode === filter;
   });
 
-  function handleRsvp(id: string) {
+  async function handleRsvp(id: string) {
     setRsvps((prev) => toggleRsvp(id, prev));
+    try {
+      await fetch(`/api/community-events/${id}/rsvp`, { method: "POST", credentials: "include" });
+    } catch { /* optimistic update stands */ }
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!form.title || !form.date) return;
+    const tempId = `custom-${Date.now()}`;
     const evt: CommunityEvent = {
-      id: `custom-${Date.now()}`,
+      id: tempId,
       title: form.title,
       type: form.type,
       mode: form.mode,
@@ -189,6 +205,22 @@ export default function CommunityEvents() {
     setRsvps((prev) => toggleRsvp(evt.id, prev));
     setForm(EMPTY_FORM);
     setAdding(false);
+    try {
+      const res = await fetch("/api/community-events", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: evt.title, type: evt.type, mode: evt.mode,
+          date: evt.date, time: evt.time, location: evt.location,
+          city: evt.city, artistName: evt.artistName, description: evt.description,
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json() as CommunityEvent;
+        setCustomEvents(prev => prev.map(e => e.id === tempId ? { ...e, id: saved.id } : e));
+        setRsvps(prev => { const n = new Set(prev); n.delete(tempId); n.add(saved.id); return n; });
+      }
+    } catch { /* keep optimistic */ }
   }
 
   const FILTERS = [

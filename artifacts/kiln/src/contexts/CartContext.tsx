@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { Listing } from "@/data/listings";
 
 export interface CartItem {
@@ -38,9 +38,23 @@ function saveCart(items: CartItem[]) {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(readCart);
 
-  const sync = useCallback((next: CartItem[]) => {
+  const syncLocal = useCallback((next: CartItem[]) => {
     setItems(next);
     saveCart(next);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/me/cart", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ items: { listingId: string; quantity: number }[] }> : null)
+      .then(data => {
+        if (!data?.items?.length) return;
+        setItems(prev => {
+          const serverIds = new Set(data.items.map(i => i.listingId));
+          const kept = prev.filter(i => serverIds.has(i.listing.id));
+          return kept;
+        });
+      })
+      .catch(() => {});
   }, []);
 
   const addItem = useCallback((listing: Listing) => {
@@ -52,7 +66,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       saveCart(next);
       return next;
     });
-  }, [sync]);
+    fetch("/api/me/cart", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId: listing.id, quantity: 1 }),
+    }).catch(() => {});
+  }, [syncLocal]);
 
   const removeItem = useCallback((listingId: string) => {
     setItems((prev) => {
@@ -60,6 +79,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       saveCart(next);
       return next;
     });
+    fetch(`/api/me/cart/${listingId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
   }, []);
 
   const updateQty = useCallback((listingId: string, qty: number) => {
@@ -75,6 +95,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(() => {
     setItems([]);
     saveCart([]);
+    fetch("/api/me/cart", { method: "DELETE", credentials: "include" }).catch(() => {});
   }, []);
 
   const isInCart = useCallback((listingId: string) => {

@@ -49,7 +49,21 @@ export default function StitchStudio() {
     setPreviewUrl(URL.createObjectURL(file));
   }
 
-  function handlePublish() {
+  async function handlePublish() {
+    try {
+      await fetch("/api/posts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caption,
+          mediaType: videoFile ? "video" : "image",
+          tags: ["stitch"],
+          stitchLength,
+          stitchOfId: sourceReel?.id ?? null,
+        }),
+      });
+    } catch { /* show done regardless */ }
     setStep("done");
   }
 

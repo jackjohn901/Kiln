@@ -58,13 +58,26 @@ export default function DuetStudio() {
     ? EXISTING_DUETS.filter((d) => d.originalReel.id === reelId)
     : EXISTING_DUETS;
 
-  function handlePublish() {
+  async function handlePublish() {
     if (!response.trim() || !profile) return;
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      setStep("done");
-    }, 1600);
+    try {
+      await fetch("/api/posts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caption: response,
+          mediaUrl: reel?.thumbnail ?? null,
+          mediaType: "image",
+          tags: ["duet"],
+          technique: reel?.technique ?? null,
+          duetOfId: reel?.id ?? null,
+        }),
+      });
+    } catch { /* show done regardless */ }
+    setSubmitting(false);
+    setStep("done");
   }
 
   if (step === "done") {

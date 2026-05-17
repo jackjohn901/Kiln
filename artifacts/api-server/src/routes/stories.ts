@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { storiesTable, storyViewsTable, notificationsTable } from "@workspace/db";
-import { eq, desc, gt, and, sql } from "drizzle-orm";
+import { storiesTable, storyViewsTable, followsTable } from "@workspace/db";
+import { eq, desc, gt, and, inArray, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -11,8 +11,16 @@ router.get("/stories/feed", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const now = new Date();
   try {
+    const followRows = await db.select({ followingId: followsTable.followingId }).from(followsTable)
+      .where(eq(followsTable.followerId, req.user.id));
+    const followingIds = followRows.map(r => r.followingId);
+    followingIds.push(req.user.id);
     const stories = await db.select().from(storiesTable)
-      .where(and(gt(storiesTable.expiresAt, now), eq(storiesTable.isActive, true)))
+      .where(and(
+        gt(storiesTable.expiresAt, now),
+        eq(storiesTable.isActive, true),
+        followingIds.length > 0 ? inArray(storiesTable.authorId, followingIds) : eq(storiesTable.isActive, true)
+      ))
       .orderBy(desc(storiesTable.createdAt))
       .limit(100);
     // Group by author
