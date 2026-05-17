@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { profilesTable, postsTable, followsTable } from "@workspace/db";
-import { desc, eq, and, inArray, sql } from "drizzle-orm";
+import { profilesTable, postsTable, followsTable, streaksTable } from "@workspace/db";
+import { desc, eq, and, inArray, sql, isNotNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -24,6 +24,60 @@ router.get("/leaderboard", async (req, res): Promise<void> => {
     }
     res.json({ profiles: profiles.map((p, i) => ({ ...p, rank: i + 1, isFollowing: followingIds.has(p.userId), createdAt: p.createdAt.toISOString() })) });
   } catch (err) { req.log.error({ err }, "leaderboard error"); res.status(500).json({ error: "Failed to load leaderboard" }); }
+});
+
+// GET /leaderboard/streaks — top creators by current streak
+router.get("/leaderboard/streaks", async (req, res): Promise<void> => {
+  try {
+    const streaks = await db.select().from(streaksTable)
+      .where(isNotNull(streaksTable.lastPostDate))
+      .orderBy(desc(streaksTable.currentStreak))
+      .limit(50);
+    if (!streaks.length) { res.json({ profiles: [] }); return; }
+    const ids = streaks.map(s => s.userId);
+    const profiles = await db.select().from(profilesTable).where(inArray(profilesTable.userId, ids));
+    const profileMap = Object.fromEntries(profiles.map(p => [p.userId, p]));
+    res.json({
+      profiles: streaks.map(s => ({
+        userId: s.userId,
+        currentStreak: s.currentStreak,
+        longestStreak: s.longestStreak,
+        handle: profileMap[s.userId]?.handle ?? null,
+        displayName: profileMap[s.userId]?.displayName ?? null,
+        avatarUrl: profileMap[s.userId]?.avatarUrl ?? null,
+        medium: profileMap[s.userId]?.medium ?? null,
+      })),
+    });
+  } catch (err) { req.log.error({ err }, "streakLeaderboard error"); res.status(500).json({ error: "Failed" }); }
+});
+
+// GET /leaderboard/cities — artists grouped by city, sorted by count
+router.get("/leaderboard/cities", async (req, res): Promise<void> => {
+  try {
+    const profiles = await db.select().from(profilesTable)
+      .where(isNotNull(profilesTable.location))
+      .orderBy(desc(profilesTable.followerCount))
+      .limit(200);
+    const cityMap = new Map<string, typeof profiles>();
+    for (const p of profiles) {
+      const city = (p.location ?? "").split(",")[0].trim();
+      if (!city) continue;
+      if (!cityMap.has(city)) cityMap.set(city, []);
+      cityMap.get(city)!.push(p);
+    }
+    const cities = [...cityMap.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 20)
+      .map(([city, artists]) => ({
+        city,
+        count: artists.length,
+        topArtists: artists.slice(0, 5).map(p => ({
+          userId: p.userId, displayName: p.displayName, handle: p.handle,
+          avatarUrl: p.avatarUrl, medium: p.medium, followerCount: p.followerCount,
+        })),
+      }));
+    res.json({ cities });
+  } catch (err) { req.log.error({ err }, "cityLeaderboard error"); res.status(500).json({ error: "Failed" }); }
 });
 
 // GET /trending-posts — trending posts by like count

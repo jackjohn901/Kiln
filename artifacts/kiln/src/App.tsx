@@ -115,6 +115,8 @@ import LinkInBio from "@/pages/LinkInBio";
 import LinkInBioPublic from "@/pages/LinkInBioPublic";
 import SubscriptionBoxes from "@/pages/SubscriptionBoxes";
 import CreateSubscriptionBox from "@/pages/CreateSubscriptionBox";
+import Referrals from "@/pages/Referrals";
+import Badges from "@/pages/Badges";
 
 const queryClient = new QueryClient();
 
@@ -295,6 +297,8 @@ function Router() {
       <Route path="/link/:slug" component={LinkInBioPublic} />
       <Route path="/subscription-boxes" component={SubscriptionBoxes} />
       <Route path="/subscription-boxes/create" component={CreateSubscriptionBox} />
+      <Route path="/referrals" component={Referrals} />
+      <Route path="/badges" component={Badges} />
       <Route component={NotFound} />
       </Switch>
     </>

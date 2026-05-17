@@ -1,13 +1,28 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { Trophy, Clock, Users, Flame, ChevronRight, Zap, Star, CheckCircle } from "lucide-react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { Trophy, Clock, Users, Flame, Zap, Star, CheckCircle, Loader2, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
-import { challenges, type Challenge } from "@/data/challenges";
-import { useSocial } from "@/contexts/SocialContext";
 
-function timeLeft(deadline: string): string {
-  const ms = new Date(deadline).getTime() - Date.now();
+interface ApiChallenge {
+  id: string;
+  emoji: string;
+  title: string;
+  description: string;
+  prompt: string;
+  technique: string | null;
+  hashtag: string;
+  prizeDescription: string | null;
+  sponsoredBy: string | null;
+  entryCount: number;
+  startsAt: string;
+  endsAt: string;
+  status: "active" | "upcoming" | "ended";
+  entered: boolean;
+}
+
+function timeLeft(endsAt: string): string {
+  const ms = new Date(endsAt).getTime() - Date.now();
   if (ms <= 0) return "Ended";
   const days = Math.floor(ms / 86400000);
   const hours = Math.floor((ms % 86400000) / 3600000);
@@ -15,234 +30,207 @@ function timeLeft(deadline: string): string {
   return `${hours}h left`;
 }
 
-function ChallengeCard({ challenge, entered, onEnter }: { challenge: Challenge; entered: boolean; onEnter: () => void }) {
+function timeUntil(startsAt: string): string {
+  const ms = new Date(startsAt).getTime() - Date.now();
+  if (ms <= 0) return "Starting soon";
+  const days = Math.floor(ms / 86400000);
+  return `Starts in ${days}d`;
+}
+
+const RARITY_COLORS: Record<string, string> = {
+  active: "border-amber-500/40 bg-amber-500/5",
+  upcoming: "border-sky-500/30 bg-sky-500/5",
+  ended: "border-white/5 opacity-60",
+};
+
+function ChallengeCard({ c, onEnter }: { c: ApiChallenge; onEnter: (id: string) => void }) {
   const [, navigate] = useLocation();
-  const isActive = challenge.status === "active";
-  const isUpcoming = challenge.status === "upcoming";
-  const isEnded = challenge.status === "ended";
+  const [entering, setEntering] = useState(false);
+
+  const handleEnter = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (c.entered || c.status !== "active") return;
+    setEntering(true);
+    try {
+      const r = await fetch(`/api/challenges/${c.id}/enter`, { method: "POST", credentials: "include" });
+      if (r.ok || r.status === 409) onEnter(c.id);
+    } finally {
+      setEntering(false);
+    }
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border bg-stone-900/60 overflow-hidden transition-all hover:border-amber-500/30 ${
-        isEnded ? "border-white/5 opacity-60" : "border-white/10"
-      }`}
+      className={`rounded-2xl border bg-stone-900/60 overflow-hidden cursor-pointer transition-all hover:border-amber-500/30 ${RARITY_COLORS[c.status]}`}
+      onClick={() => navigate(`/challenges/${c.id}`)}
     >
-      {/* Leaderboard preview */}
-      {challenge.leaderboard.length > 0 && (
-        <div className="relative h-28 bg-stone-950 overflow-hidden">
-          <div className="flex h-full">
-            {challenge.leaderboard.slice(0, 3).map((entry, i) => (
-              <div key={entry.artistId} className="flex-1 relative">
-                <img
-                  src={entry.thumbnail}
-                  alt={entry.artistName}
-                  className="h-full w-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${entry.artistId}/200/200`; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-transparent to-transparent" />
-                <div className={`absolute top-1.5 left-1.5 h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                  i === 0 ? "bg-amber-400 text-stone-950" : i === 1 ? "bg-stone-400 text-stone-950" : "bg-amber-700 text-amber-100"
-                }`}>
-                  {i + 1}
-                </div>
-                <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                  <p className="text-[9px] text-white font-medium truncate">{entry.artistName}</p>
-                  <p className="text-[8px] text-stone-400">{entry.likes.toLocaleString()} likes</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-stone-950/60 to-transparent" />
-        </div>
-      )}
-
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-3">
-          <span className="text-2xl shrink-0">{challenge.emoji}</span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-0.5">
-              <h3 className="font-bold text-amber-100 text-base leading-tight">{challenge.title}</h3>
-              {isActive && (
-                <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE
-                </span>
-              )}
-              {isUpcoming && (
-                <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold text-blue-400">
-                  COMING SOON
-                </span>
-              )}
-              {isEnded && (
-                <span className="rounded-full bg-stone-700 px-2 py-0.5 text-[10px] font-bold text-stone-400">
-                  ENDED
-                </span>
-              )}
+      <div className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-3xl">{c.emoji}</span>
+            <div>
+              <h3 className="font-semibold text-white leading-tight">{c.title}</h3>
+              {c.technique && <p className="text-xs text-amber-400/80 mt-0.5">{c.technique}</p>}
             </div>
-            <p className="text-xs text-stone-500">{challenge.subtitle}</p>
           </div>
-        </div>
-
-        <p className="text-sm text-stone-400 leading-relaxed mb-3">{challenge.description}</p>
-
-        {/* Tags */}
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          {challenge.technique && (
-            <Link href={`/tag/${encodeURIComponent(challenge.technique)}`}>
-              <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs text-amber-300">
-                {challenge.technique}
-              </span>
-            </Link>
-          )}
-          <span className="text-xs text-stone-600">#{challenge.tag}</span>
-          {challenge.sponsoredBy && (
-            <span className="text-[10px] text-stone-600">Sponsored by {challenge.sponsoredBy}</span>
-          )}
-        </div>
-
-        {/* Stats row */}
-        <div className="flex items-center gap-4 text-xs text-stone-500 mb-4">
-          <span className="flex items-center gap-1">
-            <Users size={11} /> {challenge.entries.toLocaleString()} entries
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+            c.status === "active" ? "bg-green-500/20 text-green-400" :
+            c.status === "upcoming" ? "bg-sky-500/20 text-sky-400" :
+            "bg-stone-700 text-stone-400"
+          }`}>
+            {c.status === "active" ? "LIVE" : c.status === "upcoming" ? "SOON" : "ENDED"}
           </span>
-          {!isEnded && (
-            <span className="flex items-center gap-1 text-amber-400">
-              <Clock size={11} /> {timeLeft(challenge.deadline)}
+        </div>
+
+        <p className="text-sm text-stone-300 leading-relaxed">{c.description}</p>
+
+        {c.prizeDescription && (
+          <div className="flex items-center gap-1.5 text-sm text-amber-300">
+            <Trophy className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>{c.prizeDescription}</span>
+          </div>
+        )}
+        {c.sponsoredBy && (
+          <p className="text-xs text-stone-500">Sponsored by {c.sponsoredBy}</p>
+        )}
+
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-3 text-xs text-stone-400">
+            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{c.entryCount.toLocaleString()} entries</span>
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {c.status === "upcoming" ? timeUntil(c.startsAt) : timeLeft(c.endsAt)}
             </span>
+          </div>
+          {c.status === "active" && (
+            <button
+              onClick={handleEnter}
+              disabled={c.entered || entering}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
+                c.entered
+                  ? "bg-green-500/20 text-green-400 cursor-default"
+                  : "bg-amber-500 text-stone-950 hover:bg-amber-400 active:scale-95"
+              }`}
+            >
+              {entering ? <Loader2 className="w-3 h-3 animate-spin" /> :
+               c.entered ? <><CheckCircle className="w-3 h-3" /> Entered</> :
+               <><Zap className="w-3 h-3" /> Enter</>}
+            </button>
           )}
-          <span className="flex items-center gap-1 text-amber-500 ml-auto">
-            <Trophy size={11} /> {challenge.prize}
-          </span>
+          {c.status !== "active" && (
+            <ChevronRight className="w-4 h-4 text-stone-600" />
+          )}
         </div>
 
-        {/* CTA */}
-        {isActive && (
-          <button
-            onClick={entered ? undefined : onEnter}
-            className={`flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all ${
-              entered
-                ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
-                : "bg-amber-500 text-stone-950 hover:bg-amber-400 active:scale-[0.98]"
-            }`}
-          >
-            {entered ? (
-              <><CheckCircle size={15} /> Entered</>
-            ) : (
-              <><Zap size={15} /> Enter Challenge</>
-            )}
-          </button>
-        )}
-        {isUpcoming && (
-          <button className="flex w-full items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-stone-400">
-            <Star size={14} /> Remind Me
-          </button>
-        )}
-        {isEnded && challenge.leaderboard.length > 0 && (
-          <div className="rounded-xl bg-stone-800/50 px-3 py-2 text-xs text-stone-400 text-center">
-            🏆 Winner: <span className="font-semibold text-amber-300">{challenge.leaderboard[0].artistName}</span>
-          </div>
-        )}
+        <div className="pt-1 border-t border-white/5">
+          <p className="text-xs text-stone-500 font-mono">#{c.hashtag}</p>
+        </div>
       </div>
     </motion.div>
   );
 }
 
 export default function Challenges() {
-  const [, navigate] = useLocation();
+  const [challenges, setChallenges] = useState<ApiChallenge[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "active" | "upcoming" | "ended">("all");
-  const [entered, setEntered] = useState<Set<string>>(new Set());
 
-  const filtered = challenges.filter((c) => filter === "all" || c.status === filter);
-  const activeCount = challenges.filter((c) => c.status === "active").length;
-  const totalEntries = challenges.reduce((s, c) => s + c.entries, 0);
+  useEffect(() => {
+    fetch("/api/challenges", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setChallenges(data.challenges ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  function handleEnter(id: string) {
-    setEntered((prev) => new Set(prev).add(id));
-    navigate("/create");
-  }
+  const handleEnter = (id: string) => {
+    setChallenges(prev => prev.map(c => c.id === id ? { ...c, entered: true, entryCount: c.entryCount + 1 } : c));
+  };
+
+  const filtered = filter === "all" ? challenges : challenges.filter(c => c.status === filter);
+  const active = challenges.filter(c => c.status === "active");
+  const totalEntries = challenges.reduce((s, c) => s + c.entryCount, 0);
 
   return (
-    <div className="min-h-screen bg-[#12100e] text-stone-100">
+    <div className="min-h-screen bg-stone-950 text-white pb-28 md:pb-8">
       <Nav />
+      <div className="max-w-lg mx-auto px-4 pt-16 space-y-6">
 
-      <div className="mx-auto max-w-4xl px-4 pb-16 pt-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy size={22} className="text-amber-400" />
-            <h1 className="font-serif text-3xl font-bold text-amber-100">Challenges</h1>
+        <div className="pt-4 space-y-1">
+          <div className="flex items-center gap-2">
+            <Flame className="w-6 h-6 text-amber-400" />
+            <h1 className="text-2xl font-bold">Creation Challenges</h1>
           </div>
-          <p className="text-stone-400 text-sm max-w-xl">
-            Weekly craft challenges from the Kiln community. Enter with a post, compete for prizes, and get featured.
-          </p>
-
-          {/* Stats */}
-          <div className="mt-4 flex gap-4">
-            <div className="rounded-2xl border border-white/8 bg-stone-900/50 px-4 py-3">
-              <p className="text-lg font-bold text-amber-300">{activeCount}</p>
-              <p className="text-xs text-stone-500">active now</p>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-stone-900/50 px-4 py-3">
-              <p className="text-lg font-bold text-amber-300">{totalEntries.toLocaleString()}</p>
-              <p className="text-xs text-stone-500">total entries</p>
-            </div>
-            <div className="rounded-2xl border border-white/8 bg-stone-900/50 px-4 py-3">
-              <p className="text-lg font-bold text-amber-300">{challenges.length}</p>
-              <p className="text-xs text-stone-500">challenges run</p>
-            </div>
-          </div>
+          <p className="text-stone-400 text-sm">Weekly prompts. Real prizes. Community glory.</p>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-6">
-          {(["all", "active", "upcoming", "ended"] as const).map((f) => (
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Active now", value: active.length, icon: Zap, color: "text-green-400" },
+            { label: "Total entries", value: totalEntries.toLocaleString(), icon: Users, color: "text-amber-400" },
+            { label: "Prizes this month", value: `${active.filter(c => c.prizeDescription).length}`, icon: Trophy, color: "text-purple-400" },
+          ].map(s => (
+            <div key={s.label} className="rounded-xl border border-white/8 bg-stone-900/50 p-3 text-center">
+              <s.icon className={`w-4 h-4 mx-auto mb-1 ${s.color}`} />
+              <p className="text-lg font-bold">{s.value}</p>
+              <p className="text-[10px] text-stone-500 uppercase tracking-wide">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+          {(["all", "active", "upcoming", "ended"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium border transition-colors capitalize ${
-                filter === f
-                  ? "border-amber-500 bg-amber-500/15 text-amber-300"
-                  : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-300"
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all capitalize ${
+                filter === f ? "bg-amber-500 text-stone-950" : "bg-stone-800 text-stone-400 hover:text-white"
               }`}
             >
               {f}
-              {f === "active" && <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block align-middle animate-pulse" />}
             </button>
           ))}
         </div>
 
-        {/* Challenge grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((challenge) => (
-            <ChallengeCard
-              key={challenge.id}
-              challenge={challenge}
-              entered={entered.has(challenge.id)}
-              onEnter={() => handleEnter(challenge.id)}
-            />
-          ))}
-        </div>
-
-        {filtered.length === 0 && (
-          <div className="py-24 text-center text-stone-600">
-            <Trophy size={32} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No challenges in this category yet.</p>
+        {/* Challenge list */}
+        {loading ? (
+          <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-stone-500" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-stone-500">
+            <Star className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p>No challenges in this category</p>
           </div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            <div className="space-y-4">
+              {filtered.map(c => <ChallengeCard key={c.id} c={c} onEnter={handleEnter} />)}
+            </div>
+          </AnimatePresence>
         )}
 
-        {/* Create your own */}
-        <div className="mt-12 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6 text-center">
-          <Flame size={24} className="mx-auto mb-2 text-amber-400" />
-          <h3 className="font-semibold text-amber-100 mb-1">Want to run a challenge?</h3>
-          <p className="text-sm text-stone-500 mb-4">Verified artists and brands can create sponsored challenges. Reach thousands of craft artists.</p>
-          <Link href="/apply-verified">
-            <button className="rounded-full border border-amber-500/40 px-6 py-2 text-sm text-amber-300 hover:bg-amber-500/10 transition-colors">
-              Apply for Verified <ChevronRight size={13} className="inline" />
-            </button>
-          </Link>
+        {/* How it works */}
+        <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 space-y-3">
+          <h3 className="font-semibold text-amber-400">How challenges work</h3>
+          <div className="space-y-2">
+            {[
+              { step: "1", text: "Pick an active challenge and tap Enter" },
+              { step: "2", text: "Post your work with the challenge hashtag" },
+              { step: "3", text: "Community votes on entries" },
+              { step: "4", text: "Top entry wins the prize + Featured Artist slot" },
+            ].map(s => (
+              <div key={s.step} className="flex items-start gap-3 text-sm text-stone-300">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.step}</span>
+                <span>{s.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
+
       </div>
     </div>
   );

@@ -32,6 +32,11 @@ import boostsRouter from "./boosts";
 import linkInBioRouter from "./link-in-bio";
 import subscriptionBoxesRouter from "./subscription-boxes";
 import meRouter from "./me";
+import streaksRouter from "./streaks";
+import badgesRouter from "./badges";
+import challengesRouter from "./challenges";
+import referralsRouter from "./referrals";
+import pollsRouter from "./polls";
 
 const router: IRouter = Router();
 
@@ -68,5 +73,10 @@ router.use(boostsRouter);
 router.use(linkInBioRouter);
 router.use(subscriptionBoxesRouter);
 router.use(meRouter);
+router.use(streaksRouter);
+router.use(badgesRouter);
+router.use(challengesRouter);
+router.use(referralsRouter);
+router.use(pollsRouter);
 
 export default router;

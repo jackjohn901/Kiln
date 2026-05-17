@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -62,6 +62,8 @@ export default function Nav() {
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
     { href: "/audience", label: "Audience", icon: Users },
     { href: "/coa", label: "Certificates", icon: FileText },
+    { href: "/badges", label: "Badges", icon: Medal },
+    { href: "/referrals", label: "Invite Artists", icon: Share2 },
   ];
 
   useEffect(() => {
@@ -86,6 +88,8 @@ export default function Nav() {
           ? []
           : [{ href: "/apply-verified", icon: Shield, label: "Apply for Verified" }]),
         { href: "/analytics",      icon: BarChart2, label: "Analytics" },
+        { href: "/badges",         icon: Medal,     label: "My Badges" },
+        { href: "/referrals",      icon: Share2,    label: "Invite Artists" },
         { href: "/settings",       icon: Settings,  label: "Settings" },
       ]
     : [];

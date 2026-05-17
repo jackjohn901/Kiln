@@ -6,6 +6,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
+import { updateStreak } from "./streaks";
 
 const router = Router();
 
@@ -33,6 +34,7 @@ router.post("/posts", async (req, res): Promise<void> => {
       isPatronOnly: isPatronOnly ?? false,
     }).returning();
 
+    updateStreak(user.id).catch(() => {});
     res.status(201).json({ ...post, tags: post.tags ?? [], isLiked: false, isSaved: false, createdAt: post.createdAt.toISOString() });
   } catch (err) {
     req.log.error({ err }, "createPost error");
