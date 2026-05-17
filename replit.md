@@ -1,44 +1,82 @@
-# [Project name]
+# Kiln — Artist Creator Platform
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A TikTok/Instagram Reels-style creator platform for craft artists at kilnfire.replit.app/kiln/.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/kiln run dev` — run the frontend (reads PORT from env)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React + Vite + Wouter + Tailwind (artifacts/kiln)
+- API: Express 5 (artifacts/api-server, port 8080)
+- DB: PostgreSQL + Drizzle ORM (lib/db)
+- Auth: Replit Auth via `useAuth()` hook from AuthContext
+- Build: esbuild (CJS bundle for API)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/db/src/schema/` — source of truth for all DB tables
+- `artifacts/api-server/src/routes/index.ts` — all API routes registered here
+- `artifacts/api-server/src/lib/seed.ts` — seed data (v3 marker = seed-v3-marker)
+- `artifacts/kiln/src/contexts/` — AuthContext, ProfileContext, SocialContext, CartContext
+- `artifacts/kiln/src/pages/` — all page components
+- `artifacts/kiln/src/data/` — static reference data (techniques, materials, etc.)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- All social actions (like/save/comment/follow) go through SocialContext — no inline fetch calls in pages.
+- Feed uses two data sources: static `REELS` from `@/data/reels` (For You) + `/api/feed/following` (Following tab).
+- Seed data uses a marker user ID (e.g. "seed-v3-marker") to run exactly once on server start.
+- GuildDetail and PatronTiers fetch from the API when the local static data file has no matching entry.
+- MobileNav is `fixed bottom-0 z-50` — any page with a bottom submit button needs `pb-28 md:pb-8`.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Full creator platform for craft artists:
+- **Feed** — TikTok-style vertical video/photo reels, For You + Following tabs
+- **Shop** — Buy original works directly from artists (listings, wishlist, cart)
+- **Drops** — Limited-edition timed releases with waitlist + patron early access
+- **Auctions** — Live bidding on one-of-a-kind works with real-time bid counts
+- **Workshops** — Book in-person and online classes from working artists
+- **Guilds** — Technique-based communities (join, post, member directory)
+- **Patron Tiers** — Monthly subscription tiers to support individual artists
+- **Commissions** — Request custom work; artists manage quotes/milestones
+- **Earnings** — Artist dashboard for tips + subscription income
+- **Analytics** — Post performance stats for logged-in artists
+- **Messages** — Direct messaging between users
+- **Notifications** — Real-time activity feed (likes, follows, tips, bids, etc.)
+- **Discover** — Browse artists by technique, location, commission availability
+- **Profiles** — Full artist profiles with posts, shop, patron link
+
+Static/reference pages (no backend required): Techniques, Materials, Mentorship, Opportunities, Process Journals, Lineage/Craft DNA.
+
+## Seed Artists
+
+All seed data uses IDs prefixed `seed-`:
+- `seed-elena-vasquez` — Elena Vasquez (Ceramics, Portland OR)
+- `seed-marco-chen` — Marco Chen (Glasswork, Brooklyn NY)
+- `seed-zoe-nakamura` — Zoe Nakamura (Weaving, Seattle WA)
+- `seed-felix-okafor` — Felix Okafor (Woodwork, Chicago IL)
+- `seed-aria-patel` — Aria Patel (Metalwork, San Francisco CA)
+- `seed-sam-rivera` — Sam Rivera (Pottery, Austin TX)
+
+## Gotchas
+
+- Seed marker must be bumped (seed-v3 → seed-v4 etc.) to re-run seed on a live DB.
+- All authenticated API calls need `credentials: "include"` in fetch options.
+- `pnpm run dev` at workspace root has no script — run individual packages via workflows.
+- Static guild/artist data files in `src/data/` are for reference/demo data; DB is source of truth for real users.
 
 ## User preferences
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
 
 ## Pointers
 

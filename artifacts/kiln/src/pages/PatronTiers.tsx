@@ -50,23 +50,38 @@ const FALLBACK_TIERS = [
 
 const PERK_ICONS = [Bell, Video, Lock, Tag, Zap, Package, Star, Heart, Crown];
 
+interface ApiProfile {
+  displayName?: string;
+  avatarUrl?: string;
+  medium?: string;
+  bio?: string;
+}
+
 export default function PatronTiers() {
   const { artistId } = useParams<{ artistId: string }>();
   const [tiers, setTiers] = useState<ApiTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [apiProfile, setApiProfile] = useState<ApiProfile | null>(null);
 
   const localArtist = getArtistById(artistId ?? "") ?? seedArtists.find(a => a.id === artistId);
 
   useEffect(() => {
     if (!artistId) return;
-    fetch(`/api/patron-tiers/${artistId}`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => setTiers(data.tiers ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [artistId]);
+    Promise.all([
+      fetch(`/api/patron-tiers/${artistId}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => setTiers(data.tiers ?? []))
+        .catch(() => {}),
+      !localArtist
+        ? fetch(`/api/users/${artistId}/profile`, { credentials: "include" })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(data => setApiProfile(data.profile ?? data))
+            .catch(() => {})
+        : Promise.resolve(),
+    ]).finally(() => setLoading(false));
+  }, [artistId, localArtist]);
 
   const handleSubscribe = async (tierId: string, tierName: string) => {
     setToggling(tierId);
@@ -82,8 +97,9 @@ export default function PatronTiers() {
   };
 
   const currentTier = tiers.find(t => t.isSubscribed);
-  const artistName = localArtist?.name ?? "this artist";
-  const avatarUrl = localArtist?.images[0]?.url ?? `https://picsum.photos/seed/${artistId}/80/80`;
+  const artistName = localArtist?.name ?? apiProfile?.displayName ?? "this artist";
+  const artistMedium = localArtist?.medium ?? apiProfile?.medium;
+  const avatarUrl = localArtist?.images?.[0]?.url ?? apiProfile?.avatarUrl ?? `https://picsum.photos/seed/${artistId}/80/80`;
 
   const displayTiers = tiers.length > 0 ? tiers : FALLBACK_TIERS.map((t, i) => ({
     id: `fallback-${i}`, artistId: artistId ?? "", name: t.name, description: t.description,
@@ -102,7 +118,7 @@ export default function PatronTiers() {
             <img src={avatarUrl} alt={artistName} className="h-10 w-10 rounded-full object-cover border border-white/10" onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artistId}/80/80`; }} />
             <div>
               <h1 className="font-serif text-xl text-amber-100">Support {artistName.split(" ")[0]}</h1>
-              {localArtist?.medium && <p className="text-xs text-stone-500">{localArtist.medium}</p>}
+              {artistMedium && <p className="text-xs text-stone-500">{artistMedium}</p>}
             </div>
           </div>
         </div>
