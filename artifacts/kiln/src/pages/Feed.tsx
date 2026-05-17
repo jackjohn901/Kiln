@@ -287,6 +287,7 @@ function ReelCard({
   onToggleMusic,
   videoAudioOn,
   onToggleVideoAudio,
+  musicUnlocked,
   onComment,
   onNotInterested,
   onMoreLikeThis,
@@ -297,6 +298,7 @@ function ReelCard({
   onToggleMusic: () => void;
   videoAudioOn: boolean;
   onToggleVideoAudio: () => void;
+  musicUnlocked: boolean;
   onComment: (reelId: string, artistName: string) => void;
   onNotInterested: () => void;
   onMoreLikeThis: () => void;
@@ -350,18 +352,20 @@ function ReelCard({
     }
   }, [isActive, resolvedVideoUrl]);
 
-  // Original audio volume: blend with music track when both are on
+  // Original audio: browsers require muted for autoplay — unmute imperatively after user gesture
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (!videoAudioOn) {
-      v.volume = 0;
+    // Never unmute before the user has tapped (autoplay policy) or when not active
+    if (!musicUnlocked || !isActive || !videoAudioOn) {
+      v.muted = true;
       return;
     }
+    v.muted = false;
     const hasMusicTrack = !!(reel.musicTrackId);
-    // Duck original audio to 25% when a music layer is active on top
+    // Duck original audio to 25% when a music layer is playing on top
     v.volume = (hasMusicTrack && !musicMuted) ? 0.25 : 1.0;
-  }, [videoAudioOn, musicMuted, isActive, reel.musicTrackId]);
+  }, [videoAudioOn, musicMuted, musicUnlocked, isActive, reel.musicTrackId]);
 
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
@@ -382,6 +386,7 @@ function ReelCard({
           ref={videoRef}
           key={resolvedVideoUrl}
           src={resolvedVideoUrl}
+          muted
           loop
           playsInline
           poster={reel.thumbnail}
@@ -510,8 +515,22 @@ function ReelCard({
           className="line-clamp-2 max-w-[78vw] text-sm leading-snug text-stone-200 drop-shadow"
         />
 
-        <div className="pt-1">
+        <div className="pt-1 flex items-center gap-2 flex-wrap">
           <MusicDisc trackId={reel.musicTrackId} spinning={isActive && !musicMuted} />
+          {/* Original audio toggle — only relevant when there's actual video content */}
+          {resolvedVideoUrl && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleVideoAudio(); }}
+              className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] backdrop-blur-sm transition-all ${
+                videoAudioOn
+                  ? "bg-white/15 text-white/80 border border-white/10"
+                  : "bg-black/40 text-white/30 border border-white/5"
+              }`}
+            >
+              {videoAudioOn ? <Mic size={10} /> : <MicOff size={10} />}
+              <span>Original</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -635,16 +654,6 @@ function ReelCard({
 
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
-
-        {/* Original audio toggle */}
-        <button onClick={onToggleVideoAudio} className="flex flex-col items-center gap-1">
-          {videoAudioOn ? (
-            <Mic size={20} className="text-white" />
-          ) : (
-            <MicOff size={20} className="text-white/40" />
-          )}
-          <span className={`text-[9px] ${videoAudioOn ? "text-white/70" : "text-white/30"}`}>Original</span>
-        </button>
 
         {/* Music layer toggle */}
         <button onClick={onToggleMusic} className="flex flex-col items-center gap-1">
@@ -1264,6 +1273,7 @@ export default function Feed() {
               onToggleMusic={handleToggleMusic}
               videoAudioOn={videoAudioOn}
               onToggleVideoAudio={() => setVideoAudioOn((v) => !v)}
+              musicUnlocked={musicUnlocked}
               onComment={(id, name) => setCommentReel({ id, artistName: name })}
               onNotInterested={() => handleNotInterested(reel.id)}
               onMoreLikeThis={() => handleMoreLikeThis(reel.technique)}
