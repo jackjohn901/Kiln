@@ -50,3 +50,4 @@ export * from "./verification_applications";
 export * from "./reports";
 export * from "./push_subscriptions";
 export * from "./giftCards";
+export * from "./payouts";

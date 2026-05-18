@@ -1,7 +1,15 @@
 import { Router, type IRouter } from 'express';
 import { db } from "@workspace/db";
-import { ordersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  ordersTable,
+  digitalDownloadPurchasesTable,
+  workshopsTable,
+  workshopBookingsTable,
+  commissionsTable,
+  auctionsTable,
+} from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
+import crypto from "crypto";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 
@@ -17,11 +25,12 @@ interface CartLineItem {
 
 router.post('/stripe/checkout', async (req, res): Promise<void> => {
   try {
-    const { items, customerEmail, successPath, cancelPath } = req.body as {
+    const { items, customerEmail, successPath, cancelPath, metadata: extraMetadata } = req.body as {
       items: CartLineItem[];
       customerEmail?: string;
       successPath?: string;
       cancelPath?: string;
+      metadata?: Record<string, string>;
     };
 
     if (!items?.length) {
@@ -35,6 +44,9 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       : `http://localhost:${process.env.PORT ?? 5000}`;
 
     const basePath = process.env.BASE_PATH ?? '';
+
+    // Attach calling user's ID to metadata so webhook can act on their behalf
+    const userId = req.isAuthenticated() ? req.user.id : undefined;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -56,13 +68,16 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       cancel_url: `${baseUrl}${basePath}${cancelPath ?? '/cart'}`,
       metadata: {
         platform: 'kiln',
+        ...(userId ? { userId } : {}),
+        ...(extraMetadata ?? {}),
       },
     });
 
     res.json({ url: session.url, sessionId: session.id });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, 'Stripe checkout error');
-    res.status(500).json({ error: err.message ?? 'Checkout failed' });
+    const msg = err instanceof Error ? err.message : 'Checkout failed';
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -109,9 +124,10 @@ router.post('/stripe/subscription-checkout', async (req, res): Promise<void> => 
     });
 
     res.json({ url: session.url, sessionId: session.id });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, 'Stripe subscription checkout error');
-    res.status(500).json({ error: err.message ?? 'Checkout failed' });
+    const msg = err instanceof Error ? err.message : 'Checkout failed';
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -124,15 +140,34 @@ router.get('/stripe/session/:sessionId', async (req, res): Promise<void> => {
       customerEmail: session.customer_details?.email,
       amountTotal: session.amount_total,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, 'Stripe session retrieve error');
-    res.status(500).json({ error: err.message });
+    const msg = err instanceof Error ? err.message : 'Failed';
+    res.status(500).json({ error: msg });
   }
 });
 
 router.post('/stripe/webhook', async (req, res): Promise<void> => {
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env['STRIPE_WEBHOOK_SECRET'];
+
+  type SessionMeta = {
+    platform?: string;
+    type?: string;
+    orderId?: string;
+    userId?: string;
+    // digital
+    productId?: string;
+    productTitle?: string;
+    downloadUrl?: string;
+    // workshop
+    workshopId?: string;
+    // commission
+    commissionId?: string;
+    milestone?: string;
+    // auction
+    auctionId?: string;
+  };
 
   let event: { type: string; data: { object: Record<string, unknown> } };
   try {
@@ -150,17 +185,90 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as {
-        id: string; payment_status: string;
-        metadata?: { platform?: string; orderId?: string };
+        id: string;
+        payment_status: string;
+        amount_total?: number | null;
+        metadata?: SessionMeta;
         customer_email?: string | null;
       };
+
       if (session.payment_status === 'paid' && session.metadata?.platform === 'kiln') {
-        if (session.metadata?.orderId) {
+        const meta = session.metadata ?? {};
+
+        // 1. Generic order payment
+        if (meta.orderId) {
           await db.update(ordersTable)
             .set({ status: 'paid' })
-            .where(eq(ordersTable.id, session.metadata.orderId));
+            .where(eq(ordersTable.id, meta.orderId));
         }
-        logger.info({ sessionId: session.id }, 'Stripe checkout completed');
+
+        // 2. Digital download — record purchase so user can download
+        if (meta.type === 'digital' && meta.productId && meta.userId) {
+          const existing = await db.select({ id: digitalDownloadPurchasesTable.id })
+            .from(digitalDownloadPurchasesTable)
+            .where(and(
+              eq(digitalDownloadPurchasesTable.userId, meta.userId),
+              eq(digitalDownloadPurchasesTable.productId, meta.productId),
+            ));
+          if (existing.length === 0) {
+            await db.insert(digitalDownloadPurchasesTable).values({
+              id: crypto.randomUUID(),
+              userId: meta.userId,
+              productId: meta.productId,
+              productTitle: meta.productTitle ?? meta.productId,
+              amountCents: session.amount_total ?? 0,
+              downloadUrl: meta.downloadUrl ?? null,
+            });
+          }
+        }
+
+        // 3. Workshop booking — auto-confirm seat after payment
+        if (meta.type === 'workshop' && meta.workshopId && meta.userId) {
+          const [w] = await db.select().from(workshopsTable)
+            .where(eq(workshopsTable.id, meta.workshopId));
+          if (w && w.spotsBooked < w.maxSpots) {
+            const existing = await db.select({ id: workshopBookingsTable.id })
+              .from(workshopBookingsTable)
+              .where(and(
+                eq(workshopBookingsTable.workshopId, meta.workshopId),
+                eq(workshopBookingsTable.userId, meta.userId),
+              ));
+            if (existing.length === 0) {
+              await db.insert(workshopBookingsTable).values({
+                id: crypto.randomUUID(),
+                workshopId: meta.workshopId,
+                userId: meta.userId,
+                userName: "",
+                paidAmount: w.price,
+              });
+              await db.update(workshopsTable)
+                .set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` })
+                .where(eq(workshopsTable.id, meta.workshopId));
+            }
+          }
+        }
+
+        // 4. Commission milestone payment — auto-confirm deposit or final
+        if (meta.type === 'commission' && meta.commissionId && meta.milestone) {
+          if (meta.milestone === 'deposit') {
+            await db.update(commissionsTable)
+              .set({ depositPaid: true })
+              .where(eq(commissionsTable.id, meta.commissionId));
+          } else if (meta.milestone === 'final') {
+            await db.update(commissionsTable)
+              .set({ finalPaid: true })
+              .where(eq(commissionsTable.id, meta.commissionId));
+          }
+        }
+
+        // 5. Auction payment — mark as paid
+        if (meta.type === 'auction' && meta.auctionId) {
+          await db.update(auctionsTable)
+            .set({ status: 'paid' })
+            .where(eq(auctionsTable.id, meta.auctionId));
+        }
+
+        logger.info({ sessionId: session.id, type: meta.type ?? 'order' }, 'Stripe checkout completed');
       }
     }
     res.json({ received: true });

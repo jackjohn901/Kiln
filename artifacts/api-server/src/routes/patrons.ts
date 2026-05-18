@@ -19,6 +19,26 @@ router.get("/patron-tiers/:artistId", async (req, res): Promise<void> => {
   res.json({ tiers: tiers.map(t => ({ ...t, isSubscribed: subscribedTierIds.has(t.id), createdAt: t.createdAt.toISOString() })) });
 });
 
+// PATCH /patron-tiers/:tierId — update a tier (artist only)
+router.patch("/patron-tiers/:tierId", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [tier] = await db.select().from(patronTiersTable).where(eq(patronTiersTable.id, req.params.tierId));
+  if (!tier) { res.status(404).json({ error: "Tier not found" }); return; }
+  if (tier.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+  const { name, description, price, perks, isActive, sortOrder } = req.body as {
+    name?: string; description?: string; price?: number; perks?: string[]; isActive?: boolean; sortOrder?: number;
+  };
+  const updates: Partial<typeof tier> = {};
+  if (name !== undefined) updates.name = name;
+  if (description !== undefined) updates.description = description;
+  if (price !== undefined) updates.price = Number(price);
+  if (perks !== undefined) updates.perks = perks;
+  if (isActive !== undefined) updates.isActive = isActive;
+  if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
+  const [updated] = await db.update(patronTiersTable).set(updates).where(eq(patronTiersTable.id, req.params.tierId)).returning();
+  res.json({ ...updated, isSubscribed: false, createdAt: updated.createdAt.toISOString() });
+});
+
 // POST /patron-tiers — create a tier (artist)
 router.post("/patron-tiers", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

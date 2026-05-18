@@ -5,6 +5,8 @@ import { eq, desc, and, gt } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
 import { sendEmail, outbidEmail } from "../lib/email";
+import { getUncachableStripeClient } from "../stripeClient";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -62,6 +64,47 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   }
   broadcastAll({ type: "bid", auctionId: auction.id, currentBid: bidAmount, bidCount: auction.bidCount + 1, bidderName: name });
   res.json({ bid: { ...bid, createdAt: bid.createdAt.toISOString() }, auction: { ...updated, startDate: updated.startDate.toISOString(), endDate: updated.endDate.toISOString(), createdAt: updated.createdAt.toISOString() } });
+});
+
+// POST /auctions/:id/checkout — Stripe checkout for the winning bidder
+router.post("/auctions/:id/checkout", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [auction] = await db.select().from(auctionsTable).where(eq(auctionsTable.id, req.params.id));
+  if (!auction) { res.status(404).json({ error: "Not found" }); return; }
+  if (new Date() < auction.endDate) { res.status(400).json({ error: "Auction is still live" }); return; }
+  if (!auction.currentBidderId) { res.status(400).json({ error: "No winning bid on this auction" }); return; }
+  if (auction.currentBidderId !== req.user.id) { res.status(403).json({ error: "You are not the winning bidder" }); return; }
+  try {
+    const stripe = await getUncachableStripeClient();
+    const baseUrl = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+      : `http://localhost:${process.env.PORT ?? 5000}`;
+    const basePath = process.env.BASE_PATH ?? "";
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      customer_email: req.user.email ?? undefined,
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          unit_amount: auction.currentBid * 100,
+          product_data: {
+            name: auction.title,
+            description: `Won at auction — ${auction.artistName}`,
+            images: auction.imageUrl ? [auction.imageUrl] : [],
+          },
+        },
+        quantity: 1,
+      }],
+      mode: "payment",
+      success_url: `${baseUrl}${basePath}/auctions?auction_paid=${auction.id}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${basePath}/auctions`,
+      metadata: { platform: "kiln", type: "auction", auctionId: auction.id, userId: req.user.id },
+    });
+    res.json({ url: session.url, sessionId: session.id });
+  } catch (err: unknown) {
+    logger.error({ err }, "Auction checkout error");
+    res.status(500).json({ error: "Checkout failed" });
+  }
 });
 
 export default router;

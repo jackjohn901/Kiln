@@ -99,6 +99,11 @@ function CommissionCard({ commission, isArtist, onUpdate }: { commission: Commis
           }],
           successPath: `/commission-tracker?deposit_paid=${commission.id}`,
           cancelPath: "/commission-tracker",
+          metadata: {
+            type: "commission",
+            commissionId: commission.id,
+            milestone: "deposit",
+          },
         }),
       });
       const data = await res.json();

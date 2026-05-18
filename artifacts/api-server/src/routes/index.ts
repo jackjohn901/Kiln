@@ -64,6 +64,7 @@ import adminRouter from "./admin";
 import analyticsRouter from "./analytics";
 import giftCardsRouter from "./gift-cards";
 import videoRouter from "./video";
+import payoutsRouter from "./payouts";
 
 const router: IRouter = Router();
 
@@ -132,5 +133,6 @@ router.use(adminRouter);
 router.use(analyticsRouter);
 router.use(giftCardsRouter);
 router.use(videoRouter);
+router.use(payoutsRouter);
 
 export default router;

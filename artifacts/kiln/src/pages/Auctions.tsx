@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Gavel, Clock, TrendingUp, X, AlertCircle, CheckCircle, Trophy, ChevronDown, ChevronUp } from "lucide-react";
+import { Gavel, Clock, TrendingUp, X, AlertCircle, CheckCircle, Trophy, ChevronDown, ChevronUp, CreditCard, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useProfile } from "@/contexts/ProfileContext";
 
 interface Bid {
   id: string;
@@ -25,6 +26,7 @@ interface Auction {
   startingPrice: number;
   reservePrice: number | null;
   currentBid: number;
+  currentBidderId: string | null;
   currentBidderName: string | null;
   bidCount: number;
   currency: string;
@@ -48,8 +50,9 @@ function getTimeLeft(endDate: string): string {
   return `${m}m left`;
 }
 
-function AuctionCard({ auction, onBid }: { auction: Auction; onBid: (a: Auction) => void }) {
+function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBid: (a: Auction) => void; currentUserId?: string }) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(auction.endDate));
+  const [paying, setPaying] = useState(false);
   useEffect(() => {
     const iv = setInterval(() => setTimeLeft(getTimeLeft(auction.endDate)), 30000);
     return () => clearInterval(iv);
@@ -58,6 +61,24 @@ function AuctionCard({ auction, onBid }: { auction: Auction; onBid: (a: Auction)
   const isLive = auction.status === "live" && new Date(auction.endDate) > new Date();
   const reserveMet = auction.reservePrice === null || auction.currentBid >= auction.reservePrice;
   const displayBid = auction.currentBid > 0 ? auction.currentBid : auction.startingPrice;
+  const isEnded = !isLive;
+  const isWinner = isEnded && !!auction.currentBidderId && auction.currentBidderId === currentUserId;
+  const alreadyPaid = auction.status === "paid";
+
+  async function handlePayNow() {
+    setPaying(true);
+    try {
+      const res = await fetch(`/api/auctions/${auction.id}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json() as { url?: string; error?: string };
+      if (data.url) window.location.href = data.url;
+    } catch { /* ignore */ } finally {
+      setPaying(false);
+    }
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -120,7 +141,19 @@ function AuctionCard({ auction, onBid }: { auction: Auction; onBid: (a: Auction)
             <Gavel size={14} /> Place Bid
           </button>
         )}
-        {!isLive && auction.status === "closed" && (
+        {isWinner && !alreadyPaid && (
+          <button onClick={handlePayNow} disabled={paying}
+            className="w-full flex items-center justify-center gap-2 rounded-full bg-emerald-500 py-2.5 text-sm font-semibold text-stone-950 hover:bg-emerald-400 transition-colors disabled:opacity-60">
+            {paying ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+            {paying ? "Redirecting…" : `Pay ${formatPrice(auction.currentBid)} — You won!`}
+          </button>
+        )}
+        {isWinner && alreadyPaid && (
+          <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 py-1">
+            <CheckCircle size={12} /> Payment received — contact the artist to arrange delivery
+          </div>
+        )}
+        {!isLive && !isWinner && (
           <div className="flex items-center justify-center gap-1.5 text-xs text-stone-500 py-1">
             <Trophy size={12} className="text-amber-500/60" />
             {auction.currentBidderName ? `Won by ${auction.currentBidderName}` : "Auction ended"}
@@ -239,6 +272,7 @@ export default function Auctions() {
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [tab, setTab] = useState<"live" | "all" | "ended">("live");
   const { subscribe } = useWebSocket();
+  const { profile } = useProfile();
   const selectedRef = useRef(selectedAuction);
   selectedRef.current = selectedAuction;
 
@@ -327,7 +361,7 @@ export default function Auctions() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(auction => (
-            <AuctionCard key={auction.id} auction={auction} onBid={handleOpenBid} />
+            <AuctionCard key={auction.id} auction={auction} onBid={handleOpenBid} currentUserId={profile?.id} />
           ))}
         </div>
       </div>

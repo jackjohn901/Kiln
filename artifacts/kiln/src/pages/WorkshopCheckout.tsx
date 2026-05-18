@@ -85,6 +85,11 @@ export default function WorkshopCheckout() {
           customerEmail: form.email,
           successPath: `/workshops/book/${workshop.id}?booked=1`,
           cancelPath: `/workshops/book/${workshop.id}`,
+          metadata: {
+            type: "workshop",
+            workshopId: workshop.id,
+            userId: profile?.id ?? "",
+          },
         }),
       });
       const data = await res.json();

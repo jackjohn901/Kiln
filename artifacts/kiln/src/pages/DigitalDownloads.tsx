@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   Download, FileText, BookOpen, FlaskConical, Camera, DollarSign,
@@ -221,15 +221,69 @@ export default function DigitalDownloads() {
     return matchSearch && matchCat;
   });
 
-  function handlePurchase(product: DigitalProduct) {
-    if (!profile) { setSelectedProduct(product); return; }
+  // Handle return from Stripe checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get("downloaded");
+    if (productId) {
+      setPurchased(prev => new Set(prev).add(productId));
+      window.history.replaceState({}, "", window.location.pathname);
+      const product = PRODUCTS.find(p => p.id === productId);
+      if (product) { setSelectedProduct(product); setJustPurchased(true); }
+    }
+  }, []);
+
+  async function handlePurchase(product: DigitalProduct) {
+    if (!profile) return;
     setPurchasing(true);
-    setTimeout(() => {
-      setPurchased((prev) => new Set(prev).add(product.id));
+    try {
+      if (product.isFree) {
+        await fetch("/api/digital-downloads/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            productId: product.id,
+            productTitle: product.title,
+            amountCents: 0,
+            downloadUrl: `https://kilnfire.replit.app/kiln/downloads/${product.id}`,
+          }),
+        });
+        setPurchased(prev => new Set(prev).add(product.id));
+        setJustPurchased(true);
+        setTimeout(() => setJustPurchased(false), 5000);
+      } else {
+        const res = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            items: [{ name: product.title, price: product.price ?? 0, quantity: 1, artistName: product.author }],
+            successPath: `/digital-downloads?downloaded=${product.id}`,
+            cancelPath: "/digital-downloads",
+            metadata: {
+              type: "digital",
+              productId: product.id,
+              productTitle: product.title,
+              downloadUrl: `https://kilnfire.replit.app/kiln/downloads/${product.id}`,
+            },
+          }),
+        });
+        const data = await res.json() as { url?: string };
+        if (data.url) window.location.href = data.url;
+      }
+    } catch { /* ignore */ } finally {
       setPurchasing(false);
-      setJustPurchased(true);
-      setTimeout(() => setJustPurchased(false), 3000);
-    }, 1400);
+    }
+  }
+
+  async function handleDownload(productId: string) {
+    try {
+      const res = await fetch(`/api/digital-downloads/${productId}/download-url`, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json() as { url?: string };
+      if (data.url) window.open(data.url, "_blank");
+    } catch { /* ignore */ }
   }
 
   const hasPurchased = selectedProduct ? purchased.has(selectedProduct.id) : false;
@@ -433,13 +487,17 @@ export default function DigitalDownloads() {
                   <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
                     <Check size={20} className="text-emerald-400 mx-auto mb-2" />
                     <p className="text-sm font-semibold text-emerald-300">Download ready!</p>
-                    <p className="text-xs text-stone-600 mt-1">Check your email for the download link. Payments are peer-to-peer.</p>
-                    <button className="mt-3 flex items-center gap-2 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/30 px-4 py-2 text-sm font-semibold text-emerald-400 hover:bg-emerald-500/30 transition-colors">
+                    <p className="text-xs text-stone-600 mt-1">Your purchase has been recorded.</p>
+                    <button
+                      onClick={() => handleDownload(selectedProduct.id)}
+                      className="mt-3 flex items-center gap-2 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/30 px-4 py-2 text-sm font-semibold text-emerald-400 hover:bg-emerald-500/30 transition-colors">
                       <Download size={13} /> Download now
                     </button>
                   </div>
                 ) : hasPurchased ? (
-                  <button className="w-full flex items-center justify-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 py-3 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30 transition-colors">
+                  <button
+                    onClick={() => handleDownload(selectedProduct.id)}
+                    className="w-full flex items-center justify-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 py-3 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30 transition-colors">
                     <Download size={15} /> Download again
                   </button>
                 ) : (
