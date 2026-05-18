@@ -40,9 +40,7 @@ interface ArtistGroup {
 
 // Demo payment stubs for seeded artists so the UI shows live examples
 const DEMO_PAYMENTS: Record<string, Partial<ArtistPayments>> = {
-  "alex-bernstein":  { stripeLink: "https://buy.stripe.com/test_demo", venmo: "@alexbglass" },
-  "lino-tagliapietra": { venmo: "@linotagliapietra", paypalMe: "linotagliapietra" },
-  "default": { venmo: "@artist", cashapp: "$artist" },
+  "default": {},
 };
 
 function getDemoPayments(artistId: string): ArtistPayments {

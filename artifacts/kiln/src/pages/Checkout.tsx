@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, CreditCard, Lock, CheckCircle, ShoppingBag, Flame } from "lucide-react";
+import { ArrowLeft, Lock, CheckCircle, ShoppingBag } from "lucide-react";
 import Nav from "@/components/Nav";
 import { listings, formatPrice } from "@/data/listings";
 import { artists } from "@/data/artists";
@@ -13,7 +13,7 @@ function getArtistName(artistId: string): string {
   return ALL_ARTISTS.find((a) => a.id === artistId)?.name ?? artistId;
 }
 
-type Step = "review" | "billing" | "confirm";
+type Step = "review" | "confirm";
 
 function OrderSummary({ listingId }: { listingId: string }) {
   const listing = listings.find((l) => l.id === listingId);
@@ -73,11 +73,9 @@ export default function Checkout() {
     city: "",
     state: "",
     zip: "",
-    cardNumber: "",
-    cardExpiry: "",
-    cardCvc: "",
   });
   const [processing, setProcessing] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const [orderId, setOrderId] = useState(() => `KLN-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
 
   if (!listing) {
@@ -116,28 +114,30 @@ export default function Checkout() {
   async function handlePurchase() {
     if (!listing) return;
     setProcessing(true);
+    setCheckoutError("");
     try {
-      const total = listing.price + Math.round(listing.price * 0.025);
-      const res = await fetch("/api/me/orders", {
+      const artistName = getArtistName(listing.artistId);
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: listing.title,
-          sellerId: listing.artistId,
-          type: "listing",
-          refId: listing.id,
-          imageUrl: listing.imageUrl ?? null,
-          amount: total,
+          items: [{ name: listing.title, price: listing.price, quantity: 1, imageUrl: listing.imageUrl ?? undefined, artistName }],
+          customerEmail: form.email || undefined,
+          successPath: "/shop",
+          cancelPath: `/shop/checkout/${listingId}`,
         }),
       });
-      if (res.ok) {
-        const data = await res.json() as { orderId: string };
-        setOrderId(`KLN-${data.orderId.slice(0, 8).toUpperCase()}`);
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
       }
-    } catch { /* proceed to confirm even if API fails */ }
+      setCheckoutError(data.error ?? "Checkout failed. Please try again.");
+    } catch {
+      setCheckoutError("Something went wrong. Please try again.");
+    }
     setProcessing(false);
-    setStep("confirm");
   }
 
   if (step === "confirm") {
@@ -197,17 +197,13 @@ export default function Checkout() {
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 mb-8">
-          {(["review", "billing"] as Step[]).map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                step === s ? "bg-amber-500 text-stone-950" : (["review", "billing"].indexOf(step) > i) ? "bg-emerald-500 text-white" : "bg-stone-800 text-stone-500"
-              }`}>
-                {(["review", "billing"].indexOf(step) > i) ? <CheckCircle size={12} /> : i + 1}
-              </div>
-              <span className={`text-sm capitalize ${step === s ? "text-amber-200" : "text-stone-600"}`}>{s}</span>
-              {i < 1 && <div className="h-px w-8 bg-stone-700" />}
-            </div>
-          ))}
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold bg-amber-500 text-stone-950">1</div>
+            <span className="text-sm text-amber-200">Shipping</span>
+            <div className="h-px w-8 bg-stone-700" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold bg-stone-800 text-stone-500">2</div>
+            <span className="text-sm text-stone-600">Payment</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
@@ -240,75 +236,18 @@ export default function Checkout() {
                     </div>
                   </div>
                 </div>
+                {checkoutError && (
+                  <p className="text-sm text-red-400 rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">{checkoutError}</p>
+                )}
                 <button
-                  onClick={() => setStep("billing")}
-                  disabled={!form.name || !form.email || !form.address || !form.city || !form.zip}
-                  className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+                  onClick={handlePurchase}
+                  disabled={processing || !form.name || !form.email || !form.address || !form.city || !form.zip}
+                  className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  Continue to Payment
+                  <Lock size={13} />
+                  {processing ? "Redirecting to Stripe…" : `Pay Securely · ${formatPrice(listing.price + Math.round(listing.price * 0.025))}`}
                 </button>
-              </div>
-            )}
-
-            {step === "billing" && (
-              <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-5 space-y-4">
-                <div className="flex items-center gap-2">
-                  <CreditCard size={16} className="text-stone-400" />
-                  <h2 className="font-semibold text-stone-100">Payment</h2>
-                  <div className="ml-auto flex items-center gap-1 text-xs text-stone-500">
-                    <Lock size={10} /> Secure
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-stone-500 mb-1 block">Card number</label>
-                    <input
-                      value={form.cardNumber}
-                      onChange={(e) => field("cardNumber", e.target.value.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim())}
-                      placeholder="4242 4242 4242 4242"
-                      className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm font-mono text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-stone-500 mb-1 block">Expiry</label>
-                      <input
-                        value={form.cardExpiry}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, "").slice(0, 4);
-                          field("cardExpiry", val.length > 2 ? val.slice(0, 2) + "/" + val.slice(2) : val);
-                        }}
-                        placeholder="MM/YY"
-                        className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm font-mono text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-stone-500 mb-1 block">CVC</label>
-                      <input
-                        value={form.cardCvc}
-                        onChange={(e) => field("cardCvc", e.target.value.replace(/\D/g, "").slice(0, 3))}
-                        placeholder="123"
-                        className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm font-mono text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-2 text-xs text-stone-500">
-                  <Flame size={10} className="inline mr-1 text-amber-400" />
-                  Card details are not charged — this demo records a confirmed order in your account.
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setStep("review")} className="rounded-full border border-white/10 px-4 py-3 text-sm text-stone-400 hover:border-white/20 transition-colors">
-                    Back
-                  </button>
-                  <button
-                    onClick={handlePurchase}
-                    disabled={processing || !form.cardNumber || !form.cardExpiry || !form.cardCvc}
-                    className="flex-1 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
-                  >
-                    {processing ? "Processing…" : `Complete Purchase · ${formatPrice(listing.price + Math.round(listing.price * 0.025))}`}
-                  </button>
-                </div>
+                <p className="text-center text-xs text-stone-600">You'll be taken to Stripe's secure checkout to enter your payment details</p>
               </div>
             )}
           </div>

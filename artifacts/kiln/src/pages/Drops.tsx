@@ -51,6 +51,7 @@ function CountdownBadge({ dropDate }: { dropDate: string }) {
 
 function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (id: string, val: boolean) => void }) {
   const [toggling, setToggling] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
 
   const handleWaitlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -63,6 +64,28 @@ function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (i
       }
     } catch {}
     setToggling(false);
+  };
+
+  const handleBuyNow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBuyingNow(true);
+    try {
+      const r = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: [{ name: drop.title, price: drop.price, quantity: 1, imageUrl: drop.imageUrl ?? undefined, artistName: drop.artistName }],
+          successPath: "/drops?purchased=1",
+          cancelPath: "/drops",
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data.url) { window.location.href = data.url; return; }
+      }
+    } catch {}
+    setBuyingNow(false);
   };
 
   const isSold = drop.status === "sold" || drop.editionSold >= drop.edition;
@@ -104,7 +127,13 @@ function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (i
           <p className="text-lg font-semibold text-amber-300">{formatPrice(drop.price)}</p>
           <p className="text-xs text-stone-500">{drop.technique ?? "Studio work"} · Ed. {drop.edition}</p>
         </div>
-        {!isSold && (
+        {!isSold && drop.status === "live" && (
+          <button onClick={handleBuyNow} disabled={buyingNow}
+            className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-1.5 text-xs font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-60">
+            {buyingNow ? <Loader2 size={10} className="animate-spin" /> : "Buy Now"}
+          </button>
+        )}
+        {!isSold && drop.status === "upcoming" && (
           <button onClick={handleWaitlist} disabled={toggling}
             className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
               drop.isOnWaitlist

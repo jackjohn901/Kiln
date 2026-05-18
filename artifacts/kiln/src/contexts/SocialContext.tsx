@@ -535,6 +535,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markRead = useCallback((id: string) => {
+    fetch(`/api/notifications/${id}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
     update((s) => ({ ...s, notifications: s.notifications.map((n) => n.id === id ? { ...n, read: true } : n) }));
   }, []);
 
@@ -554,6 +555,17 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const sendCommissionInquiry = useCallback((inquiry: Omit<CommissionInquiry, "id" | "status" | "createdAt">) => {
     const newInquiry: CommissionInquiry = { ...inquiry, id: genId(), status: "pending", createdAt: new Date().toISOString() };
+    fetch("/api/commissions", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        artistId: inquiry.toArtistId,
+        description: inquiry.description,
+        budget: inquiry.budget ?? null,
+        timeline: inquiry.timeline ?? null,
+      }),
+    }).catch(() => {});
     update((s) => ({ ...s, commissions: [newInquiry, ...s.commissions] }));
   }, []);
 

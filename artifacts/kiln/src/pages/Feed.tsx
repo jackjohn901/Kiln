@@ -770,6 +770,8 @@ export default function Feed() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
+  const [apiPostOffset, setApiPostOffset] = useState(20);
+  const [hasMoreApiPosts, setHasMoreApiPosts] = useState(true);
   const [musicMuted, setMusicMuted] = useState(false);
   const [videoAudioOn, setVideoAudioOn] = useState(true);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
@@ -890,6 +892,7 @@ export default function Feed() {
       .catch(() => {});
   }, []);
 
+
   // Detect and auto-publish any scheduled posts that are now past their scheduled time
   useEffect(() => {
     try {
@@ -948,6 +951,43 @@ export default function Feed() {
   }, [baseReels]);
 
   const activeReel = reels[activeIndex];
+
+  // Load more API posts when nearing the end of the feed
+  useEffect(() => {
+    if (!hasMoreApiPosts || feedTab !== "foryou") return;
+    if (activeIndex < reels.length - 5) return;
+    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
+    fetch(`/api/feed?limit=20&offset=${apiPostOffset}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        if (!data?.posts?.length) { setHasMoreApiPosts(false); return; }
+        const more: Reel[] = data.posts.map((p: any) => ({
+          id: `db-${p.id}`,
+          videoId: "",
+          videoUrl: p.videoUrl ?? undefined,
+          artistId: p.authorId ?? "unknown",
+          artistName: p.authorName ?? "Artist",
+          technique: p.technique ?? "Studio Craft",
+          location: "",
+          caption: p.caption ?? "",
+          craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
+          likes: p.likeCount ?? 0,
+          saves: p.saveCount ?? 0,
+          thumbnail: p.thumbnailUrl ?? undefined,
+          avatarUrl: p.authorAvatarUrl ?? undefined,
+          musicTrackId: defaultMusicId,
+          available: false,
+          patronOnly: p.isPatronOnly ?? false,
+        }));
+        setUserPostReels((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const fresh = more.filter((r) => !existingIds.has(r.id));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
+        setApiPostOffset((o) => o + 20);
+      })
+      .catch(() => {});
+  }, [activeIndex, reels.length, apiPostOffset, hasMoreApiPosts, feedTab]);
 
   // Scroll detection
   useEffect(() => {

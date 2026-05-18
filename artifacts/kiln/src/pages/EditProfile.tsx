@@ -227,7 +227,7 @@ export default function EditProfile() {
       <div className="mx-auto max-w-xl px-4 py-8 pb-28 md:pb-8">
         <div className="mb-8">
           <h1 className="font-serif text-2xl font-bold text-amber-100">Edit Profile</h1>
-          <p className="text-sm text-stone-500">Changes are saved to your device</p>
+          <p className="text-sm text-stone-500">Changes saved to your profile</p>
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">

@@ -35,6 +35,7 @@ export default function Discover() {
   const [query, setQuery] = useState("");
   const [medium, setMedium] = useState("All");
   const [statusFilter, setStatusFilter] = useState<"Any" | "Open" | "Waitlisted">("Any");
+  const [locationFilter, setLocationFilter] = useState("Any");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -107,6 +108,11 @@ export default function Discover() {
       .map((x) => x.artist);
   }, [following]);
 
+  const uniqueLocations = useMemo(() => {
+    const cities = ALL_ARTISTS.map((a) => a.location?.split(",")[0]?.trim()).filter(Boolean);
+    return ["Any", ...Array.from(new Set(cities)).sort()];
+  }, []);
+
   const filtered = useMemo(() => {
     return ALL_ARTISTS.filter((a) => {
       const q = query.toLowerCase();
@@ -126,9 +132,12 @@ export default function Discover() {
         (statusFilter === "Open" && status === "open") ||
         (statusFilter === "Waitlisted" && status === "waitlisted");
 
-      return matchesQuery && matchesMedium && matchesStatus;
+      const matchesLocation =
+        locationFilter === "Any" || a.location?.toLowerCase().includes(locationFilter.toLowerCase());
+
+      return matchesQuery && matchesMedium && matchesStatus && matchesLocation;
     });
-  }, [query, medium, statusFilter, getArtistCommissionStatus]);
+  }, [query, medium, statusFilter, locationFilter, getArtistCommissionStatus]);
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">
@@ -394,6 +403,23 @@ export default function Discover() {
                 }`}
               >
                 {m}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2 mb-3 flex-wrap">
+            <span className="text-xs text-stone-500 self-center mr-1">Location:</span>
+            {uniqueLocations.slice(0, 8).map((loc) => (
+              <button
+                key={loc}
+                onClick={() => setLocationFilter(loc)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  locationFilter === loc
+                    ? "border-sky-500 bg-sky-500/10 text-sky-300"
+                    : "border-stone-700 text-stone-400 hover:border-stone-500"
+                }`}
+              >
+                {loc}
               </button>
             ))}
           </div>
