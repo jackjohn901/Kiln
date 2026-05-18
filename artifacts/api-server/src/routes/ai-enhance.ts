@@ -10,10 +10,10 @@ const client = new OpenAI({
 
 const COLOR_GRADES: Record<string, string> = {
   cinematic: "contrast(1.15) saturate(0.75) brightness(0.88) sepia(0.06)",
-  vibrant: "contrast(1.05) saturate(1.4) brightness(1.05)",
-  moody: "contrast(1.25) saturate(0.6) brightness(0.82) hue-rotate(10deg)",
-  clean: "contrast(1.0) saturate(0.85) brightness(1.1)",
-  golden: "contrast(1.1) saturate(1.15) brightness(0.93) sepia(0.28)",
+  vibrant:   "contrast(1.05) saturate(1.4) brightness(1.05)",
+  moody:     "contrast(1.25) saturate(0.6) brightness(0.82) hue-rotate(10deg)",
+  clean:     "contrast(1.0) saturate(0.85) brightness(1.1)",
+  golden:    "contrast(1.1) saturate(1.15) brightness(0.93) sepia(0.28)",
 };
 
 const STYLE_GUIDES: Record<string, string> = {
@@ -25,15 +25,24 @@ const STYLE_GUIDES: Record<string, string> = {
     "Warm, story-driven, human. The craft process IS the story. Gentle authentic pacing. Feels like the art speaks for itself. Aspirational but deeply grounded in real making.",
   "short-clip":
     "Maximum impact in 7 seconds. One arresting image + one perfect line of text. Pure scroll-stopping energy. No fluff — just the essential. Think viral social clip.",
+  documentary:
+    "Slow, intimate, archival. Ken Burns-style meditative pacing. The craft as witness to time and practice. Text is sparse and poetic — one or two lines that linger. Warm, desaturated, timeless.",
+  "luxury-brand":
+    "Ultra-minimal, aspirational, silent luxury. Think Hermès or Bottega Veneta. Almost no text — the image alone commands respect. One perfect word or phrase. Whisper-quiet, impossibly elegant.",
+  "behind-the-scenes":
+    "Raw, authentic, unpolished. The real studio, the real hands, the real process. Casual handwritten-feeling text. Warm and unguarded. Makes viewers feel they have exclusive access.",
+  "time-lapse-reveal":
+    "Fast-paced progressive reveal. Multiple quick text bursts that build momentum to a dramatic final image reveal. High energy rhythm that climaxes in the last second. Think epic product launch.",
 };
 
 router.post("/ai/enhance-reel", async (req, res): Promise<void> => {
-  const { imageUrl, caption, technique, style, artistName } = req.body as {
-    imageUrl: string;
+  const { imageUrl, caption, technique, style, artistName, clipDurationMs } = req.body as {
+    imageUrl?: string;
     caption?: string;
     technique?: string;
     style: string;
     artistName?: string;
+    clipDurationMs?: number;
   };
 
   if (!style) {
@@ -42,6 +51,9 @@ router.post("/ai/enhance-reel", async (req, res): Promise<void> => {
   }
 
   const styleGuide = STYLE_GUIDES[style] ?? STYLE_GUIDES["movie-trailer"];
+  const totalMs = clipDurationMs && clipDurationMs > 0 ? Math.round(clipDurationMs) : 7000;
+  const watermarkStart = Math.round(totalMs * 0.83);
+  const watermarkDuration = Math.round(totalMs * 0.14);
 
   const userPrompt = `${imageUrl ? `Analyze this craft art image and generate` : `Generate`} a cinematic "${style}" enhancement plan.
 
@@ -51,6 +63,7 @@ Context:
 - Artist: ${artistName || "the artist"}
 - Style mode: ${style}
 - Style guide: ${styleGuide}
+- Total clip duration: ${totalMs}ms
 
 Return ONLY valid JSON — no markdown, no code fences, no explanation. Just the raw JSON object:
 {
@@ -61,7 +74,7 @@ Return ONLY valid JSON — no markdown, no code fences, no explanation. Just the
       "id": "o1",
       "text": "text to display",
       "startMs": 0,
-      "durationMs": 2400,
+      "durationMs": ${Math.round(totalMs * 0.34)},
       "position": "bottom",
       "style": "large"
     }
@@ -76,10 +89,10 @@ Return ONLY valid JSON — no markdown, no code fences, no explanation. Just the
 
 Critical overlay rules:
 - 3 to 5 overlays, no more
-- Timestamps must span 0ms to 7000ms total
+- Timestamps must span 0ms to ${totalMs}ms total
 - startMs values must be strictly increasing
 - (startMs + durationMs) must be less than the next overlay's startMs by at least 200ms
-- Final overlay: artist watermark ("${artistName || "kilnfire"}" or brand) at position "top-right", style "watermark", startMs around 5800, durationMs 1000
+- Final overlay: artist watermark ("${artistName || "kilnfire"}") at position "top-right", style "watermark", startMs ${watermarkStart}, durationMs ${watermarkDuration}
 - position options: "top" | "center" | "bottom" | "top-right"
 - style options: "title" | "large" | "small" | "watermark" | "subtitle"
 - colorGrade options: cinematic | vibrant | moody | clean | golden
