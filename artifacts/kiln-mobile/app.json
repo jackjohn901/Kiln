@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Kiln",
+    "name": "KilnFire",
     "slug": "kiln-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "kiln-mobile",
+    "scheme": "kilnfire",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -15,11 +15,30 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.replit.kilnfire.mobile"
+      "bundleIdentifier": "app.kilnfire",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "KilnFire uses your camera so you can record and share your craft process.",
+        "NSMicrophoneUsageDescription": "KilnFire uses your microphone when recording video.",
+        "NSPhotoLibraryUsageDescription": "KilnFire accesses your photo library so you can share images and videos of your work.",
+        "NSPhotoLibraryAddUsageDescription": "KilnFire saves media to your photo library."
+      }
     },
     "android": {
-      "package": "app.replit.kilnfire.mobile",
-      "googleServicesFile": "./google-services.json"
+      "package": "app.kilnfire",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#191615"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -28,11 +47,19 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://kilnfire.replit.app/"
         }
       ],
       "expo-font",
       "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "KilnFire accesses your photo library so you can share your craft.",
+          "cameraPermission": "KilnFire uses your camera to record and share your craft process.",
+          "microphonePermission": "KilnFire uses your microphone when recording video."
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -40,10 +67,15 @@
           "color": "#D87F31",
           "sounds": [],
           "androidMode": "default",
-          "androidCollapsedTitle": "Kiln"
+          "androidCollapsedTitle": "KilnFire"
         }
       ]
     ],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
