@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "eXVFqGYTk5YLUcI-EhyC-"
@@ -12,3 +11,39 @@ id = "iVwxgNoN7Fwoid2VB4d95"
 uri = "file://assets/images/kiln-icon-raw.png"
 type = "image"
 title = "generated_image"
+
+[[generated]]
+id = "HYNEjLgjMae2FsapCNt6l"
+uri = "file://assets/icons/kiln-icon-v1.png"
+type = "image"
+title = "kilnfire icon kiln flame"
+
+[[generated]]
+id = "HXuuDM5xE2ciWILhd3X30"
+uri = "file://assets/icons/kiln-icon-v2.png"
+type = "image"
+title = "kilnfire icon flame mark"
+
+[[generated]]
+id = "uz00kF_1ETQgSKWWkmTyj"
+uri = "file://assets/icons/kiln-icon-v3.png"
+type = "image"
+title = "kilnfire icon ceramic vessel"
+
+[[outputs]]
+id = "sJHvn6KG7yE_SSck3915p"
+uri = "file://assets/icons/kiln-icon-v1.png"
+type = "image"
+title = "Option 1 — Kiln with Fire"
+
+[[outputs]]
+id = "G51LKm7MUEBKyzBlrwQYB"
+uri = "file://assets/icons/kiln-icon-v2.png"
+type = "image"
+title = "Option 2 — Flame Mark"
+
+[[outputs]]
+id = "BiI4NavcLacwiQoxPNUs1"
+uri = "file://assets/icons/kiln-icon-v3.png"
+type = "image"
+title = "Option 3 — Glowing Vessel"
