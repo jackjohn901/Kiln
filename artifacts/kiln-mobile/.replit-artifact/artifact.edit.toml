@@ -1,0 +1,20 @@
+kind = "mobile"
+previewPath = "/kiln-mobile/"
+title = "Kiln — Mobile App"
+version = "1.0.0"
+id = "kiln-mobile"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+name = "expo"
+paths = ["/kiln-mobile/"]
+localPort = 8099
+
+[services.development]
+run = "pnpm --filter @workspace/kiln-mobile run dev"
+
+[services.env]
+PORT = "8099"

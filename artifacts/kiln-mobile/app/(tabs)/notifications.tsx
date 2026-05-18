@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,11 +10,22 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { useGetNotifications } from "@workspace/api-client-react";
 import { router } from "expo-router";
-import { relativeTime } from "@/lib/api";
+import { relativeTime, apiPost } from "@/lib/api";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 type NotifType = "like" | "follow" | "comment" | "sale";
 
@@ -23,7 +34,50 @@ const ICON_MAP: Record<string, { name: keyof typeof Feather.glyphMap; color: str
   follow: { name: "user-plus", color: "#4A90D9" },
   comment: { name: "message-circle", color: "#D87F31" },
   sale: { name: "shopping-bag", color: "#4CAF50" },
+  bid: { name: "trending-up", color: "#9C6FE4" },
+  tip: { name: "gift", color: "#D87F31" },
 };
+
+async function registerForPushNotifications(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+
+  if (finalStatus !== "granted") return null;
+
+  try {
+    const token = await Notifications.getExpoPushTokenAsync();
+    return token.data;
+  } catch {
+    return null;
+  }
+}
+
+function PushBanner({ onDismiss }: { onDismiss: () => void }) {
+  const colors = useColors();
+  return (
+    <View style={[styles.pushBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+      <View style={[styles.pushIconCircle, { backgroundColor: `${colors.primary}22` }]}>
+        <Feather name="bell" size={18} color={colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.pushTitle, { color: colors.foreground }]}>Enable notifications</Text>
+        <Text style={[styles.pushSub, { color: colors.mutedForeground }]}>
+          Get alerts for likes, comments, and new followers
+        </Text>
+      </View>
+      <Pressable onPress={onDismiss} hitSlop={10}>
+        <Feather name="x" size={16} color={colors.mutedForeground} />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function NotificationsScreen() {
   const colors = useColors();
@@ -31,11 +85,57 @@ export default function NotificationsScreen() {
   const { isAuthenticated, login } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const { data, isLoading } = useGetNotifications(
-    { query: { enabled: isAuthenticated } as any }
+  const [pushStatus, setPushStatus] = useState<"idle" | "requested" | "granted" | "denied">("idle");
+  const notifListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || Platform.OS === "web") return;
+
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      if (status === "granted") {
+        setPushStatus("granted");
+        registerForPushNotifications().then((token) => {
+          if (token) apiPost("/api/me/push-token", { token, platform: Platform.OS }).catch(() => {});
+        });
+      } else if (status === "denied") {
+        setPushStatus("denied");
+      } else {
+        setPushStatus("idle");
+      }
+    });
+
+    notifListener.current = Notifications.addNotificationReceivedListener(() => {
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const link = response.notification.request.content.data?.link as string | undefined;
+      if (link) router.push(link as any);
+    });
+
+    return () => {
+      notifListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, [isAuthenticated]);
+
+  const handleEnablePush = async () => {
+    setPushStatus("requested");
+    const token = await registerForPushNotifications();
+    if (token) {
+      setPushStatus("granted");
+      await apiPost("/api/me/push-token", { token, platform: Platform.OS }).catch(() => {});
+    } else {
+      setPushStatus("denied");
+    }
+  };
+
+  const { data, isLoading, refetch } = useGetNotifications(
+    { query: { enabled: isAuthenticated, refetchInterval: 30_000 } as any }
   );
 
   const notifications = data?.notifications ?? [];
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   if (!isAuthenticated) {
     return (
@@ -55,8 +155,23 @@ export default function NotificationsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Activity</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: colors.foreground }]}>Activity</Text>
+          {unreadCount > 0 && (
+            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
+
+      {pushStatus === "idle" && Platform.OS !== "web" && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          <PushBanner onDismiss={handleEnablePush} />
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.center}>
@@ -71,6 +186,8 @@ export default function NotificationsScreen() {
             { paddingBottom: insets.bottom + (Platform.OS === "web" ? 84 : 80) },
           ]}
           showsVerticalScrollIndicator={false}
+          onRefresh={refetch}
+          refreshing={isLoading}
           ItemSeparatorComponent={() => (
             <View style={[styles.sep, { backgroundColor: colors.border }]} />
           )}
@@ -122,7 +239,14 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 8 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   title: { fontFamily: "Inter_700Bold", fontSize: 28 },
+  badge: {
+    minWidth: 22, height: 22, borderRadius: 11,
+    alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  badgeText: { fontFamily: "Inter_700Bold", fontSize: 11 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   list: { paddingHorizontal: 0 },
   sep: { height: StyleSheet.hairlineWidth },
@@ -134,11 +258,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: "center", justifyContent: "center",
   },
   textBlock: { flex: 1 },
   rowText: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },
@@ -147,6 +268,16 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   empty: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontFamily: "Inter_500Medium", fontSize: 15 },
+  pushBanner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    borderWidth: 1, borderRadius: 12, padding: 12,
+  },
+  pushIconCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
+  },
+  pushTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  pushSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 },
   authWall: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 40 },
   authTitle: { fontFamily: "Inter_700Bold", fontSize: 22 },
   authSub: { fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center" },

@@ -14,9 +14,13 @@
       "backgroundColor": "#191615"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "app.replit.kilnfire.mobile"
     },
-    "android": {},
+    "android": {
+      "package": "app.replit.kilnfire.mobile",
+      "googleServicesFile": "./google-services.json"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -28,7 +32,17 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#D87F31",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "Kiln"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

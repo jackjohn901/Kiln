@@ -6,3 +6,9 @@ id = "eXVFqGYTk5YLUcI-EhyC-"
 uri = "file://artifacts/kiln-mobile/assets/images/icon.png"
 type = "image"
 title = "kiln app icon"
+
+[[generated]]
+id = "iVwxgNoN7Fwoid2VB4d95"
+uri = "file://assets/images/kiln-icon-raw.png"
+type = "image"
+title = "generated_image"
