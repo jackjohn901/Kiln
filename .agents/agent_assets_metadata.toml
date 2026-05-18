@@ -119,3 +119,9 @@ id = "_UY2JyUvmRYc9lUggTz-S"
 uri = "file://screenshots/06-guilds.jpg"
 type = "image"
 title = "Screenshot 6 — Craft Guilds"
+
+[[outputs]]
+id = "166xqKXahZ3wDwX79esCB"
+uri = "file://kilnfire-store-submission.tar.gz"
+type = "unspecified"
+title = "KilnFire — App Store & Google Play Submission Package"
