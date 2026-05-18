@@ -242,12 +242,7 @@ export default function DigitalDownloads() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            productId: product.id,
-            productTitle: product.title,
-            amountCents: 0,
-            downloadUrl: `https://kilnfire.replit.app/kiln/downloads/${product.id}`,
-          }),
+          body: JSON.stringify({ productId: product.id }),
         });
         setPurchased(prev => new Set(prev).add(product.id));
         setJustPurchased(true);
@@ -258,14 +253,12 @@ export default function DigitalDownloads() {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            items: [{ name: product.title, price: product.price ?? 0, quantity: 1, artistName: product.author }],
+            items: [{ name: product.title, quantity: 1, artistName: product.author }],
             successPath: `/digital-downloads?downloaded=${product.id}`,
             cancelPath: "/digital-downloads",
             metadata: {
               type: "digital",
               productId: product.id,
-              productTitle: product.title,
-              downloadUrl: `https://kilnfire.replit.app/kiln/downloads/${product.id}`,
             },
           }),
         });

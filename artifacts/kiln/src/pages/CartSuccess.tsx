@@ -10,17 +10,6 @@ interface SessionData {
   amountTotal: number | null;
 }
 
-interface PreCheckout {
-  sessionId: string;
-  items: Array<{
-    title: string;
-    amount: number;
-    sellerId?: string;
-    type?: string;
-    refId?: string;
-    imageUrl?: string;
-  }>;
-}
 
 export default function CartSuccess() {
   const [, navigate] = useLocation();
@@ -50,34 +39,20 @@ export default function CartSuccess() {
         orderCreated.current = true;
 
         try {
-          const raw = localStorage.getItem("kiln_pre_checkout");
-          const pre: PreCheckout | null = raw ? JSON.parse(raw) : null;
-
-          if (pre?.items?.length) {
-            const res = await fetch("/api/me/orders/bulk", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ stripeSessionId: sessionId, items: pre.items }),
-            });
-            if (res.ok) {
-              const d = await res.json() as { orderIds?: string[] };
-              if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
-              localStorage.removeItem("kiln_pre_checkout");
-            }
-          } else if (data?.amountTotal) {
-            await fetch("/api/me/orders", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({
-                title: "Shop purchase",
-                amount: data.amountTotal / 100,
-                stripeSessionId: sessionId,
-                type: "listing",
-              }),
-            });
+          // Server derives all order data from Stripe session metadata + DB lookups.
+          // We only need to supply the session ID.
+          const res = await fetch("/api/me/orders/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ stripeSessionId: sessionId }),
+          });
+          if (res.ok) {
+            const d = await res.json() as { orderIds?: string[] };
+            if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
           }
+          // Clean up any stale pre-checkout data from localStorage.
+          localStorage.removeItem("kiln_pre_checkout");
         } catch {}
       })
       .catch(() => {})

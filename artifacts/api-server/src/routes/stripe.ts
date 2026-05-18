@@ -7,20 +7,23 @@ import {
   workshopBookingsTable,
   commissionsTable,
   auctionsTable,
+  listingsTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
+import { getDigitalProduct } from '../lib/digitalProducts';
 
 const router: IRouter = Router();
 
 interface CartLineItem {
   name: string;
-  price: number;
   quantity: number;
   imageUrl?: string;
   artistName?: string;
+  /** Server uses this to look up the authoritative price from the listings table. */
+  listingId?: string;
 }
 
 router.post('/stripe/checkout', async (req, res): Promise<void> => {
@@ -37,6 +40,89 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       res.status(400).json({ error: 'No items provided' }); return;
     }
 
+    // Resolve authoritative prices server-side.
+    // For listing items: look up from the DB by listingId.
+    // For digital download items: look up from the server-side product registry.
+    const listingIds = items
+      .map((item) => item.listingId)
+      .filter((id): id is string => !!id);
+
+    let listingPriceMap = new Map<string, { price: number; artistId: string; title: string; imageUrl: string | null }>();
+    if (listingIds.length > 0) {
+      const rows = await db
+        .select({
+          id: listingsTable.id,
+          price: listingsTable.price,
+          isSold: listingsTable.isSold,
+          isAvailable: listingsTable.isAvailable,
+          artistId: listingsTable.artistId,
+          title: listingsTable.title,
+          imageUrl: listingsTable.imageUrl,
+        })
+        .from(listingsTable)
+        .where(inArray(listingsTable.id, listingIds));
+      for (const row of rows) {
+        if (row.isSold || !row.isAvailable) {
+          res.status(400).json({ error: `Listing "${row.id}" is no longer available.` }); return;
+        }
+        listingPriceMap.set(row.id, {
+          price: row.price,
+          artistId: row.artistId,
+          title: row.title,
+          imageUrl: row.imageUrl,
+        });
+      }
+    }
+
+    // Enforce strict checkout mode separation to prevent metadata/item mismatch attacks.
+    // A digital-product checkout MUST NOT contain listing items (and vice versa).
+    // This prevents paying a cheap listing price while claiming a paid digital entitlement.
+    const isDigital = extraMetadata?.type === 'digital';
+    const hasListingItems = listingIds.length > 0;
+
+    if (isDigital && hasListingItems) {
+      res.status(400).json({ error: 'Digital product checkouts cannot include listing items.' }); return;
+    }
+
+    let digitalPriceCents: number | null = null;
+    if (isDigital) {
+      if (!extraMetadata?.productId) {
+        res.status(400).json({ error: 'productId required for digital checkout.' }); return;
+      }
+      const product = getDigitalProduct(extraMetadata.productId);
+      if (!product) {
+        res.status(400).json({ error: 'Digital product not found.' }); return;
+      }
+      if (product.isFree) {
+        res.status(400).json({ error: 'Free products do not require a checkout session.' }); return;
+      }
+      if (items.length !== 1) {
+        res.status(400).json({ error: 'Digital checkout must contain exactly one item.' }); return;
+      }
+      digitalPriceCents = Math.round(product.priceUsd * 100);
+    }
+
+    // Validate quantities: must be positive integers within a reasonable range.
+    for (const item of items) {
+      const qty = item.quantity;
+      if (!Number.isInteger(qty) || qty < 1 || qty > 100) {
+        res.status(400).json({ error: 'Item quantity must be an integer between 1 and 100.' }); return;
+      }
+    }
+
+    // Validate that every item has an authoritative price source.
+    for (const item of items) {
+      if (item.listingId) {
+        if (!listingPriceMap.has(item.listingId)) {
+          res.status(400).json({ error: `Listing "${item.listingId}" not found.` }); return;
+        }
+      } else if (isDigital && digitalPriceCents !== null) {
+        // Price will be set from registry below — OK.
+      } else {
+        res.status(400).json({ error: 'Each checkout item must include a valid listingId.' }); return;
+      }
+    }
+
     const stripe = await getUncachableStripeClient();
 
     const baseUrl = process.env.REPLIT_DOMAINS
@@ -45,31 +131,68 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const basePath = process.env.BASE_PATH ?? '';
 
-    // Attach calling user's ID to metadata so webhook can act on their behalf
     const userId = req.isAuthenticated() ? req.user.id : undefined;
+
+    // Embed server-resolved listing IDs and quantities in session metadata so that
+    // order creation after success can derive line items from a trusted source,
+    // not from client-supplied localStorage data.
+    const sessionListingIds = listingIds.join(',');
+    const sessionListingQtys = items
+      .filter((item) => item.listingId)
+      .map((item) => String(item.quantity))
+      .join(',');
+
+    // Reserved keys that must NEVER be overridden by client-supplied extraMetadata.
+    const RESERVED_META_KEYS = new Set(['platform', 'userId', 'listingIds', 'listingQtys']);
+    // Allowlist of safe extra metadata keys clients may pass through (e.g. for digital/workshop flows).
+    const ALLOWED_EXTRA_KEYS = new Set(['type', 'productId', 'workshopId', 'commissionId', 'milestone', 'auctionId', 'orderId']);
+
+    const safeExtraMeta: Record<string, string> = {};
+    if (extraMetadata) {
+      for (const [key, value] of Object.entries(extraMetadata)) {
+        if (!RESERVED_META_KEYS.has(key) && ALLOWED_EXTRA_KEYS.has(key) && typeof value === 'string') {
+          safeExtraMeta[key] = value;
+        }
+      }
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer_email: customerEmail,
-      line_items: items.map((item) => ({
-        price_data: {
-          currency: 'usd',
-          unit_amount: Math.round(item.price * 100),
-          product_data: {
-            name: item.name,
-            description: item.artistName ? `By ${item.artistName}` : undefined,
-            images: item.imageUrl ? [item.imageUrl] : undefined,
+      line_items: items.map((item) => {
+        let unitAmountCents: number;
+        if (item.listingId) {
+          const dbListing = listingPriceMap.get(item.listingId)!;
+          unitAmountCents = Math.round(dbListing.price * 100);
+        } else {
+          unitAmountCents = digitalPriceCents!;
+        }
+
+        return {
+          price_data: {
+            currency: 'usd',
+            unit_amount: unitAmountCents,
+            product_data: {
+              name: item.name,
+              description: item.artistName ? `By ${item.artistName}` : undefined,
+              images: item.imageUrl ? [item.imageUrl] : undefined,
+            },
           },
-        },
-        quantity: item.quantity,
-      })),
+          quantity: item.quantity,
+        };
+      }),
       mode: 'payment',
       success_url: `${baseUrl}${basePath}${successPath ?? '/cart/success'}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}${basePath}${cancelPath ?? '/cart'}`,
       metadata: {
+        // Reserved keys are always set from trusted server-side values.
+        // safeExtraMeta is spread after to allow additional context keys,
+        // but reserved keys cannot appear in safeExtraMeta (enforced above).
+        ...safeExtraMeta,
         platform: 'kiln',
         ...(userId ? { userId } : {}),
-        ...(extraMetadata ?? {}),
+        // Trusted server-side record of what was purchased (for order creation).
+        ...(sessionListingIds ? { listingIds: sessionListingIds, listingQtys: sessionListingQtys } : {}),
       },
     });
 
@@ -202,23 +325,36 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
             .where(eq(ordersTable.id, meta.orderId));
         }
 
-        // 2. Digital download — record purchase so user can download
+        // 2. Digital download — record purchase so user can download.
+        // Title and download URL are sourced from the server-side product registry.
+        // Amount paid is verified against the authoritative product price before granting
+        // the entitlement, preventing a cheap-listing session from unlocking a paid product.
         if (meta.type === 'digital' && meta.productId && meta.userId) {
-          const existing = await db.select({ id: digitalDownloadPurchasesTable.id })
-            .from(digitalDownloadPurchasesTable)
-            .where(and(
-              eq(digitalDownloadPurchasesTable.userId, meta.userId),
-              eq(digitalDownloadPurchasesTable.productId, meta.productId),
-            ));
-          if (existing.length === 0) {
-            await db.insert(digitalDownloadPurchasesTable).values({
-              id: crypto.randomUUID(),
-              userId: meta.userId,
-              productId: meta.productId,
-              productTitle: meta.productTitle ?? meta.productId,
-              amountCents: session.amount_total ?? 0,
-              downloadUrl: meta.downloadUrl ?? null,
-            });
+          const product = getDigitalProduct(meta.productId);
+          if (product && !product.isFree) {
+            const authorizedPriceCents = Math.round(product.priceUsd * 100);
+            const paidCents = session.amount_total ?? 0;
+            // Allow $1.00 tolerance for rounding differences.
+            if (Math.abs(authorizedPriceCents - paidCents) <= 100) {
+              const existing = await db.select({ id: digitalDownloadPurchasesTable.id })
+                .from(digitalDownloadPurchasesTable)
+                .where(and(
+                  eq(digitalDownloadPurchasesTable.userId, meta.userId),
+                  eq(digitalDownloadPurchasesTable.productId, meta.productId),
+                ));
+              if (existing.length === 0) {
+                await db.insert(digitalDownloadPurchasesTable).values({
+                  id: crypto.randomUUID(),
+                  userId: meta.userId,
+                  productId: meta.productId,
+                  productTitle: product.title,
+                  amountCents: paidCents,
+                  downloadUrl: product.downloadUrl,
+                });
+              }
+            } else {
+              logger.warn({ sessionId: session.id, productId: meta.productId, authorizedPriceCents, paidCents }, 'Digital entitlement rejected: paid amount does not match product price');
+            }
           }
         }
 

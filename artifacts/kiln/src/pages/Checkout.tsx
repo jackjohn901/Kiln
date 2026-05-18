@@ -122,7 +122,7 @@ export default function Checkout() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: [{ name: listing.title, price: listing.price, quantity: 1, imageUrl: listing.imageUrl ?? undefined, artistName }],
+          items: [{ name: listing.title, listingId: listing.id, quantity: 1, imageUrl: listing.imageUrl ?? undefined, artistName }],
           customerEmail: form.email || undefined,
           successPath: "/shop",
           cancelPath: `/shop/checkout/${listingId}`,

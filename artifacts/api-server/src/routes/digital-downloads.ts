@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { digitalDownloadPurchasesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { getDigitalProduct } from "../lib/digitalProducts";
 
 const router = Router();
 
@@ -41,17 +42,36 @@ router.get("/digital-downloads/:productId/download-url", async (req, res): Promi
   }
 });
 
-// POST /digital-downloads/purchase — record a purchase
+// POST /digital-downloads/purchase — record a FREE product acquisition only.
+// Paid products are recorded exclusively via the Stripe webhook after confirmed payment.
 router.post("/digital-downloads/purchase", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { productId, productTitle, amountCents, downloadUrl } = req.body;
-  if (!productId || !productTitle) { res.status(400).json({ error: "productId and productTitle required" }); return; }
+  const { productId } = req.body;
+  if (!productId) { res.status(400).json({ error: "productId required" }); return; }
+
+  // Verify the product exists in the server-side registry and is genuinely free.
+  const product = getDigitalProduct(productId);
+  if (!product) {
+    res.status(404).json({ error: "Product not found." }); return;
+  }
+  if (!product.isFree) {
+    res.status(403).json({ error: "Paid products must be purchased through checkout." }); return;
+  }
+
   const existing = await db.select().from(digitalDownloadPurchasesTable)
-    .where(and(eq(digitalDownloadPurchasesTable.userId, req.user.id), eq(digitalDownloadPurchasesTable.productId, productId)));
+    .where(and(
+      eq(digitalDownloadPurchasesTable.userId, req.user.id),
+      eq(digitalDownloadPurchasesTable.productId, productId),
+    ));
   if (existing.length > 0) { res.json({ purchase: existing[0], duplicate: true }); return; }
+
   const [purchase] = await db.insert(digitalDownloadPurchasesTable).values({
-    id: crypto.randomUUID(), userId: req.user.id, productId, productTitle,
-    amountCents: amountCents ?? 0, downloadUrl: downloadUrl ?? null,
+    id: crypto.randomUUID(),
+    userId: req.user.id,
+    productId: product.id,
+    productTitle: product.title,
+    amountCents: 0,
+    downloadUrl: product.downloadUrl,
   }).returning();
   res.status(201).json({ purchase });
 });

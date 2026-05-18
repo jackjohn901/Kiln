@@ -1,11 +1,72 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, verificationApplicationsTable, userSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { logger } from "../lib/logger";
+import { getUncachableStripeClient } from "../stripeClient";
 
 const router: IRouter = Router();
+
+type VerifiedSession = {
+  amountTotal: number | null;
+  listingIds: string[];
+  listingQtys: number[];
+};
+
+/**
+ * Retrieve and verify a Stripe checkout session for the requesting user.
+ * Enforces:
+ *  - session exists and payment_status === "paid"
+ *  - metadata.platform === "kiln" (session was created by this server)
+ *  - metadata.userId is present and matches the caller (prevents session reuse across users)
+ *
+ * Returns parsed session data on success, or null if any check fails.
+ */
+async function verifyStripeSession(
+  stripeSessionId: string,
+  expectedUserId: string
+): Promise<VerifiedSession | null> {
+  try {
+    const stripe = await getUncachableStripeClient();
+    const session = await stripe.checkout.sessions.retrieve(stripeSessionId);
+
+    if (session.payment_status !== "paid") {
+      logger.warn({ stripeSessionId }, "Order rejected: session not paid");
+      return null;
+    }
+
+    const meta = (session.metadata ?? {}) as Record<string, string>;
+
+    // Require platform tag to reject sessions from other integrations.
+    if (meta.platform !== "kiln") {
+      logger.warn({ stripeSessionId }, "Order rejected: wrong platform");
+      return null;
+    }
+
+    // Require strict user ownership: userId must be present in metadata and match caller.
+    // Sessions created while the user was not authenticated do not embed a userId and
+    // cannot be used to create order records.
+    if (!meta.userId || meta.userId !== expectedUserId) {
+      logger.warn({ stripeSessionId, expectedUserId, metaUserId: meta.userId }, "Order rejected: userId mismatch or absent");
+      return null;
+    }
+
+    // Parse server-embedded listing IDs and quantities (set at checkout creation time).
+    const listingIds = meta.listingIds
+      ? meta.listingIds.split(",").filter(Boolean)
+      : [];
+    const rawQtys = meta.listingQtys
+      ? meta.listingQtys.split(",").map(Number)
+      : [];
+    const listingQtys = listingIds.map((_, i) => (Number.isFinite(rawQtys[i]) && rawQtys[i] > 0 ? rawQtys[i] : 1));
+
+    return { amountTotal: session.amount_total, listingIds, listingQtys };
+  } catch (err) {
+    logger.error({ err, stripeSessionId }, "Stripe session verification error");
+    return null;
+  }
+}
 
 // GET /me/orders — list all orders for the current user
 router.get("/me/orders", async (req, res): Promise<void> => {
@@ -22,49 +83,104 @@ router.get("/me/orders", async (req, res): Promise<void> => {
   }
 });
 
-// POST /me/orders — create a single order after confirmed Stripe payment
+// POST /me/orders — create a single order after confirmed Stripe payment.
+// Used as a fallback when there is no pre-checkout item snapshot.
+// All commerce-critical fields (amount) are derived from the verified Stripe session.
 router.post("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
 
-  const { title, description, sellerId, type, refId, imageUrl, amount, stripeSessionId } = req.body as {
-    title: string;
+  const { title, description, type, refId, imageUrl, stripeSessionId } = req.body as {
+    title?: string;
     description?: string;
-    sellerId?: string;
     type?: string;
     refId?: string;
     imageUrl?: string;
-    amount: number;
-    stripeSessionId?: string;
+    stripeSessionId: string;
   };
 
-  if (!title || typeof amount !== "number") {
-    res.status(400).json({ error: "title and amount required" }); return;
+  if (!stripeSessionId) {
+    res.status(400).json({ error: "stripeSessionId required" }); return;
+  }
+
+  const verified = await verifyStripeSession(stripeSessionId, userId);
+  if (!verified) {
+    res.status(402).json({ error: "Payment verification failed. Complete a valid Stripe checkout first." }); return;
   }
 
   try {
-    const dedupeKey = stripeSessionId ? `stripe:${stripeSessionId}` : null;
-
-    if (dedupeKey) {
-      const existing = await db.select({ id: ordersTable.id }).from(ordersTable)
-        .where(eq(ordersTable.notes, dedupeKey))
-        .limit(1);
-      if (existing.length > 0) {
-        res.json({ orderId: existing[0].id, duplicate: true }); return;
-      }
+    const dedupeKey = `stripe:${stripeSessionId}`;
+    const existing = await db.select({ id: ordersTable.id }).from(ordersTable)
+      .where(eq(ordersTable.notes, dedupeKey))
+      .limit(1);
+    if (existing.length > 0) {
+      res.json({ orderId: existing[0].id, duplicate: true }); return;
     }
 
+    // If this session has listingIds in metadata, delegate to the bulk endpoint logic
+    // instead of creating a generic single order.
+    if (verified.listingIds.length > 0) {
+      const listings = await db
+        .select({ id: listingsTable.id, title: listingsTable.title, artistId: listingsTable.artistId, price: listingsTable.price, imageUrl: listingsTable.imageUrl })
+        .from(listingsTable)
+        .where(inArray(listingsTable.id, verified.listingIds));
+
+      const listingMap = new Map(listings.map((l) => [l.id, l]));
+
+      // Reconcile: server-derived total must match Stripe-confirmed amount_total.
+      let expectedCents = 0;
+      for (let i = 0; i < verified.listingIds.length; i++) {
+        const listing = listingMap.get(verified.listingIds[i]);
+        if (listing) expectedCents += Math.round(listing.price * 100) * (verified.listingQtys[i] ?? 1);
+      }
+      const paidCents = verified.amountTotal ?? 0;
+      if (Math.abs(expectedCents - paidCents) > 100) {
+        logger.warn({ stripeSessionId, expectedCents, paidCents }, "Order rejected: amount mismatch");
+        res.status(402).json({ error: "Payment amount does not match order total." }); return;
+      }
+
+      const orderIds: string[] = [];
+
+      for (let i = 0; i < verified.listingIds.length; i++) {
+        const listingId = verified.listingIds[i];
+        const listing = listingMap.get(listingId);
+        if (!listing) continue;
+        const qty = verified.listingQtys[i] ?? 1;
+        const orderId = crypto.randomUUID();
+        await db.insert(ordersTable).values({
+          id: orderId,
+          buyerId: userId,
+          sellerId: listing.artistId,
+          type: "listing",
+          refId: listingId,
+          title: listing.title,
+          description: null,
+          imageUrl: listing.imageUrl ?? null,
+          amount: listing.price * qty,
+          currency: "USD",
+          status: "confirmed",
+          notes: orderIds.length === 0 ? dedupeKey : null,
+        });
+        orderIds.push(orderId);
+      }
+
+      res.json({ orderId: orderIds[0] ?? null, orderIds });
+      return;
+    }
+
+    // Generic fallback: no listing metadata. Amount is derived from Stripe, not the client.
+    const amountUsd = verified.amountTotal != null ? Math.round(verified.amountTotal / 100) : 0;
     const orderId = crypto.randomUUID();
     await db.insert(ordersTable).values({
       id: orderId,
       buyerId: userId,
-      sellerId: sellerId ?? "kiln",
+      sellerId: "kiln",
       type: type ?? "listing",
       refId: refId ?? null,
-      title,
+      title: title ?? "Shop purchase",
       description: description ?? null,
       imageUrl: imageUrl ?? null,
-      amount: Math.round(amount),
+      amount: amountUsd,
       currency: "USD",
       status: "confirmed",
       notes: dedupeKey,
@@ -77,25 +193,26 @@ router.post("/me/orders", async (req, res): Promise<void> => {
   }
 });
 
-// POST /me/orders/bulk — create multiple orders (one per cart item) after Stripe session
+// POST /me/orders/bulk — create multiple orders after a Stripe cart checkout.
+// All order data is derived from server-embedded session metadata + DB lookups.
+// The client only needs to supply the stripeSessionId; item data from the client is ignored.
 router.post("/me/orders/bulk", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
 
-  const { stripeSessionId, items } = req.body as {
-    stripeSessionId: string;
-    items: Array<{
-      title: string;
-      amount: number;
-      sellerId?: string;
-      type?: string;
-      refId?: string;
-      imageUrl?: string;
-    }>;
-  };
+  const { stripeSessionId } = req.body as { stripeSessionId: string };
 
-  if (!stripeSessionId || !Array.isArray(items) || items.length === 0) {
-    res.status(400).json({ error: "stripeSessionId and items required" }); return;
+  if (!stripeSessionId) {
+    res.status(400).json({ error: "stripeSessionId required" }); return;
+  }
+
+  const verified = await verifyStripeSession(stripeSessionId, userId);
+  if (!verified) {
+    res.status(402).json({ error: "Payment verification failed. Complete a valid Stripe checkout first." }); return;
+  }
+
+  if (verified.listingIds.length === 0) {
+    res.status(400).json({ error: "No listing data found for this session." }); return;
   }
 
   try {
@@ -108,24 +225,65 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
       res.json({ orderIds: [existing[0].id], duplicate: true }); return;
     }
 
+    // Look up listing data from the DB — authoritative source for seller, price, and title.
+    const listings = await db
+      .select({
+        id: listingsTable.id,
+        title: listingsTable.title,
+        artistId: listingsTable.artistId,
+        price: listingsTable.price,
+        imageUrl: listingsTable.imageUrl,
+      })
+      .from(listingsTable)
+      .where(inArray(listingsTable.id, verified.listingIds));
+
+    const listingMap = new Map(listings.map((l) => [l.id, l]));
+
+    // Reconcile: server-derived total must match Stripe-confirmed amount_total.
+    // This prevents a paid session for a cheap item from being used to mint high-value orders.
+    let expectedCents = 0;
+    for (let i = 0; i < verified.listingIds.length; i++) {
+      const listing = listingMap.get(verified.listingIds[i]);
+      if (listing) expectedCents += Math.round(listing.price * 100) * (verified.listingQtys[i] ?? 1);
+    }
+    const paidCents = verified.amountTotal ?? 0;
+    if (Math.abs(expectedCents - paidCents) > 100) {
+      logger.warn({ stripeSessionId, expectedCents, paidCents }, "Bulk order rejected: amount mismatch");
+      res.status(402).json({ error: "Payment amount does not match order total." }); return;
+    }
+
     const orderIds: string[] = [];
-    for (const item of items) {
+
+    for (let i = 0; i < verified.listingIds.length; i++) {
+      const listingId = verified.listingIds[i];
+      const listing = listingMap.get(listingId);
+      if (!listing) {
+        logger.warn({ listingId }, "Listing from session metadata not found in DB; skipping");
+        continue;
+      }
+      const qty = verified.listingQtys[i] ?? 1;
       const orderId = crypto.randomUUID();
       await db.insert(ordersTable).values({
         id: orderId,
         buyerId: userId,
-        sellerId: item.sellerId ?? "kiln",
-        type: item.type ?? "listing",
-        refId: item.refId ?? null,
-        title: item.title,
+        sellerId: listing.artistId,
+        type: "listing",
+        refId: listingId,
+        title: listing.title,
         description: null,
-        imageUrl: item.imageUrl ?? null,
-        amount: Math.round(item.amount),
+        imageUrl: listing.imageUrl ?? null,
+        // Amount is the DB listing price (authoritative) multiplied by quantity.
+        amount: listing.price * qty,
         currency: "USD",
         status: "confirmed",
+        // Only the first order row carries the deduplication key.
         notes: orderIds.length === 0 ? dedupeKey : null,
       });
       orderIds.push(orderId);
+    }
+
+    if (orderIds.length === 0) {
+      res.status(400).json({ error: "No valid listings found for this session." }); return;
     }
 
     res.json({ orderIds });

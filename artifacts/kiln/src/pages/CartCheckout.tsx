@@ -156,7 +156,7 @@ export default function CartCheckout() {
     try {
       const cartItems = items.map(({ listing, quantity }) => ({
         name: listing.title as string,
-        price: listing.price as number,
+        listingId: listing.id as string,
         quantity,
         imageUrl: (listing.imageUrl as string | undefined) ?? undefined,
         artistName: ((listing as unknown as Record<string, unknown>).artistName as string | undefined) ?? undefined,
