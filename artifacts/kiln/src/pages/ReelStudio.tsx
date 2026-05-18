@@ -464,6 +464,13 @@ export default function ReelStudio() {
     [plan, sourceType, clipDurationMs],
   );
 
+  // Render first frame whenever we enter the studio with a fresh plan (after renderFrame is stable)
+  useEffect(() => {
+    if (step !== "studio" || !plan) return;
+    const timer = setTimeout(() => renderFrame(0), 60);
+    return () => clearTimeout(timer);
+  }, [step, plan, renderFrame]);
+
   const stopPlayback = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     audioRef.current?.stop();
@@ -619,10 +626,7 @@ export default function ReelStudio() {
 
       setPlan(data);
       setStep("studio");
-      setTimeout(() => {
-        const hasSource = sourceType === "video" ? !!videoRef.current : !!imgRef.current;
-        if (hasSource) renderFrame(0);
-      }, 150);
+      // First-frame render handled by useEffect([step, plan, renderFrame])
     } catch {
       setError("Enhancement failed — please try again.");
       setStep("style");
@@ -714,7 +718,6 @@ export default function ReelStudio() {
             </h2>
             <div className="grid grid-cols-3 gap-2">
               {feedPosts.map(p => {
-                const thumb = p.thumbnailUrl ?? (p.videoUrl ? null : null);
                 const isVideo = !!p.videoUrl;
                 const displaySrc = p.thumbnailUrl ?? undefined;
 
@@ -951,7 +954,9 @@ export default function ReelStudio() {
   // ── Step 4: Studio ────────────────────────────────────────────────────────
 
   const durationLabel = `${(clipDurationMs / 1000).toFixed(1)}s`;
-  const readyToRecord = sourceType === "video" ? !!videoRef.current : !!imgRef.current;
+  const readyToRecord = sourceType === "video"
+    ? (!!videoRef.current && (videoRef.current.readyState ?? 0) >= 2)
+    : !!imgRef.current;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-28 md:pb-8">

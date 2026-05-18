@@ -36,14 +36,14 @@ router.post("/ai/enhance-reel", async (req, res): Promise<void> => {
     artistName?: string;
   };
 
-  if (!imageUrl || !style) {
-    res.status(400).json({ error: "imageUrl and style are required" });
+  if (!style) {
+    res.status(400).json({ error: "style is required" });
     return;
   }
 
   const styleGuide = STYLE_GUIDES[style] ?? STYLE_GUIDES["movie-trailer"];
 
-  const userPrompt = `Analyze this craft art image and generate a cinematic "${style}" enhancement plan.
+  const userPrompt = `${imageUrl ? `Analyze this craft art image and generate` : `Generate`} a cinematic "${style}" enhancement plan.
 
 Context:
 - Caption: ${caption || "No caption"}
@@ -99,10 +99,12 @@ All text must feel authentic to craft culture — poetic, process-honoring, neve
         },
         {
           role: "user",
-          content: [
-            { type: "image_url", image_url: { url: imageUrl } },
-            { type: "text", text: userPrompt },
-          ],
+          content: imageUrl
+            ? [
+                { type: "image_url" as const, image_url: { url: imageUrl } },
+                { type: "text" as const, text: userPrompt },
+              ]
+            : userPrompt,
         },
       ],
     });
