@@ -1,14 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
 
-const MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
-const FOLLOWER_DATA = [1240, 1380, 1520, 1710, 1890, 2100, 2340, 2580, 2880, 3200, 3650, 4120];
+function buildDayMap(dayMap: Record<string, number>, period: "30d" | "90d" | "1y"): number[] {
+  const now = new Date();
+  if (period === "30d") {
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (29 - i));
+      return dayMap[d.toISOString().slice(0, 10)] ?? 0;
+    });
+  }
+  const months = period === "90d" ? 3 : 12;
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
+    const monthKey = d.toISOString().slice(0, 7);
+    return Object.entries(dayMap)
+      .filter(([k]) => k.startsWith(monthKey))
+      .reduce((s, [, v]) => s + v, 0);
+  });
+}
+
+function buildPeriodLabels(period: "30d" | "90d" | "1y"): string[] {
+  const now = new Date();
+  if (period === "30d") {
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (29 - i));
+      return i % 6 === 0 ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+    });
+  }
+  const months = period === "90d" ? 3 : 12;
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
+    return d.toLocaleDateString("en-US", { month: "short" });
+  });
+}
+
 const REVENUE_DATA = [840, 1200, 950, 2400, 1800, 3200, 2900, 4100, 3800, 5200, 4600, 6800];
-const VIEW_DATA = [8400, 9200, 11000, 13500, 12800, 16200, 18900, 22000, 24500, 28000, 31000, 38500];
+const MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
 
 function MiniLineChart({ data, color, height = 60 }: { data: number[]; color: string; height?: number }) {
   const max = Math.max(...data);
@@ -108,6 +141,7 @@ export default function Analytics() {
   const [analyticsData, setAnalyticsData] = useState<{
     totalPosts: number; totalLikes: number; totalComments: number;
     totalSaves: number; followerCount: number; topPosts: ApiPost[];
+    postsByDay: Record<string, number>; likesByDay: Record<string, number>;
   } | null>(null);
 
   useEffect(() => {
@@ -142,19 +176,23 @@ export default function Analytics() {
     );
   }
 
+  const postActivityData = useMemo(() => buildDayMap(analyticsData?.postsByDay ?? {}, period), [analyticsData, period]);
+  const likeActivityData = useMemo(() => buildDayMap(analyticsData?.likesByDay ?? {}, period), [analyticsData, period]);
+  const periodLabels = useMemo(() => buildPeriodLabels(period), [period]);
+
   const slicedCount = period === "30d" ? 1 : period === "90d" ? 3 : 12;
   const displayMonths = MONTHS.slice(-slicedCount);
-  const displayFollowers = FOLLOWER_DATA.slice(-slicedCount);
   const displayRevenue = REVENUE_DATA.slice(-slicedCount);
-  const displayViews = VIEW_DATA.slice(-slicedCount);
-
-  const lastF = FOLLOWER_DATA[FOLLOWER_DATA.length - 1];
-  const prevF = FOLLOWER_DATA[FOLLOWER_DATA.length - 2];
-  const followerChange = Math.round(((lastF - prevF) / prevF) * 100);
 
   const lastR = REVENUE_DATA[REVENUE_DATA.length - 1];
   const prevR = REVENUE_DATA[REVENUE_DATA.length - 2];
   const revenueChange = Math.round(((lastR - prevR) / prevR) * 100);
+
+  const totalPostActivity = postActivityData.reduce((s, v) => s + v, 0);
+  const halfLen = Math.floor(postActivityData.length / 2);
+  const firstHalf = postActivityData.slice(0, halfLen).reduce((s, v) => s + v, 0);
+  const secondHalf = postActivityData.slice(halfLen).reduce((s, v) => s + v, 0);
+  const postChange = firstHalf > 0 ? Math.round(((secondHalf - firstHalf) / firstHalf) * 100) : 0;
 
   const totalRevenue = earningTotals?.total ?? REVENUE_DATA.reduce((a, b) => a + b, 0);
 
@@ -183,27 +221,29 @@ export default function Analytics() {
 
         {/* KPI grid */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard label="Followers" value={(analyticsData?.followerCount ?? apiFollowers ?? lastF).toLocaleString()} change={followerChange} icon={Users} color="bg-sky-500/10 text-sky-400" />
+          <KpiCard label="Followers" value={(analyticsData?.followerCount ?? apiFollowers ?? 0).toLocaleString()} icon={Users} color="bg-sky-500/10 text-sky-400" />
           <KpiCard label="Total likes" value={(analyticsData?.totalLikes ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
           <KpiCard label="Total saves" value={(analyticsData?.totalSaves ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.saveCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
           <KpiCard label="Posts" value={String(analyticsData?.totalPosts ?? apiPosts.length)} sub="Published" icon={TrendingUp} color="bg-emerald-500/10 text-emerald-400" />
         </div>
 
-        {/* Follower chart */}
+        {/* Post activity chart (real data) */}
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-stone-200">Follower Growth</h2>
-              <p className="text-xs text-stone-500">+{(lastF - prevF).toLocaleString()} this month</p>
+              <h2 className="text-sm font-bold text-stone-200">Posting Activity</h2>
+              <p className="text-xs text-stone-500">{totalPostActivity} post{totalPostActivity !== 1 ? "s" : ""} this period</p>
             </div>
-            <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${followerChange >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
-              <ArrowUp size={9} /> {followerChange}%
-            </span>
+            {postChange !== 0 && (
+              <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${postChange >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                {postChange >= 0 ? <ArrowUp size={9} /> : <ArrowDown size={9} />} {Math.abs(postChange)}%
+              </span>
+            )}
           </div>
-          <MiniLineChart data={displayFollowers} color="#60a5fa" height={80} />
+          <MiniLineChart data={postActivityData.length > 0 ? postActivityData : [0, 0]} color="#60a5fa" height={80} />
           <div className="mt-1.5 flex justify-between">
-            {displayMonths.filter((_, i) => i % Math.ceil(displayMonths.length / 6) === 0 || i === displayMonths.length - 1).map((m) => (
-              <span key={m} className="text-[9px] text-stone-700">{m}</span>
+            {periodLabels.filter((l) => l).slice(0, 6).map((m, i) => (
+              <span key={i} className="text-[9px] text-stone-700">{m}</span>
             ))}
           </div>
         </div>
@@ -222,13 +262,13 @@ export default function Analytics() {
           <BarChart data={displayRevenue} color="#34d399" labels={displayMonths} />
         </div>
 
-        {/* Views chart */}
+        {/* Likes & Engagement chart (real data) */}
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <div className="mb-3">
-            <h2 className="text-sm font-bold text-stone-200">Content Views</h2>
-            <p className="text-xs text-stone-500">Reel views + profile visits</p>
+            <h2 className="text-sm font-bold text-stone-200">Likes &amp; Engagement</h2>
+            <p className="text-xs text-stone-500">{likeActivityData.reduce((s, v) => s + v, 0).toLocaleString()} likes this period</p>
           </div>
-          <MiniLineChart data={displayViews} color="#f59e0b" height={72} />
+          <MiniLineChart data={likeActivityData.length > 0 ? likeActivityData : [0, 0]} color="#f59e0b" height={72} />
         </div>
 
         {/* Commission stats */}

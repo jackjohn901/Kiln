@@ -10,7 +10,7 @@ import {
   Zap, Gavel, BookMarked, Calendar, Mail, X, ChevronRight,
   Download, Grid3x3, SplitSquareHorizontal, Gift, Scissors,
   CheckSquare, UserCircle2, Calculator, Dna, GitBranch,
-  Vote, Ghost, Radar, Timer, Network, Music2,
+  Vote, Ghost, Radar, Timer, Network, Music2, Repeat2, Megaphone, ArrowLeftRight,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -41,6 +41,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/gift-cards", icon: Gift, label: "Gift Cards" },
       { href: "/collector-journey", icon: TrendingUp, label: "Collector Journey" },
       { href: "/taste-graph", icon: Radar, label: "Taste Graph" },
+      { href: "/resale", icon: Repeat2, label: "Resale Market" },
+      { href: "/link-in-bio", icon: Link2, label: "Link in Bio" },
     ],
   },
   {
@@ -49,6 +51,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/create-listing", icon: ShoppingBag, label: "List a Piece" },
       { href: "/create-drop", icon: Zap, label: "Schedule a Drop" },
       { href: "/create-workshop", icon: BookOpen, label: "Create Workshop" },
+      { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
+      { href: "/subscription-boxes", icon: Gift, label: "Subscription Boxes" },
       { href: "/music-studio", icon: Music2, label: "Music Studio" },
       { href: "/sound-market", icon: Music2, label: "Sound Market" },
       { href: "/analytics", icon: BarChart2, label: "Analytics" },
@@ -88,6 +92,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/duet", icon: SplitSquareHorizontal, label: "Duet Studio" },
       { href: "/stitch", icon: Scissors, label: "Stitch Studio" },
       { href: "/technique-genetics", icon: Network, label: "Technique Genetics" },
+      { href: "/materials-exchange", icon: ArrowLeftRight, label: "Material Exchange" },
     ],
   },
   {

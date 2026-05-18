@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2 } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -83,6 +83,9 @@ export default function Nav() {
         { href: "/collection",     icon: Package,   label: "My Collection" },
         { href: "/orders",         icon: ShoppingBag, label: "Orders" },
         { href: "/earnings",       icon: DollarSign, label: "Earnings" },
+        { href: "/campaigns",      icon: Megaphone, label: "Campaigns" },
+        { href: "/link-in-bio",    icon: Link2,     label: "Link in Bio" },
+        { href: "/resale",         icon: Repeat2,   label: "Resale Market" },
         { href: "/drafts",         icon: Clock,     label: "Drafts" },
         ...(isVerified(profile.id)
           ? []

@@ -10,6 +10,38 @@ const MEDIUM_OPTIONS = [
   "Enamel", "Wood Turning", "Stone Carving", "Mosaic", "Leather", "Jewelry",
 ];
 
+const COLLECTING_OPTIONS = [
+  "Ceramics", "Glass", "Metalwork", "Fiber Arts", "Wood", "Jewelry",
+  "Contemporary Craft", "Studio Pottery", "Functional Ware", "Sculptural Works",
+  "Vintage / Antique", "Emerging Artists", "Investment Pieces",
+];
+
+const DECORATOR_OPTIONS = [
+  "Residential", "Commercial", "Hospitality", "Healthcare", "Retail",
+  "Art Consulting", "New Builds", "Renovations", "Luxury", "Sustainable Design",
+];
+
+const GALLERY_FOCUS_OPTIONS = [
+  "Ceramics", "Glass", "Metalwork", "Fiber Arts", "Wood", "Jewelry",
+  "Mixed Media", "Contemporary Craft", "Traditional Craft", "Emerging Artists",
+  "Established Artists", "International Artists",
+];
+
+const MUSEUM_FOCUS_OPTIONS = [
+  "Ceramics & Pottery", "Glass Arts", "Textile & Fiber", "Metalwork",
+  "Wood Arts", "Contemporary Craft", "Folk Art", "Industrial Design",
+  "American Craft", "International Craft", "Decorative Arts",
+];
+
+const BIO_PLACEHOLDER: Record<string, string> = {
+  artist: "Tell your story — your medium, practice, and what drives your work...",
+  collector: "Tell artists about yourself — what you collect, what you love, and what you're looking for...",
+  interior_decorator: "Tell artists about your practice — what kinds of projects you work on and what craft means to your clients...",
+  gallery: "Tell artists and collectors about your gallery — your focus, location, and what makes your program special...",
+  museum: "Tell artists and collectors about your institution — your collection, mission, and what you're looking to acquire...",
+  enthusiast: "Tell the community about yourself — what draws you to craft and how you engage with it...",
+};
+
 /** Step 1: Resize on canvas → Blob (never touches localStorage) */
 function resizeToBlob(file: File, maxPx: number, quality = 0.82): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -322,7 +354,7 @@ export default function EditProfile() {
                 maxLength={500}
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                placeholder="Tell your story — your medium, practice, and what drives your work..."
+                placeholder={BIO_PLACEHOLDER[profile.accountType ?? "artist"] ?? BIO_PLACEHOLDER.artist}
                 className="w-full resize-none rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
               />
               <p className="mt-1 text-right text-xs text-stone-700">{form.bio.length}/500</p>
@@ -342,32 +374,45 @@ export default function EditProfile() {
             </div>
           </div>
 
-          {/* Mediums */}
-          <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5">
-            <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-stone-600">
-              <Layers size={11} /> Mediums
-            </p>
-            <p className="mb-3 text-xs text-stone-700">Select all that apply</p>
-            <div className="flex flex-wrap gap-2">
-              {MEDIUM_OPTIONS.map((m) => {
-                const active = form.mediums.includes(m);
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => toggleMedium(m)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      active
-                        ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-                        : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-300"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Account-type-specific interests/focus */}
+          {(() => {
+            const accountType = profile.accountType ?? "artist";
+            let sectionTitle = "Mediums";
+            let sectionDesc = "Select all that apply";
+            let options = MEDIUM_OPTIONS;
+            if (accountType === "collector") { sectionTitle = "Collecting Focus"; sectionDesc = "What kinds of craft do you collect?"; options = COLLECTING_OPTIONS; }
+            else if (accountType === "interior_decorator") { sectionTitle = "Project Specialties"; sectionDesc = "What kinds of projects do you work on?"; options = DECORATOR_OPTIONS; }
+            else if (accountType === "gallery") { sectionTitle = "Gallery Focus"; sectionDesc = "What types of work does your gallery represent?"; options = GALLERY_FOCUS_OPTIONS; }
+            else if (accountType === "museum") { sectionTitle = "Collection Focus"; sectionDesc = "What does your institution collect or exhibit?"; options = MUSEUM_FOCUS_OPTIONS; }
+            else if (accountType === "enthusiast") { sectionTitle = "Craft Interests"; sectionDesc = "Which crafts are you passionate about?"; }
+            return (
+              <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5">
+                <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-stone-600">
+                  <Layers size={11} /> {sectionTitle}
+                </p>
+                <p className="mb-3 text-xs text-stone-700">{sectionDesc}</p>
+                <div className="flex flex-wrap gap-2">
+                  {options.map((m) => {
+                    const active = form.mediums.includes(m);
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => toggleMedium(m)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          active
+                            ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                            : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-300"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Links */}
           <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5 space-y-4">

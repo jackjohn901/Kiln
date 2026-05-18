@@ -7,6 +7,21 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
+// GET /me/orders — list all orders for the current user
+router.get("/me/orders", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const { desc } = await import("drizzle-orm");
+    const orders = await db.select().from(ordersTable)
+      .where(eq(ordersTable.buyerId, req.user.id))
+      .orderBy(desc(ordersTable.createdAt));
+    res.json({ orders });
+  } catch (err) {
+    logger.error({ err }, "me/orders GET error");
+    res.status(500).json({ error: "Failed to load orders" });
+  }
+});
+
 // POST /me/orders — create a single order after confirmed Stripe payment
 router.post("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
