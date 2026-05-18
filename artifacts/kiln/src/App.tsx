@@ -103,6 +103,7 @@ import CreateListing from "@/pages/CreateListing";
 import CreateDrop from "@/pages/CreateDrop";
 import CreateWorkshop from "@/pages/CreateWorkshop";
 import MusicStudio from "@/pages/MusicStudio";
+import ReelStudio from "@/pages/ReelStudio";
 import SoundMarket from "@/pages/SoundMarket";
 import CartSuccess from "@/pages/CartSuccess";
 import Campaigns from "@/pages/Campaigns";
@@ -303,6 +304,7 @@ function Router() {
       <Route path="/create-drop" component={CreateDrop} />
       <Route path="/create-workshop" component={CreateWorkshop} />
       <Route path="/music-studio" component={MusicStudio} />
+      <Route path="/reel-studio" component={ReelStudio} />
       <Route path="/sound-market" component={SoundMarket} />
       <Route path="/campaigns" component={Campaigns} />
       <Route path="/campaigns/create" component={CreateCampaign} />

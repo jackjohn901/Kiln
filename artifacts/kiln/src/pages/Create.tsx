@@ -343,6 +343,20 @@ export default function Create() {
         <Check size={40} className="text-amber-400" />
         <h2 className="font-serif text-2xl text-amber-100">Posted to Kiln</h2>
         <p className="text-stone-400">Your process is live. Artists and collectors can now discover your work.</p>
+        {/* AI Reel Studio CTA */}
+        <button
+          onClick={() => navigate("/reel-studio")}
+          className="w-full max-w-xs flex items-center gap-3 p-4 rounded-2xl border border-amber-400/30 bg-amber-400/6 hover:bg-amber-400/12 transition-colors text-left"
+        >
+          <div className="h-10 w-10 rounded-xl bg-amber-400/15 flex items-center justify-center shrink-0">
+            <Sparkles size={18} className="text-amber-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-100">Turn it into a cinematic clip</p>
+            <p className="text-xs text-stone-400 mt-0.5">AI Reel Studio — movie trailer, ad, or 7-sec clip</p>
+          </div>
+        </button>
+
         <div className="flex gap-3">
           <button
             onClick={() => navigate("/")}
