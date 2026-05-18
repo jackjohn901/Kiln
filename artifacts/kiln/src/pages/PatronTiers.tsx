@@ -84,13 +84,39 @@ export default function PatronTiers() {
   }, [artistId, localArtist]);
 
   const handleSubscribe = async (tierId: string, tierName: string) => {
+    const tier = tiers.find(t => t.id === tierId);
+    const isFallback = tierId.startsWith("fallback-");
+    const isCurrentlySubscribed = tier?.isSubscribed ?? false;
+
     setToggling(tierId);
     try {
-      const r = await fetch(`/api/patron-tiers/${tierId}/subscribe`, { method: "POST", credentials: "include" });
-      if (r.ok) {
-        const data = await r.json();
-        setTiers(prev => prev.map(t => t.id === tierId ? { ...t, isSubscribed: data.subscribed, subscriberCount: data.subscribed ? t.subscriberCount + 1 : t.subscriberCount - 1 } : t));
-        if (data.subscribed) { setConfirming(tierId); setTimeout(() => setConfirming(null), 3000); }
+      if (isCurrentlySubscribed || isFallback) {
+        const r = await fetch(`/api/patron-tiers/${tierId}/subscribe`, { method: "POST", credentials: "include" });
+        if (r.ok) {
+          const data = await r.json();
+          setTiers(prev => prev.map(t => t.id === tierId ? { ...t, isSubscribed: data.subscribed, subscriberCount: data.subscribed ? t.subscriberCount + 1 : t.subscriberCount - 1 } : t));
+          if (data.subscribed) { setConfirming(tierId); setTimeout(() => setConfirming(null), 3000); }
+        }
+      } else {
+        const label = `${tierName} — ${artistName}`;
+        const amount = tier?.price ?? 5;
+        const r = await fetch(`/api/stripe/subscription-checkout`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            artistId,
+            tierId,
+            tierLabel: label,
+            amount,
+            successPath: `/patron-tiers/${artistId}`,
+            cancelPath: `/patron-tiers/${artistId}`,
+          }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.url) { window.location.href = data.url; return; }
+        }
       }
     } catch {}
     setToggling(null);

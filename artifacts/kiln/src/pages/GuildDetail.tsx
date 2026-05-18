@@ -77,6 +77,7 @@ export default function GuildDetail() {
 
   const [apiGuild, setApiGuild] = useState<ApiGuild | null>(null);
   const [apiMembers, setApiMembers] = useState<ApiMemberWithProfile[]>([]);
+  const [apiEvents, setApiEvents] = useState<{ title: string; date: string; location: string; description: string }[]>([]);
 
   const staticGuild = getGuildById(id ?? "");
 
@@ -106,6 +107,16 @@ export default function GuildDetail() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    fetch(`/api/community-events`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : { events: [] })
+      .then(data => setApiEvents((data.events ?? []).map((e: { title: string; date: string; location?: string; city?: string; description?: string }) => ({
+        title: e.title,
+        date: e.date,
+        location: e.location ?? e.city ?? "",
+        description: e.description ?? "",
+      }))))
+      .catch(() => {});
   }, [id, staticGuild]);
 
   async function toggleJoin() {
@@ -230,7 +241,7 @@ export default function GuildDetail() {
         {guild.description && <p className="mb-6 text-sm text-stone-400 leading-relaxed">{guild.description}</p>}
 
         <GuildTabs tab={tab} setTab={setTab} likedPosts={likedPosts} setLikedPosts={setLikedPosts}
-          posts={[]} members={apiMembers} events={[]} resources={[]} rules={DEFAULT_RULES}
+          posts={[]} members={apiMembers} events={apiEvents} resources={[]} rules={DEFAULT_RULES}
           memberCount={guild.memberCount} />
 
         <div className="h-20" />

@@ -731,6 +731,17 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const quoteInquiry = useCallback((id: string, quote: CommissionQuote) => {
+    fetch(`/api/commissions/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "quoted",
+        quotedPrice: quote.price,
+        artistNotes: quote.terms,
+        estimatedDelivery: quote.deliveryDate || null,
+      }),
+    }).catch(() => {});
     update((s) => ({
       ...s,
       receivedInquiries: s.receivedInquiries.map((i) =>

@@ -111,6 +111,16 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
 
+  const toggleLike = () => {
+    setLiked(v => !v);
+    fetch(`/api/posts/${item.id}/like`, { method: "POST", credentials: "include" }).catch(() => {});
+  };
+
+  const toggleSave = () => {
+    setSaved(v => !v);
+    fetch(`/api/posts/${item.id}/save`, { method: "POST", credentials: "include" }).catch(() => {});
+  };
+
   useEffect(() => {
     if (!item.isVideo || item.videoId || !item.mediaUrl) return;
     if (isIdbUrl(item.mediaUrl)) {
@@ -161,11 +171,11 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
         <div className="mt-4 flex items-center justify-between px-1">
           <p className="text-sm text-stone-300 line-clamp-2 flex-1">{item.caption}</p>
           <div className="flex items-center gap-3 ml-4 shrink-0">
-            <button onClick={() => setLiked(v => !v)} title={liked ? "Unlike" : "Like"}
+            <button onClick={toggleLike} title={liked ? "Unlike" : "Like"}
               className={`transition-colors ${liked ? "text-red-400" : "text-stone-400 hover:text-red-400"}`}>
               <Heart size={18} fill={liked ? "currentColor" : "none"} />
             </button>
-            <button onClick={() => setSaved(v => !v)} title={saved ? "Unsave" : "Save"}
+            <button onClick={toggleSave} title={saved ? "Unsave" : "Save"}
               className={`transition-colors ${saved ? "text-amber-400" : "text-stone-400 hover:text-amber-400"}`}>
               <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
             </button>
@@ -747,11 +757,11 @@ export default function ArtistProfile() {
             <p className="text-xs text-stone-500">posts</p>
           </div>
           <Link href={`/artists/${artist.id}/followers`} className="text-center hover:opacity-80 transition-opacity">
-            <p className="font-bold text-white">{stats.followers.toLocaleString()}</p>
+            <p className="font-bold text-white">{(dbFollowerCount || stats.followers).toLocaleString()}</p>
             <p className="text-xs text-stone-500">followers</p>
           </Link>
           <Link href={`/artists/${artist.id}/following`} className="text-center hover:opacity-80 transition-opacity">
-            <p className="font-bold text-white">{stats.following}</p>
+            <p className="font-bold text-white">{dbProfile?.followingCount ?? stats.following}</p>
             <p className="text-xs text-stone-500">following</p>
           </Link>
           {workshops.length > 0 && (
