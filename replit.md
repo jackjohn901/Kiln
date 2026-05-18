@@ -24,7 +24,7 @@ A TikTok/Instagram Reels-style creator platform for craft artists at kilnfire.re
 
 - `lib/db/src/schema/` — source of truth for all DB tables
 - `artifacts/api-server/src/routes/index.ts` — all API routes registered here
-- `artifacts/api-server/src/lib/seed.ts` — seed data (v3 marker = seed-v3-marker)
+- `artifacts/api-server/src/lib/seed.ts` — seed data (v4 marker = seed-v4-marker)
 - `artifacts/kiln/src/contexts/` — AuthContext, ProfileContext, SocialContext, CartContext
 - `artifacts/kiln/src/pages/` — all page components
 - `artifacts/kiln/src/data/` — static reference data (techniques, materials, etc.)
@@ -33,7 +33,7 @@ A TikTok/Instagram Reels-style creator platform for craft artists at kilnfire.re
 
 - All social actions (like/save/comment/follow) go through SocialContext — no inline fetch calls in pages.
 - Feed uses two data sources: static `REELS` from `@/data/reels` (For You) + `/api/feed/following` (Following tab).
-- Seed data uses a marker user ID (e.g. "seed-v3-marker") to run exactly once on server start.
+- Seed data uses a marker user ID (e.g. "seed-v4-marker") to run exactly once on server start.
 - GuildDetail and PatronTiers fetch from the API when the local static data file has no matching entry.
 - MobileNav is `fixed bottom-0 z-50` — any page with a bottom submit button needs `pb-28 md:pb-8`.
 

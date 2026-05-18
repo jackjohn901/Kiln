@@ -8,10 +8,10 @@ import {
 } from "@workspace/db";
 import { logger } from "./logger";
 
-const SEED_MARKER_ID = "seed-v3-marker";
+const SEED_MARKER_ID = "seed-v4-marker";
 
 const SEED_USERS = [
-  { id: "seed-v3-marker", email: "seed-v3@kiln.internal", firstName: "Seed", lastName: "V3" },
+  { id: "seed-v4-marker", email: "seed-v4@kiln.internal", firstName: "Seed", lastName: "V4" },
   { id: "seed-elena-vasquez", email: "elena@example.kiln", firstName: "Elena", lastName: "Vasquez" },
   { id: "seed-marco-chen", email: "marco@example.kiln", firstName: "Marco", lastName: "Chen" },
   { id: "seed-zoe-nakamura", email: "zoe@example.kiln", firstName: "Zoe", lastName: "Nakamura" },
@@ -72,7 +72,7 @@ const SEED_POSTS = [
     id: "seed-post-02", authorId: "seed-elena-vasquez", authorName: "Elena Vasquez",
     authorAvatarUrl: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=200&q=80",
     thumbnailUrl: "https://images.unsplash.com/photo-1490312278390-ab64016b5873?w=800&q=80",
-    caption: "High-fire reduction session. The copper red glaze has that deep oxblood effect I've been chasing for months.",
+    caption: "High-fire reduction session. The copper red glaze has that deep oxblood effect I've been chasing for months. [critique welcome] — especially curious about glaze thickness and application.",
     technique: "Ceramics", likeCount: 891, commentCount: 43, saveCount: 178,
   },
   {
@@ -95,7 +95,7 @@ const SEED_POSTS = [
     id: "seed-post-05", authorId: "seed-marco-chen", authorName: "Marco Chen",
     authorAvatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80",
     thumbnailUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80",
-    caption: "Flamework session — borosilicate tubing and silver foil. The colour layering took 6 hours to get right.",
+    caption: "Flamework session — borosilicate tubing and silver foil. The colour layering took 6 hours to get right. [critique welcome] — first time using silver foil at this scale.",
     technique: "Glasswork", likeCount: 1102, commentCount: 55, saveCount: 189,
   },
   {
@@ -125,7 +125,7 @@ const SEED_POSTS = [
     id: "seed-post-09", authorId: "seed-felix-okafor", authorName: "Felix Okafor",
     authorAvatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80",
     thumbnailUrl: "https://images.unsplash.com/photo-1612198790700-b12fe81e1e3c?w=800&q=80",
-    caption: "Hand-cut dovetails on this walnut cabinet took 2 full days. No shortcuts, no jigs — just a sharp chisel and patience.",
+    caption: "Hand-cut dovetails on this walnut cabinet took 2 full days. No shortcuts, no jigs — just a sharp chisel and patience. [critique welcome] — looking for feedback on proportions and finish.",
     technique: "Woodwork", likeCount: 2670, commentCount: 93, saveCount: 438,
   },
   {
@@ -183,7 +183,7 @@ const SEED_POSTS = [
     id: "seed-post-17", authorId: "seed-aria-patel", authorName: "Aria Patel",
     authorAvatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80",
     thumbnailUrl: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&q=80",
-    caption: "Argentium silver cuff — reticulated with heat, then hand-hammered over a mandrel. The surface texture is irreproducible.",
+    caption: "Argentium silver cuff — reticulated with heat, then hand-hammered over a mandrel. The surface texture is irreproducible. [critique welcome] — open to thoughts on the reticulation pattern.",
     technique: "Metalwork", likeCount: 887, commentCount: 41, saveCount: 153,
   },
   {
@@ -599,6 +599,7 @@ export async function seedDatabase(): Promise<void> {
     await db.insert(postsTable).values(SEED_POSTS).onConflictDoUpdate({
       target: postsTable.id,
       set: {
+        caption: sql`EXCLUDED.caption`,
         videoUrl: sql`EXCLUDED.video_url`,
         authorAvatarUrl: sql`EXCLUDED.author_avatar_url`,
       },
@@ -625,7 +626,7 @@ export async function seedDatabase(): Promise<void> {
       listings: SEED_LISTINGS.length, drops: SEED_DROPS.length,
       auctions: SEED_AUCTIONS.length, workshops: SEED_WORKSHOPS.length,
       guilds: SEED_GUILDS.length, patronTiers: SEED_PATRON_TIERS.length,
-    }, "Database seeded (v3)");
+    }, "Database seeded (v4)");
   } catch (err) {
     logger.error({ err }, "Seed error (non-fatal)");
   }

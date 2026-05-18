@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { critiquesTable, postsTable } from "@workspace/db";
-import { eq, desc, ilike, or, sql } from "drizzle-orm";
+import { eq, desc, ilike, or, inArray, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -17,7 +17,7 @@ router.get("/critique-posts", async (req, res): Promise<void> => {
     let critiquesByPost: Record<string, typeof critiquesTable.$inferSelect[]> = {};
     if (postIds.length > 0) {
       const allCritiques = await db.select().from(critiquesTable)
-        .where(sql`${critiquesTable.postId} = ANY(${postIds})`)
+        .where(inArray(critiquesTable.postId, postIds))
         .orderBy(desc(critiquesTable.createdAt));
       for (const c of allCritiques) {
         if (!critiquesByPost[c.postId]) critiquesByPost[c.postId] = [];

@@ -115,7 +115,7 @@ export default function PostDetail() {
   }, [rawPostId, isDbPost]);
 
   async function handleDbLike() {
-    const res = await fetch(`/api/posts/${rawPostId}/like`, { method: "POST" });
+    const res = await fetch(`/api/posts/${rawPostId}/like`, { method: "POST", credentials: "include" });
     if (res.ok) {
       const data = await res.json();
       setDbLiked(data.liked);
@@ -124,7 +124,7 @@ export default function PostDetail() {
   }
 
   async function handleDbSave() {
-    const res = await fetch(`/api/posts/${rawPostId}/save`, { method: "POST" });
+    const res = await fetch(`/api/posts/${rawPostId}/save`, { method: "POST", credentials: "include" });
     if (res.ok) {
       const data = await res.json();
       setDbSaved(data.saved);
