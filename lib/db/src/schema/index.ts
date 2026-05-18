@@ -54,3 +54,4 @@ export * from "./critiques";
 export * from "./push_subscriptions";
 export * from "./giftCards";
 export * from "./payouts";
+export * from "./video_uploads";
