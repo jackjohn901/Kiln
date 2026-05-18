@@ -17,6 +17,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.kilnfire",
       "buildNumber": "1",
+      "icon": {
+        "light": "./assets/images/icon-light.png",
+        "dark": "./assets/images/icon.png",
+        "tinted": "./assets/images/icon-tinted.png"
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "KilnFire uses your camera so you can record and share your craft process.",
         "NSMicrophoneUsageDescription": "KilnFire uses your microphone when recording video.",

@@ -30,6 +30,18 @@ uri = "file://assets/icons/kiln-icon-v3.png"
 type = "image"
 title = "kilnfire icon ceramic vessel"
 
+[[generated]]
+id = "Qv3D_IpN8g5qhbiW40T5q"
+uri = "file://artifacts/kiln-mobile/assets/images/icon-light.png"
+type = "image"
+title = "kilnfire icon light flame"
+
+[[generated]]
+id = "3TpBskPe31kXlSjV18iM1"
+uri = "file://artifacts/kiln-mobile/assets/images/icon-tinted.png"
+type = "image"
+title = "kilnfire icon tinted monochrome"
+
 [[outputs]]
 id = "sJHvn6KG7yE_SSck3915p"
 uri = "file://assets/icons/kiln-icon-v1.png"
@@ -47,3 +59,21 @@ id = "BiI4NavcLacwiQoxPNUs1"
 uri = "file://assets/icons/kiln-icon-v3.png"
 type = "image"
 title = "Option 3 — Glowing Vessel"
+
+[[outputs]]
+id = "w8wcFbG9GAe9gWcp_abHE"
+uri = "file://artifacts/kiln-mobile/assets/images/icon-light.png"
+type = "image"
+title = "Light mode icon"
+
+[[outputs]]
+id = "5Q5i-5fw60N7ZiTEG-WUl"
+uri = "file://artifacts/kiln-mobile/assets/images/icon.png"
+type = "image"
+title = "Dark mode icon (existing)"
+
+[[outputs]]
+id = "EAIDANdY085W9RRHxkab5"
+uri = "file://artifacts/kiln-mobile/assets/images/icon-tinted.png"
+type = "image"
+title = "Tinted / monochrome icon"
