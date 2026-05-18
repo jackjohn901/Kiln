@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   ChevronLeft, Star, MapPin, Shield, Grid3x3, Heart,
@@ -37,6 +37,7 @@ function StarRow({ rating }: { rating: number }) {
 }
 
 export default function CollectorProfile() {
+  const [, navigate] = useLocation();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<"collection" | "reviews" | "following">("collection");
 
@@ -73,7 +74,9 @@ export default function CollectorProfile() {
               <div className="h-20 w-20 overflow-hidden rounded-2xl border-4 border-stone-950 shadow-xl">
                 <img src={collector.avatarUrl} alt={collector.name} className="h-full w-full object-cover" />
               </div>
-              <button className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/20 transition-colors">
+              <button
+                onClick={() => navigate(`/messages/${collector.id}`)}
+                className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/20 transition-colors">
                 <MessageCircle size={14} /> Message
               </button>
             </div>

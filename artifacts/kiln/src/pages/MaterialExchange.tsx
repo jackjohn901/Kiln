@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Package, Plus, Search, Tag, MapPin, Clock, MessageCircle, Heart, Filter, X, Star } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -112,6 +113,7 @@ function timeAgo(ts: number) {
 }
 
 export default function MaterialExchange() {
+  const [, navigate] = useLocation();
   const { profile } = useProfile();
   const [listings, setListings] = useState<MaterialListing[]>(SEED);
   const [search, setSearch] = useState("");
@@ -303,7 +305,9 @@ export default function MaterialExchange() {
                   >
                     <Heart size={11} className={l.liked ? "fill-current" : ""} /> {l.likes}
                   </button>
-                  <button className="flex items-center gap-1 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                  <button
+                    onClick={() => navigate(`/messages/${l.userId}`)}
+                    className="flex items-center gap-1 text-xs text-stone-600 hover:text-stone-400 transition-colors">
                     <MessageCircle size={11} /> Message
                   </button>
                 </div>

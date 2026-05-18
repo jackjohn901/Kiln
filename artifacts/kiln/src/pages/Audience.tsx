@@ -223,7 +223,23 @@ export default function Audience() {
 
         {display.length > 0 && (
           <div className="mt-4 flex justify-end">
-            <button className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors">
+            <button
+              onClick={() => {
+                const header = "Name,Handle,Type,Spend,Last Active,Note";
+                const rows = display.map(c =>
+                  [c.name, c.handle, c.type, c.spend.toFixed(2), c.lastActive ? new Date(c.lastActive).toLocaleDateString() : "", c.note ?? ""]
+                    .map(v => `"${String(v).replace(/"/g, '""')}"`)
+                    .join(",")
+                );
+                const csv = [header, ...rows].join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = "kiln-audience.csv"; a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors"
+            >
               <Download size={12} /> Export CSV
             </button>
           </div>

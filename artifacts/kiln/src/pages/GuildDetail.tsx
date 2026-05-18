@@ -298,7 +298,10 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                           <Heart size={14} fill={likedPosts[post.id] ? "currentColor" : "none"} />
                           {post.likes + (likedPosts[post.id] ? 1 : 0)}
                         </button>
-                        <button className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors">
+                        <button
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/artists/${post.artistId}`).catch(() => {})}
+                          className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-300 transition-colors"
+                          title="Copy link">
                           <Share2 size={13} /> Share
                         </button>
                         <Link href={`/artists/${post.artistId}`} className="ml-auto text-xs text-amber-500 hover:text-amber-400 transition-colors">

@@ -107,6 +107,9 @@ function buildGrid(artist: Artist): GridItem[] {
 
 function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
   const [videoSrc, setVideoSrc] = useState<string>("");
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     if (!item.isVideo || item.videoId || !item.mediaUrl) return;
@@ -158,9 +161,20 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
         <div className="mt-4 flex items-center justify-between px-1">
           <p className="text-sm text-stone-300 line-clamp-2 flex-1">{item.caption}</p>
           <div className="flex items-center gap-3 ml-4 shrink-0">
-            <button className="text-stone-400 hover:text-red-400 transition-colors"><Heart size={18} /></button>
-            <button className="text-stone-400 hover:text-amber-400 transition-colors"><Bookmark size={18} /></button>
-            <button className="text-stone-400 hover:text-stone-200 transition-colors"><Share2 size={18} /></button>
+            <button onClick={() => setLiked(v => !v)} title={liked ? "Unlike" : "Like"}
+              className={`transition-colors ${liked ? "text-red-400" : "text-stone-400 hover:text-red-400"}`}>
+              <Heart size={18} fill={liked ? "currentColor" : "none"} />
+            </button>
+            <button onClick={() => setSaved(v => !v)} title={saved ? "Unsave" : "Save"}
+              className={`transition-colors ${saved ? "text-amber-400" : "text-stone-400 hover:text-amber-400"}`}>
+              <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+            </button>
+            <button
+              onClick={() => navigator.clipboard.writeText(window.location.href).then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); }).catch(() => {})}
+              title={shareCopied ? "Copied!" : "Copy link"}
+              className={`transition-colors ${shareCopied ? "text-emerald-400" : "text-stone-400 hover:text-stone-200"}`}>
+              <Share2 size={18} />
+            </button>
           </div>
         </div>
       </div>

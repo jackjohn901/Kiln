@@ -63,7 +63,7 @@ export default function BoostPost() {
             <CheckCircle size={48} className="mx-auto text-green-400 mb-4" />
             <h2 className="text-xl font-bold text-stone-100 mb-2">Post Boosted!</h2>
             <p className="text-stone-400 text-sm mb-6">Your post is now being promoted to a wider audience.</p>
-            <Link href="/feed" className="px-6 py-2.5 rounded-full bg-amber-500 text-stone-950 font-semibold text-sm hover:bg-amber-400 transition-colors">Back to Feed</Link>
+            <Link href="/" className="px-6 py-2.5 rounded-full bg-amber-500 text-stone-950 font-semibold text-sm hover:bg-amber-400 transition-colors">Back to Feed</Link>
           </div>
         ) : (
           <>

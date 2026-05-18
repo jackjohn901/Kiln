@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import {
   ArrowLeft, Play, Mic, Video, SplitSquareHorizontal, Upload,
@@ -48,6 +48,7 @@ export default function DuetStudio() {
   const { profile } = useProfile();
   const { reelLikes, toggleReelLike } = useSocial();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<DuetStep>("browse");
   const [layout, setLayout] = useState<"side-by-side" | "reaction" | "green-screen">("side-by-side");
   const [response, setResponse] = useState("");
@@ -172,7 +173,10 @@ export default function DuetStudio() {
           </div>
 
           {/* Upload your video */}
-          <button className="w-full flex items-center gap-3 rounded-2xl border border-dashed border-stone-700 bg-stone-900/40 p-4 hover:border-amber-500/30 transition-colors group">
+          <input ref={fileInputRef} type="file" accept="video/mp4,video/quicktime,video/*" className="hidden" onChange={() => {}} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center gap-3 rounded-2xl border border-dashed border-stone-700 bg-stone-900/40 p-4 hover:border-amber-500/30 transition-colors group">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-800 group-hover:bg-amber-500/10 transition-colors">
               <Upload size={16} className="text-stone-500 group-hover:text-amber-400" />
             </div>
