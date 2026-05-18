@@ -14,6 +14,7 @@ export interface UserProfile {
   avatarUrl: string;
   coverUrl: string;
   isCustom: boolean;
+  accountType?: string;
 }
 
 interface ProfileContextType {

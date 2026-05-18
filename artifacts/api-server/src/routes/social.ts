@@ -231,15 +231,15 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const userId = req.user.id;
-  const { handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus } = req.body;
+  const { handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType } = req.body;
   try {
     const [existing] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!existing) {
-      const [created] = await db.insert(profilesTable).values({ userId, handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus }).returning();
+      const [created] = await db.insert(profilesTable).values({ userId, handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType: accountType ?? "artist" }).returning();
       res.json({ ...created, isFollowing: false, createdAt: created.createdAt.toISOString() }); return;
     }
     const [updated] = await db.update(profilesTable)
-      .set({ handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus })
+      .set({ handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, ...(accountType ? { accountType } : {}) })
       .where(eq(profilesTable.userId, userId))
       .returning();
     res.json({ ...updated, isFollowing: false, createdAt: updated.createdAt.toISOString() });

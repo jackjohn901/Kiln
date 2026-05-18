@@ -24,6 +24,7 @@ export const profilesTable = pgTable("profiles", {
   totalSpentCents: integer("total_spent_cents").notNull().default(0),
   broadcastSubscriberCount: integer("broadcast_subscriber_count").notNull().default(0),
   linkInBioSlug: varchar("link_in_bio_slug", { length: 100 }),
+  accountType: varchar("account_type", { length: 50 }).default("artist"),
   contactEmail: varchar("contact_email", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
