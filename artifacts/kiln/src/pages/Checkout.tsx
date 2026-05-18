@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, Lock, CheckCircle, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Lock, CheckCircle, ShoppingBag, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
-import { listings, formatPrice } from "@/data/listings";
+import { listings, formatPrice, type Listing } from "@/data/listings";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -15,9 +15,7 @@ function getArtistName(artistId: string): string {
 
 type Step = "review" | "confirm";
 
-function OrderSummary({ listingId }: { listingId: string }) {
-  const listing = listings.find((l) => l.id === listingId);
-  if (!listing) return null;
+function OrderSummary({ listing }: { listing: Listing }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-stone-900/50 p-5">
       <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-4">Order Summary</h3>
@@ -63,7 +61,35 @@ export default function Checkout() {
   const { listingId } = useParams<{ listingId: string }>();
   const { profile } = useProfile();
 
-  const listing = listings.find((l) => l.id === listingId);
+  const staticListing = listings.find((l) => l.id === listingId);
+  const [apiListing, setApiListing] = useState<Listing | null>(null);
+  const [listingLoading, setListingLoading] = useState(!staticListing);
+
+  useEffect(() => {
+    if (staticListing || !listingId) return;
+    setListingLoading(true);
+    fetch(`/api/listings/${listingId}`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.id) {
+          setApiListing({
+            id: d.id,
+            artistId: d.artistId,
+            title: d.title,
+            year: d.year != null ? String(d.year) : "",
+            medium: d.medium ?? "",
+            dimensions: d.dimensions ?? "",
+            price: d.price ?? 0,
+            imageUrl: d.imageUrl ?? null,
+            available: d.isAvailable ?? true,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setListingLoading(false));
+  }, [listingId, staticListing]);
+
+  const listing = staticListing ?? apiListing;
 
   const [step, setStep] = useState<Step>("review");
   const [form, setForm] = useState({
@@ -76,7 +102,18 @@ export default function Checkout() {
   });
   const [processing, setProcessing] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [orderId, setOrderId] = useState(() => `KLN-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
+  const [orderId] = useState(() => `KLN-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
+
+  if (listingLoading) {
+    return (
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="flex flex-col items-center justify-center gap-4 py-32">
+          <Loader2 size={28} className="text-amber-500 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   if (!listing) {
     return (
@@ -253,7 +290,7 @@ export default function Checkout() {
           </div>
 
           {/* Right: order summary */}
-          <OrderSummary listingId={listingId ?? ""} />
+          <OrderSummary listing={listing} />
         </div>
       </div>
     </div>
