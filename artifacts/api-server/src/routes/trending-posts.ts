@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { postsTable } from "@workspace/db";
-import { desc, gte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { redactPatronMedia } from "../lib/publicFields";
 
 const router = Router();
 
@@ -11,10 +12,13 @@ router.get("/trending-posts", async (req, res): Promise<void> => {
     const limit = Math.min(parseInt(String(req.query.limit ?? "50")), 200);
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const posts = await db.select().from(postsTable)
-      .where(gte(postsTable.createdAt, since))
+      .where(and(
+        eq(postsTable.isDraft, false),
+        or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
+        gte(postsTable.createdAt, since),
+      ))
       .orderBy(desc(postsTable.likeCount), desc(postsTable.commentCount))
       .limit(limit);
-    // Aggregate tags
     const tagMap = new Map<string, number>();
     posts.forEach(p => (p.tags ?? []).forEach(t => tagMap.set(t, (tagMap.get(t) ?? 0) + 1)));
     const trendingTags = Array.from(tagMap.entries())
@@ -22,7 +26,7 @@ router.get("/trending-posts", async (req, res): Promise<void> => {
       .slice(0, 30)
       .map(([tag, count]) => ({ tag, count }));
     res.json({
-      posts: posts.map(p => ({ ...p, createdAt: p.createdAt.toISOString() })),
+      posts: posts.map(p => redactPatronMedia({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })),
       trendingTags,
     });
   } catch (err) {

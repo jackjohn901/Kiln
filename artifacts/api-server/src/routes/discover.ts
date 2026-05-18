@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { profilesTable, postsTable, followsTable, streaksTable } from "@workspace/db";
-import { desc, eq, and, inArray, sql, isNotNull } from "drizzle-orm";
+import { desc, eq, and, or, inArray, sql, isNotNull, isNull, lte } from "drizzle-orm";
+import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
 
 const router = Router();
 
@@ -9,7 +10,7 @@ const router = Router();
 router.get("/leaderboard", async (req, res): Promise<void> => {
   try {
     const { medium, limit = "50" } = req.query as Record<string, string>;
-    let query = db.select().from(profilesTable).$dynamic();
+    let query = db.select(publicProfileFields).from(profilesTable).$dynamic();
     if (medium && medium !== "All") {
       const { ilike } = await import("drizzle-orm");
       query = query.where(ilike(profilesTable.medium, `%${medium}%`));
@@ -35,7 +36,13 @@ router.get("/leaderboard/streaks", async (req, res): Promise<void> => {
       .limit(50);
     if (!streaks.length) { res.json({ profiles: [] }); return; }
     const ids = streaks.map(s => s.userId);
-    const profiles = await db.select().from(profilesTable).where(inArray(profilesTable.userId, ids));
+    const profiles = await db.select({
+      userId: profilesTable.userId,
+      handle: profilesTable.handle,
+      displayName: profilesTable.displayName,
+      avatarUrl: profilesTable.avatarUrl,
+      medium: profilesTable.medium,
+    }).from(profilesTable).where(inArray(profilesTable.userId, ids));
     const profileMap = Object.fromEntries(profiles.map(p => [p.userId, p]));
     res.json({
       profiles: streaks.map(s => ({
@@ -54,7 +61,15 @@ router.get("/leaderboard/streaks", async (req, res): Promise<void> => {
 // GET /leaderboard/cities — artists grouped by city, sorted by count
 router.get("/leaderboard/cities", async (req, res): Promise<void> => {
   try {
-    const profiles = await db.select().from(profilesTable)
+    const profiles = await db.select({
+      userId: profilesTable.userId,
+      displayName: profilesTable.displayName,
+      handle: profilesTable.handle,
+      avatarUrl: profilesTable.avatarUrl,
+      medium: profilesTable.medium,
+      followerCount: profilesTable.followerCount,
+      location: profilesTable.location,
+    }).from(profilesTable)
       .where(isNotNull(profilesTable.location))
       .orderBy(desc(profilesTable.followerCount))
       .limit(200);
@@ -84,12 +99,16 @@ router.get("/leaderboard/cities", async (req, res): Promise<void> => {
 router.get("/trending-posts", async (req, res): Promise<void> => {
   try {
     const { tag, limit = "30" } = req.query as Record<string, string>;
-    let query = db.select().from(postsTable).$dynamic();
-    if (tag) {
-      query = query.where(sql`${postsTable.tags} @> ARRAY[${tag}]::text[]`);
-    }
-    const posts = await query.orderBy(desc(postsTable.likeCount)).limit(Number(limit));
-    res.json({ posts: posts.map(p => ({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })) });
+    const baseFilter = and(
+      sql`${postsTable.isDraft} = false`,
+      or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
+      tag ? sql`${postsTable.tags} @> ARRAY[${tag}]::text[]` : undefined,
+    );
+    const posts = await db.select().from(postsTable)
+      .where(baseFilter)
+      .orderBy(desc(postsTable.likeCount))
+      .limit(Number(limit));
+    res.json({ posts: posts.map(p => redactPatronMedia({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })) });
   } catch (err) { req.log.error({ err }, "trendingPosts error"); res.status(500).json({ error: "Failed to load trending posts" }); }
 });
 
@@ -101,7 +120,7 @@ router.get("/followers/:userId", async (req, res): Promise<void> => {
     const follows = await db.select({ followerId: followsTable.followerId }).from(followsTable).where(eq(followsTable.followingId, userId)).limit(Number(limit)).offset(Number(offset));
     const followerIds = follows.map(f => f.followerId);
     if (!followerIds.length) { res.json({ followers: [] }); return; }
-    const profiles = await db.select().from(profilesTable).where(inArray(profilesTable.userId, followerIds));
+    const profiles = await db.select(publicProfileFields).from(profilesTable).where(inArray(profilesTable.userId, followerIds));
     const viewerId = req.isAuthenticated() ? req.user.id : null;
     let viewerFollowing = new Set<string>();
     if (viewerId) {
@@ -119,7 +138,7 @@ router.get("/following/:userId", async (req, res): Promise<void> => {
     const follows = await db.select({ followingId: followsTable.followingId }).from(followsTable).where(eq(followsTable.followerId, userId)).limit(50);
     const followingIds = follows.map(f => f.followingId);
     if (!followingIds.length) { res.json({ following: [] }); return; }
-    const profiles = await db.select().from(profilesTable).where(inArray(profilesTable.userId, followingIds));
+    const profiles = await db.select(publicProfileFields).from(profilesTable).where(inArray(profilesTable.userId, followingIds));
     res.json({ following: profiles.map(p => ({ ...p, isFollowing: true, createdAt: p.createdAt.toISOString() })) });
   } catch (err) { req.log.error({ err }, "getFollowing error"); res.status(500).json({ error: "Failed to load following" }); }
 });

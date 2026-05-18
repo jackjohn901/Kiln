@@ -24,10 +24,21 @@ router.get("/guilds", async (req, res): Promise<void> => {
 router.get("/guilds/:id", async (req, res): Promise<void> => {
   const [guild] = await db.select().from(guildsTable).where(eq(guildsTable.id, req.params.id));
   if (!guild) { res.status(404).json({ error: "Not found" }); return; }
-  const members = await db.select().from(guildMembersTable).where(eq(guildMembersTable.guildId, guild.id));
+
   const viewerId = req.isAuthenticated() ? req.user.id : null;
-  const isJoined = viewerId ? members.some(m => m.userId === viewerId) : false;
-  res.json({ ...guild, isJoined, members: members.map(m => ({ ...m, joinedAt: m.joinedAt.toISOString() })), createdAt: guild.createdAt.toISOString() });
+
+  if (!guild.isPublic) {
+    if (!viewerId) { res.status(404).json({ error: "Not found" }); return; }
+    const [membership] = await db.select({ userId: guildMembersTable.userId })
+      .from(guildMembersTable)
+      .where(and(eq(guildMembersTable.guildId, guild.id), eq(guildMembersTable.userId, viewerId)));
+    if (!membership) { res.status(404).json({ error: "Not found" }); return; }
+  }
+
+  const members = await db.select().from(guildMembersTable).where(eq(guildMembersTable.guildId, guild.id));
+  const isMember = viewerId ? members.some(m => m.userId === viewerId) : false;
+
+  res.json({ ...guild, isJoined: isMember, members: members.map(m => ({ ...m, joinedAt: m.joinedAt.toISOString() })), createdAt: guild.createdAt.toISOString() });
 });
 
 // POST /guilds — create guild
@@ -48,12 +59,22 @@ router.post("/guilds/:id/join", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id; const guildId = req.params.id;
   try {
+    const [guild] = await db.select().from(guildsTable).where(eq(guildsTable.id, guildId));
+    if (!guild) { res.status(404).json({ error: "Guild not found" }); return; }
+
     const [existing] = await db.select().from(guildMembersTable).where(and(eq(guildMembersTable.guildId, guildId), eq(guildMembersTable.userId, userId)));
+
     if (existing) {
       await db.delete(guildMembersTable).where(and(eq(guildMembersTable.guildId, guildId), eq(guildMembersTable.userId, userId)));
       await db.update(guildsTable).set({ memberCount: sql`GREATEST(${guildsTable.memberCount} - 1, 0)` }).where(eq(guildsTable.id, guildId));
       res.json({ joined: false }); return;
     }
+
+    if (!guild.isPublic) {
+      res.status(403).json({ error: "This guild is private and not open to new members" });
+      return;
+    }
+
     await db.insert(guildMembersTable).values({ guildId, userId, role: "member" });
     await db.update(guildsTable).set({ memberCount: sql`${guildsTable.memberCount} + 1` }).where(eq(guildsTable.id, guildId));
     res.json({ joined: true });

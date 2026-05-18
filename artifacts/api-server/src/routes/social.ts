@@ -3,7 +3,8 @@ import { db } from "@workspace/db";
 import {
   followsTable, profilesTable, notificationsTable, postsTable,
 } from "@workspace/db";
-import { eq, and, sql, or, ilike, inArray, desc } from "drizzle-orm";
+import { eq, and, sql, or, ilike, inArray, desc, isNull, lte } from "drizzle-orm";
+import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
 import { sendEmail, newFollowerEmail } from "../lib/email";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
@@ -109,7 +110,7 @@ router.get("/users/search", async (req, res): Promise<void> => {
       conditions.push(ilike(profilesTable.medium, `%${medium}%`) as any);
     }
 
-    const profiles = await db.select().from(profilesTable)
+    const profiles = await db.select(publicProfileFields).from(profilesTable)
       .where(conditions.length > 0 ? and(...(conditions as [any, ...any[]])) : undefined)
       .orderBy(desc(profilesTable.followerCount))
       .limit(Math.min(Number(limit) || 30, 50));
@@ -146,7 +147,7 @@ router.get("/users/:userId/profile", async (req, res): Promise<void> => {
   const viewerId = req.isAuthenticated() ? req.user.id : null;
 
   try {
-    const [profile] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
+    const [profile] = await db.select(publicProfileFields).from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!profile) { res.status(404).json({ error: "Profile not found" }); return; }
 
     let isFollowing = false;
@@ -168,15 +169,15 @@ router.get("/users/:userId/posts", async (req, res): Promise<void> => {
   const { userId } = req.params;
   try {
     const posts = await db.select().from(postsTable)
-      .where(eq(postsTable.authorId, userId))
+      .where(and(
+        eq(postsTable.authorId, userId),
+        eq(postsTable.isDraft, false),
+        or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
+      ))
       .orderBy(desc(postsTable.createdAt))
       .limit(30);
     res.json({
-      posts: posts.map((p) => ({
-        ...p,
-        tags: p.tags ?? [],
-        createdAt: p.createdAt.toISOString(),
-      })),
+      posts: posts.map((p) => redactPatronMedia({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })),
     });
   } catch (err) {
     req.log.error({ err }, "getUserPosts error");

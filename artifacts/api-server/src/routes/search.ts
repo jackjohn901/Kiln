@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, profilesTable, listingsTable, guildsTable, postsTable } from "@workspace/db";
-import { ilike, or, and, isNull, lte, sql, desc } from "drizzle-orm";
+import { ilike, or, and, eq, isNull, lte, sql, desc } from "drizzle-orm";
+import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.get("/search", async (req, res): Promise<void> => {
 
   try {
     const [artists, listings, guilds, posts] = await Promise.all([
-      db.select().from(profilesTable)
+      db.select(publicProfileFields).from(profilesTable)
         .where(or(sql`${artistVec} @@ ${tsq}`, ilike(profilesTable.displayName, like), ilike(profilesTable.handle, like)))
         .orderBy(sql`ts_rank(${artistVec}, ${tsq}) desc`)
         .limit(8),
@@ -29,7 +30,10 @@ router.get("/search", async (req, res): Promise<void> => {
         .orderBy(sql`ts_rank(${listingVec}, ${tsq}) desc`)
         .limit(8),
       db.select().from(guildsTable)
-        .where(or(sql`${guildVec} @@ ${tsq}`, ilike(guildsTable.name, like), ilike(guildsTable.description, like)))
+        .where(and(
+          eq(guildsTable.isPublic, true),
+          or(sql`${guildVec} @@ ${tsq}`, ilike(guildsTable.name, like), ilike(guildsTable.description, like)),
+        ))
         .limit(6),
       db.select().from(postsTable)
         .where(and(
@@ -40,7 +44,12 @@ router.get("/search", async (req, res): Promise<void> => {
         .orderBy(sql`ts_rank(${postVec}, ${tsq}) desc`)
         .limit(6),
     ]);
-    res.json({ artists, listings, guilds, posts });
+    res.json({
+      artists,
+      listings,
+      guilds,
+      posts: posts.map(p => redactPatronMedia({ ...p, tags: p.tags ?? [] })),
+    });
   } catch (err) {
     req.log.error({ err }, "search error");
     res.status(500).json({ error: "Search failed" });
@@ -54,12 +63,12 @@ router.get("/users/search", async (req, res): Promise<void> => {
     let profiles;
     if (q && q.trim().length >= 1) {
       const like = `%${q.trim()}%`;
-      profiles = await db.select().from(profilesTable)
+      profiles = await db.select(publicProfileFields).from(profilesTable)
         .where(or(ilike(profilesTable.displayName, like), ilike(profilesTable.handle, like)))
         .orderBy(desc(profilesTable.followerCount))
         .limit(Number(limit));
     } else {
-      profiles = await db.select().from(profilesTable)
+      profiles = await db.select(publicProfileFields).from(profilesTable)
         .orderBy(sql`RANDOM()`)
         .limit(Number(limit));
     }
