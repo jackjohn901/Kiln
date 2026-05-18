@@ -65,6 +65,9 @@ import analyticsRouter from "./analytics";
 import giftCardsRouter from "./gift-cards";
 import videoRouter from "./video";
 import payoutsRouter from "./payouts";
+import newslettersRouter from "./newsletters";
+import mentorshipRouter from "./mentorship";
+import critiquesRouter from "./critiques";
 
 const router: IRouter = Router();
 
@@ -134,5 +137,8 @@ router.use(analyticsRouter);
 router.use(giftCardsRouter);
 router.use(videoRouter);
 router.use(payoutsRouter);
+router.use(newslettersRouter);
+router.use(mentorshipRouter);
+router.use(critiquesRouter);
 
 export default router;

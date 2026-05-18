@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useLocation } from "wouter";
+import { useState, useRef, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
@@ -14,6 +14,7 @@ const SHIPS_TO_OPTIONS = ["Worldwide", "United States", "Canada", "Europe", "Aus
 
 export default function CreateListing() {
   const [, navigate] = useLocation();
+  const search = useSearch();
   const { upload, uploading } = useUpload();
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +35,16 @@ export default function CreateListing() {
   });
   const [tagInput, setTagInput] = useState("");
   const [imagePreview, setImagePreview] = useState("");
+
+  // Pre-fill price + technique from PriceCalculator query params
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const price = params.get("price");
+    const technique = params.get("technique");
+    if (price || technique) {
+      setForm(f => ({ ...f, ...(price ? { price } : {}), ...(technique ? { technique } : {}) }));
+    }
+  }, [search]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -81,10 +81,7 @@ export default function Newsletter() {
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [history, setHistory] = useState<SentNewsletter[]>(() => {
-    const stored = readSent();
-    return stored.length > 0 ? stored : SEED_NEWSLETTERS;
-  });
+  const [history, setHistory] = useState<SentNewsletter[]>(SEED_NEWSLETTERS);
   const [showHistory, setShowHistory] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -92,22 +89,41 @@ export default function Newsletter() {
   const canSend = subject.trim().length > 0 && body.trim().length > 10;
   const wordCount = body.split(/\s+/).filter(Boolean).length;
 
+  // Load real sent newsletters from server
+  useEffect(() => {
+    fetch("/api/me/newsletters", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data?.newsletters?.length) {
+          setHistory(prev => {
+            const serverIds = new Set(data.newsletters.map((n: SentNewsletter) => n.id));
+            const seeds = prev.filter(n => !serverIds.has(n.id) && n.id.startsWith("nl-00"));
+            return [...data.newsletters, ...seeds];
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   async function handleSend() {
     if (!canSend) return;
     setSending(true);
-    await new Promise((r) => setTimeout(r, 1800));
-    const newsletter: SentNewsletter = {
-      id: `nl-${Date.now()}`,
-      subject,
-      body,
-      audience,
-      sentAt: new Date().toISOString(),
-      recipientCount,
-      openRate: 0,
-    };
-    const next = [newsletter, ...history];
-    setHistory(next);
-    writeSent(next);
+    try {
+      const r = await fetch("/api/newsletters", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, body, audience, recipientCount }),
+      });
+      const data = r.ok ? await r.json() : null;
+      const newsletter: SentNewsletter = data
+        ? { id: data.id, subject: data.subject, body: data.body, audience: data.audience, sentAt: data.sentAt, recipientCount: data.recipientCount, openRate: 0 }
+        : { id: `nl-${Date.now()}`, subject, body, audience, sentAt: new Date().toISOString(), recipientCount, openRate: 0 };
+      setHistory(prev => [newsletter, ...prev.filter(n => n.id !== newsletter.id)]);
+    } catch {
+      const newsletter: SentNewsletter = { id: `nl-${Date.now()}`, subject, body, audience, sentAt: new Date().toISOString(), recipientCount, openRate: 0 };
+      setHistory(prev => [newsletter, ...prev]);
+    }
     setSending(false);
     setSent(true);
     setSubject("");

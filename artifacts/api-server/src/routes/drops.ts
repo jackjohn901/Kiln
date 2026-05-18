@@ -44,6 +44,24 @@ router.post("/drops", async (req, res): Promise<void> => {
   res.status(201).json({ ...drop, isOnWaitlist: false, dropDate: drop.dropDate.toISOString(), createdAt: drop.createdAt.toISOString() });
 });
 
+// GET /me/drops — my created drops
+router.get("/me/drops", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const rows = await db.select().from(dropsTable).where(eq(dropsTable.artistId, req.user.id)).orderBy(desc(dropsTable.createdAt));
+  res.json({ drops: rows.map(d => ({ ...d, isOnWaitlist: false, dropDate: d.dropDate.toISOString(), createdAt: d.createdAt.toISOString() })) });
+});
+
+// DELETE /drops/:id — remove a drop (owner only)
+router.delete("/drops/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [drop] = await db.select().from(dropsTable).where(eq(dropsTable.id, req.params.id));
+  if (!drop) { res.status(404).json({ error: "Not found" }); return; }
+  if (drop.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.delete(dropWaitlistsTable).where(eq(dropWaitlistsTable.dropId, req.params.id));
+  await db.delete(dropsTable).where(eq(dropsTable.id, req.params.id));
+  res.json({ success: true });
+});
+
 // POST /drops/:id/waitlist — toggle waitlist
 router.post("/drops/:id/waitlist", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

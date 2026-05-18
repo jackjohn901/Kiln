@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, profilesTable, listingsTable, guildsTable, postsTable } from "@workspace/db";
-import { ilike, or, and, isNull, lte, sql } from "drizzle-orm";
+import { ilike, or, and, isNull, lte, sql, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -43,6 +43,29 @@ router.get("/search", async (req, res): Promise<void> => {
     res.json({ artists, listings, guilds, posts });
   } catch (err) {
     req.log.error({ err }, "search error");
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
+// GET /users/search — featured/random profiles for community discovery
+router.get("/users/search", async (req, res): Promise<void> => {
+  const { q, limit = "8" } = req.query as Record<string, string>;
+  try {
+    let profiles;
+    if (q && q.trim().length >= 1) {
+      const like = `%${q.trim()}%`;
+      profiles = await db.select().from(profilesTable)
+        .where(or(ilike(profilesTable.displayName, like), ilike(profilesTable.handle, like)))
+        .orderBy(desc(profilesTable.followerCount))
+        .limit(Number(limit));
+    } else {
+      profiles = await db.select().from(profilesTable)
+        .orderBy(sql`RANDOM()`)
+        .limit(Number(limit));
+    }
+    res.json({ profiles });
+  } catch (err) {
+    req.log.error({ err }, "users/search error");
     res.status(500).json({ error: "Search failed" });
   }
 });

@@ -328,7 +328,7 @@ export default function PriceCalculator() {
             >
               <CheckCircle size={14} /> Copy result
             </button>
-            <Link href="/create" className="flex-1">
+            <Link href={`/create?price=${suggested}&technique=${encodeURIComponent(technique)}`} className="flex-1">
               <button className="w-full rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors flex items-center justify-center gap-2">
                 <Plus size={14} /> List this piece
               </button>

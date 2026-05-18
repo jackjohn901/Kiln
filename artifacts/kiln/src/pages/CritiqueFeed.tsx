@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, MessageSquare, Star, Send, ThumbsUp, X, Plus, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -177,13 +177,32 @@ function timeAgo(iso: string) {
 export default function CritiqueFeed() {
   const { profile } = useProfile();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [critiqueForm, setCritiqueForm] = useState<{ postId: string; ratings: { technique: number; concept: number; finish: number; originality: number }; text: string } | null>(null);
+  const [critiqueForm, setCritiqueForm] = useState<{ postId: string; postArtistId: string; ratings: { technique: number; concept: number; finish: number; originality: number }; text: string } | null>(null);
   const [helpfulClicked, setHelpfulClicked] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
   const [posts, setPosts] = useState(SEED_POSTS);
 
-  function submitCritique() {
-    if (!critiqueForm || !profile) return;
-    const newCritique = {
+  // Merge real posts that have [critique welcome] from DB on top of seeds
+  useEffect(() => {
+    fetch("/api/critique-posts")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data?.posts?.length) {
+          setPosts(prev => {
+            const dbIds = new Set(data.posts.map((p: CritiquePost) => p.id));
+            const seeds = prev.filter(p => !dbIds.has(p.id));
+            return [...data.posts, ...seeds];
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function submitCritique() {
+    if (!critiqueForm || !profile || submitting) return;
+    setSubmitting(true);
+    // optimistic update
+    const tempCritique = {
       id: `cr-new-${Date.now()}`,
       fromName: profile.name,
       fromAvatar: `https://picsum.photos/seed/${profile.id}/80/80`,
@@ -194,10 +213,34 @@ export default function CritiqueFeed() {
     };
     setPosts(prev => prev.map(p =>
       p.id === critiqueForm.postId
-        ? { ...p, critiques: [newCritique, ...p.critiques], critiqueCount: p.critiqueCount + 1 }
+        ? { ...p, critiques: [tempCritique, ...p.critiques], critiqueCount: p.critiqueCount + 1 }
         : p
     ));
     setCritiqueForm(null);
+    try {
+      const r = await fetch(`/api/critique-posts/${critiqueForm.postId}/critiques`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...critiqueForm.ratings, text: critiqueForm.text, postArtistId: critiqueForm.postArtistId }),
+      });
+      if (r.ok) {
+        const saved = await r.json();
+        // replace temp with server record
+        setPosts(prev => prev.map(p =>
+          p.id === (critiqueForm?.postId ?? "")
+            ? { ...p, critiques: p.critiques.map(c => c.id === tempCritique.id ? { ...c, id: saved.id } : c) }
+            : p
+        ));
+      }
+    } catch {}
+    setSubmitting(false);
+  }
+
+  function handleHelpful(postId: string, critiqueId: string) {
+    if (helpfulClicked.has(critiqueId)) return;
+    setHelpfulClicked(s => { const n = new Set(s); n.add(critiqueId); return n; });
+    fetch(`/api/critique-posts/${postId}/critiques/${critiqueId}/helpful`, { method: "POST", credentials: "include" }).catch(() => {});
   }
 
   return (
@@ -263,7 +306,7 @@ export default function CritiqueFeed() {
                 </button>
                 {profile && (
                   <button
-                    onClick={() => setCritiqueForm(critiqueForm?.postId === post.id ? null : { postId: post.id, ratings: { technique: 4, concept: 4, finish: 4, originality: 4 }, text: "" })}
+                    onClick={() => setCritiqueForm(critiqueForm?.postId === post.id ? null : { postId: post.id, postArtistId: post.artistId, ratings: { technique: 4, concept: 4, finish: 4, originality: 4 }, text: "" })}
                     className="ml-auto flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors"
                   >
                     <Plus size={11} /> Give Critique
@@ -306,11 +349,11 @@ export default function CritiqueFeed() {
                         className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none resize-none"
                       />
                       <button
-                        disabled={!critiqueForm.text.trim()}
+                        disabled={!critiqueForm.text.trim() || submitting}
                         onClick={submitCritique}
                         className="flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
-                        <Send size={13} /> Post Critique
+                        <Send size={13} /> {submitting ? "Posting…" : "Post Critique"}
                       </button>
                     </div>
                   </motion.div>
@@ -341,7 +384,7 @@ export default function CritiqueFeed() {
                           </div>
                           <p className="text-sm text-stone-400 leading-relaxed mb-3">{c.text}</p>
                           <button
-                            onClick={() => setHelpfulClicked(s => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })}
+                            onClick={() => handleHelpful(post.id, c.id)}
                             className={`flex items-center gap-1.5 text-xs transition-colors ${helpfulClicked.has(c.id) ? "text-amber-400" : "text-stone-600 hover:text-stone-400"}`}
                           >
                             <ThumbsUp size={11} /> Helpful ({c.helpful + (helpfulClicked.has(c.id) ? 1 : 0)})

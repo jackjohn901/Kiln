@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, Video, MapPin, Clock, Users, CheckCircle, ExternalLink, Mail, Star, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,17 +40,40 @@ export default function Mentorship() {
   const [applyingTo, setApplyingTo] = useState<string | null>(null);
   const [appliedTo, setAppliedTo] = useState<Set<string>>(new Set());
   const [applyText, setApplyText] = useState("");
+  const [applying, setApplying] = useState(false);
   const [mediumFilter, setMediumFilter] = useState<string>("all");
 
   const mediums = ["all", ...Array.from(new Set(MENTORS.map(m => m.medium.split(" & ")[0])))];
 
   const filtered = MENTORS.filter(m => mediumFilter === "all" || m.medium.includes(mediumFilter));
 
-  function handleApply(mentorId: string) {
-    if (!applyText.trim()) return;
+  // Load already-applied mentor IDs from server
+  useEffect(() => {
+    fetch("/api/me/mentorship/applications", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data?.applications?.length) {
+          setAppliedTo(new Set(data.applications.map((a: { mentorId: string }) => a.mentorId)));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleApply(mentorId: string) {
+    if (!applyText.trim() || applying) return;
+    setApplying(true);
+    try {
+      await fetch("/api/mentorship/apply", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mentorId, message: applyText }),
+      });
+    } catch {}
     setAppliedTo(s => new Set([...s, mentorId]));
     setApplyingTo(null);
     setApplyText("");
+    setApplying(false);
   }
 
   return (

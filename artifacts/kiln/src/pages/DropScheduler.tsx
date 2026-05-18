@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Zap, Plus, X, Clock, Calendar, DollarSign, Trash2, Eye, Edit2, CheckCircle } from "lucide-react";
@@ -97,6 +97,36 @@ export default function DropScheduler() {
   const [drops, setDrops] = useState<MyDrop[]>(getStoredDrops);
   const [showForm, setShowForm] = useState(false);
   const [previewDrop, setPreviewDrop] = useState<MyDrop | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Load my drops from server on mount
+  useEffect(() => {
+    fetch("/api/me/drops", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        if (data?.drops?.length) {
+          const apiDrops: MyDrop[] = data.drops.map((d: { id: string; title: string; description: string | null; imageUrl: string | null; price: number; edition: number; dropDate: string; status: string; createdAt: string }) => {
+            const dt = new Date(d.dropDate);
+            return {
+              id: d.id,
+              title: d.title,
+              description: d.description ?? "",
+              pieces: d.edition ?? 1,
+              priceFrom: d.price,
+              priceTo: Math.round(d.price * 1.5),
+              dropDate: dt.toISOString().split("T")[0]!,
+              dropTime: dt.toTimeString().substring(0, 5),
+              imageUrl: d.imageUrl ?? undefined,
+              status: d.status as MyDrop["status"],
+              notifyFollowers: true,
+              createdAt: d.createdAt,
+            };
+          });
+          setDrops(apiDrops);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -112,34 +142,62 @@ export default function DropScheduler() {
   const [imageUrl, setImageUrl] = useState("");
   const [notifyFollowers, setNotifyFollowers] = useState(true);
 
-  function createDrop() {
-    if (!title.trim()) return;
-    const drop: MyDrop = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      description: description.trim(),
-      pieces,
-      priceFrom,
-      priceTo,
-      dropDate,
-      dropTime,
-      imageUrl: imageUrl.trim() || undefined,
-      status: "scheduled",
-      notifyFollowers,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [drop, ...drops];
-    setDrops(updated);
-    saveDrops(updated);
+  async function createDrop() {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    const dropDateIso = `${dropDate}T${dropTime}:00`;
+    try {
+      const r = await fetch("/api/drops", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          imageUrl: imageUrl.trim() || undefined,
+          price: priceFrom,
+          edition: pieces,
+          dropDate: dropDateIso,
+          isPatronEarlyAccess: false,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const drop: MyDrop = {
+          id: data.id,
+          title: data.title,
+          description: data.description ?? "",
+          pieces,
+          priceFrom,
+          priceTo,
+          dropDate,
+          dropTime,
+          imageUrl: imageUrl.trim() || undefined,
+          status: "scheduled",
+          notifyFollowers,
+          createdAt: data.createdAt,
+        };
+        setDrops(prev => [drop, ...prev]);
+      } else {
+        // fallback local
+        const drop: MyDrop = { id: Date.now().toString(), title: title.trim(), description: description.trim(), pieces, priceFrom, priceTo, dropDate, dropTime, imageUrl: imageUrl.trim() || undefined, status: "scheduled", notifyFollowers, createdAt: new Date().toISOString() };
+        setDrops(prev => [drop, ...prev]);
+      }
+    } catch {
+      const drop: MyDrop = { id: Date.now().toString(), title: title.trim(), description: description.trim(), pieces, priceFrom, priceTo, dropDate, dropTime, imageUrl: imageUrl.trim() || undefined, status: "scheduled", notifyFollowers, createdAt: new Date().toISOString() };
+      setDrops(prev => [drop, ...prev]);
+    }
+    setSaving(false);
     setShowForm(false);
     setTitle(""); setDescription(""); setPieces(5); setPriceFrom(200); setPriceTo(800);
     setImageUrl(""); setNotifyFollowers(true);
   }
 
-  function deleteDrop(id: string) {
-    const updated = drops.filter((d) => d.id !== id);
-    setDrops(updated);
-    saveDrops(updated);
+  async function deleteDrop(id: string) {
+    setDrops(prev => prev.filter(d => d.id !== id));
+    try {
+      await fetch(`/api/drops/${id}`, { method: "DELETE", credentials: "include" });
+    } catch {}
   }
 
   const draftDrop: MyDrop | null = title.trim() ? {
