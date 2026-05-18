@@ -10,13 +10,16 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { AuthProvider } from "@/lib/auth";
+import { useAppUpdates } from "@/hooks/useAppUpdates";
 
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) setBaseUrl(`https://${domain}`);
@@ -31,12 +34,17 @@ const queryClient = new QueryClient({
 });
 
 function RootLayoutNav() {
+  const updateState = useAppUpdates();
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false, presentation: "modal" }} />
-      <Stack.Screen name="chat/[threadId]" options={{ headerShown: true, headerTitle: "", headerBackTitle: "Back" }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false, presentation: "modal" }} />
+        <Stack.Screen name="chat/[threadId]" options={{ headerShown: true, headerTitle: "", headerBackTitle: "Back" }} />
+      </Stack>
+      <UpdateBanner updateState={updateState} />
+    </View>
   );
 }
 

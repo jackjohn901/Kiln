@@ -57,6 +57,7 @@
       ],
       "expo-font",
       "expo-web-browser",
+      "expo-updates",
       [
         "expo-image-picker",
         {
@@ -76,6 +77,15 @@
         }
       ]
     ],
+    "updates": {
+      "url": "https://u.expo.dev/YOUR_EAS_PROJECT_ID",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "YOUR_EAS_PROJECT_ID"
