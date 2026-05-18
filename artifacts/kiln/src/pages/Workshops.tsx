@@ -51,6 +51,11 @@ function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (id: st
   const handleBook = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (soldOut || w.isBooked) return;
+    // Paid workshops require Stripe checkout; navigate there instead of direct booking
+    if (w.price > 0) {
+      navigate(`/workshop-checkout/${w.id}`);
+      return;
+    }
     setBooking(true);
     try {
       const r = await fetch(`/api/workshops/${w.id}/book`, { method: "POST", credentials: "include" });

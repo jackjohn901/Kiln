@@ -53,11 +53,14 @@ router.post("/workshops", async (req, res): Promise<void> => {
   } catch (err) { req.log.error({ err }, "createWorkshop error"); res.status(500).json({ error: "Failed to create workshop" }); }
 });
 
-// POST /workshops/:id/book — book a spot
+// POST /workshops/:id/book — book a spot (free workshops only).
+// Paid workshops (price > 0) must be booked via /api/stripe/checkout to ensure payment is verified
+// before a seat is reserved. Direct booking of paid workshops is rejected here.
 router.post("/workshops/:id/book", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [w] = await db.select().from(workshopsTable).where(eq(workshopsTable.id, req.params.id));
   if (!w) { res.status(404).json({ error: "Not found" }); return; }
+  if (w.price > 0) { res.status(402).json({ error: "This workshop requires payment. Please complete checkout before your spot is reserved." }); return; }
   if (w.spotsBooked >= w.maxSpots) { res.status(400).json({ error: "No spots left" }); return; }
   const userId = req.user.id;
   const [existing] = await db.select().from(workshopBookingsTable).where(and(eq(workshopBookingsTable.workshopId, w.id), eq(workshopBookingsTable.userId, userId)));
@@ -65,7 +68,7 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
   try {
     const user = req.user;
     const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Student";
-    const [booking] = await db.insert(workshopBookingsTable).values({ id: crypto.randomUUID(), workshopId: w.id, userId, userName: name, userEmail: user.email ?? undefined, paidAmount: w.price }).returning();
+    const [booking] = await db.insert(workshopBookingsTable).values({ id: crypto.randomUUID(), workshopId: w.id, userId, userName: name, userEmail: user.email ?? undefined, paidAmount: 0 }).returning();
     await db.update(workshopsTable).set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` }).where(eq(workshopsTable.id, w.id));
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: w.artistId, type: "workshop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `booked your workshop: ${w.title}`, link: `/workshops` });
     res.status(201).json({ booking: { ...booking, createdAt: booking.createdAt.toISOString() }, spotsLeft: w.maxSpots - w.spotsBooked - 1 });
@@ -73,10 +76,16 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
 });
 
 // DELETE /workshops/:id/book — cancel booking
+// spotsBooked is only decremented when a booking row belonging to the caller is actually deleted,
+// preventing unauthenticated seat-count manipulation by users who never held a booking.
 router.delete("/workshops/:id/book", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  await db.delete(workshopBookingsTable).where(and(eq(workshopBookingsTable.workshopId, req.params.id), eq(workshopBookingsTable.userId, req.user.id)));
-  await db.update(workshopsTable).set({ spotsBooked: sql`GREATEST(${workshopsTable.spotsBooked} - 1, 0)` }).where(eq(workshopsTable.id, req.params.id));
+  const deleted = await db.delete(workshopBookingsTable)
+    .where(and(eq(workshopBookingsTable.workshopId, req.params.id), eq(workshopBookingsTable.userId, req.user.id)))
+    .returning({ id: workshopBookingsTable.id });
+  if (deleted.length > 0) {
+    await db.update(workshopsTable).set({ spotsBooked: sql`GREATEST(${workshopsTable.spotsBooked} - 1, 0)` }).where(eq(workshopsTable.id, req.params.id));
+  }
   res.json({ success: true });
 });
 
