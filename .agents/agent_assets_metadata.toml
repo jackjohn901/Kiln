@@ -125,3 +125,9 @@ id = "166xqKXahZ3wDwX79esCB"
 uri = "file://kilnfire-store-submission.tar.gz"
 type = "unspecified"
 title = "KilnFire — App Store & Google Play Submission Package"
+
+[[outputs]]
+id = "h9dPaBFwapyW9VGDlljwI"
+uri = "file://kilnfire-store-submission.zip"
+type = "unspecified"
+title = "KilnFire — App Store & Google Play Submission Package"
