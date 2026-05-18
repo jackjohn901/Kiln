@@ -77,6 +77,19 @@ router.get("/posts/:postId", async (req, res): Promise<void> => {
   }
 });
 
+// POST /posts/:postId/view — increment view count (anonymous OK, once per call)
+router.post("/posts/:postId/view", async (req, res): Promise<void> => {
+  const { postId } = req.params;
+  try {
+    await db.update(postsTable)
+      .set({ viewCount: sql`${postsTable.viewCount} + 1` })
+      .where(eq(postsTable.id, postId));
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: false });
+  }
+});
+
 // POST /posts/:postId/like — toggle like
 router.post("/posts/:postId/like", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

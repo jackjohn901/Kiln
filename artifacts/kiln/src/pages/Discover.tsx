@@ -57,6 +57,27 @@ export default function Discover() {
       .catch(() => {});
   }, []);
 
+  interface ApiArtist {
+    id: string; displayName: string | null; handle: string | null;
+    bio: string | null; avatarUrl: string | null; medium: string | null;
+    followerCount: number | null;
+  }
+  const [apiSearchResults, setApiSearchResults] = useState<ApiArtist[]>([]);
+  useEffect(() => {
+    if (query.trim().length < 2) { setApiSearchResults([]); return; }
+    const controller = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((data) => {
+          const profiles: ApiArtist[] = (data?.artists ?? []).map((p: ApiArtist) => p);
+          setApiSearchResults(profiles);
+        })
+        .catch(() => {});
+    }, 300);
+    return () => { clearTimeout(t); controller.abort(); };
+  }, [query]);
+
   const handleCommunityFollow = (userId: string) => {
     const nowFollowing = !communityFollowing.has(userId);
     setCommunityFollowing((prev) => {
@@ -461,7 +482,36 @@ export default function Discover() {
             </div>
           </div>
 
-          <p className="text-xs text-stone-500 mb-4">{filtered.length} artist{filtered.length !== 1 ? "s" : ""}</p>
+          {/* API / platform search results */}
+          {query.trim().length >= 2 && apiSearchResults.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Search size={13} className="text-amber-400" />
+                <h2 className="text-sm font-semibold text-stone-300">Artists on Kiln matching "{query.trim()}"</h2>
+                <span className="rounded-full bg-stone-800 border border-stone-700 px-2 py-0.5 text-[9px] text-stone-500">{apiSearchResults.length} result{apiSearchResults.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {apiSearchResults.map((p) => {
+                  const avatarUrl = p.avatarUrl ?? `https://picsum.photos/seed/${p.id}/200/200`;
+                  const name = p.displayName ?? p.handle ?? "Artist";
+                  return (
+                    <div key={p.id} className="flex flex-col items-center gap-2.5 rounded-2xl border border-amber-500/20 bg-stone-900/60 p-4 hover:border-amber-500/40 hover:bg-stone-900 transition-all cursor-pointer"
+                      onClick={() => navigate(`/artists/${p.id}`)}>
+                      <img src={avatarUrl} alt={name} className="h-12 w-12 rounded-full object-cover border border-white/10" />
+                      <div className="text-center min-w-0 w-full">
+                        <p className="text-sm font-semibold text-stone-100 truncate">{name}</p>
+                        {p.medium && <p className="text-[10px] text-amber-400 truncate">{p.medium}</p>}
+                        {p.followerCount != null && <p className="text-[10px] text-stone-600">{p.followerCount.toLocaleString()} followers</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="border-t border-white/5 mb-5" />
+            </div>
+          )}
+
+          <p className="text-xs text-stone-500 mb-4">{filtered.length} artist{filtered.length !== 1 ? "s" : ""} in library</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {filtered.map((artist) => {

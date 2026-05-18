@@ -140,8 +140,8 @@ export default function Analytics() {
   const [earningTotals, setEarningTotals] = useState<EarningTotals | null>(null);
   const [analyticsData, setAnalyticsData] = useState<{
     totalPosts: number; totalLikes: number; totalComments: number;
-    totalSaves: number; followerCount: number; topPosts: ApiPost[];
-    postsByDay: Record<string, number>; likesByDay: Record<string, number>;
+    totalSaves: number; totalViews: number; followerCount: number; topPosts: ApiPost[];
+    postsByDay: Record<string, number>; likesByDay: Record<string, number>; viewsByDay: Record<string, number>;
   } | null>(null);
 
   useEffect(() => {
@@ -222,8 +222,8 @@ export default function Analytics() {
         {/* KPI grid */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KpiCard label="Followers" value={(analyticsData?.followerCount ?? apiFollowers ?? 0).toLocaleString()} icon={Users} color="bg-sky-500/10 text-sky-400" />
-          <KpiCard label="Total likes" value={(analyticsData?.totalLikes ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
-          <KpiCard label="Total saves" value={(analyticsData?.totalSaves ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.saveCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
+          <KpiCard label="Total views" value={(analyticsData?.totalViews ?? 0).toLocaleString()} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
+          <KpiCard label="Total likes" value={(analyticsData?.totalLikes ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
           <KpiCard label="Posts" value={String(analyticsData?.totalPosts ?? apiPosts.length)} sub="Published" icon={TrendingUp} color="bg-emerald-500/10 text-emerald-400" />
         </div>
 
@@ -270,6 +270,21 @@ export default function Analytics() {
           </div>
           <MiniLineChart data={likeActivityData.length > 0 ? likeActivityData : [0, 0]} color="#f59e0b" height={72} />
         </div>
+
+        {/* Views chart (real data from view tracking) */}
+        {(() => {
+          const viewActivityData = buildDayMap(analyticsData?.viewsByDay ?? {}, period);
+          const totalViewActivity = viewActivityData.reduce((s, v) => s + v, 0);
+          return (
+            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+              <div className="mb-3">
+                <h2 className="text-sm font-bold text-stone-200">Post Views</h2>
+                <p className="text-xs text-stone-500">{totalViewActivity.toLocaleString()} views this period · tracked in real time</p>
+              </div>
+              <MiniLineChart data={viewActivityData.length > 0 ? viewActivityData : [0, 0]} color="#a78bfa" height={72} />
+            </div>
+          );
+        })()}
 
         {/* Commission stats */}
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">

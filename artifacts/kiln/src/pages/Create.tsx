@@ -67,7 +67,7 @@ export default function Create() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
   const { recordPost } = useSocial();
-  const { upload, uploadVideo, uploading, progress } = useUpload();
+  const { upload, uploading, progress } = useUpload();
 
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
@@ -218,25 +218,16 @@ export default function Create() {
     try {
       let thumbnailUrl: string | undefined;
       let mediaUrl = previewUrl;
-      let muxUploadId: string | undefined;
-      let muxPlaybackId: string | undefined;
 
       if (file && mediaType === "video") {
         // Capture thumbnail while the blob URL is still valid
         thumbnailUrl = await captureVideoThumbnail(previewUrl) || undefined;
-        // Try Mux first for video transcoding; fall back to object storage then IndexedDB
+        // Upload video to Object Storage; fall back to IndexedDB
         try {
-          const muxResult = await uploadVideo(file);
-          muxUploadId = muxResult.uploadId;
-          muxPlaybackId = muxResult.playbackId;
-          // Keep blob/previewUrl as local preview; Mux serves the actual HLS stream
+          const result = await upload(file);
+          mediaUrl = result.servingUrl;
         } catch {
-          try {
-            const result = await upload(file);
-            mediaUrl = result.servingUrl;
-          } catch {
-            mediaUrl = await storeBlob(file);
-          }
+          mediaUrl = await storeBlob(file);
         }
       } else if (file) {
         // Images: try server upload, fall back to base64
@@ -301,8 +292,6 @@ export default function Create() {
           isPatronOnly,
           scheduledAt: scheduledAt || null,
           isDraft: scheduledAt ? true : false,
-          muxUploadId: muxUploadId ?? null,
-          muxPlaybackId: muxPlaybackId ?? null,
         }),
       }).catch(() => {});
 

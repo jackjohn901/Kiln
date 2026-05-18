@@ -324,6 +324,16 @@ function ReelCard({
     const iv = setInterval(() => setPlayProgress((p) => (p >= 100 ? 0 : p + 0.4)), 400);
     return () => clearInterval(iv);
   }, [isActive]);
+
+  // Track post view once per session when this reel enters the active slot
+  useEffect(() => {
+    if (!isActive) return;
+    const key = `kiln_v_${reel.id}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    fetch(`/api/posts/${reel.id}/view`, { method: "POST" }).catch(() => {});
+  }, [isActive, reel.id]);
+
   const reelAnnotations = TECHNIQUE_ANNOTATIONS[reel.technique] ?? [];
 
   // Resolve idb:// video URLs from IndexedDB

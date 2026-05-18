@@ -28,20 +28,18 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
     const totalLikes = allPosts.reduce((s, p) => s + (p.likeCount ?? 0), 0);
     const totalComments = allPosts.reduce((s, p) => s + (p.commentCount ?? 0), 0);
     const totalSaves = allPosts.reduce((s, p) => s + (p.saveCount ?? 0), 0);
+    const totalViews = allPosts.reduce((s, p) => s + (p.viewCount ?? 0), 0);
 
     // Posts per day for last 30 days (for chart)
     const recentPosts = allPosts.filter((p) => new Date(p.createdAt) >= thirtyDaysAgo);
     const postsByDay: Record<string, number> = {};
+    const likesByDay: Record<string, number> = {};
+    const viewsByDay: Record<string, number> = {};
     for (const p of recentPosts) {
       const day = new Date(p.createdAt).toISOString().slice(0, 10);
       postsByDay[day] = (postsByDay[day] ?? 0) + 1;
-    }
-
-    // Likes per day for last 30 days (proportional estimate from recent posts)
-    const likesByDay: Record<string, number> = {};
-    for (const p of recentPosts) {
-      const day = new Date(p.createdAt).toISOString().slice(0, 10);
       likesByDay[day] = (likesByDay[day] ?? 0) + (p.likeCount ?? 0);
+      viewsByDay[day] = (viewsByDay[day] ?? 0) + (p.viewCount ?? 0);
     }
 
     // Top posts by engagement
@@ -63,10 +61,12 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
       totalLikes,
       totalComments,
       totalSaves,
+      totalViews,
       followerCount,
       topPosts,
       postsByDay,
       likesByDay,
+      viewsByDay,
     });
   } catch (err) {
     req.log.error({ err }, "analytics/me error");
