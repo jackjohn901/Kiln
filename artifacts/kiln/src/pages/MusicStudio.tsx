@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import {
-  Play, Pause, Trash2, Save, ChevronLeft, Music2, RotateCcw,
+  Play, Pause, Trash2, Save, ChevronLeft, Music, Music2, RotateCcw,
   Download, SlidersHorizontal, Plus, ChevronDown, ChevronUp, Check, Zap,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -437,6 +437,53 @@ export default function MusicStudio() {
     setBeatTitle("");
   }
 
+  // ── Use beat on a post (writes to sessionStorage, then navigates) ─────────────
+
+  function useOnPost(beat: CommunityBeat) {
+    stop();
+    try {
+      sessionStorage.setItem("kiln_pending_beat", JSON.stringify({
+        id: `beat-${beat.id}`,
+        title: beat.title,
+        artist: beat.artistName,
+        url: `beat://${beat.id}`,
+        license: beat.license === "free" ? "Free" : beat.license === "community" ? "$1" : "$5",
+        bpm: beat.bpm,
+      }));
+    } catch { /* sessionStorage unavailable */ }
+    setLocation("/create");
+  }
+
+  function useCurrentOnPost() {
+    // Auto-save the current beat first so MusicPicker can find it
+    const title = beatTitle.trim() || "My Beat";
+    const id = randomId();
+    const beat: CommunityBeat = {
+      id,
+      title,
+      artistHandle: profile?.handle ?? "me",
+      artistName:   profile?.name   ?? "You",
+      bpm,
+      steps,
+      pattern:       pattern.map((r) => [...r]),
+      trackCount:    NUM_TRACKS,
+      trackVolumes:  [...trackVolumes],
+      trackMutes:    [...trackMutes],
+      melodyNotes:   [...toneNotes[2]],
+      bassNotes:     [...toneNotes[0]],
+      chordNotes:    [...toneNotes[1]],
+      swing,
+      reverb,
+      license,
+      price: license === "free" ? 0 : license === "community" ? 1 : 5,
+      createdAt: new Date().toISOString(),
+      usedCount: 0,
+    };
+    saveCommunityBeat(beat);
+    setSaved(true);
+    useOnPost(beat);
+  }
+
   // ── Load beat into studio ──────────────────────────────────────────────────────
 
   function loadBeat(beat: CommunityBeat) {
@@ -783,7 +830,7 @@ export default function MusicStudio() {
                     ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
                     : "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 hover:from-amber-400 hover:to-orange-400 active:scale-95 shadow-lg shadow-amber-500/20"
                 }`}>
-                {saved ? <><Check size={15} /> Saved to My Sounds!</> : <><Save size={15} /> Save to My Sounds</>}
+                {saved ? <><Check size={15} /> Saved!</> : <><Save size={15} /> Save to My Sounds</>}
               </button>
               <button onClick={exportWAV} disabled={exporting}
                 className="flex items-center gap-1.5 rounded-full border border-stone-700 px-4 py-3 text-xs text-stone-400 hover:border-emerald-500/40 hover:text-emerald-400 transition-colors disabled:opacity-50">
@@ -791,6 +838,18 @@ export default function MusicStudio() {
                 {exporting ? "…" : "WAV"}
               </button>
             </div>
+
+            {/* Use on Post — the primary action */}
+            <button
+              onClick={useCurrentOnPost}
+              className="w-full flex items-center justify-center gap-2 rounded-full border-2 border-amber-400/60 bg-amber-400/10 py-3 text-sm font-bold text-amber-300 hover:bg-amber-400/20 hover:border-amber-400 transition-all active:scale-95"
+            >
+              <Music size={15} />
+              Use on Post →
+            </button>
+            <p className="text-center text-[10px] text-stone-700">
+              Saves your beat and adds it to your next post
+            </p>
           </div>
         </div>
       )}
@@ -827,7 +886,7 @@ export default function MusicStudio() {
                 <BeatCard key={beat.id} beat={beat}
                   onEdit={() => loadBeat(beat)}
                   onDelete={() => { deleteCommunityBeat(beat.id); setMyBeats((p) => p.filter((b) => b.id !== beat.id)); }}
-                  onUseInPost={() => setLocation("/create")}
+                  onUseInPost={() => useOnPost(beat)}
                 />
               ))}
             </>
