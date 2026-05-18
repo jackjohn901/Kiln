@@ -2,18 +2,25 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ArrowLeft, Play, Square, Download, Sparkles, Film,
-  Megaphone, Star, Zap, RefreshCw, Check, Pencil, X, ChevronRight,
+  Megaphone, Star, Zap, RefreshCw, Check, Pencil, X, ChevronRight, Video,
+  AlertTriangle,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CLIP_MS = 7000;
+const IMAGE_CLIP_MS = 7000;
+const MAX_VIDEO_MS  = 30_000;
 const CANVAS_W = 540;
 const CANVAS_H = 960;
 
+type SourceType = "image" | "video";
 type Style = "movie-trailer" | "advertisement" | "commercial" | "short-clip";
-type Step = "source" | "style" | "enhancing" | "studio";
+type Step  = "source" | "style" | "enhancing" | "studio";
+
+function isVideoUrl(url: string) {
+  return /\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(url);
+}
 
 interface Overlay {
   id: string;
@@ -117,7 +124,6 @@ function buildAudio(
 
   function movieTrailer() {
     const rv = reverb(4, 1.4);
-    // Low drone swell
     const drone = ctx.createOscillator();
     const dg = ctx.createGain();
     const f = ctx.createBiquadFilter();
@@ -132,14 +138,13 @@ function buildAudio(
     drone.connect(f); f.connect(dg); dg.connect(rv);
     drone.start(); oscs.push(drone);
 
-    // Swell chord (A minor: A2 E3 A3)
     [110, 165, 220].forEach((hz, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.type = "sine"; o.frequency.value = hz;
       g.gain.setValueAtTime(0, ctx.currentTime + i * 0.4);
       g.gain.linearRampToValueAtTime(0.07, ctx.currentTime + 3 + i * 0.3);
-      g.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 5.5);
+      g.gain.linearRampToValueAtTime(0.1, ctx.currentTime + Math.min(5.5, durationSec - 0.5));
       g.gain.linearRampToValueAtTime(0, ctx.currentTime + durationSec);
       o.connect(g); g.connect(rv);
       o.start(); oscs.push(o);
@@ -162,7 +167,6 @@ function buildAudio(
       o.connect(g); g.connect(master);
       o.start(t); o.stop(t + 0.22); oscs.push(o);
     }
-    // Bright shimmer
     const shimmer = ctx.createOscillator();
     const sg = ctx.createGain();
     shimmer.type = "sine"; shimmer.frequency.value = 1046.5;
@@ -174,7 +178,6 @@ function buildAudio(
 
   function commercial() {
     const rv = reverb(3, 2.2);
-    // Warm A major pad
     [220, 277.2, 329.6, 440].forEach((hz, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -190,7 +193,6 @@ function buildAudio(
   }
 
   function shortClip() {
-    // Bass hit
     const bass = ctx.createOscillator();
     const bg = ctx.createGain();
     bass.type = "sine";
@@ -201,8 +203,7 @@ function buildAudio(
     bass.connect(bg); bg.connect(master);
     bass.start(); bass.stop(ctx.currentTime + 0.5); oscs.push(bass);
 
-    // Riser
-    const nBuf = ctx.createBuffer(1, ctx.sampleRate * 5, ctx.sampleRate);
+    const nBuf = ctx.createBuffer(1, ctx.sampleRate * Math.min(5, durationSec), ctx.sampleRate);
     const nd = nBuf.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource();
@@ -210,24 +211,24 @@ function buildAudio(
     const rf = ctx.createBiquadFilter();
     rf.type = "bandpass"; rf.Q.value = 8;
     rf.frequency.setValueAtTime(200, ctx.currentTime + 1);
-    rf.frequency.linearRampToValueAtTime(3200, ctx.currentTime + 5.2);
+    rf.frequency.linearRampToValueAtTime(3200, ctx.currentTime + Math.min(5.2, durationSec - 0.5));
     const rg = ctx.createGain();
     rg.gain.setValueAtTime(0, ctx.currentTime + 1);
-    rg.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 5);
-    rg.gain.linearRampToValueAtTime(0, ctx.currentTime + 5.8);
+    rg.gain.linearRampToValueAtTime(0.22, ctx.currentTime + Math.min(5, durationSec - 0.5));
+    rg.gain.linearRampToValueAtTime(0, ctx.currentTime + Math.min(5.8, durationSec));
     noise.connect(rf); rf.connect(rg); rg.connect(master);
     noise.start(ctx.currentTime + 1);
     sources.push(noise);
 
-    // Drop thump
+    const thumpT = Math.min(5.5, durationSec - 1.5);
     const drop = ctx.createOscillator();
     const dg2 = ctx.createGain();
     drop.type = "sine"; drop.frequency.value = 58;
-    dg2.gain.setValueAtTime(0, ctx.currentTime + 5.5);
-    dg2.gain.linearRampToValueAtTime(0.38, ctx.currentTime + 5.55);
-    dg2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 7);
+    dg2.gain.setValueAtTime(0, ctx.currentTime + thumpT);
+    dg2.gain.linearRampToValueAtTime(0.38, ctx.currentTime + thumpT + 0.05);
+    dg2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationSec);
     drop.connect(dg2); dg2.connect(master);
-    drop.start(ctx.currentTime + 5.5); drop.stop(ctx.currentTime + 7.1); oscs.push(drop);
+    drop.start(ctx.currentTime + thumpT); drop.stop(ctx.currentTime + durationSec + 0.1); oscs.push(drop);
   }
 
   const builders: Record<Style, () => void> = {
@@ -305,7 +306,6 @@ function drawOverlay(
   const totalH = lines.length * lineH;
   const startY = baseY - totalH / 2;
 
-  // Backdrop gradient for readability (skip for watermark)
   if (overlay.style !== "watermark") {
     const padV = 20;
     const grad = ctx.createLinearGradient(0, startY - padV, 0, startY + totalH + padV);
@@ -331,110 +331,174 @@ export default function ReelStudio() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
 
-  const [step, setStep] = useState<Step>("source");
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [pasteUrl, setPasteUrl] = useState("");
+  const [step, setStep]                 = useState<Step>("source");
+  const [sourceType, setSourceType]     = useState<SourceType>("image");
+  const [sourceUrl, setSourceUrl]       = useState("");         // thumbnail / image URL (shown in UI + sent to AI)
+  const [videoSourceUrl, setVideoSourceUrl] = useState("");     // actual video URL for canvas playback
+  const [pasteUrl, setPasteUrl]         = useState("");
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
-  const [chosenStyle, setChosenStyle] = useState<Style>("movie-trailer");
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [progressMs, setProgressMs] = useState(0);
-  const [downloadUrl, setDownloadUrl] = useState("");
-  const [published, setPublished] = useState(false);
-  const [error, setError] = useState("");
+  const [chosenStyle, setChosenStyle]   = useState<Style>("movie-trailer");
+  const [plan, setPlan]                 = useState<Plan | null>(null);
+  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [editText, setEditText]         = useState("");
+  const [feedPosts, setFeedPosts]       = useState<FeedPost[]>([]);
+  const [isPlaying, setIsPlaying]       = useState(false);
+  const [isRecording, setIsRecording]   = useState(false);
+  const [progressMs, setProgressMs]     = useState(0);
+  const [clipDurationMs, setClipDurationMs] = useState(IMAGE_CLIP_MS);
+  const [downloadUrl, setDownloadUrl]   = useState("");
+  const [published, setPublished]       = useState(false);
+  const [error, setError]               = useState("");
+  const [corsBlocked, setCorsBlocked]   = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const rafRef = useRef<number>(0);
-  const audioRef = useRef<ReturnType<typeof buildAudio> | null>(null);
+  const imgRef    = useRef<HTMLImageElement | null>(null);
+  const videoRef  = useRef<HTMLVideoElement | null>(null);
+  const rafRef    = useRef<number>(0);
+  const audioRef  = useRef<ReturnType<typeof buildAudio> | null>(null);
 
   // Load recent posts for source picking
   useEffect(() => {
-    fetch("/api/feed?limit=12")
+    fetch("/api/feed?limit=18")
       .then(r => r.json())
       .then(d => setFeedPosts(d.posts ?? []))
       .catch(() => {});
   }, []);
 
-  // Pre-load image when source is chosen
+  // Pre-load image when sourceUrl changes and sourceType === "image"
   useEffect(() => {
-    if (!sourceUrl) return;
+    if (!sourceUrl || sourceType !== "image") return;
+    imgRef.current = null;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = sourceUrl;
     img.onload = () => {
       imgRef.current = img;
-      if (canvasRef.current) renderFrame(0);
+      if (canvasRef.current && plan) renderFrame(0);
     };
     img.onerror = () => {
-      // Fallback: try without crossOrigin
       const img2 = new Image();
       img2.src = sourceUrl;
-      img2.onload = () => { imgRef.current = img2; if (canvasRef.current) renderFrame(0); };
+      img2.onload = () => { imgRef.current = img2; if (canvasRef.current && plan) renderFrame(0); };
     };
-  }, [sourceUrl]); // eslint-disable-line
+  }, [sourceUrl, sourceType]); // eslint-disable-line
+
+  // Load video element when sourceType === "video"
+  useEffect(() => {
+    if (!videoSourceUrl || sourceType !== "video") return;
+    setCorsBlocked(false);
+    videoRef.current = null;
+
+    const vid = document.createElement("video");
+    vid.crossOrigin = "anonymous";
+    vid.muted = true;
+    vid.playsInline = true;
+    vid.src = videoSourceUrl;
+    vid.preload = "auto";
+
+    vid.onloadedmetadata = () => {
+      videoRef.current = vid;
+      const durMs = Math.min(vid.duration * 1000, MAX_VIDEO_MS);
+      setClipDurationMs(isFinite(durMs) && durMs > 0 ? durMs : IMAGE_CLIP_MS);
+      // draw first frame
+      vid.currentTime = 0;
+    };
+    vid.onseeked = () => {
+      if (canvasRef.current && plan) renderFrame(0);
+    };
+    vid.onerror = () => {
+      // Try without crossOrigin
+      const vid2 = document.createElement("video");
+      vid2.muted = true;
+      vid2.playsInline = true;
+      vid2.src = videoSourceUrl;
+      vid2.preload = "auto";
+      vid2.onloadedmetadata = () => {
+        videoRef.current = vid2;
+        const durMs = Math.min(vid2.duration * 1000, MAX_VIDEO_MS);
+        setClipDurationMs(isFinite(durMs) && durMs > 0 ? durMs : IMAGE_CLIP_MS);
+        vid2.currentTime = 0;
+      };
+      vid2.onseeked = () => {
+        if (canvasRef.current && plan) renderFrame(0);
+      };
+    };
+  }, [videoSourceUrl, sourceType]); // eslint-disable-line
 
   const renderFrame = useCallback(
     (ms: number) => {
       const canvas = canvasRef.current;
-      const img = imgRef.current;
-      if (!canvas || !img) return;
-      const ctx = canvas.getContext("2d")!;
+      if (!canvas) return;
+      const ctx2d = canvas.getContext("2d")!;
       const W = CANVAS_W, H = CANVAS_H;
 
-      // Color-graded image
-      ctx.filter = plan?.colorFilter ?? "none";
-      ctx.drawImage(img, 0, 0, W, H);
-      ctx.filter = "none";
+      const source = sourceType === "video" ? videoRef.current : imgRef.current;
+      if (!source) return;
+
+      try {
+        ctx2d.filter = plan?.colorFilter ?? "none";
+        ctx2d.drawImage(source as CanvasImageSource, 0, 0, W, H);
+        ctx2d.filter = "none";
+      } catch {
+        return;
+      }
 
       // Fade transition
       const fadeMs = 450;
       if (ms < fadeMs) {
-        ctx.fillStyle = `rgba(0,0,0,${1 - ms / fadeMs})`;
-        ctx.fillRect(0, 0, W, H);
-      } else if (ms > CLIP_MS - fadeMs) {
-        ctx.fillStyle = `rgba(0,0,0,${(ms - (CLIP_MS - fadeMs)) / fadeMs})`;
-        ctx.fillRect(0, 0, W, H);
+        ctx2d.fillStyle = `rgba(0,0,0,${1 - ms / fadeMs})`;
+        ctx2d.fillRect(0, 0, W, H);
+      } else if (ms > clipDurationMs - fadeMs) {
+        ctx2d.fillStyle = `rgba(0,0,0,${(ms - (clipDurationMs - fadeMs)) / fadeMs})`;
+        ctx2d.fillRect(0, 0, W, H);
       }
 
       // Active overlays
       (plan?.overlays ?? []).forEach(ov => {
         if (ms >= ov.startMs && ms <= ov.startMs + ov.durationMs) {
           const p = (ms - ov.startMs) / ov.durationMs;
-          drawOverlay(ctx, ov, p, W, H);
+          drawOverlay(ctx2d, ov, p, W, H);
         }
       });
     },
-    [plan],
+    [plan, sourceType, clipDurationMs],
   );
 
   const stopPlayback = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     audioRef.current?.stop();
     audioRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
     setIsPlaying(false);
   }, []);
 
   const playPreview = useCallback(() => {
-    if (!imgRef.current) return;
+    const hasSource = sourceType === "video" ? !!videoRef.current : !!imgRef.current;
+    if (!hasSource) return;
     stopPlayback();
     setIsPlaying(true);
     setDownloadUrl("");
 
-    const audio = buildAudio(chosenStyle, CLIP_MS / 1000);
+    const audio = buildAudio(chosenStyle, clipDurationMs / 1000);
     audioRef.current = audio;
     audio.start();
+
+    if (sourceType === "video" && videoRef.current) {
+      const vid = videoRef.current;
+      vid.currentTime = 0;
+      vid.muted = true;
+      vid.play().catch(() => {});
+    }
 
     const wall = performance.now();
     const loop = () => {
       const elapsed = performance.now() - wall;
-      if (elapsed >= CLIP_MS) {
-        renderFrame(CLIP_MS);
-        setProgressMs(CLIP_MS);
+      if (elapsed >= clipDurationMs) {
+        renderFrame(clipDurationMs);
+        setProgressMs(clipDurationMs);
         stopPlayback();
         return;
       }
@@ -443,22 +507,39 @@ export default function ReelStudio() {
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
-  }, [chosenStyle, renderFrame, stopPlayback]);
+  }, [chosenStyle, clipDurationMs, renderFrame, sourceType, stopPlayback]);
 
   const exportClip = useCallback(async () => {
     const canvas = canvasRef.current;
-    if (!canvas || !imgRef.current) return;
+    const hasSource = sourceType === "video" ? !!videoRef.current : !!imgRef.current;
+    if (!canvas || !hasSource) return;
+
+    setCorsBlocked(false);
     setIsRecording(true);
     setDownloadUrl("");
     stopPlayback();
 
-    // Render first frame
     renderFrame(0);
 
-    const audio = buildAudio(chosenStyle, CLIP_MS / 1000);
+    if (sourceType === "video" && videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(() => {});
+    }
+
+    const audio = buildAudio(chosenStyle, clipDurationMs / 1000);
     audio.start();
 
-    const videoStream = canvas.captureStream(30);
+    let videoStream: MediaStream;
+    try {
+      videoStream = canvas.captureStream(30);
+    } catch {
+      audio.stop();
+      setIsRecording(false);
+      setCorsBlocked(true);
+      return;
+    }
+
     const combined = new MediaStream([
       ...videoStream.getVideoTracks(),
       ...audio.dest.stream.getAudioTracks(),
@@ -467,11 +548,25 @@ export default function ReelStudio() {
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
       ? "video/webm;codecs=vp9,opus"
       : "video/webm";
-    const recorder = new MediaRecorder(combined, { mimeType });
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(combined, { mimeType });
+    } catch {
+      audio.stop();
+      setIsRecording(false);
+      setCorsBlocked(true);
+      return;
+    }
+
     const chunks: Blob[] = [];
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.onstop = () => {
       audio.stop();
+      if (sourceType === "video" && videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
       const blob = new Blob(chunks, { type: "video/webm" });
       setDownloadUrl(URL.createObjectURL(blob));
       setIsRecording(false);
@@ -481,19 +576,19 @@ export default function ReelStudio() {
     const wall = performance.now();
     const loop = () => {
       const elapsed = performance.now() - wall;
-      if (elapsed >= CLIP_MS + 300) { recorder.stop(); return; }
-      renderFrame(Math.min(elapsed, CLIP_MS));
-      setProgressMs(Math.min(elapsed, CLIP_MS));
+      if (elapsed >= clipDurationMs + 400) { recorder.stop(); return; }
+      renderFrame(Math.min(elapsed, clipDurationMs));
+      setProgressMs(Math.min(elapsed, clipDurationMs));
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
-  }, [chosenStyle, renderFrame, stopPlayback]);
+  }, [chosenStyle, clipDurationMs, renderFrame, sourceType, stopPlayback]);
 
   // ── Enhance request ──────────────────────────────────────────────────────
 
   async function enhance() {
-    const url = sourceUrl || pasteUrl.trim();
-    if (!url) return;
+    const aiImageUrl = sourceUrl.trim(); // always a thumbnail/image URL for AI
+    if (!aiImageUrl && !selectedPost?.caption) return;
     setStep("enhancing");
     setError("");
     try {
@@ -502,7 +597,7 @@ export default function ReelStudio() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          imageUrl: url,
+          imageUrl: aiImageUrl || undefined,
           caption: selectedPost?.caption ?? "",
           technique: selectedPost?.technique ?? "",
           style: chosenStyle,
@@ -511,11 +606,24 @@ export default function ReelStudio() {
       });
       if (!r.ok) throw new Error(await r.text());
       const data: Plan = await r.json();
+
+      // For video: scale overlays to actual video duration
+      if (sourceType === "video" && clipDurationMs !== IMAGE_CLIP_MS) {
+        const scale = clipDurationMs / IMAGE_CLIP_MS;
+        data.overlays = data.overlays.map(ov => ({
+          ...ov,
+          startMs: Math.round(ov.startMs * scale),
+          durationMs: Math.round(ov.durationMs * scale),
+        }));
+      }
+
       setPlan(data);
       setStep("studio");
-      // Render first frame once image is ready
-      setTimeout(() => { if (imgRef.current) renderFrame(0); }, 100);
-    } catch (e) {
+      setTimeout(() => {
+        const hasSource = sourceType === "video" ? !!videoRef.current : !!imgRef.current;
+        if (hasSource) renderFrame(0);
+      }, 150);
+    } catch {
       setError("Enhancement failed — please try again.");
       setStep("style");
     }
@@ -550,20 +658,40 @@ export default function ReelStudio() {
 
   function selectPost(p: FeedPost) {
     setSelectedPost(p);
-    const url = p.thumbnailUrl ?? p.videoUrl ?? "";
-    setSourceUrl(url);
+    if (p.videoUrl) {
+      setSourceType("video");
+      setVideoSourceUrl(p.videoUrl);
+      // Use thumbnail for AI analysis preview; fall back to a blank source so AI uses caption only
+      setSourceUrl(p.thumbnailUrl ?? "");
+      setClipDurationMs(IMAGE_CLIP_MS); // will be updated once video loads
+    } else {
+      setSourceType("image");
+      setVideoSourceUrl("");
+      setSourceUrl(p.thumbnailUrl ?? "");
+    }
   }
 
   function confirmPasteUrl() {
     const url = pasteUrl.trim();
     if (!url) return;
-    setSourceUrl(url);
+    if (isVideoUrl(url)) {
+      setSourceType("video");
+      setVideoSourceUrl(url);
+      setSourceUrl(""); // no thumbnail for pasted video URL
+    } else {
+      setSourceType("image");
+      setVideoSourceUrl("");
+      setSourceUrl(url);
+    }
     setSelectedPost(null);
   }
 
   // ── Progress bar ─────────────────────────────────────────────────────────
 
-  const pct = Math.min((progressMs / CLIP_MS) * 100, 100);
+  const pct = Math.min((progressMs / clipDurationMs) * 100, 100);
+  const hasSource = sourceType === "video"
+    ? (!!videoSourceUrl)
+    : (!!sourceUrl);
 
   // ── Step 1: Source ────────────────────────────────────────────────────────
 
@@ -579,15 +707,17 @@ export default function ReelStudio() {
         </div>
 
         <div className="max-w-2xl mx-auto px-4 pt-6 space-y-6">
-          {/* Recent posts */}
+          {/* Recent posts — images AND videos */}
           <div>
             <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">
               Recent Posts
             </h2>
             <div className="grid grid-cols-3 gap-2">
               {feedPosts.map(p => {
-                const thumb = p.thumbnailUrl ?? p.videoUrl;
-                if (!thumb) return null;
+                const thumb = p.thumbnailUrl ?? (p.videoUrl ? null : null);
+                const isVideo = !!p.videoUrl;
+                const displaySrc = p.thumbnailUrl ?? undefined;
+
                 return (
                   <button
                     key={p.id}
@@ -598,7 +728,25 @@ export default function ReelStudio() {
                         : "border-transparent hover:border-white/30"
                     }`}
                   >
-                    <img src={thumb} alt="" className="w-full h-full object-cover" />
+                    {displaySrc ? (
+                      <img src={displaySrc} alt="" className="w-full h-full object-cover" />
+                    ) : isVideo ? (
+                      /* Video-only post: show a dark placeholder with film icon */
+                      <div className="w-full h-full bg-stone-900 flex items-center justify-center">
+                        <Film size={24} className="text-white/30" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-stone-900" />
+                    )}
+
+                    {/* Video badge */}
+                    {isVideo && (
+                      <div className="absolute top-1.5 left-1.5 bg-black/70 rounded-md px-1.5 py-0.5 flex items-center gap-1">
+                        <Video size={9} className="text-amber-400" />
+                        <span className="text-[9px] text-amber-400 font-semibold">VIDEO</span>
+                      </div>
+                    )}
+
                     {selectedPost?.id === p.id && (
                       <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
                         <div className="bg-amber-400 rounded-full p-1">
@@ -615,17 +763,20 @@ export default function ReelStudio() {
             </div>
           </div>
 
-          {/* Or paste URL */}
+          {/* Paste URL — accepts images or video URLs */}
           <div>
-            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">
-              Or paste an image URL
+            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-1">
+              Or paste a URL
             </h2>
+            <p className="text-xs text-white/30 mb-3">
+              Image (.jpg/.png) or video (.mp4/.webm/.mov)
+            </p>
             <div className="flex gap-2">
               <input
                 type="url"
                 value={pasteUrl}
                 onChange={e => setPasteUrl(e.target.value)}
-                placeholder="https://example.com/photo.jpg"
+                placeholder="https://example.com/video.mp4"
                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400"
               />
               <button
@@ -639,12 +790,22 @@ export default function ReelStudio() {
           </div>
 
           {/* Preview of chosen source */}
-          {sourceUrl && (
+          {(sourceUrl || videoSourceUrl) && (
             <div className="flex items-center gap-3 p-3 bg-white/5 border border-amber-400/30 rounded-xl">
-              <img src={sourceUrl} alt="" className="w-14 h-14 rounded-lg object-cover" />
+              {sourceType === "video" ? (
+                <div className="w-14 h-14 rounded-lg bg-stone-800 flex items-center justify-center shrink-0">
+                  <Video size={20} className="text-amber-400" />
+                </div>
+              ) : (
+                <img src={sourceUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">Source selected</p>
-                <p className="text-xs text-white/40 truncate">{sourceUrl}</p>
+                <p className="text-sm font-medium truncate">
+                  {sourceType === "video" ? "Video source selected" : "Image source selected"}
+                </p>
+                <p className="text-xs text-white/40 truncate">
+                  {sourceType === "video" ? (videoSourceUrl || "from feed") : sourceUrl}
+                </p>
               </div>
               <Check size={18} className="text-amber-400 shrink-0" />
             </div>
@@ -656,7 +817,7 @@ export default function ReelStudio() {
           <div className="max-w-2xl mx-auto">
             <button
               onClick={() => setStep("style")}
-              disabled={!sourceUrl}
+              disabled={!hasSource}
               className="w-full py-4 bg-amber-400 text-black font-bold rounded-2xl disabled:opacity-40 flex items-center justify-center gap-2"
             >
               Choose Style <ChevronRight size={18} />
@@ -681,6 +842,14 @@ export default function ReelStudio() {
         </div>
 
         <div className="max-w-2xl mx-auto px-4 pt-6 space-y-3">
+          {sourceType === "video" && (
+            <div className="flex items-center gap-2 p-3 bg-amber-400/8 border border-amber-400/20 rounded-xl mb-2">
+              <Video size={14} className="text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-300">
+                Video source detected — AI will re-edit your clip with cinematic grading and overlays.
+              </p>
+            </div>
+          )}
           <p className="text-white/50 text-sm mb-4">
             Pick the treatment that matches how you want your work to feel.
           </p>
@@ -750,13 +919,18 @@ export default function ReelStudio() {
           </div>
         </div>
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Generating your reel</h2>
+          <h2 className="text-2xl font-bold mb-2">
+            {sourceType === "video" ? "Re-editing your video" : "Generating your reel"}
+          </h2>
           <p className="text-white/50 text-sm max-w-xs">
-            AI is analyzing your work and crafting a cinematic{" "}
-            {STYLES.find(s => s.id === chosenStyle)?.label.toLowerCase()} treatment…
+            AI is{" "}
+            {sourceType === "video"
+              ? "crafting a cinematic treatment for your video clip"
+              : `analyzing your work and crafting a cinematic ${STYLES.find(s => s.id === chosenStyle)?.label.toLowerCase()} treatment`}
+            …
           </p>
         </div>
-        {sourceUrl && (
+        {sourceType === "image" && sourceUrl && (
           <div className="relative w-32 rounded-xl overflow-hidden">
             <img src={sourceUrl} alt="" className="w-full object-cover opacity-40" />
             <div
@@ -765,11 +939,19 @@ export default function ReelStudio() {
             />
           </div>
         )}
+        {sourceType === "video" && (
+          <div className="w-32 h-40 rounded-xl bg-stone-900 flex items-center justify-center opacity-60">
+            <Video size={32} className="text-amber-400" />
+          </div>
+        )}
       </div>
     );
   }
 
   // ── Step 4: Studio ────────────────────────────────────────────────────────
+
+  const durationLabel = `${(clipDurationMs / 1000).toFixed(1)}s`;
+  const readyToRecord = sourceType === "video" ? !!videoRef.current : !!imgRef.current;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pb-28 md:pb-8">
@@ -780,7 +962,7 @@ export default function ReelStudio() {
         <div className="flex-1">
           <h1 className="font-bold text-base leading-tight">AI Reel Studio</h1>
           <p className="text-xs text-white/40">
-            {STYLES.find(s => s.id === chosenStyle)?.label} · {plan?.colorGrade ?? ""}
+            {STYLES.find(s => s.id === chosenStyle)?.label} · {plan?.colorGrade ?? ""} · {durationLabel}
           </p>
         </div>
         <button
@@ -795,7 +977,6 @@ export default function ReelStudio() {
 
         {/* ── Canvas preview ────────────────────────────────────────── */}
         <div className="flex flex-col items-center gap-3 md:sticky md:top-20 md:self-start">
-          {/* Phone-frame wrapper */}
           <div className="relative rounded-[2.4rem] overflow-hidden border-4 border-white/10 shadow-2xl"
                style={{ width: Math.round(CANVAS_W * 0.33), height: Math.round(CANVAS_H * 0.33) }}>
             <canvas
@@ -805,7 +986,6 @@ export default function ReelStudio() {
               className="block"
               style={{ width: "100%", height: "100%", imageRendering: "crisp-edges" }}
             />
-            {/* Play overlay */}
             {!isPlaying && !isRecording && (
               <button
                 onClick={playPreview}
@@ -822,6 +1002,12 @@ export default function ReelStudio() {
                 <span className="text-[10px] font-bold text-white">REC</span>
               </div>
             )}
+            {sourceType === "video" && !isPlaying && !isRecording && (
+              <div className="absolute top-2 right-2 bg-black/60 rounded-md px-1.5 py-0.5 flex items-center gap-1">
+                <Video size={9} className="text-amber-400" />
+                <span className="text-[9px] text-amber-400 font-semibold">VIDEO</span>
+              </div>
+            )}
           </div>
 
           {/* Progress bar */}
@@ -831,6 +1017,11 @@ export default function ReelStudio() {
               style={{ width: `${pct}%` }}
             />
           </div>
+
+          {/* Time label */}
+          <p className="text-[10px] text-white/30 -mt-1">
+            {(progressMs / 1000).toFixed(1)}s / {durationLabel}
+          </p>
 
           {/* Playback controls */}
           <div className="flex items-center gap-2">
@@ -953,13 +1144,24 @@ export default function ReelStudio() {
                     <div
                       className="h-full bg-amber-400/60 rounded-full"
                       style={{
-                        marginLeft: `${(ov.startMs / CLIP_MS) * 100}%`,
-                        width: `${(ov.durationMs / CLIP_MS) * 100}%`,
+                        marginLeft: `${(ov.startMs / clipDurationMs) * 100}%`,
+                        width: `${(ov.durationMs / clipDurationMs) * 100}%`,
                       }}
                     />
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* CORS warning */}
+          {corsBlocked && (
+            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+              <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-300">
+                This video can't be captured due to browser security restrictions on external sources.
+                Try uploading the video directly to Kiln first, then select it from your posts.
+              </p>
             </div>
           )}
 
@@ -989,13 +1191,13 @@ export default function ReelStudio() {
             ) : (
               <button
                 onClick={exportClip}
-                disabled={isRecording || isPlaying || !imgRef.current}
+                disabled={isRecording || isPlaying || !readyToRecord}
                 className="w-full py-4 bg-amber-400 text-black font-bold rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isRecording ? (
                   <>
                     <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    Recording 7-second clip…
+                    Recording {durationLabel} clip…
                   </>
                 ) : (
                   <>
