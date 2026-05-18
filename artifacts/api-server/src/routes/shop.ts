@@ -124,6 +124,14 @@ router.post("/listings/:id/inquire", async (req, res): Promise<void> => {
   res.status(201).json({ ...order, createdAt: order.createdAt.toISOString(), updatedAt: order.updatedAt.toISOString() });
 });
 
+// GET /me/wishlist — my wishlisted listing IDs
+router.get("/me/wishlist", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.json({ listingIds: [] }); return; }
+  const rows = await db.select({ listingId: wishlistsTable.listingId })
+    .from(wishlistsTable).where(eq(wishlistsTable.userId, req.user.id));
+  res.json({ listingIds: rows.map(r => r.listingId) });
+});
+
 // GET /me/listings — my listings
 router.get("/me/listings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

@@ -262,7 +262,9 @@ export default function Inbox() {
                           <button
                             disabled={!quoteForm.price || !quoteForm.paymentSchedule || !quoteForm.deliveryDate}
                             onClick={() => {
-                              quoteInquiry(inquiry.id, { ...quoteForm, sentAt: new Date().toISOString() });
+                              const quote = { ...quoteForm, sentAt: new Date().toISOString() };
+                              quoteInquiry(inquiry.id, quote);
+                              setApiReceived(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: "quoted" as const, quote } : i));
                               setQuotingId(null);
                             }}
                             className="flex-1 rounded-xl bg-sky-600 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

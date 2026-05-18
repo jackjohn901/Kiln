@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2 } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X } from "lucide-react";
 import { useLocation } from "wouter";
 import Nav from "@/components/Nav";
 
@@ -42,10 +42,11 @@ function StarRating({ value, size = 11 }: { value: number; size?: number }) {
   );
 }
 
-function WorkshopCard({ w, onBook }: { w: ApiWorkshop; onBook: (id: string) => void }) {
+function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (id: string) => void; onCancel: (id: string) => void }) {
   const [, navigate] = useLocation();
   const soldOut = w.spotsLeft === 0;
   const [booking, setBooking] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const handleBook = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,6 +57,16 @@ function WorkshopCard({ w, onBook }: { w: ApiWorkshop; onBook: (id: string) => v
       if (r.ok) onBook(w.id);
     } catch {}
     setBooking(false);
+  };
+
+  const handleCancel = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCancelling(true);
+    try {
+      const r = await fetch(`/api/workshops/${w.id}/book`, { method: "DELETE", credentials: "include" });
+      if (r.ok) onCancel(w.id);
+    } catch {}
+    setCancelling(false);
   };
 
   return (
@@ -113,16 +124,30 @@ function WorkshopCard({ w, onBook }: { w: ApiWorkshop; onBook: (id: string) => v
 
         <div className="flex items-center justify-between">
           <span className="text-lg font-bold text-stone-100">${w.price}</span>
-          <button onClick={handleBook} disabled={soldOut || w.isBooked || booking}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-semibold text-xs transition-colors disabled:opacity-60 ${
-              w.isBooked ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-300" :
-              soldOut ? "bg-stone-700 text-stone-500" :
-              "bg-amber-500 text-stone-950 hover:bg-amber-400"
-            }`}>
-            {booking ? <Loader2 size={12} className="animate-spin" /> : null}
-            {w.isBooked ? "Reserved" : soldOut ? "Waitlist" : "Reserve Spot"}
-            {!w.isBooked && !soldOut && <ChevronRight size={13} />}
-          </button>
+          {w.isBooked ? (
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400">
+                <CheckCircle2 size={12} /> Reserved
+              </span>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-stone-700 text-xs text-stone-400 hover:border-red-500/40 hover:text-red-400 transition-colors disabled:opacity-50"
+              >
+                {cancelling ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={handleBook} disabled={soldOut || booking}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-semibold text-xs transition-colors disabled:opacity-60 ${
+                soldOut ? "bg-stone-700 text-stone-500" : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+              }`}>
+              {booking ? <Loader2 size={12} className="animate-spin" /> : null}
+              {soldOut ? "Waitlist" : "Reserve Spot"}
+              {!soldOut && <ChevronRight size={13} />}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -147,6 +172,10 @@ export default function Workshops() {
 
   const handleBook = (workshopId: string) => {
     setWorkshops(prev => prev.map(w => w.id === workshopId ? { ...w, isBooked: true, spotsBooked: w.spotsBooked + 1, spotsLeft: w.spotsLeft - 1 } : w));
+  };
+
+  const handleCancel = (workshopId: string) => {
+    setWorkshops(prev => prev.map(w => w.id === workshopId ? { ...w, isBooked: false, spotsBooked: Math.max(0, w.spotsBooked - 1), spotsLeft: w.spotsLeft + 1 } : w));
   };
 
   return (
@@ -176,7 +205,7 @@ export default function Workshops() {
             <>
               {!loading && <p className="text-xs text-stone-500 mb-4">{filtered.length} workshop{filtered.length !== 1 ? "s" : ""}</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filtered.map(w => <WorkshopCard key={w.id} w={w} onBook={handleBook} />)}
+                {filtered.map(w => <WorkshopCard key={w.id} w={w} onBook={handleBook} onCancel={handleCancel} />)}
               </div>
               {filtered.length === 0 && (
                 <div className="text-center py-16">

@@ -38,20 +38,30 @@ function saveCart(items: CartItem[]) {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(readCart);
 
-  const syncLocal = useCallback((next: CartItem[]) => {
-    setItems(next);
-    saveCart(next);
-  }, []);
-
+  // Sync with server on mount: reconcile server cart with local state
   useEffect(() => {
     fetch("/api/me/cart", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ items: { listingId: string; quantity: number }[] }> : null)
       .then(data => {
         if (!data?.items?.length) return;
+        const serverItems = data.items;
+        const serverIds = new Set(serverItems.map(i => i.listingId));
         setItems(prev => {
-          const serverIds = new Set(data.items.map(i => i.listingId));
-          const kept = prev.filter(i => serverIds.has(i.listing.id));
-          return kept;
+          // Update quantities from server, remove items server no longer has
+          const reconciled = prev
+            .filter(i => serverIds.has(i.listing.id))
+            .map(i => {
+              const sv = serverItems.find(s => s.listingId === i.listing.id);
+              return sv && sv.quantity !== i.quantity ? { ...i, quantity: sv.quantity } : i;
+            });
+          // If server has extra IDs we don't have listing data for, they'll appear next visit
+          const changed = reconciled.length !== prev.length ||
+            reconciled.some((r, idx) => r.quantity !== prev[idx]?.quantity);
+          if (changed) {
+            saveCart(reconciled);
+            return reconciled;
+          }
+          return prev;
         });
       })
       .catch(() => {});
@@ -71,7 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId: listing.id, quantity: 1 }),
     }).catch(() => {});
-  }, [syncLocal]);
+  }, []);
 
   const removeItem = useCallback((listingId: string) => {
     setItems((prev) => {

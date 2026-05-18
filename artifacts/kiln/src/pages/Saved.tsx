@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Bookmark, Play, Heart, ShoppingBag } from "lucide-react";
+import { Bookmark, Play, Heart, ShoppingBag, Bell, Trash2, ExternalLink } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { artists } from "@/data/artists";
@@ -44,18 +44,28 @@ interface SavedReel {
   avatarUrl: string;
 }
 
-type Tab = "reels" | "works";
+interface ApiPost {
+  id: string; caption: string; thumbnailUrl: string | null; videoUrl: string | null;
+  likeCount: number; technique: string | null; authorName: string; authorAvatarUrl: string | null;
+}
+
+interface PriceAlert {
+  id?: string;
+  listingId: string;
+  targetPrice?: number | null;
+  createdAt?: string;
+}
+
+type Tab = "reels" | "works" | "alerts";
 
 export default function Saved() {
   const { reelSaves, toggleReelSave } = useSocial();
   const { wishlistIds, toggleWishlist } = useWishlist();
   const [tab, setTab] = useState<Tab>("reels");
 
-  interface ApiPost {
-    id: string; caption: string; thumbnailUrl: string | null; videoUrl: string | null;
-    likeCount: number; technique: string | null; authorName: string; authorAvatarUrl: string | null;
-  }
   const [apiSavedPosts, setApiSavedPosts] = useState<ApiPost[]>([]);
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [alertsLoaded, setAlertsLoaded] = useState(false);
 
   useEffect(() => {
     fetch("/api/me/saves", { credentials: "include" })
@@ -65,6 +75,22 @@ export default function Saved() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (tab !== "alerts" || alertsLoaded) return;
+    fetch("/api/me/price-alerts", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { alerts?: PriceAlert[] } | null) => {
+        setPriceAlerts(data?.alerts ?? []);
+        setAlertsLoaded(true);
+      })
+      .catch(() => { setAlertsLoaded(true); });
+  }, [tab, alertsLoaded]);
+
+  function removeAlert(listingId: string) {
+    setPriceAlerts(prev => prev.filter(a => a.listingId !== listingId));
+    fetch(`/api/me/price-alerts/${listingId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+  }
 
   const savedReels = useMemo<SavedReel[]>(() => {
     const allArtists = [...artists, ...seedArtists];
@@ -94,10 +120,24 @@ export default function Saved() {
     return listings.filter((l) => wishlistIds.includes(l.id));
   }, [wishlistIds]);
 
+  // Enrich price alerts with static listing data
+  const enrichedAlerts = useMemo(() => {
+    return priceAlerts.map(a => {
+      const listing = listings.find(l => l.id === a.listingId);
+      return { ...a, listing };
+    });
+  }, [priceAlerts]);
+
   const allArtists = [...artists, ...seedArtists];
   function getArtistName(artistId: string) {
     return allArtists.find((a) => a.id === artistId)?.name ?? artistId;
   }
+
+  const TABS: [Tab, string][] = [
+    ["reels", "Reels"],
+    ["works", "Works"],
+    ["alerts", "Alerts"],
+  ];
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -111,14 +151,14 @@ export default function Saved() {
           <div>
             <h1 className="font-serif text-2xl font-bold text-amber-100">Saved</h1>
             <p className="text-sm text-stone-500">
-              {savedReels.length + apiSavedPosts.length} {savedReels.length + apiSavedPosts.length === 1 ? "reel" : "reels"} · {wishlistedListings.length} {wishlistedListings.length === 1 ? "work" : "works"}
+              {savedReels.length + apiSavedPosts.length} {savedReels.length + apiSavedPosts.length === 1 ? "reel" : "reels"} · {wishlistedListings.length} {wishlistedListings.length === 1 ? "work" : "works"} · {priceAlerts.length} {priceAlerts.length === 1 ? "alert" : "alerts"}
             </p>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-1 rounded-xl bg-stone-900 p-1 mb-6 w-fit">
-          {([["reels", "Reels"], ["works", "Works"]] as [Tab, string][]).map(([t, label]) => (
+          {TABS.map(([t, label]) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -127,6 +167,11 @@ export default function Saved() {
               }`}
             >
               {label}
+              {t === "alerts" && priceAlerts.length > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500/20 px-1 text-[10px] font-bold text-amber-400">
+                  {priceAlerts.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -154,13 +199,11 @@ export default function Saved() {
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
                           <Play size={20} className="text-white fill-white" />
                         </div>
                       </div>
-
                       <div className="absolute bottom-0 left-0 right-0 p-3">
                         <div className="flex items-center gap-2 mb-1.5">
                           <img src={r.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover border border-white/20" />
@@ -177,7 +220,6 @@ export default function Saved() {
                       </div>
                     </div>
                   </Link>
-
                   <button
                     onClick={() => toggleReelSave(r.id)}
                     className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm text-amber-400 hover:text-stone-400 transition-colors"
@@ -269,6 +311,78 @@ export default function Saved() {
                   >
                     <Heart size={14} className="fill-current" />
                   </button>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* Alerts tab — price alerts */}
+        {tab === "alerts" && (
+          !alertsLoaded ? (
+            <div className="flex items-center justify-center py-24">
+              <div className="w-6 h-6 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+            </div>
+          ) : enrichedAlerts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <Bell size={40} className="mb-4 text-stone-700" />
+              <p className="mb-2 text-stone-400 font-medium">No price alerts set</p>
+              <p className="mb-6 text-sm text-stone-600">On any listing, tap "Notify me" to get alerted when the price drops</p>
+              <Link href="/shop" className="rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
+                Browse Shop
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {enrichedAlerts.map((a) => (
+                <div key={a.listingId} className="flex items-center gap-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4">
+                  {/* Thumbnail */}
+                  <div className="h-16 w-16 shrink-0 rounded-xl overflow-hidden bg-stone-800">
+                    {a.listing?.imageUrl ? (
+                      <img src={a.listing.imageUrl} alt={a.listing.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <ShoppingBag size={20} className="text-stone-600" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-stone-200 line-clamp-1">
+                      {a.listing?.title ?? a.listingId}
+                    </p>
+                    {a.listing && (
+                      <p className="text-xs text-stone-500 mt-0.5">{getArtistName(a.listing.artistId)}</p>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-3">
+                      <span className="text-sm font-bold text-amber-400">
+                        {a.listing ? formatPrice(a.listing.price) : "—"}
+                      </span>
+                      {a.targetPrice != null && (
+                        <span className="text-xs text-stone-500">
+                          Alert at {formatPrice(a.targetPrice)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {a.listing && (
+                      <Link href={`/listings/${a.listingId}`}>
+                        <button className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-stone-400 hover:border-white/20 hover:text-stone-200 transition-colors">
+                          <ExternalLink size={13} />
+                        </button>
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => removeAlert(a.listingId)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:border-red-500/40 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
