@@ -77,3 +77,45 @@ id = "EAIDANdY085W9RRHxkab5"
 uri = "file://artifacts/kiln-mobile/assets/images/icon-tinted.png"
 type = "image"
 title = "Tinted / monochrome icon"
+
+[[outputs]]
+id = "dlrXaCgDmu2XRdpxZA-3K"
+uri = "file://screenshots/APP_STORE_SUBMISSION.md"
+type = "text"
+title = "App Store Submission Document"
+
+[[outputs]]
+id = "CunsyXHOwrVSZo36cVFpa"
+uri = "file://screenshots/01-feed.jpg"
+type = "image"
+title = "Screenshot 1 — Video Feed"
+
+[[outputs]]
+id = "0VwIeqaX7tsWXo_AUL1Gs"
+uri = "file://screenshots/02-discover.jpg"
+type = "image"
+title = "Screenshot 2 — Discover Artists"
+
+[[outputs]]
+id = "qnzJFjgQpBnBObWBcp3jb"
+uri = "file://screenshots/03-shop.jpg"
+type = "image"
+title = "Screenshot 3 — Shop"
+
+[[outputs]]
+id = "x-D1MxLUa3xSe4mHQavFV"
+uri = "file://screenshots/04-workshops.jpg"
+type = "image"
+title = "Screenshot 4 — Workshops"
+
+[[outputs]]
+id = "78rELrDDS9LxHjDyH457P"
+uri = "file://screenshots/05-artist-profile.jpg"
+type = "image"
+title = "Screenshot 5 — Artist Profile"
+
+[[outputs]]
+id = "_UY2JyUvmRYc9lUggTz-S"
+uri = "file://screenshots/06-guilds.jpg"
+type = "image"
+title = "Screenshot 6 — Craft Guilds"
