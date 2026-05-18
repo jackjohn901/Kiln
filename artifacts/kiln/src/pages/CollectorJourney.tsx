@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -28,6 +28,7 @@ const JOINED_DATE = "March 2025";
 export default function CollectorJourney() {
   const { following, subscriptions, reelLikes, reelSaves } = useSocial();
   const { profile } = useProfile();
+  const [journeyCopied, setJourneyCopied] = useState(false);
 
   const followedArtists = useMemo(() =>
     following.slice(0, 6).map((id) => ALL_ARTISTS.find((a) => a.id === id)).filter(Boolean),
@@ -241,11 +242,14 @@ export default function CollectorJourney() {
           <button
             onClick={() => {
               const text = `My Kiln collector journey: ${following.length} artists followed, ${subscriptions.length} patrons, ${Object.values(reelSaves).filter(Boolean).length} reels saved. Building my craft collection at kiln.art`;
-              navigator.clipboard.writeText(text);
+              navigator.clipboard.writeText(text).then(() => {
+                setJourneyCopied(true);
+                setTimeout(() => setJourneyCopied(false), 2500);
+              }).catch(() => {});
             }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-amber-500/30 py-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition-colors"
           >
-            <Share2 size={13} /> Share your journey
+            <Share2 size={13} /> {journeyCopied ? "Copied to clipboard!" : "Share your journey"}
           </button>
         </div>
 

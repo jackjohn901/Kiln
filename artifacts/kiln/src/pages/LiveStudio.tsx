@@ -57,9 +57,18 @@ export default function LiveStudio() {
   const { profile } = useProfile();
   const { isFollowing, followArtist, unfollowArtist } = useSocial();
 
-  const artist = ALL_ARTISTS.find((a) => a.id === artistId);
+  const staticArtist = ALL_ARTISTS.find((a) => a.id === artistId);
+  // When a real user navigates to their own live studio, fall back to their profile
+  const artist = (staticArtist ?? (profile?.id === artistId ? {
+    id: profile!.id,
+    name: profile!.name ?? artistId,
+    medium: "Craft Artist",
+    location: "",
+    videos: [] as { id: string }[],
+    images: profile!.avatarUrl ? [{ url: profile!.avatarUrl }] : [] as { url: string }[],
+  } : null)) as typeof staticArtist | null;
 
-  const videoId = artist?.videos[0]?.id ?? "dQhKVFbpZoQ";
+  const videoId = artist?.videos?.[0]?.id ?? "dQhKVFbpZoQ";
   const avatarUrl = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/200/200`;
 
   const [viewers, setViewers] = useState(() => 800 + (hash(artistId ?? "") % 3000));

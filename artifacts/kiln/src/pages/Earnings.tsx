@@ -221,7 +221,7 @@ export default function Earnings() {
                 <p className="text-stone-500 text-sm">No earnings recorded yet.</p>
                 <p className="text-stone-600 text-xs mt-1">Set up patron tiers or accept tips to start earning.</p>
                 <div className="mt-4 flex justify-center gap-3">
-                  <Link href="/patrons" className="rounded-full border border-amber-500/30 px-4 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 transition-colors">
+                  <Link href={profile?.id ? `/artists/${profile.id}/patron` : "/discover"} className="rounded-full border border-amber-500/30 px-4 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 transition-colors">
                     Set up tiers
                   </Link>
                   <Link href="/shop" className="rounded-full border border-stone-700 px-4 py-1.5 text-xs text-stone-400 hover:border-stone-500 transition-colors">
@@ -277,7 +277,7 @@ export default function Earnings() {
                   ) : myTiers.length === 0 ? (
                     <div className="text-center py-4">
                       <p className="text-xs text-stone-600">No tiers yet.</p>
-                      <Link href="/patrons" className="mt-2 inline-block text-xs text-amber-400 hover:text-amber-300">
+                      <Link href={profile?.id ? `/artists/${profile.id}/patron` : "/discover"} className="mt-2 inline-block text-xs text-amber-400 hover:text-amber-300">
                         Create your first tier →
                       </Link>
                     </div>
@@ -384,9 +384,9 @@ export default function Earnings() {
               <p className="text-xs text-stone-500 mb-3">Expand your revenue</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { href: "/patrons", icon: Star,         color: "text-amber-400", label: "Patron tiers" },
+                  { href: profile?.id ? `/artists/${profile.id}/patron` : "/discover", icon: Star, color: "text-amber-400", label: "Patron tiers" },
                   { href: "/drops",   icon: Zap,          color: "text-amber-400", label: "Drops" },
-                  { href: "/commissions", icon: MessageSquare, color: "text-blue-400", label: "Commissions" },
+                  { href: "/commission-tracker", icon: MessageSquare, color: "text-blue-400", label: "Commissions" },
                   { href: "/shop",    icon: BarChart2,     color: "text-stone-400", label: "Shop listings" },
                 ].map(item => {
                   const Icon = item.icon;

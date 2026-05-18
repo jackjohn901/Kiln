@@ -303,7 +303,7 @@ export default function CommissionTracker() {
       <Nav />
       <div className="mx-auto max-w-2xl px-4 pb-20 pt-6">
         <div className="mb-6 flex items-center gap-3">
-          <Link href="/commissions" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
+          <Link href="/discover" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
             <ChevronLeft size={16} />
           </Link>
           <div>

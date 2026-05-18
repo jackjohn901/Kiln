@@ -187,7 +187,7 @@ export default function Audience() {
                   tab === "collectors" ? "No commission clients yet" : "No contacts yet"}
               </p>
               {tab === "patrons" && (
-                <Link href="/patrons" className="mt-3 inline-block text-sm text-amber-400 hover:text-amber-300">
+                <Link href="/creator-home" className="mt-3 inline-block text-sm text-amber-400 hover:text-amber-300">
                   Set up patron tiers →
                 </Link>
               )}

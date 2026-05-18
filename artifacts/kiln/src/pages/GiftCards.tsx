@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Gift, CheckCircle, Flame, Send, Copy, Check } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useProfile } from "@/contexts/ProfileContext";
 
 const DENOMINATIONS = [25, 50, 100, 250, 500, 1000];
 
@@ -20,6 +21,7 @@ interface ApiGiftCard {
 }
 
 export default function GiftCards() {
+  const { profile } = useProfile();
   const [amount, setAmount] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState("");
   const [design, setDesign] = useState(DESIGNS[0]);
@@ -39,6 +41,48 @@ export default function GiftCards() {
 
   const finalAmount = customAmount ? parseInt(customAmount, 10) || 0 : amount;
 
+  // Handle return from Stripe checkout — create gift card after payment confirmed
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("purchased")) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    const raw = localStorage.getItem("kiln_gift_card_pending");
+    if (!raw) return;
+    let cfg: { amount: number; designId: string; recipientName: string; recipientEmail: string; senderName: string; message: string };
+    try { cfg = JSON.parse(raw); } catch { return; }
+    localStorage.removeItem("kiln_gift_card_pending");
+    // Restore form state
+    setAmount(cfg.amount);
+    const d = DESIGNS.find(dd => dd.id === cfg.designId) ?? DESIGNS[0];
+    setDesign(d);
+    setRecipientName(cfg.recipientName);
+    setRecipientEmail(cfg.recipientEmail);
+    setSenderName(cfg.senderName);
+    setMessage(cfg.message);
+    setActiveTab("buy");
+    // Now create the gift card (payment confirmed by Stripe redirect)
+    setPurchaseLoading(true);
+    fetch("/api/gift-cards", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: cfg.amount,
+        designId: cfg.designId,
+        recipientName: cfg.recipientName || undefined,
+        recipientEmail: cfg.recipientEmail || undefined,
+        message: cfg.message || undefined,
+      }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { card?: ApiGiftCard } | null) => {
+        if (data?.card) { setGeneratedCode(data.card.code); setStep("done"); }
+      })
+      .catch(() => {})
+      .finally(() => setPurchaseLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (activeTab !== "mine") return;
     fetch("/api/gift-cards/mine", { credentials: "include" })
@@ -50,26 +94,29 @@ export default function GiftCards() {
   }, [activeTab]);
 
   async function handlePurchase() {
+    if (!profile) return;
     setPurchaseLoading(true);
     try {
-      const res = await fetch("/api/gift-cards", {
+      // Save config to restore after Stripe redirect
+      localStorage.setItem("kiln_gift_card_pending", JSON.stringify({
+        amount: finalAmount, designId: design.id,
+        recipientName, recipientEmail, senderName, message,
+      }));
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: finalAmount,
-          designId: design.id,
-          recipientName: recipientName || undefined,
-          recipientEmail: recipientEmail || undefined,
-          message: message || undefined,
+          items: [{ name: `Kiln Gift Card — $${finalAmount}`, price: finalAmount, quantity: 1, artistName: "Kiln" }],
+          successPath: "/gift-cards?purchased=1",
+          cancelPath: "/gift-cards",
+          metadata: { type: "gift_card" },
         }),
       });
-      const data = await res.json() as { card?: ApiGiftCard; error?: string };
-      if (res.ok && data.card) {
-        setGeneratedCode(data.card.code);
-        setStep("done");
-      }
-    } catch {}
+      const data = await res.json() as { url?: string };
+      if (data.url) { window.location.href = data.url; return; }
+      localStorage.removeItem("kiln_gift_card_pending");
+    } catch { localStorage.removeItem("kiln_gift_card_pending"); }
     setPurchaseLoading(false);
   }
 
@@ -310,9 +357,12 @@ export default function GiftCards() {
               </button>
 
               {recipientEmail && (
-                <button className="flex mx-auto items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
+                <a
+                  href={`mailto:${recipientEmail}?subject=Your%20Kiln%20Gift%20Card%20%E2%80%94%20%24${finalAmount}&body=Hi%20${encodeURIComponent(recipientName || "there")}%2C%0A%0AHere%20is%20your%20Kiln%20gift%20card%20code%20worth%20%24${finalAmount}%3A%0A%0A${encodeURIComponent(generatedCode)}%0A%0ARedeem%20it%20at%3A%20https%3A%2F%2Fkilnfire.replit.app%2Fkiln%2Fgift-cards%0A%0AEnjoy%20supporting%20independent%20craft%20artists!`}
+                  className="flex mx-auto items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                >
                   <Send size={14} /> Send via email
-                </button>
+                </a>
               )}
 
               <button

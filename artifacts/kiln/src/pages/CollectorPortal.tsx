@@ -216,7 +216,7 @@ export default function CollectorPortal() {
                               className="p-1 rounded-lg text-stone-600 hover:text-stone-400 transition-colors" title="Add note">
                               <MessageCircle size={12} />
                             </button>
-                            <Link href={`/shop/${listing.id}`}>
+                            <Link href={`/listings/${listing.id}`}>
                               <button className="p-1 rounded-lg text-stone-600 hover:text-amber-400 transition-colors">
                                 <Eye size={12} />
                               </button>
@@ -264,7 +264,7 @@ export default function CollectorPortal() {
                             className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-stone-500 hover:text-stone-300 transition-colors">
                             <MessageCircle size={10} /> Note
                           </button>
-                          <Link href={`/shop/${listing.id}`}>
+                          <Link href={`/listings/${listing.id}`}>
                             <button className="flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-stone-500 hover:text-amber-400 transition-colors">
                               <Eye size={10} /> View
                             </button>
