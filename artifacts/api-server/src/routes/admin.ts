@@ -6,10 +6,10 @@ const router: IRouter = Router();
 
 // Only users whose IDs are in ADMIN_USER_IDS env var can access these routes
 // Format: comma-separated list of user IDs
+// If ADMIN_USER_IDS is absent or empty, all admin routes are denied (fail-closed).
 function isAdmin(userId: string): boolean {
   const admins = (process.env["ADMIN_USER_IDS"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  // If no admins configured, allow any authenticated user (dev mode)
-  if (admins.length === 0) return true;
+  if (admins.length === 0) return false;
   return admins.includes(userId);
 }
 
