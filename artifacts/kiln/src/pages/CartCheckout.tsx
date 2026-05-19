@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Check, Package, ArrowRight, Truck, ShieldCheck,
-  ExternalLink, MessageCircle, Info, CreditCard, Gift,
+  ExternalLink, MessageCircle, Info, CreditCard, Gift, AlertTriangle,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
@@ -75,6 +75,8 @@ export default function CartCheckout() {
   const [giftMessage, setGiftMessage] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
+  const [manualPayoutWarning, setManualPayoutWarning] = useState(false);
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
@@ -187,13 +189,25 @@ export default function CartCheckout() {
             })),
           }));
         } catch {}
-        window.location.href = data.url;
+        if (data.manualPayout) {
+          setPendingCheckoutUrl(data.url);
+          setManualPayoutWarning(true);
+          setCheckingOut(false);
+        } else {
+          window.location.href = data.url;
+        }
       } else {
         throw new Error(data.error ?? "Checkout failed");
       }
     } catch (err) {
       setCheckoutError(err instanceof Error ? err.message : "Checkout failed. Please try again.");
       setCheckingOut(false);
+    }
+  }
+
+  function proceedToPendingCheckout() {
+    if (pendingCheckoutUrl) {
+      window.location.href = pendingCheckoutUrl;
     }
   }
 
@@ -341,15 +355,49 @@ export default function CartCheckout() {
                       </p>
                     </div>
 
-                    <button
-                      disabled={!addrValid() || checkingOut}
-                      onClick={handleStripeCheckout}
-                      className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {checkingOut ? "Redirecting to checkout…" : <><CreditCard size={14} /> Pay securely with Stripe</>}
-                    </button>
-                    {checkoutError && (
-                      <p className="text-center text-xs text-rose-400 mt-2">{checkoutError}</p>
+                    {manualPayoutWarning && pendingCheckoutUrl ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-2 space-y-3"
+                      >
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 flex items-start gap-2.5">
+                          <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
+                            <p className="text-xs text-amber-200/70">
+                              This artist manages payouts manually. Your order will be processed within 3–5 business days.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setManualPayoutWarning(false); setPendingCheckoutUrl(null); }}
+                            className="flex-1 rounded-full border border-white/10 py-2.5 text-sm text-stone-400 hover:text-stone-300 hover:border-white/20 transition-colors"
+                          >
+                            Go back
+                          </button>
+                          <button
+                            onClick={proceedToPendingCheckout}
+                            className="flex-1 flex items-center justify-center gap-2 rounded-full bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+                          >
+                            <CreditCard size={14} /> Continue to payment
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <>
+                        <button
+                          disabled={!addrValid() || checkingOut}
+                          onClick={handleStripeCheckout}
+                          className="mt-2 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {checkingOut ? "Redirecting to checkout…" : <><CreditCard size={14} /> Pay securely with Stripe</>}
+                        </button>
+                        {checkoutError && (
+                          <p className="text-center text-xs text-rose-400 mt-2">{checkoutError}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </motion.div>

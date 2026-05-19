@@ -253,7 +253,8 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    res.json({ url: session.url, sessionId: session.id });
+    const manualPayout = listingIds.length > 0 && connectedAccountId === null;
+    res.json({ url: session.url, sessionId: session.id, manualPayout });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe checkout error');
     const msg = err instanceof Error ? err.message : 'Checkout failed';
