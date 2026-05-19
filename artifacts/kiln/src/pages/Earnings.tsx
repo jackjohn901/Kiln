@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
@@ -137,6 +137,7 @@ export default function Earnings() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceRefreshing, setBalanceRefreshing] = useState(false);
   const [balanceError, setBalanceError] = useState(false);
+  const [balancePollError, setBalancePollError] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(() => {
     const saved = localStorage.getItem("kiln_balance_refresh_interval");
@@ -150,8 +151,9 @@ export default function Earnings() {
       setBalanceRefreshing(true);
     } else {
       setBalanceLoading(true);
+      setBalanceError(false);
     }
-    setBalanceError(false);
+    setBalancePollError(false);
     try {
       const r = await fetch("/api/me/stripe/connect/balance", { credentials: "include" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -159,15 +161,19 @@ export default function Earnings() {
       setStripeBalance(b);
       setLastRefreshed(new Date());
     } catch (err: unknown) {
-      console.error("[Kiln] Stripe balance fetch failed:", err);
-      setBalanceError(true);
+      if (isBackground) {
+        setBalancePollError(true);
+      } else {
+        console.error("[Kiln] Stripe balance fetch failed:", err);
+        setBalanceError(true);
+      }
     } finally {
       setBalanceLoading(false);
       setBalanceRefreshing(false);
     }
   }, []);
 
-  // Auto-refresh interval
+  // Auto-refresh interval — persists choice to localStorage and restarts the timer
   useEffect(() => {
     localStorage.setItem("kiln_balance_refresh_interval", refreshInterval);
     if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
@@ -189,7 +195,7 @@ export default function Earnings() {
     }
   }, [search]);
 
-  // Fetch Stripe Connect status
+  // Fetch Stripe Connect status and kick off initial balance load + polling
   useEffect(() => {
     fetch("/api/me/stripe/connect/status", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -207,6 +213,10 @@ export default function Earnings() {
       })
       .catch(() => {})
       .finally(() => setConnectLoading(false));
+
+    return () => {
+      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -503,7 +513,7 @@ export default function Earnings() {
                   })()}
                   {stripeConnect.chargesEnabled && (
                     <>
-                      {balanceLoading ? (
+                      {balanceLoading && !stripeBalance ? (
                         <div className="mt-3 flex justify-center py-2">
                           <Loader2 size={14} className="animate-spin text-stone-600" />
                         </div>
@@ -513,17 +523,19 @@ export default function Earnings() {
                         </p>
                       ) : stripeBalance ? (
                         <>
-                          {/* Balance header: last-refreshed + manual refresh button */}
+                          {/* Balance header: last-refreshed timestamp + manual refresh button */}
                           <div className="mt-3 flex items-center justify-between mb-1.5">
                             <span className="text-[10px] text-stone-600">
-                              {balanceRefreshing
+                              {balancePollError
+                                ? <span className="text-amber-500/80">Refresh failed — showing last known balance</span>
+                                : balanceRefreshing
                                 ? "Refreshing…"
                                 : lastRefreshed
                                   ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
                                   : ""}
                             </span>
                             <button
-                              onClick={() => void fetchBalance(true)}
+                              onClick={() => void fetchBalance(false)}
                               disabled={balanceRefreshing || balanceLoading}
                               title="Refresh balance now"
                               className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-40 transition-colors"
