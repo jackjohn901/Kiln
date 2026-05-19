@@ -91,18 +91,46 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 });
 
 /**
- * GET /storage/objects/*
+ * POST /storage/uploads/make-public
  *
- * Serve object entities from PRIVATE_OBJECT_DIR.
- * Requires authentication and ACL authorization — callers must own the object
- * or it must be marked public in its ACL policy.
+ * Mark an uploaded object as publicly readable.
+ * Used after profile photo / cover uploads so they display on public profiles.
  */
-router.get("/storage/objects/*path", async (req: Request, res: Response) => {
+router.post("/storage/uploads/make-public", async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
+  const { objectPath } = req.body as { objectPath?: string };
+  if (!objectPath || typeof objectPath !== "string") {
+    res.status(400).json({ error: "objectPath is required" });
+    return;
+  }
+
+  try {
+    const normalizedPath = objectPath.startsWith("/objects/")
+      ? objectPath
+      : `/objects/${objectPath.replace(/^\/+/, "")}`;
+    await objectStorageService.trySetObjectEntityAclPolicy(normalizedPath, {
+      owner: req.user.id,
+      visibility: "public",
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    req.log.error({ err: error }, "Error setting object ACL to public");
+    res.status(500).json({ error: "Failed to make object public" });
+  }
+});
+
+/**
+ * GET /storage/objects/*
+ *
+ * Serve object entities from PRIVATE_OBJECT_DIR.
+ * Public objects (visibility: "public") are readable without auth.
+ * Private objects require the requesting user to be the owner.
+ */
+router.get("/storage/objects/*path", async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
@@ -110,7 +138,7 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
     const canAccess = await objectStorageService.canAccessObjectEntity({
-      userId: req.user.id,
+      userId: req.isAuthenticated() ? req.user.id : undefined,
       objectFile,
       requestedPermission: ObjectPermission.READ,
     });

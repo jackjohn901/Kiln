@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Save, User, Camera, Globe, Instagram, MapPin, Layers, AlignLeft, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MEDIUM_OPTIONS = [
   "Glass Blowing", "Flameworking", "Kiln Forming", "Raku", "Ceramics", "Porcelain",
@@ -89,10 +90,19 @@ async function uploadToStorage(blob: Blob, filename: string): Promise<string> {
   });
   if (!putRes.ok) throw new Error("Upload to storage failed");
 
+  // Mark profile photos as publicly readable so they display on public profiles
+  await fetch("/api/storage/uploads/make-public", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ objectPath }),
+  });
+
   return `/api/storage${objectPath}`;
 }
 
 export default function EditProfile() {
+  const { user } = useAuth();
   const { profile, setProfile } = useProfile();
   const [, navigate] = useLocation();
 
@@ -128,6 +138,23 @@ export default function EditProfile() {
       if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
     };
   }, [avatarPreview, coverPreview]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
+          <p className="text-stone-400">You need to be signed in to edit your profile.</p>
+          <a
+            href="/api/login?returnTo=/kiln/edit-profile"
+            className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+          >
+            Sign in
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   if (!profile) {
     return (
