@@ -169,6 +169,29 @@ router.get('/me/stripe/connect/refresh', async (req, res): Promise<void> => {
   }
 });
 
+router.get('/me/stripe/connect/dashboard-link', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  try {
+    const [profile] = await db
+      .select({ stripeConnectedAccountId: profilesTable.stripeConnectedAccountId })
+      .from(profilesTable)
+      .where(eq(profilesTable.userId, req.user.id));
+
+    if (!profile?.stripeConnectedAccountId) {
+      res.status(400).json({ error: 'No connected Stripe account' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const loginLink = await stripe.accounts.createLoginLink(profile.stripeConnectedAccountId);
+    res.json({ url: loginLink.url });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Stripe Connect dashboard link error');
+    res.status(500).json({ error: 'Failed to create dashboard link' });
+  }
+});
+
 router.post('/me/stripe/connect/disconnect', async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
 

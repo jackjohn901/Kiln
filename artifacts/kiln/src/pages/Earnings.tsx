@@ -3,7 +3,7 @@ import { Link, useSearch } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
-  CreditCard, CheckCircle, AlertCircle, Unlink,
+  CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -109,6 +109,7 @@ export default function Earnings() {
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [disconnectingStripe, setDisconnectingStripe] = useState(false);
   const [connectSuccessToast, setConnectSuccessToast] = useState(false);
+  const [openingDashboard, setOpeningDashboard] = useState(false);
 
   // Show success toast when returning from Stripe onboarding
   useEffect(() => {
@@ -140,6 +141,21 @@ export default function Earnings() {
       window.location.href = data.url;
     } catch {
       setConnectingStripe(false);
+    }
+  }
+
+  async function handleOpenDashboard() {
+    setOpeningDashboard(true);
+    const newTab = window.open("", "_blank", "noopener,noreferrer");
+    try {
+      const res = await fetch("/api/me/stripe/connect/dashboard-link", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as { url: string };
+      if (newTab) newTab.location.href = data.url;
+    } catch {
+      if (newTab) newTab.close();
+    } finally {
+      setOpeningDashboard(false);
     }
   }
 
@@ -351,6 +367,16 @@ export default function Earnings() {
                       Disconnect
                     </button>
                   </div>
+                  {stripeConnect.chargesEnabled && (
+                    <button
+                      onClick={handleOpenDashboard}
+                      disabled={openingDashboard}
+                      className="mt-3 flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-400 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+                    >
+                      {openingDashboard ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                      Open Stripe Dashboard
+                    </button>
+                  )}
                   <p className="mt-2 text-[10px] text-stone-600">Buyers pay directly to your Stripe account. Kiln retains a 10% platform fee.</p>
                 </div>
               ) : (
