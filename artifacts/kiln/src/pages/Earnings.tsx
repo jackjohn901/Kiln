@@ -53,6 +53,8 @@ interface StripeConnectStatus {
   accountId?: string | null;
   disabledReason?: string | null;
   requirementsCurrentDeadline?: number | null;
+  requirementsEventuallyDue?: number;
+  requirementsPastDue?: number;
 }
 
 interface CurrencyBalance {
@@ -450,16 +452,25 @@ export default function Earnings() {
                   {(() => {
                     const isRestricted = !!stripeConnect.disabledReason;
                     const deadline = stripeConnect.requirementsCurrentDeadline;
-                    const isOverdue = deadline != null && deadline * 1000 < Date.now();
-                    const needsAction = isRestricted || isOverdue;
-                    const deadlineLabel = deadline
-                      ? new Date(deadline * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    const nowMs = Date.now();
+                    const deadlineMs = deadline != null ? deadline * 1000 : null;
+                    const isOverdue = deadlineMs != null && deadlineMs < nowMs;
+                    const isFutureDeadline = deadlineMs != null && deadlineMs >= nowMs;
+                    const daysRemaining = isFutureDeadline
+                      ? Math.ceil((deadlineMs! - nowMs) / 86400000)
+                      : null;
+                    const eventuallyDue = stripeConnect.requirementsEventuallyDue ?? 0;
+                    const pastDue = stripeConnect.requirementsPastDue ?? 0;
+                    const needsUrgentAction = isRestricted || isOverdue || pastDue > 0;
+                    const needsUpcomingAction = !needsUrgentAction && (isFutureDeadline || eventuallyDue > 0);
+                    const deadlineLabel = deadlineMs
+                      ? new Date(deadlineMs).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                       : null;
 
                     return (
                       <>
-                        {/* Restriction / overdue requirements warning banner */}
-                        {needsAction && (
+                        {/* Restriction / overdue requirements — red banner */}
+                        {needsUrgentAction && (
                           <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
                             <div className="flex items-start gap-2">
                               <AlertCircle size={15} className="mt-0.5 flex-shrink-0 text-rose-400" />
@@ -485,6 +496,34 @@ export default function Earnings() {
                           </div>
                         )}
 
+                        {/* Upcoming requirements — yellow caution banner */}
+                        {needsUpcomingAction && (
+                          <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle size={15} className="mt-0.5 flex-shrink-0 text-amber-400" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-amber-300">
+                                  Action needed
+                                  {daysRemaining != null && ` — ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`}
+                                </p>
+                                <p className="mt-0.5 text-xs text-amber-400/80">
+                                  {eventuallyDue > 0
+                                    ? `${eventuallyDue} verification item${eventuallyDue === 1 ? "" : "s"} due${deadlineLabel ? ` by ${deadlineLabel}` : ""}. Complete now to keep payouts running smoothly.`
+                                    : `Verification required by ${deadlineLabel}. Complete now to keep payouts running smoothly.`}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleConnectStripe}
+                              disabled={connectingStripe}
+                              className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-colors"
+                            >
+                              {connectingStripe ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                              {connectingStripe ? "Redirecting…" : "Complete verification"}
+                            </button>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {stripeConnect.chargesEnabled ? (
@@ -501,7 +540,7 @@ export default function Earnings() {
                               )}
                             </div>
                           </div>
-                          {needsAction ? (
+                          {needsUrgentAction ? (
                             <button
                               onClick={handleDisconnectStripe}
                               disabled={disconnectingStripe}
