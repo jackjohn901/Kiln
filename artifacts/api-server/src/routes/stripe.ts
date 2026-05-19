@@ -439,11 +439,23 @@ router.post('/stripe/gift-card-checkout', async (req, res): Promise<void> => {
 router.get('/stripe/session/:sessionId', async (req, res): Promise<void> => {
   try {
     const stripe = await getUncachableStripeClient();
-    const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+    const [session, lineItemsPage] = await Promise.all([
+      stripe.checkout.sessions.retrieve(req.params.sessionId),
+      stripe.checkout.sessions.listLineItems(req.params.sessionId, { limit: 100 }),
+    ]);
+
+    const lineItems = lineItemsPage.data.map((item) => ({
+      name: item.description ?? 'Item',
+      quantity: item.quantity ?? 1,
+      amountTotal: item.amount_total,
+    }));
+
     res.json({
       status: session.status,
       customerEmail: session.customer_details?.email,
       amountTotal: session.amount_total,
+      manualPayout: session.metadata?.manualPayout === 'true',
+      lineItems,
     });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe session retrieve error');

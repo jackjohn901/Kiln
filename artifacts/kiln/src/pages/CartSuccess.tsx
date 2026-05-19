@@ -1,13 +1,21 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { CheckCircle, Package, ArrowRight, Clock } from "lucide-react";
+import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
+
+interface LineItem {
+  name: string;
+  quantity: number;
+  amountTotal: number;
+}
 
 interface SessionData {
   status: string;
   customerEmail: string | null;
   amountTotal: number | null;
+  manualPayout: boolean;
+  lineItems: LineItem[];
 }
 
 interface PaymentSettings {
@@ -138,6 +146,8 @@ export default function CartSuccess() {
     );
   }
 
+  const isManual = session?.manualPayout === true;
+
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
@@ -162,6 +172,56 @@ export default function CartSuccess() {
           </p>
         )}
 
+        {/* Manual payout expanded notice */}
+        {isManual && (
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 p-5 text-sm text-left mb-6">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertCircle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-200 font-semibold mb-1">Manual fulfillment in progress</p>
+                <p className="text-stone-400 leading-relaxed">
+                  This artist processes payments directly. Your order has been recorded and the artist has
+                  been notified. Expect a reply within <span className="text-amber-300 font-medium">2–5 business days</span> with
+                  payment instructions and shipping details.
+                </p>
+              </div>
+            </div>
+            {session?.customerEmail && (
+              <p className="text-stone-500 text-xs border-t border-white/8 pt-3 mt-3">
+                The artist will contact you at{" "}
+                <span className="text-stone-300 font-medium">{session.customerEmail}</span>.
+                Keep an eye on your inbox.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Itemised line items (shown for manual payout orders) */}
+        {isManual && session?.lineItems && session.lineItems.length > 0 && (
+          <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-left mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ShoppingBag size={14} className="text-amber-400" />
+              <span className="text-stone-300 font-medium">Order summary</span>
+            </div>
+            <ul className="space-y-2 divide-y divide-white/6">
+              {session.lineItems.map((item, i) => (
+                <li key={i} className="flex items-center justify-between pt-2 first:pt-0">
+                  <span className="text-stone-300 flex-1 pr-4">
+                    {item.name}
+                    {item.quantity > 1 && (
+                      <span className="text-stone-500 ml-1">× {item.quantity}</span>
+                    )}
+                  </span>
+                  <span className="text-amber-300 font-medium tabular-nums shrink-0">
+                    ${(item.amountTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Standard fulfillment info box */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-stone-400 text-left space-y-2 mb-8">
           {processingWindowDays !== null && (
             <div className="flex items-center gap-2">
