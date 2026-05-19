@@ -37,6 +37,8 @@ interface StripeConnectStatus {
   status: string | null;
   chargesEnabled: boolean;
   accountId?: string | null;
+  disabledReason?: string | null;
+  requirementsCurrentDeadline?: number | null;
 }
 
 interface StripeBalance {
@@ -366,31 +368,84 @@ export default function Earnings() {
                 <div className="flex justify-center py-3"><Loader2 size={16} className="animate-spin text-stone-600" /></div>
               ) : stripeConnect?.connected ? (
                 <div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {stripeConnect.chargesEnabled ? (
-                        <CheckCircle size={15} className="text-emerald-400" />
-                      ) : (
-                        <AlertCircle size={15} className="text-amber-400" />
-                      )}
-                      <div>
-                        <p className="text-sm text-stone-200">
-                          {stripeConnect.chargesEnabled ? "Connected & active" : "Connected — pending verification"}
-                        </p>
-                        {stripeConnect.status && (
-                          <p className="text-[10px] text-stone-600 capitalize">{stripeConnect.status}</p>
+                  {(() => {
+                    const isRestricted = !!stripeConnect.disabledReason;
+                    const deadline = stripeConnect.requirementsCurrentDeadline;
+                    const isOverdue = deadline != null && deadline * 1000 < Date.now();
+                    const needsAction = isRestricted || isOverdue;
+                    const deadlineLabel = deadline
+                      ? new Date(deadline * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : null;
+
+                    return (
+                      <>
+                        {/* Restriction / overdue requirements warning banner */}
+                        {needsAction && (
+                          <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle size={15} className="mt-0.5 flex-shrink-0 text-rose-400" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-rose-300">
+                                  {isRestricted ? "Your Stripe account is restricted" : "Verification required"}
+                                </p>
+                                <p className="mt-0.5 text-xs text-rose-400/80">
+                                  {isRestricted
+                                    ? "Payouts are paused. Complete verification to restore access."
+                                    : `Action required${deadlineLabel ? ` by ${deadlineLabel}` : ""}. Complete verification to avoid interruptions.`}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleConnectStripe}
+                              disabled={connectingStripe}
+                              className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/25 disabled:opacity-50 transition-colors"
+                            >
+                              {connectingStripe ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                              {connectingStripe ? "Redirecting…" : "Complete verification"}
+                            </button>
+                          </div>
                         )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleDisconnectStripe}
-                      disabled={disconnectingStripe}
-                      className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1.5 text-xs text-stone-500 hover:text-rose-400 hover:border-rose-500/30 disabled:opacity-50 transition-colors"
-                    >
-                      {disconnectingStripe ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />}
-                      Disconnect
-                    </button>
-                  </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {stripeConnect.chargesEnabled ? (
+                              <CheckCircle size={15} className="text-emerald-400" />
+                            ) : (
+                              <AlertCircle size={15} className="text-amber-400" />
+                            )}
+                            <div>
+                              <p className="text-sm text-stone-200">
+                                {stripeConnect.chargesEnabled ? "Connected & active" : "Connected — pending verification"}
+                              </p>
+                              {stripeConnect.status && (
+                                <p className="text-[10px] text-stone-600 capitalize">{stripeConnect.status}</p>
+                              )}
+                            </div>
+                          </div>
+                          {needsAction ? (
+                            <button
+                              onClick={handleDisconnectStripe}
+                              disabled={disconnectingStripe}
+                              title="Disconnect Stripe account"
+                              className="flex items-center gap-1 rounded-lg border border-white/5 px-2.5 py-1.5 text-xs text-stone-700 hover:text-stone-500 hover:border-white/8 disabled:opacity-50 transition-colors"
+                            >
+                              {disconnectingStripe ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />}
+                              Disconnect
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleDisconnectStripe}
+                              disabled={disconnectingStripe}
+                              className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1.5 text-xs text-stone-500 hover:text-rose-400 hover:border-rose-500/30 disabled:opacity-50 transition-colors"
+                            >
+                              {disconnectingStripe ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />}
+                              Disconnect
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                   {stripeConnect.chargesEnabled && (
                     <>
                       {balanceLoading ? (

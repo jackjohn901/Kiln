@@ -80,9 +80,13 @@ router.get('/me/stripe/connect/status', async (req, res): Promise<void> => {
 
     const stripe = await getUncachableStripeClient();
     let chargesEnabled = false;
+    let disabledReason: string | null = null;
+    let requirementsCurrentDeadline: number | null = null;
     try {
       const account = await stripe.accounts.retrieve(profile.stripeConnectedAccountId);
       chargesEnabled = account.charges_enabled;
+      disabledReason = account.requirements?.disabled_reason ?? null;
+      requirementsCurrentDeadline = account.requirements?.current_deadline ?? null;
     } catch {
       // Account may have been deleted externally; treat as not connected
     }
@@ -92,6 +96,8 @@ router.get('/me/stripe/connect/status', async (req, res): Promise<void> => {
       status: profile.stripeConnectStatus,
       chargesEnabled,
       accountId: profile.stripeConnectedAccountId,
+      disabledReason,
+      requirementsCurrentDeadline,
     });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe Connect status error');
