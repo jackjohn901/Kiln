@@ -200,12 +200,11 @@ export default function Subscribe() {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-stone-900/60 p-4 mb-6">
-            <p className="text-sm font-medium text-stone-400 mb-3">Payment method</p>
-            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-stone-800 px-4 py-3">
-              <Lock size={14} className="text-stone-500" />
-              <span className="text-sm text-stone-400">•••• •••• •••• 4242  Visa</span>
+            <p className="text-sm font-medium text-stone-400 mb-3">Payment</p>
+            <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+              <Lock size={14} className="text-amber-500/70" />
+              <span className="text-sm text-stone-400">You'll be taken to Stripe to complete payment securely</span>
             </div>
-            <p className="text-xs text-stone-600 mt-2">This is a demo — no real payment is processed.</p>
           </div>
 
           <div className="flex gap-3">

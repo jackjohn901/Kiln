@@ -68,7 +68,6 @@ export default function LiveStudio() {
     images: profile!.avatarUrl ? [{ url: profile!.avatarUrl }] : [] as { url: string }[],
   } : null)) as typeof staticArtist | null;
 
-  const videoId = artist?.videos?.[0]?.id ?? "dQhKVFbpZoQ";
   const avatarUrl = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/200/200`;
 
   const [viewers, setViewers] = useState(() => 800 + (hash(artistId ?? "") % 3000));
@@ -141,13 +140,17 @@ export default function LiveStudio() {
     <div className="fixed inset-0 bg-black flex flex-col lg:flex-row overflow-hidden">
       {/* ── Video / stream area ── */}
       <div className="relative flex-1 min-h-0 overflow-hidden">
-        {/* Background stream (YouTube video as mock live) */}
-        <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&playlist=${videoId}`}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ transform: "scale(1.05)" }}
-          allow="autoplay; encrypted-media"
+        {/* Studio background — artist avatar blurred as ambient fill */}
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `url(${avatarUrl})`,
+            filter: "blur(32px) brightness(0.25) saturate(0.6)",
+            transform: "scale(1.1)",
+          }}
         />
+        {/* Dark studio overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-stone-950/80 via-stone-900/60 to-amber-950/30" />
 
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
