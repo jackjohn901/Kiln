@@ -235,6 +235,47 @@ export function manualPayoutReceiptEmail(
   `);
 }
 
+export function newSaleEmail(
+  buyerName: string,
+  buyerEmail: string,
+  sessionId: string,
+  amountTotalCents: number,
+  items: ManualPayoutReceiptItem[],
+): string {
+  const itemRows = items
+    .map(
+      (item) =>
+        `<p style="margin:0 0 6px;">
+          <strong>${escHtml(item.title)}</strong>
+          ${item.quantity > 1 ? ` &times; ${item.quantity}` : ""}
+        </p>`,
+    )
+    .join("");
+
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Sale! 🎉</h1>
+    <p style="color:#78716c;margin-bottom:0;">Someone just purchased your work on Kiln.</p>
+    ${card(`
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Buyer</p>
+      <p style="margin:0 0 4px;"><strong>${escHtml(buyerName || "A buyer")}</strong></p>
+      <p style="margin:0;color:#78716c;">${escHtml(buyerEmail)}</p>
+    `)}
+    ${card(`
+      <p style="margin:0 0 10px;font-size:14px;color:#fcd34d;font-weight:bold;">Items ordered</p>
+      ${itemRows}
+      <p style="margin:12px 0 0;font-size:16px;border-top:1px solid #3c3835;padding-top:12px;">
+        Total: <strong style="color:#fcd34d;">$${(amountTotalCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
+      </p>
+      <p style="margin:8px 0 0;font-size:12px;color:#78716c;">Order ref: <code style="color:#d6d3d1;">${escHtml(sessionId)}</code></p>
+    `)}
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Next steps</p>
+      <p style="margin:0;color:#d6d3d1;">Contact the buyer at the email above to confirm their shipping address and send tracking once the item is on its way.</p>
+    `)}
+    ${btn(`${BASE_URL}/earnings`, "View Earnings")}
+  `);
+}
+
 function escHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
