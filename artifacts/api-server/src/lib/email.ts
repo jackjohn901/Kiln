@@ -51,7 +51,7 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: payload.from ?? "Kiln <noreply@kilnfire.app>",
+        from: payload.from ?? "Kiln <onboarding@resend.dev>",
         to: [payload.to],
         subject: payload.subject,
         html: payload.html,
