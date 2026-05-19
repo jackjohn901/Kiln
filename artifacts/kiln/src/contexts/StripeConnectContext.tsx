@@ -1,0 +1,74 @@
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { useProfile } from "@/contexts/ProfileContext";
+
+interface StripeConnectStatus {
+  connected: boolean;
+  status: string | null;
+  chargesEnabled: boolean;
+  accountId?: string | null;
+  disabledReason?: string | null;
+  requirementsCurrentDeadline?: number | null;
+  requirementsEventuallyDue?: number;
+  requirementsPastDue?: number;
+}
+
+interface StripeConnectContextValue {
+  status: StripeConnectStatus | null;
+  loading: boolean;
+  refresh: () => void;
+  hasWarning: boolean;
+  hasUrgent: boolean;
+}
+
+const StripeConnectContext = createContext<StripeConnectContextValue>({
+  status: null,
+  loading: false,
+  refresh: () => undefined,
+  hasWarning: false,
+  hasUrgent: false,
+});
+
+export function StripeConnectProvider({ children }: { children: ReactNode }) {
+  const { profile } = useProfile();
+  const [status, setStatus] = useState<StripeConnectStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetch_ = useCallback(async () => {
+    if (!profile) {
+      setStatus(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      const r = await fetch("/api/me/stripe/connect/status", { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = (await r.json()) as StripeConnectStatus;
+      setStatus(data);
+    } catch {
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    void fetch_();
+  }, [fetch_]);
+
+  const eventuallyDue = status?.requirementsEventuallyDue ?? 0;
+  const pastDue = status?.requirementsPastDue ?? 0;
+  const hasUrgent = pastDue > 0 || !!status?.disabledReason;
+  const hasWarning = !hasUrgent && eventuallyDue > 0;
+
+  return (
+    <StripeConnectContext.Provider
+      value={{ status, loading, refresh: () => { void fetch_(); }, hasWarning, hasUrgent }}
+    >
+      {children}
+    </StripeConnectContext.Provider>
+  );
+}
+
+export function useStripeConnect(): StripeConnectContextValue {
+  return useContext(StripeConnectContext);
+}

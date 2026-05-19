@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone, AlertTriangle } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { useCart } from "@/contexts/CartContext";
+import { useStripeConnect } from "@/contexts/StripeConnectContext";
 import NotificationPanel from "@/components/NotificationPanel";
 import GlobalSearch from "@/components/GlobalSearch";
 
@@ -13,6 +14,7 @@ export default function Nav() {
   const { profile, logout } = useProfile();
   const { unreadCount, unreadMessageCount, receivedInquiries, isVerified } = useSocial();
   const { itemCount } = useCart();
+  const { hasWarning, hasUrgent } = useStripeConnect();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -201,6 +203,24 @@ export default function Nav() {
                 </span>
               )}
             </button>
+
+            {/* Stripe verification warning — only shown to logged-in users with outstanding requirements */}
+            {profile && (hasUrgent || hasWarning) && (
+              <Link
+                href="/earnings"
+                title={hasUrgent ? "Stripe account restricted — action required" : "Stripe verification needed"}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  hasUrgent
+                    ? "border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+                    : "border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                }`}
+              >
+                <AlertTriangle size={13} className="flex-shrink-0" />
+                <span className="hidden sm:inline">
+                  {hasUrgent ? "Action required" : "Verify account"}
+                </span>
+              </Link>
+            )}
 
             <Link
               href="/create"
