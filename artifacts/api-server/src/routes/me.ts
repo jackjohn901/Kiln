@@ -217,12 +217,20 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
 
   try {
     const dedupeKey = `stripe:${stripeSessionId}`;
-    const existing = await db.select({ id: ordersTable.id }).from(ordersTable)
+    const existing = await db
+      .select({ id: ordersTable.id, sellerId: ordersTable.sellerId })
+      .from(ordersTable)
       .where(eq(ordersTable.notes, dedupeKey))
       .limit(1);
 
     if (existing.length > 0) {
-      res.json({ orderIds: [existing[0].id], duplicate: true }); return;
+      // Fetch all orders for this session to collect seller IDs.
+      const allExisting = await db
+        .select({ id: ordersTable.id, sellerId: ordersTable.sellerId })
+        .from(ordersTable)
+        .where(eq(ordersTable.notes, dedupeKey));
+      const sellerIds = [...new Set(allExisting.map((o) => o.sellerId).filter(Boolean))];
+      res.json({ orderIds: [existing[0].id], duplicate: true, sellerIds }); return;
     }
 
     // Look up listing data from the DB — authoritative source for seller, price, and title.
@@ -253,6 +261,7 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
     }
 
     const orderIds: string[] = [];
+    const sellerIdSet = new Set<string>();
 
     for (let i = 0; i < verified.listingIds.length; i++) {
       const listingId = verified.listingIds[i];
@@ -280,13 +289,14 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         notes: orderIds.length === 0 ? dedupeKey : null,
       });
       orderIds.push(orderId);
+      sellerIdSet.add(listing.artistId);
     }
 
     if (orderIds.length === 0) {
       res.status(400).json({ error: "No valid listings found for this session." }); return;
     }
 
-    res.json({ orderIds });
+    res.json({ orderIds, sellerIds: [...sellerIdSet] });
   } catch (err) {
     logger.error({ err }, "me/orders/bulk error");
     res.status(500).json({ error: "Failed to create orders" });

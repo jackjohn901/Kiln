@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { CheckCircle, Package, ArrowRight } from "lucide-react";
+import { CheckCircle, Package, ArrowRight, Clock } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 
@@ -10,6 +10,9 @@ interface SessionData {
   amountTotal: number | null;
 }
 
+interface PaymentSettings {
+  processingWindow?: number;
+}
 
 export default function CartSuccess() {
   const [, navigate] = useLocation();
@@ -17,6 +20,7 @@ export default function CartSuccess() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [orderId, setOrderId] = useState<string>(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
+  const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const orderCreated = useRef(false);
 
   useEffect(() => {
@@ -29,6 +33,52 @@ export default function CartSuccess() {
     }
 
     clearCart();
+
+    // Read seller IDs from kiln_pre_checkout before it is cleaned up below.
+    // This lets us re-fetch payment settings (including processingWindow) from the API.
+    let sellerIds: string[] = [];
+    try {
+      const preCheckout = JSON.parse(localStorage.getItem("kiln_pre_checkout") ?? "null") as {
+        items?: Array<{ sellerId?: string }>;
+      } | null;
+      sellerIds = [
+        ...new Set(
+          (preCheckout?.items ?? [])
+            .map((i) => i.sellerId)
+            .filter((id): id is string => !!id)
+        ),
+      ];
+    } catch {}
+
+    // Apply a cached hint immediately so the UI isn't blank during the API fetch.
+    try {
+      const cached = localStorage.getItem("kiln_processing_window");
+      if (cached !== null) {
+        const days = parseInt(cached, 10);
+        if (!isNaN(days)) setProcessingWindowDays(days);
+        localStorage.removeItem("kiln_processing_window");
+      }
+    } catch {}
+
+    // Fetch processing windows from seller payment settings (authoritative source).
+    if (sellerIds.length > 0) {
+      Promise.all(
+        sellerIds.map((id) =>
+          fetch(`/api/users/${id}/payment-settings`, { credentials: "include" })
+            .then((r) => r.ok ? (r.json() as Promise<PaymentSettings>) : null)
+            .catch(() => null)
+        )
+      ).then((results) => {
+        const windows = results
+          .filter(Boolean)
+          .map((r) => r!.processingWindow)
+          .filter((w): w is number => typeof w === "number");
+        if (windows.length > 0) {
+          // Use the longest window so buyers get the most conservative estimate.
+          setProcessingWindowDays(Math.max(...windows));
+        }
+      });
+    }
 
     fetch(`/api/stripe/session/${sessionId}`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
@@ -48,8 +98,29 @@ export default function CartSuccess() {
             body: JSON.stringify({ stripeSessionId: sessionId }),
           });
           if (res.ok) {
-            const d = await res.json() as { orderIds?: string[] };
+            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[] };
             if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
+
+            // Use order-backed seller IDs as the authoritative source for processing window.
+            // This works even on page refresh since orders are persisted in the DB.
+            const orderSellerIds = d.sellerIds ?? [];
+            if (orderSellerIds.length > 0) {
+              Promise.all(
+                orderSellerIds.map((id) =>
+                  fetch(`/api/users/${id}/payment-settings`, { credentials: "include" })
+                    .then((r) => r.ok ? (r.json() as Promise<PaymentSettings>) : null)
+                    .catch(() => null)
+                )
+              ).then((results) => {
+                const windows = results
+                  .filter(Boolean)
+                  .map((r) => r!.processingWindow)
+                  .filter((w): w is number => typeof w === "number");
+                if (windows.length > 0) {
+                  setProcessingWindowDays(Math.max(...windows));
+                }
+              });
+            }
           }
           // Clean up any stale pre-checkout data from localStorage.
           localStorage.removeItem("kiln_pre_checkout");
@@ -92,6 +163,20 @@ export default function CartSuccess() {
         )}
 
         <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-stone-400 text-left space-y-2 mb-8">
+          {processingWindowDays !== null && (
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-amber-400 shrink-0" />
+              <span>
+                Processing window:{" "}
+                <span className="text-amber-300 font-medium">
+                  {processingWindowDays === 1
+                    ? "1 business day"
+                    : `${processingWindowDays} business days`}
+                </span>
+                {" "}— the artist will prepare your order within this time.
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Package size={14} className="text-amber-400 shrink-0" />
             <span>The artist will be notified and will reach out within 2–3 business days with shipping details.</span>

@@ -83,7 +83,7 @@ export default function CartCheckout() {
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
 
-  // Detect return from success
+  // Detect return from success (legacy path — real Stripe flow lands on /cart/success)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "1") {
@@ -209,6 +209,14 @@ export default function CartCheckout() {
 
   function proceedToPendingCheckout() {
     if (pendingCheckoutUrl) {
+      // Persist processing window so it survives the Stripe redirect
+      try {
+        if (processingWindowDays !== null) {
+          localStorage.setItem("kiln_processing_window", String(processingWindowDays));
+        } else {
+          localStorage.removeItem("kiln_processing_window");
+        }
+      } catch {}
       window.location.href = pendingCheckoutUrl;
     }
   }
@@ -586,6 +594,16 @@ export default function CartCheckout() {
                         <span>Payments</span>
                         <span className="text-emerald-400">Sent directly to artists</span>
                       </div>
+                      {processingWindowDays !== null && (
+                        <div className="flex justify-between">
+                          <span className="flex items-center gap-1"><Package size={11} /> Processing window</span>
+                          <span className="text-amber-300">
+                            {processingWindowDays === 1
+                              ? "1 business day"
+                              : `${processingWindowDays} business days`}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>Estimated delivery</span>
                         <span className="text-stone-300">5–10 business days</span>
