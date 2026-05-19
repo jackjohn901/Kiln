@@ -1,10 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useSearch } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
-  CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink,
+  CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
 } from "lucide-react";
+
+type RefreshInterval = "30s" | "1m" | "5m" | "manual";
+const REFRESH_MS: Record<RefreshInterval, number | null> = {
+  "30s": 30_000,
+  "1m":  60_000,
+  "5m":  300_000,
+  "manual": null,
+};
+const REFRESH_LABELS: Record<RefreshInterval, string> = {
+  "30s": "30s",
+  "1m":  "1m",
+  "5m":  "5m",
+  "manual": "Manual",
+};
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 
@@ -121,7 +135,50 @@ export default function Earnings() {
   const [openingDashboard, setOpeningDashboard] = useState(false);
   const [stripeBalance, setStripeBalance] = useState<StripeBalance | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceRefreshing, setBalanceRefreshing] = useState(false);
   const [balanceError, setBalanceError] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(() => {
+    const saved = localStorage.getItem("kiln_balance_refresh_interval");
+    return (saved as RefreshInterval | null) ?? "1m";
+  });
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chargesEnabledRef = useRef(false);
+
+  const fetchBalance = useCallback(async (isBackground = false) => {
+    if (isBackground) {
+      setBalanceRefreshing(true);
+    } else {
+      setBalanceLoading(true);
+    }
+    setBalanceError(false);
+    try {
+      const r = await fetch("/api/me/stripe/connect/balance", { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const b = await r.json() as StripeBalance;
+      setStripeBalance(b);
+      setLastRefreshed(new Date());
+    } catch (err: unknown) {
+      console.error("[Kiln] Stripe balance fetch failed:", err);
+      setBalanceError(true);
+    } finally {
+      setBalanceLoading(false);
+      setBalanceRefreshing(false);
+    }
+  }, []);
+
+  // Auto-refresh interval
+  useEffect(() => {
+    localStorage.setItem("kiln_balance_refresh_interval", refreshInterval);
+    if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+    const ms = REFRESH_MS[refreshInterval];
+    if (ms !== null && chargesEnabledRef.current) {
+      autoRefreshTimerRef.current = setInterval(() => { void fetchBalance(true); }, ms);
+    }
+    return () => {
+      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+    };
+  }, [refreshInterval, fetchBalance]);
 
   // Show success toast when returning from Stripe onboarding
   useEffect(() => {
@@ -139,20 +196,18 @@ export default function Earnings() {
       .then((data: StripeConnectStatus) => {
         setStripeConnect(data);
         if (data.chargesEnabled) {
-          setBalanceLoading(true);
-          setBalanceError(false);
-          fetch("/api/me/stripe/connect/balance", { credentials: "include" })
-            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-            .then((b: StripeBalance) => setStripeBalance(b))
-            .catch((err: unknown) => {
-              console.error("[Kiln] Stripe balance fetch failed:", err);
-              setBalanceError(true);
-            })
-            .finally(() => setBalanceLoading(false));
+          chargesEnabledRef.current = true;
+          void fetchBalance(false);
+          const ms = REFRESH_MS[refreshInterval];
+          if (ms !== null) {
+            if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+            autoRefreshTimerRef.current = setInterval(() => { void fetchBalance(true); }, ms);
+          }
         }
       })
       .catch(() => {})
       .finally(() => setConnectLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleConnectStripe() {
@@ -457,33 +512,75 @@ export default function Earnings() {
                           Balance unavailable — open the Stripe Dashboard to view your funds.
                         </p>
                       ) : stripeBalance ? (
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                          <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3">
-                            <p className="text-[10px] text-stone-500 mb-1">Available</p>
-                            <p className="text-base font-bold text-emerald-400">
-                              {(stripeBalance.availableCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                            </p>
+                        <>
+                          {/* Balance header: last-refreshed + manual refresh button */}
+                          <div className="mt-3 flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] text-stone-600">
+                              {balanceRefreshing
+                                ? "Refreshing…"
+                                : lastRefreshed
+                                  ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+                                  : ""}
+                            </span>
+                            <button
+                              onClick={() => void fetchBalance(true)}
+                              disabled={balanceRefreshing || balanceLoading}
+                              title="Refresh balance now"
+                              className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-40 transition-colors"
+                            >
+                              <RefreshCw size={10} className={balanceRefreshing ? "animate-spin" : ""} />
+                              Refresh
+                            </button>
                           </div>
-                          <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3">
-                            <p className="text-[10px] text-stone-500 mb-1">Pending</p>
-                            <p className="text-base font-bold text-amber-400">
-                              {(stripeBalance.pendingCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                            </p>
-                          </div>
-                          {stripeBalance.nextPayoutDate !== null && (
-                            <div className="col-span-2 rounded-xl border border-white/8 bg-stone-800/50 px-3 py-2 flex items-center justify-between">
-                              <p className="text-[10px] text-stone-500">Next payout</p>
-                              <p className="text-xs font-medium text-stone-300">
-                                {new Date(stripeBalance.nextPayoutDate * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                {stripeBalance.nextPayoutCents !== null && (
-                                  <span className="ml-1.5 text-emerald-400">
-                                    {(stripeBalance.nextPayoutCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                                  </span>
-                                )}
+                          <div className={`grid grid-cols-2 gap-2 transition-opacity duration-300 ${balanceRefreshing ? "opacity-50" : "opacity-100"}`}>
+                            <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3 relative overflow-hidden">
+                              {balanceRefreshing && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/3 to-transparent animate-[shimmer_1.5s_infinite]" />}
+                              <p className="text-[10px] text-stone-500 mb-1">Available</p>
+                              <p className="text-base font-bold text-emerald-400">
+                                {(stripeBalance.availableCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
                               </p>
                             </div>
-                          )}
-                        </div>
+                            <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3 relative overflow-hidden">
+                              {balanceRefreshing && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/3 to-transparent animate-[shimmer_1.5s_infinite]" />}
+                              <p className="text-[10px] text-stone-500 mb-1">Pending</p>
+                              <p className="text-base font-bold text-amber-400">
+                                {(stripeBalance.pendingCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                              </p>
+                            </div>
+                            {stripeBalance.nextPayoutDate !== null && (
+                              <div className="col-span-2 rounded-xl border border-white/8 bg-stone-800/50 px-3 py-2 flex items-center justify-between">
+                                <p className="text-[10px] text-stone-500">Next payout</p>
+                                <p className="text-xs font-medium text-stone-300">
+                                  {new Date(stripeBalance.nextPayoutDate * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {stripeBalance.nextPayoutCents !== null && (
+                                    <span className="ml-1.5 text-emerald-400">
+                                      {(stripeBalance.nextPayoutCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          {/* Auto-refresh interval picker */}
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-[10px] text-stone-600 shrink-0">Auto-refresh:</span>
+                            <div className="flex gap-1">
+                              {(["30s", "1m", "5m", "manual"] as RefreshInterval[]).map(opt => (
+                                <button
+                                  key={opt}
+                                  onClick={() => setRefreshInterval(opt)}
+                                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                                    refreshInterval === opt
+                                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                      : "text-stone-600 hover:text-stone-400 border border-transparent"
+                                  }`}
+                                >
+                                  {REFRESH_LABELS[opt]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
                       ) : null}
                       <button
                         onClick={handleOpenDashboard}
