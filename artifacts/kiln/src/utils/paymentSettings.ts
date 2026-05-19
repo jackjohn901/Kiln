@@ -8,6 +8,8 @@ export interface ArtistPayments {
   notes: string;
   /** Processing window in business days for manually-paid orders */
   processingWindow?: number;
+  /** Free-text delivery estimate shown to buyers (e.g. "2–3 weeks after firing") */
+  processingWindowLabel?: string;
 }
 
 export const EMPTY_PAYMENTS: ArtistPayments = {
@@ -17,6 +19,7 @@ export const EMPTY_PAYMENTS: ArtistPayments = {
   paypalMe: "",
   notes: "",
   processingWindow: undefined,
+  processingWindowLabel: undefined,
 };
 
 export function readPaymentSettings(): ArtistPayments {

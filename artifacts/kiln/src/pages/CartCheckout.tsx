@@ -78,6 +78,7 @@ export default function CartCheckout() {
   const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
   const [manualPayoutWarning, setManualPayoutWarning] = useState(false);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
+  const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
@@ -194,6 +195,7 @@ export default function CartCheckout() {
           setPendingCheckoutUrl(data.url);
           setManualPayoutWarning(true);
           setProcessingWindowDays(typeof data.processingWindowDays === "number" ? data.processingWindowDays : null);
+          setProcessingWindowLabel(typeof data.processingWindowLabel === "string" && data.processingWindowLabel.trim() ? data.processingWindowLabel.trim() : null);
           setCheckingOut(false);
         } else {
           window.location.href = data.url;
@@ -215,6 +217,11 @@ export default function CartCheckout() {
           localStorage.setItem("kiln_processing_window", String(processingWindowDays));
         } else {
           localStorage.removeItem("kiln_processing_window");
+        }
+        if (processingWindowLabel !== null) {
+          localStorage.setItem("kiln_processing_window_label", processingWindowLabel);
+        } else {
+          localStorage.removeItem("kiln_processing_window_label");
         }
       } catch {}
       window.location.href = pendingCheckoutUrl;
@@ -377,11 +384,13 @@ export default function CartCheckout() {
                             <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
                             <p className="text-xs text-amber-200/70">
                               This artist manages payouts manually. Your order will be processed within{" "}
-                              {processingWindowDays !== null
-                                ? processingWindowDays === 1
-                                  ? "1 business day"
-                                  : `${processingWindowDays} business days`
-                                : "3–5 business days"}.
+                              {processingWindowLabel
+                                ? processingWindowLabel
+                                : processingWindowDays !== null
+                                  ? processingWindowDays === 1
+                                    ? "1 business day"
+                                    : `${processingWindowDays} business days`
+                                  : "3–5 business days"}.
                             </p>
                           </div>
                         </div>
@@ -594,13 +603,15 @@ export default function CartCheckout() {
                         <span>Payments</span>
                         <span className="text-emerald-400">Sent directly to artists</span>
                       </div>
-                      {processingWindowDays !== null && (
+                      {(processingWindowLabel !== null || processingWindowDays !== null) && (
                         <div className="flex justify-between">
                           <span className="flex items-center gap-1"><Package size={11} /> Processing window</span>
                           <span className="text-amber-300">
-                            {processingWindowDays === 1
-                              ? "1 business day"
-                              : `${processingWindowDays} business days`}
+                            {processingWindowLabel
+                              ? processingWindowLabel
+                              : processingWindowDays === 1
+                                ? "1 business day"
+                                : `${processingWindowDays} business days`}
                           </span>
                         </div>
                       )}

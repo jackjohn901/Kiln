@@ -12,6 +12,9 @@ router.get("/users/:userId/payment-settings", async (req, res): Promise<void> =>
       .from(userSettingsTable).where(eq(userSettingsTable.userId, req.params.userId));
     const payments = (row?.paymentSettings as Record<string, unknown> | null) ?? {};
     const rawWindow = typeof payments.processingWindow === "number" ? payments.processingWindow : null;
+    const rawLabel = typeof payments.processingWindowLabel === "string" && payments.processingWindowLabel.trim()
+      ? payments.processingWindowLabel.trim()
+      : null;
     res.json({
       stripeLink: payments.stripeLink ?? "",
       venmo: payments.venmo ?? "",
@@ -19,6 +22,7 @@ router.get("/users/:userId/payment-settings", async (req, res): Promise<void> =>
       paypalMe: payments.paypalMe ?? "",
       notes: payments.notes ?? "",
       ...(rawWindow !== null ? { processingWindow: rawWindow } : {}),
+      ...(rawLabel !== null ? { processingWindowLabel: rawLabel } : {}),
     });
   } catch (err) {
     req.log.error({ err }, "getUserPaymentSettings error");

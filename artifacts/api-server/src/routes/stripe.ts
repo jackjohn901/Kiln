@@ -267,6 +267,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
     // For manual-payout orders, look up the artist's configured processing window
     // so the buyer can be shown an accurate estimate at checkout.
     let processingWindowDays: number | null = null;
+    let processingWindowLabel: string | null = null;
     if (manualPayout) {
       const artistIds = [...new Set(
         listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter((id): id is string => !!id),
@@ -283,6 +284,12 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
             if (w !== null) {
               processingWindowDays = processingWindowDays === null ? w : Math.max(processingWindowDays, w);
             }
+            const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
+              ? ps.processingWindowLabel.trim()
+              : null;
+            if (label !== null) {
+              processingWindowLabel = label;
+            }
           }
         } catch (windowErr) {
           // Non-critical: fall through, frontend will use the default label
@@ -291,7 +298,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       }
     }
 
-    res.json({ url: session.url, sessionId: session.id, manualPayout, processingWindowDays });
+    res.json({ url: session.url, sessionId: session.id, manualPayout, processingWindowDays, processingWindowLabel });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe checkout error');
     const msg = err instanceof Error ? err.message : 'Checkout failed';
