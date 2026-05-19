@@ -211,6 +211,47 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const manualPayout = listingIds.length > 0 && connectedAccountId === null;
 
+    // When the artist has no connected Stripe account, verify they have at least one
+    // manual payment method configured before allowing checkout to proceed.
+    // Fetching payment settings here also lets us reuse the data for processingWindow
+    // without a second DB round-trip later.
+    let artistPaymentSettingsRows: Array<{ userId: string; paymentSettings: unknown }> = [];
+    if (manualPayout) {
+      const artistIds = [...new Set(
+        listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter((id): id is string => !!id),
+      )];
+      if (artistIds.length > 0) {
+        artistPaymentSettingsRows = await db
+          .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+          .from(userSettingsTable)
+          .where(inArray(userSettingsTable.userId, artistIds));
+      }
+
+      // Check that every artist has at least one usable manual payment method.
+      // An artist with no settings row at all also counts as having no payment method.
+      const settingsMap = new Map(artistPaymentSettingsRows.map((row) => [row.userId, row.paymentSettings]));
+      const artistsWithoutMethod = artistIds.filter((id) => {
+        const ps = settingsMap.get(id) as Record<string, unknown> | null | undefined;
+        return !ps || !(
+          (typeof ps.stripeLink === 'string' && ps.stripeLink.trim()) ||
+          (typeof ps.venmo === 'string' && ps.venmo.trim()) ||
+          (typeof ps.cashapp === 'string' && ps.cashapp.trim()) ||
+          (typeof ps.paypalMe === 'string' && ps.paypalMe.trim())
+        );
+      });
+
+      if (artistsWithoutMethod.length > 0) {
+        res.status(400).json({
+          error: artistsWithoutMethod.length === 1
+            ? 'This artist has not set up a payment method yet. Please contact them directly to complete your purchase.'
+            : `${artistsWithoutMethod.length} artists in your cart have not set up a payment method yet. Please contact them directly to complete your purchase.`,
+          code: 'no_payout_method',
+          affectedArtistCount: artistsWithoutMethod.length,
+        });
+        return;
+      }
+    }
+
     const sessionParams: import('stripe').Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       customer_email: customerEmail,
@@ -264,36 +305,22 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    // For manual-payout orders, look up the artist's configured processing window
-    // so the buyer can be shown an accurate estimate at checkout.
+    // For manual-payout orders, derive the processing window from the already-fetched
+    // payment settings rows (no second DB round-trip needed).
     let processingWindowDays: number | null = null;
     let processingWindowLabel: string | null = null;
     if (manualPayout) {
-      const artistIds = [...new Set(
-        listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter((id): id is string => !!id),
-      )];
-      if (artistIds.length > 0) {
-        try {
-          const settingsRows = await db
-            .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
-            .from(userSettingsTable)
-            .where(inArray(userSettingsTable.userId, artistIds));
-          for (const row of settingsRows) {
-            const ps = row.paymentSettings as Record<string, unknown> | null;
-            const w = ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null;
-            if (w !== null) {
-              processingWindowDays = processingWindowDays === null ? w : Math.max(processingWindowDays, w);
-            }
-            const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
-              ? ps.processingWindowLabel.trim()
-              : null;
-            if (label !== null) {
-              processingWindowLabel = label;
-            }
-          }
-        } catch (windowErr) {
-          // Non-critical: fall through, frontend will use the default label
-          logger.warn({ err: windowErr }, 'Could not fetch artist processingWindow for manual-payout response');
+      for (const row of artistPaymentSettingsRows) {
+        const ps = row.paymentSettings as Record<string, unknown> | null;
+        const w = ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null;
+        if (w !== null) {
+          processingWindowDays = processingWindowDays === null ? w : Math.max(processingWindowDays, w);
+        }
+        const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
+          ? ps.processingWindowLabel.trim()
+          : null;
+        if (label !== null) {
+          processingWindowLabel = label;
         }
       }
     }

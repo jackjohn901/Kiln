@@ -75,6 +75,8 @@ export default function CartCheckout() {
   const [giftMessage, setGiftMessage] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [noPayoutMethod, setNoPayoutMethod] = useState(false);
+  const [noPayoutMethodCount, setNoPayoutMethodCount] = useState(1);
   const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
   const [manualPayoutWarning, setManualPayoutWarning] = useState(false);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
@@ -157,6 +159,7 @@ export default function CartCheckout() {
     if (!addrValid()) return;
     setCheckingOut(true);
     setCheckoutError("");
+    setNoPayoutMethod(false);
     try {
       const cartItems = items.map(({ listing, quantity }) => ({
         name: listing.title as string,
@@ -201,7 +204,13 @@ export default function CartCheckout() {
           window.location.href = data.url;
         }
       } else {
-        throw new Error(data.error ?? "Checkout failed");
+        if (data.code === "no_payout_method") {
+          setNoPayoutMethod(true);
+          setNoPayoutMethodCount(typeof data.affectedArtistCount === "number" ? data.affectedArtistCount : 1);
+          setCheckingOut(false);
+        } else {
+          throw new Error(data.error ?? "Checkout failed");
+        }
       }
     } catch (err) {
       setCheckoutError(err instanceof Error ? err.message : "Checkout failed. Please try again.");
@@ -406,6 +415,38 @@ export default function CartCheckout() {
                             className="flex-1 flex items-center justify-center gap-2 rounded-full bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
                           >
                             <CreditCard size={14} /> Continue to payment
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : noPayoutMethod ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-2 space-y-3"
+                      >
+                        <div className="rounded-xl border border-rose-500/30 bg-rose-500/8 px-4 py-3 flex items-start gap-2.5">
+                          <AlertTriangle size={14} className="text-rose-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-rose-300 mb-0.5">Payment not available</p>
+                            <p className="text-xs text-rose-200/70">
+                              {noPayoutMethodCount > 1
+                                ? `${noPayoutMethodCount} artists in your cart haven't set up a payment method yet. Please reach out to them directly through Kiln messages to arrange your purchase.`
+                                : "This artist hasn't set up a payment method yet. Please reach out to them directly through Kiln messages to arrange your purchase."}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setNoPayoutMethod(false); setNoPayoutMethodCount(1); }}
+                            className="flex-1 rounded-full border border-white/10 py-2.5 text-sm text-stone-400 hover:text-stone-300 hover:border-white/20 transition-colors"
+                          >
+                            Go back
+                          </button>
+                          <button
+                            onClick={() => navigate("/messages")}
+                            className="flex-1 flex items-center justify-center gap-2 rounded-full bg-stone-700 py-2.5 text-sm font-bold text-stone-200 hover:bg-stone-600 transition-colors"
+                          >
+                            <MessageCircle size={14} /> Contact {noPayoutMethodCount > 1 ? "artists" : "artist"}
                           </button>
                         </div>
                       </motion.div>
