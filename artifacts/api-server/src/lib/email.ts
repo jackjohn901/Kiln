@@ -182,3 +182,51 @@ export function workshopBookingEmail(workshopTitle: string, artistName: string, 
     ${btn(`${BASE_URL}/workshops`, "View Workshop")}
   `);
 }
+
+export interface ManualPayoutReceiptItem {
+  title: string;
+  quantity: number;
+  artistName?: string;
+}
+
+export function manualPayoutReceiptEmail(
+  sessionId: string,
+  amountTotalCents: number,
+  items: ManualPayoutReceiptItem[],
+): string {
+  const itemRows = items
+    .map(
+      (item) =>
+        `<p style="margin:0 0 6px;">
+          <strong>${escHtml(item.title)}</strong>
+          ${item.quantity > 1 ? ` &times; ${item.quantity}` : ""}
+          ${item.artistName ? `<span style="color:#78716c;"> — by ${escHtml(item.artistName)}</span>` : ""}
+        </p>`,
+    )
+    .join("");
+
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Order Confirmed</h1>
+    <p style="color:#78716c;margin-bottom:0;">Your payment was received. Here's your receipt.</p>
+    ${card(`
+      <p style="margin:0 0 12px;font-size:12px;color:#78716c;">Order ref: <code style="color:#d6d3d1;">${escHtml(sessionId)}</code></p>
+      ${itemRows}
+      <p style="margin:12px 0 0;font-size:16px;border-top:1px solid #3c3835;padding-top:12px;">
+        Total: <strong style="color:#fcd34d;">$${(amountTotalCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
+      </p>
+    `)}
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">What happens next?</p>
+      <p style="margin:0;color:#d6d3d1;">This order is fulfilled directly by the artist. They will contact you within 2–5 business days with shipping details and a tracking number once your item is on its way.</p>
+    `)}
+    ${btn(`${BASE_URL}/orders`, "View My Orders")}
+  `);
+}
+
+function escHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

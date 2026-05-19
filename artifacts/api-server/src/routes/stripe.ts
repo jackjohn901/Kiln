@@ -16,8 +16,14 @@ import crypto from "crypto";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 import { getDigitalProduct } from '../lib/digitalProducts';
+import { sendEmail, manualPayoutReceiptEmail } from '../lib/email';
 
 const router: IRouter = Router();
+
+// In-memory dedup guard: prevents duplicate receipt emails when Stripe retries a
+// webhook for the same session. Keyed by Stripe session ID; lives for the process
+// lifetime (cleared on restart), which covers the typical retry window.
+const manualPayoutReceiptSent = new Set<string>();
 
 interface CartLineItem {
   name: string;
@@ -203,6 +209,8 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       }
     }
 
+    const manualPayout = listingIds.length > 0 && connectedAccountId === null;
+
     const sessionParams: import('stripe').Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       customer_email: customerEmail,
@@ -240,6 +248,8 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         ...(userId ? { userId } : {}),
         // Trusted server-side record of what was purchased (for order creation).
         ...(sessionListingIds ? { listingIds: sessionListingIds, listingQtys: sessionListingQtys } : {}),
+        // Flag manual-payout sessions so the webhook can send a buyer receipt.
+        ...(manualPayout ? { manualPayout: 'true' } : {}),
       },
       // Route funds to artist's connected account when available.
       ...(connectedAccountId
@@ -253,8 +263,6 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
     };
 
     const session = await stripe.checkout.sessions.create(sessionParams);
-
-    const manualPayout = listingIds.length > 0 && connectedAccountId === null;
 
     // For manual-payout orders, look up the artist's configured processing window
     // so the buyer can be shown an accurate estimate at checkout.
@@ -428,6 +436,10 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
     milestone?: string;
     // auction
     auctionId?: string;
+    // listing cart
+    listingIds?: string;
+    listingQtys?: string;
+    manualPayout?: string;
   };
 
   let event: { type: string; data: { object: Record<string, unknown> } };
@@ -451,6 +463,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
         amount_total?: number | null;
         metadata?: SessionMeta;
         customer_email?: string | null;
+        customer_details?: { email?: string | null } | null;
       };
 
       if (session.payment_status === 'paid' && session.metadata?.platform === 'kiln') {
@@ -540,6 +553,63 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
           await db.update(auctionsTable)
             .set({ status: 'paid' })
             .where(eq(auctionsTable.id, meta.auctionId));
+        }
+
+        // 6. Manual-payout order — send buyer a receipt email since Stripe won't
+        //    automatically send one (no connected account to trigger their receipt flow).
+        if (meta.manualPayout === 'true' && meta.listingIds) {
+          const buyerEmail =
+            session.customer_email ?? session.customer_details?.email ?? null;
+          if (buyerEmail && !manualPayoutReceiptSent.has(session.id)) {
+            manualPayoutReceiptSent.add(session.id);
+            try {
+              const ids = meta.listingIds.split(',').filter(Boolean);
+              const qtys = (meta.listingQtys ?? '').split(',').map((q) => parseInt(q, 10) || 1);
+
+              const listingRows = ids.length > 0
+                ? await db
+                    .select({
+                      id: listingsTable.id,
+                      title: listingsTable.title,
+                      artistId: listingsTable.artistId,
+                    })
+                    .from(listingsTable)
+                    .where(inArray(listingsTable.id, ids))
+                : [];
+
+              const artistIds = [...new Set(listingRows.map((r) => r.artistId))];
+              const artistRows = artistIds.length > 0
+                ? await db
+                    .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
+                    .from(profilesTable)
+                    .where(inArray(profilesTable.userId, artistIds))
+                : [];
+              const artistNameMap = new Map(artistRows.map((a) => [a.userId, a.displayName ?? '']));
+
+              const receiptItems = ids.map((id, idx) => {
+                const listing = listingRows.find((r) => r.id === id);
+                return {
+                  title: listing?.title ?? id,
+                  quantity: qtys[idx] ?? 1,
+                  artistName: listing ? (artistNameMap.get(listing.artistId) ?? undefined) : undefined,
+                };
+              });
+
+              const html = manualPayoutReceiptEmail(
+                session.id,
+                session.amount_total ?? 0,
+                receiptItems,
+              );
+
+              await sendEmail({
+                to: buyerEmail,
+                subject: 'Your Kiln order is confirmed',
+                html,
+              });
+            } catch (emailErr) {
+              logger.error({ err: emailErr, sessionId: session.id }, 'Failed to send manual-payout receipt email');
+            }
+          }
         }
 
         logger.info({ sessionId: session.id, type: meta.type ?? 'order' }, 'Stripe checkout completed');
