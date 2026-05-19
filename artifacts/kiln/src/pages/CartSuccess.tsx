@@ -18,10 +18,6 @@ interface SessionData {
   lineItems: LineItem[];
 }
 
-interface PaymentSettings {
-  processingWindow?: number;
-}
-
 export default function CartSuccess() {
   const [, navigate] = useLocation();
   const { clearCart } = useCart();
@@ -42,23 +38,9 @@ export default function CartSuccess() {
 
     clearCart();
 
-    // Read seller IDs from kiln_pre_checkout before it is cleaned up below.
-    // This lets us re-fetch payment settings (including processingWindow) from the API.
-    let sellerIds: string[] = [];
-    try {
-      const preCheckout = JSON.parse(localStorage.getItem("kiln_pre_checkout") ?? "null") as {
-        items?: Array<{ sellerId?: string }>;
-      } | null;
-      sellerIds = [
-        ...new Set(
-          (preCheckout?.items ?? [])
-            .map((i) => i.sellerId)
-            .filter((id): id is string => !!id)
-        ),
-      ];
-    } catch {}
-
-    // Apply a cached hint immediately so the UI isn't blank during the API fetch.
+    // Apply a cached hint immediately so the UI isn't blank while the API responds.
+    // This is a best-effort early display only; the authoritative value comes from
+    // the order record returned by /api/me/orders/bulk below.
     try {
       const cached = localStorage.getItem("kiln_processing_window");
       if (cached !== null) {
@@ -67,26 +49,6 @@ export default function CartSuccess() {
         localStorage.removeItem("kiln_processing_window");
       }
     } catch {}
-
-    // Fetch processing windows from seller payment settings (authoritative source).
-    if (sellerIds.length > 0) {
-      Promise.all(
-        sellerIds.map((id) =>
-          fetch(`/api/users/${id}/payment-settings`, { credentials: "include" })
-            .then((r) => r.ok ? (r.json() as Promise<PaymentSettings>) : null)
-            .catch(() => null)
-        )
-      ).then((results) => {
-        const windows = results
-          .filter(Boolean)
-          .map((r) => r!.processingWindow)
-          .filter((w): w is number => typeof w === "number");
-        if (windows.length > 0) {
-          // Use the longest window so buyers get the most conservative estimate.
-          setProcessingWindowDays(Math.max(...windows));
-        }
-      });
-    }
 
     fetch(`/api/stripe/session/${sessionId}`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
@@ -106,32 +68,17 @@ export default function CartSuccess() {
             body: JSON.stringify({ stripeSessionId: sessionId }),
           });
           if (res.ok) {
-            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[] };
+            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[]; processingWindowDays?: number | null };
             if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
 
-            // Use order-backed seller IDs as the authoritative source for processing window.
-            // This works even on page refresh since orders are persisted in the DB.
-            const orderSellerIds = d.sellerIds ?? [];
-            if (orderSellerIds.length > 0) {
-              Promise.all(
-                orderSellerIds.map((id) =>
-                  fetch(`/api/users/${id}/payment-settings`, { credentials: "include" })
-                    .then((r) => r.ok ? (r.json() as Promise<PaymentSettings>) : null)
-                    .catch(() => null)
-                )
-              ).then((results) => {
-                const windows = results
-                  .filter(Boolean)
-                  .map((r) => r!.processingWindow)
-                  .filter((w): w is number => typeof w === "number");
-                if (windows.length > 0) {
-                  setProcessingWindowDays(Math.max(...windows));
-                }
-              });
+            // Use the processing window stored on the order record — authoritative snapshot
+            // taken at purchase time, reliable across page refreshes and localStorage clears.
+            if (typeof d.processingWindowDays === "number") {
+              setProcessingWindowDays(d.processingWindowDays);
             }
           }
           // Clean up any stale pre-checkout data from localStorage.
-          localStorage.removeItem("kiln_pre_checkout");
+          try { localStorage.removeItem("kiln_pre_checkout"); } catch {}
         } catch {}
       })
       .catch(() => {})

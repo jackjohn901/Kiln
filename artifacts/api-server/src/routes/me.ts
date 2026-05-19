@@ -224,13 +224,18 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
       .limit(1);
 
     if (existing.length > 0) {
-      // Fetch all orders for this session to collect seller IDs.
+      // Fetch all orders for this session to collect seller IDs and processing windows.
       const allExisting = await db
-        .select({ id: ordersTable.id, sellerId: ordersTable.sellerId })
+        .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, processingWindowDays: ordersTable.processingWindowDays })
         .from(ordersTable)
         .where(eq(ordersTable.notes, dedupeKey));
       const sellerIds = [...new Set(allExisting.map((o) => o.sellerId).filter(Boolean))];
-      res.json({ orderIds: [existing[0].id], duplicate: true, sellerIds }); return;
+      // Surface the most conservative processing window from the persisted order rows.
+      const existingWindows = allExisting
+        .map((o) => o.processingWindowDays)
+        .filter((w): w is number => typeof w === "number");
+      const maxProcessingWindowDays = existingWindows.length > 0 ? Math.max(...existingWindows) : null;
+      res.json({ orderIds: [existing[0].id], duplicate: true, sellerIds, processingWindowDays: maxProcessingWindowDays }); return;
     }
 
     // Look up listing data from the DB — authoritative source for seller, price, and title.
@@ -260,8 +265,26 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
       res.status(402).json({ error: "Payment amount does not match order total." }); return;
     }
 
+    // Fetch processing window for each seller (used to stamp the order record).
+    const sellerIdsForListings = [...new Set(listings.map((l) => l.artistId))];
+    const paymentSettingsRows = sellerIdsForListings.length > 0
+      ? await db
+          .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+          .from(userSettingsTable)
+          .where(inArray(userSettingsTable.userId, sellerIdsForListings))
+      : [];
+    const processingWindowMap = new Map<string, number | null>();
+    for (const row of paymentSettingsRows) {
+      const ps = row.paymentSettings as Record<string, unknown> | null;
+      const w = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+      processingWindowMap.set(row.userId, w);
+    }
+
     const orderIds: string[] = [];
     const sellerIdSet = new Set<string>();
+    // Track the processing window values actually stamped on each order row so the
+    // response is sourced from the persisted values, not from live payment settings.
+    const stampedWindows: number[] = [];
 
     for (let i = 0; i < verified.listingIds.length; i++) {
       const listingId = verified.listingIds[i];
@@ -272,6 +295,9 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
       }
       const qty = verified.listingQtys[i] ?? 1;
       const orderId = crypto.randomUUID();
+      // Snapshot the seller's processing window at purchase time so it remains
+      // stable even if the seller later changes their settings.
+      const stampedWindow = processingWindowMap.get(listing.artistId) ?? null;
       await db.insert(ordersTable).values({
         id: orderId,
         buyerId: userId,
@@ -287,16 +313,23 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         status: "confirmed",
         // Only the first order row carries the deduplication key.
         notes: orderIds.length === 0 ? dedupeKey : null,
+        processingWindowDays: stampedWindow,
       });
       orderIds.push(orderId);
       sellerIdSet.add(listing.artistId);
+      if (stampedWindow !== null) stampedWindows.push(stampedWindow);
     }
 
     if (orderIds.length === 0) {
       res.status(400).json({ error: "No valid listings found for this session." }); return;
     }
 
-    res.json({ orderIds, sellerIds: [...sellerIdSet] });
+    // Return the max processing window sourced from the stamped order rows — same
+    // values that are now persisted in the DB, so the response is always consistent
+    // with what the buyer would see if they fetched their order history.
+    const maxProcessingWindowDays = stampedWindows.length > 0 ? Math.max(...stampedWindows) : null;
+
+    res.json({ orderIds, sellerIds: [...sellerIdSet], processingWindowDays: maxProcessingWindowDays });
   } catch (err) {
     logger.error({ err }, "me/orders/bulk error");
     res.status(500).json({ error: "Failed to create orders" });
