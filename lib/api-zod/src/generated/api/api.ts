@@ -378,6 +378,30 @@ export const SendMessageBody = zod.object({
 });
 
 /**
+ * @summary Start Stripe Connect onboarding for the current artist
+ */
+export const StartStripeConnectResponse = zod.object({
+  url: zod.string(),
+});
+
+/**
+ * @summary Get the current user's Stripe Connect account status
+ */
+export const GetStripeConnectStatusResponse = zod.object({
+  connected: zod.boolean(),
+  status: zod.string().nullish(),
+  chargesEnabled: zod.boolean(),
+  accountId: zod.string().nullish(),
+});
+
+/**
+ * @summary Disconnect the current user's Stripe Connect account
+ */
+export const DisconnectStripeConnectResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
  * @summary Get current user's profile
  */
 export const GetMyProfileResponse = zod.object({

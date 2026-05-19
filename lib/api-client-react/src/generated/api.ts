@@ -24,6 +24,7 @@ import type {
   CommentRecord,
   CommentsResponse,
   CreatePostBody,
+  DisconnectStripeConnect200,
   ErrorEnvelope,
   FeedResponse,
   FollowResponse,
@@ -41,6 +42,8 @@ import type {
   PostRecord,
   SaveResponse,
   SendMessageBody,
+  StripeConnectOnboardingUrl,
+  StripeConnectStatus,
   ThreadsResponse,
   UpdateProfileBody,
   UploadUrlRequest,
@@ -1909,6 +1912,247 @@ export const useSendMessage = <
   TContext
 > => {
   return useMutation(getSendMessageMutationOptions(options));
+};
+
+/**
+ * @summary Start Stripe Connect onboarding for the current artist
+ */
+export const getStartStripeConnectUrl = () => {
+  return `/api/me/stripe/connect`;
+};
+
+export const startStripeConnect = async (
+  options?: RequestInit,
+): Promise<StripeConnectOnboardingUrl> => {
+  return customFetch<StripeConnectOnboardingUrl>(getStartStripeConnectUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getStartStripeConnectMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startStripeConnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startStripeConnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["startStripeConnect"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startStripeConnect>>,
+    void
+  > = () => {
+    return startStripeConnect(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartStripeConnectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startStripeConnect>>
+>;
+
+export type StartStripeConnectMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Start Stripe Connect onboarding for the current artist
+ */
+export const useStartStripeConnect = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startStripeConnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startStripeConnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getStartStripeConnectMutationOptions(options));
+};
+
+/**
+ * @summary Get the current user's Stripe Connect account status
+ */
+export const getGetStripeConnectStatusUrl = () => {
+  return `/api/me/stripe/connect/status`;
+};
+
+export const getStripeConnectStatus = async (
+  options?: RequestInit,
+): Promise<StripeConnectStatus> => {
+  return customFetch<StripeConnectStatus>(getGetStripeConnectStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetStripeConnectStatusQueryKey = () => {
+  return [`/api/me/stripe/connect/status`] as const;
+};
+
+export const getGetStripeConnectStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStripeConnectStatus>>,
+  TError = ErrorType<ApiError>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStripeConnectStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStripeConnectStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStripeConnectStatus>>
+  > = ({ signal }) => getStripeConnectStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStripeConnectStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStripeConnectStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStripeConnectStatus>>
+>;
+export type GetStripeConnectStatusQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get the current user's Stripe Connect account status
+ */
+
+export function useGetStripeConnectStatus<
+  TData = Awaited<ReturnType<typeof getStripeConnectStatus>>,
+  TError = ErrorType<ApiError>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getStripeConnectStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStripeConnectStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Disconnect the current user's Stripe Connect account
+ */
+export const getDisconnectStripeConnectUrl = () => {
+  return `/api/me/stripe/connect/disconnect`;
+};
+
+export const disconnectStripeConnect = async (
+  options?: RequestInit,
+): Promise<DisconnectStripeConnect200> => {
+  return customFetch<DisconnectStripeConnect200>(
+    getDisconnectStripeConnectUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getDisconnectStripeConnectMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectStripeConnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disconnectStripeConnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["disconnectStripeConnect"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disconnectStripeConnect>>,
+    void
+  > = () => {
+    return disconnectStripeConnect(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisconnectStripeConnectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disconnectStripeConnect>>
+>;
+
+export type DisconnectStripeConnectMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Disconnect the current user's Stripe Connect account
+ */
+export const useDisconnectStripeConnect = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectStripeConnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof disconnectStripeConnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getDisconnectStripeConnectMutationOptions(options));
 };
 
 /**

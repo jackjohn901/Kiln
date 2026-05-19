@@ -488,6 +488,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /me/stripe/connect:
+    post:
+      tags: [social]
+      operationId: startStripeConnect
+      summary: Start Stripe Connect onboarding for the current artist
+      responses:
+        '200':
+          description: Onboarding URL returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripeConnectOnboardingUrl'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /me/stripe/connect/status:
+    get:
+      tags: [social]
+      operationId: getStripeConnectStatus
+      summary: Get the current user's Stripe Connect account status
+      responses:
+        '200':
+          description: Stripe Connect status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripeConnectStatus'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /me/stripe/connect/disconnect:
+    post:
+      tags: [social]
+      operationId: disconnectStripeConnect
+      summary: Disconnect the current user's Stripe Connect account
+      responses:
+        '200':
+          description: Disconnected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /me/profile:
     get:
       tags: [social]
@@ -1016,6 +1074,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MessageRecord'
+    StripeConnectOnboardingUrl:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+    StripeConnectStatus:
+      type: object
+      required: [connected, chargesEnabled]
+      properties:
+        connected:
+          type: boolean
+        status:
+          type: [string, 'null']
+        chargesEnabled:
+          type: boolean
+        accountId:
+          type: [string, 'null']
     SendMessageBody:
       type: object
       required: [recipientId, text]

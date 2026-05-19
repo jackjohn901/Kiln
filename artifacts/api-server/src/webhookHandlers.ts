@@ -5,6 +5,7 @@ import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable } from '@workspace/db';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
+import type Stripe from 'stripe';
 
 async function activatePatronSubscription(tierId: string, userId: string): Promise<void> {
   const [tier] = await db.select().from(patronTiersTable).where(eq(patronTiersTable.id, tierId));
@@ -67,6 +68,25 @@ export class WebhookHandlers {
     try {
       const stripe = await getUncachableStripeClient();
       const event = stripe.webhooks.constructEvent(payload, signature, process.env.STRIPE_WEBHOOK_SECRET ?? '');
+
+      if (event.type === 'account.updated') {
+        const account = event.data.object as Stripe.Account;
+        if (account.id) {
+          let newStatus: string;
+          if (account.charges_enabled) {
+            newStatus = 'active';
+          } else if (account.requirements?.disabled_reason) {
+            newStatus = 'restricted';
+          } else {
+            newStatus = 'pending';
+          }
+          await db
+            .update(profilesTable)
+            .set({ stripeConnectStatus: newStatus })
+            .where(eq(profilesTable.stripeConnectedAccountId, account.id));
+          logger.info({ accountId: account.id, newStatus }, 'Stripe account.updated: synced stripeConnectStatus');
+        }
+      }
 
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object as import('stripe').Stripe.Checkout.Session;

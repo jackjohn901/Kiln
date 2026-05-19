@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
+  CreditCard, CheckCircle, AlertCircle, Unlink,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -29,6 +30,13 @@ interface PayoutRecord {
   method: string | null;
   requestedAt: string;
   processedAt: string | null;
+}
+
+interface StripeConnectStatus {
+  connected: boolean;
+  status: string | null;
+  chargesEnabled: boolean;
+  accountId?: string | null;
 }
 
 interface PatronTier {
@@ -70,6 +78,7 @@ function formatDate(iso: string) {
 
 export default function Earnings() {
   const { profile } = useProfile();
+  const search = useSearch();
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
   const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, total: 0 });
@@ -93,6 +102,58 @@ export default function Earnings() {
   const [tierPrice, setTierPrice]       = useState("");
   const [savingTier, setSavingTier]     = useState(false);
   const [showTiers, setShowTiers]       = useState(false);
+
+  // Stripe Connect state
+  const [stripeConnect, setStripeConnect] = useState<StripeConnectStatus | null>(null);
+  const [connectLoading, setConnectLoading] = useState(true);
+  const [connectingStripe, setConnectingStripe] = useState(false);
+  const [disconnectingStripe, setDisconnectingStripe] = useState(false);
+  const [connectSuccessToast, setConnectSuccessToast] = useState(false);
+
+  // Show success toast when returning from Stripe onboarding
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("connected") === "true") {
+      setConnectSuccessToast(true);
+      setTimeout(() => setConnectSuccessToast(false), 4000);
+    }
+  }, [search]);
+
+  // Fetch Stripe Connect status
+  useEffect(() => {
+    fetch("/api/me/stripe/connect/status", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((data: StripeConnectStatus) => setStripeConnect(data))
+      .catch(() => {})
+      .finally(() => setConnectLoading(false));
+  }, []);
+
+  async function handleConnectStripe() {
+    setConnectingStripe(true);
+    try {
+      const res = await fetch("/api/me/stripe/connect", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as { url: string };
+      window.location.href = data.url;
+    } catch {
+      setConnectingStripe(false);
+    }
+  }
+
+  async function handleDisconnectStripe() {
+    setDisconnectingStripe(true);
+    try {
+      await fetch("/api/me/stripe/connect/disconnect", {
+        method: "POST",
+        credentials: "include",
+      });
+      setStripeConnect({ connected: false, status: null, chargesEnabled: false });
+    } catch { /* ignore */ }
+    finally { setDisconnectingStripe(false); }
+  }
 
   useEffect(() => {
     fetch("/api/me/earnings", { credentials: "include" })
@@ -254,6 +315,59 @@ export default function Earnings() {
               </div>
             )}
 
+            {/* Stripe Payouts */}
+            <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CreditCard size={14} className="text-indigo-400" />
+                <span className="text-sm font-medium text-stone-200">Stripe Payouts</span>
+              </div>
+
+              {connectLoading ? (
+                <div className="flex justify-center py-3"><Loader2 size={16} className="animate-spin text-stone-600" /></div>
+              ) : stripeConnect?.connected ? (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {stripeConnect.chargesEnabled ? (
+                        <CheckCircle size={15} className="text-emerald-400" />
+                      ) : (
+                        <AlertCircle size={15} className="text-amber-400" />
+                      )}
+                      <div>
+                        <p className="text-sm text-stone-200">
+                          {stripeConnect.chargesEnabled ? "Connected & active" : "Connected — pending verification"}
+                        </p>
+                        {stripeConnect.status && (
+                          <p className="text-[10px] text-stone-600 capitalize">{stripeConnect.status}</p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDisconnectStripe}
+                      disabled={disconnectingStripe}
+                      className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1.5 text-xs text-stone-500 hover:text-rose-400 hover:border-rose-500/30 disabled:opacity-50 transition-colors"
+                    >
+                      {disconnectingStripe ? <Loader2 size={11} className="animate-spin" /> : <Unlink size={11} />}
+                      Disconnect
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[10px] text-stone-600">Buyers pay directly to your Stripe account. Kiln retains a 10% platform fee.</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-stone-500 mb-3">Connect a Stripe account to receive payouts directly when buyers purchase your work.</p>
+                  <button
+                    onClick={handleConnectStripe}
+                    disabled={connectingStripe}
+                    className="flex items-center gap-2 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-500/25 disabled:opacity-50 transition-colors"
+                  >
+                    {connectingStripe ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                    {connectingStripe ? "Redirecting…" : "Connect with Stripe"}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Patron tiers — quick edit */}
             <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40">
               <button
@@ -403,6 +517,14 @@ export default function Earnings() {
           </>
         )}
       </div>
+
+      {/* Stripe Connect success toast */}
+      {connectSuccessToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-lg">
+          <CheckCircle size={15} />
+          Stripe account connected successfully!
+        </div>
+      )}
 
       {/* Payout request modal */}
       {showPayoutModal && (

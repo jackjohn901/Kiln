@@ -266,6 +266,19 @@ export interface MessagesResponse {
   messages: MessageRecord[];
 }
 
+export interface StripeConnectOnboardingUrl {
+  url: string;
+}
+
+export interface StripeConnectStatus {
+  connected: boolean;
+  /** @nullable */
+  status?: string | null;
+  chargesEnabled: boolean;
+  /** @nullable */
+  accountId?: string | null;
+}
+
 export interface SendMessageBody {
   recipientId: string;
   /** @minLength 1 */
@@ -290,4 +303,8 @@ export type HandleBrowserLoginCallbackParams = {
 export type GetFeedParams = {
   cursor?: string;
   limit?: number;
+};
+
+export type DisconnectStripeConnect200 = {
+  ok: boolean;
 };

@@ -8,6 +8,7 @@ import {
   commissionsTable,
   auctionsTable,
   listingsTable,
+  profilesTable,
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -156,7 +157,52 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       }
     }
 
-    const session = await stripe.checkout.sessions.create({
+    // Determine total amount cents for Stripe Connect application fee calculation.
+    const lineItemsCents = items.map((item) => {
+      if (item.listingId) {
+        return Math.round(listingPriceMap.get(item.listingId)!.price * 100) * item.quantity;
+      }
+      return (digitalPriceCents ?? 0) * item.quantity;
+    });
+    const totalAmountCents = lineItemsCents.reduce((sum, c) => sum + c, 0);
+
+    // For single-seller listing checkouts, route funds to the artist's connected Stripe account
+    // if they have one with charges enabled (10% platform fee via application_fee_amount).
+    let connectedAccountId: string | null = null;
+    if (listingIds.length > 0) {
+      const artistIds = new Set(
+        listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter(Boolean),
+      );
+      if (artistIds.size === 1) {
+        const [artistId] = artistIds;
+        if (artistId) {
+          const [artistProfile] = await db
+            .select({
+              stripeConnectedAccountId: profilesTable.stripeConnectedAccountId,
+              stripeConnectStatus: profilesTable.stripeConnectStatus,
+            })
+            .from(profilesTable)
+            .where(eq(profilesTable.userId, artistId));
+
+          if (
+            artistProfile?.stripeConnectedAccountId &&
+            artistProfile.stripeConnectStatus === 'active'
+          ) {
+            // Verify charges_enabled directly from Stripe before routing funds.
+            try {
+              const account = await stripe.accounts.retrieve(artistProfile.stripeConnectedAccountId);
+              if (account.charges_enabled) {
+                connectedAccountId = artistProfile.stripeConnectedAccountId;
+              }
+            } catch {
+              // If retrieval fails, fall through to platform-only flow.
+            }
+          }
+        }
+      }
+    }
+
+    const sessionParams: import('stripe').Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       customer_email: customerEmail,
       line_items: items.map((item) => {
@@ -194,7 +240,18 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         // Trusted server-side record of what was purchased (for order creation).
         ...(sessionListingIds ? { listingIds: sessionListingIds, listingQtys: sessionListingQtys } : {}),
       },
-    });
+      // Route funds to artist's connected account when available.
+      ...(connectedAccountId
+        ? {
+            payment_intent_data: {
+              application_fee_amount: Math.round(totalAmountCents * 0.1),
+              transfer_data: { destination: connectedAccountId },
+            },
+          }
+        : {}),
+    };
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     res.json({ url: session.url, sessionId: session.id });
   } catch (err: unknown) {
