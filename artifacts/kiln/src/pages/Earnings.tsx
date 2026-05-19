@@ -39,6 +39,13 @@ interface StripeConnectStatus {
   accountId?: string | null;
 }
 
+interface StripeBalance {
+  availableCents: number;
+  pendingCents: number;
+  nextPayoutDate: number | null;
+  nextPayoutCents: number | null;
+}
+
 interface PatronTier {
   id: string;
   name: string;
@@ -110,6 +117,9 @@ export default function Earnings() {
   const [disconnectingStripe, setDisconnectingStripe] = useState(false);
   const [connectSuccessToast, setConnectSuccessToast] = useState(false);
   const [openingDashboard, setOpeningDashboard] = useState(false);
+  const [stripeBalance, setStripeBalance] = useState<StripeBalance | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState(false);
 
   // Show success toast when returning from Stripe onboarding
   useEffect(() => {
@@ -124,7 +134,21 @@ export default function Earnings() {
   useEffect(() => {
     fetch("/api/me/stripe/connect/status", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: StripeConnectStatus) => setStripeConnect(data))
+      .then((data: StripeConnectStatus) => {
+        setStripeConnect(data);
+        if (data.chargesEnabled) {
+          setBalanceLoading(true);
+          setBalanceError(false);
+          fetch("/api/me/stripe/connect/balance", { credentials: "include" })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+            .then((b: StripeBalance) => setStripeBalance(b))
+            .catch((err: unknown) => {
+              console.error("[Kiln] Stripe balance fetch failed:", err);
+              setBalanceError(true);
+            })
+            .finally(() => setBalanceLoading(false));
+        }
+      })
       .catch(() => {})
       .finally(() => setConnectLoading(false));
   }, []);
@@ -368,14 +392,53 @@ export default function Earnings() {
                     </button>
                   </div>
                   {stripeConnect.chargesEnabled && (
-                    <button
-                      onClick={handleOpenDashboard}
-                      disabled={openingDashboard}
-                      className="mt-3 flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-400 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
-                    >
-                      {openingDashboard ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
-                      Open Stripe Dashboard
-                    </button>
+                    <>
+                      {balanceLoading ? (
+                        <div className="mt-3 flex justify-center py-2">
+                          <Loader2 size={14} className="animate-spin text-stone-600" />
+                        </div>
+                      ) : balanceError ? (
+                        <p className="mt-3 text-xs text-stone-500">
+                          Balance unavailable — open the Stripe Dashboard to view your funds.
+                        </p>
+                      ) : stripeBalance ? (
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3">
+                            <p className="text-[10px] text-stone-500 mb-1">Available</p>
+                            <p className="text-base font-bold text-emerald-400">
+                              {(stripeBalance.availableCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3">
+                            <p className="text-[10px] text-stone-500 mb-1">Pending</p>
+                            <p className="text-base font-bold text-amber-400">
+                              {(stripeBalance.pendingCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                            </p>
+                          </div>
+                          {stripeBalance.nextPayoutDate !== null && (
+                            <div className="col-span-2 rounded-xl border border-white/8 bg-stone-800/50 px-3 py-2 flex items-center justify-between">
+                              <p className="text-[10px] text-stone-500">Next payout</p>
+                              <p className="text-xs font-medium text-stone-300">
+                                {new Date(stripeBalance.nextPayoutDate * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                {stripeBalance.nextPayoutCents !== null && (
+                                  <span className="ml-1.5 text-emerald-400">
+                                    {(stripeBalance.nextPayoutCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                      <button
+                        onClick={handleOpenDashboard}
+                        disabled={openingDashboard}
+                        className="mt-3 flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-400 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+                      >
+                        {openingDashboard ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                        Open Stripe Dashboard
+                      </button>
+                    </>
                   )}
                   <p className="mt-2 text-[10px] text-stone-600">Buyers pay directly to your Stripe account. Kiln retains a 10% platform fee.</p>
                 </div>

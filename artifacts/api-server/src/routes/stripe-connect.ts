@@ -192,6 +192,48 @@ router.get('/me/stripe/connect/dashboard-link', async (req, res): Promise<void> 
   }
 });
 
+router.get('/me/stripe/connect/balance', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  try {
+    const [profile] = await db
+      .select({ stripeConnectedAccountId: profilesTable.stripeConnectedAccountId })
+      .from(profilesTable)
+      .where(eq(profilesTable.userId, req.user.id));
+
+    if (!profile?.stripeConnectedAccountId) {
+      res.status(400).json({ error: 'No connected Stripe account' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+
+    const [balance, payouts] = await Promise.all([
+      stripe.balance.retrieve({ stripeAccount: profile.stripeConnectedAccountId }),
+      stripe.payouts.list(
+        { limit: 1, status: 'pending' },
+        { stripeAccount: profile.stripeConnectedAccountId }
+      ).catch(() => ({ data: [] })),
+    ]);
+
+    const usdAvailable = balance.available.find(b => b.currency === 'usd');
+    const usdPending   = balance.pending.find(b => b.currency === 'usd');
+
+    const nextPayout = payouts.data[0] ?? null;
+
+    res.json({
+      availableCents: usdAvailable?.amount ?? 0,
+      pendingCents:   usdPending?.amount   ?? 0,
+      nextPayoutDate: nextPayout?.arrival_date ?? null,
+      nextPayoutCents: nextPayout?.amount ?? null,
+    });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Stripe Connect balance error');
+    const msg = err instanceof Error ? err.message : 'Failed to retrieve balance';
+    res.status(500).json({ error: msg });
+  }
+});
+
 router.post('/me/stripe/connect/disconnect', async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
