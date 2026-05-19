@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -493,6 +493,24 @@ export default function Settings() {
                 <ChevronRight size={14} className="text-stone-600" />
               </Link>
             </div>
+
+            {profile?.id && (
+              <div className="rounded-2xl border border-white/8 bg-stone-900/60 px-5 py-4">
+                <p className="text-xs text-stone-500 mb-1.5">Your account ID</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate text-xs text-stone-400 font-mono bg-stone-800/60 rounded-lg px-2.5 py-1.5 select-all">
+                    {profile.id}
+                  </code>
+                  <button
+                    onClick={() => { void navigator.clipboard.writeText(profile.id); }}
+                    className="shrink-0 rounded-lg border border-white/10 bg-stone-800/60 p-1.5 text-stone-500 hover:text-stone-300 transition-colors"
+                    title="Copy ID"
+                  >
+                    <Copy size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden">
               <button
