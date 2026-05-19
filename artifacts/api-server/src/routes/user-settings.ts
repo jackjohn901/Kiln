@@ -22,6 +22,17 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
   const userId = req.user.id;
   const { settings, shippingSettings, paymentSettings, contactEmail } = req.body;
 
+  // Validate processingWindow if provided in paymentSettings
+  if (paymentSettings !== undefined && paymentSettings !== null && typeof paymentSettings === "object") {
+    const pw = (paymentSettings as Record<string, unknown>).processingWindow;
+    if (pw !== undefined && pw !== null) {
+      if (typeof pw !== "number" || !Number.isInteger(pw) || pw < 1 || pw > 90) {
+        res.status(400).json({ error: "processingWindow must be an integer between 1 and 90" });
+        return;
+      }
+    }
+  }
+
   // Persist contactEmail to profiles table if provided
   if (typeof contactEmail === "string") {
     await db.update(profilesTable)

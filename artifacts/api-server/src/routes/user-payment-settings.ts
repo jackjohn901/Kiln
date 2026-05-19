@@ -10,13 +10,15 @@ router.get("/users/:userId/payment-settings", async (req, res): Promise<void> =>
   try {
     const [row] = await db.select({ paymentSettings: userSettingsTable.paymentSettings })
       .from(userSettingsTable).where(eq(userSettingsTable.userId, req.params.userId));
-    const payments = (row?.paymentSettings as Record<string, string> | null) ?? {};
+    const payments = (row?.paymentSettings as Record<string, unknown> | null) ?? {};
+    const rawWindow = typeof payments.processingWindow === "number" ? payments.processingWindow : null;
     res.json({
       stripeLink: payments.stripeLink ?? "",
       venmo: payments.venmo ?? "",
       cashapp: payments.cashapp ?? "",
       paypalMe: payments.paypalMe ?? "",
       notes: payments.notes ?? "",
+      ...(rawWindow !== null ? { processingWindow: rawWindow } : {}),
     });
   } catch (err) {
     req.log.error({ err }, "getUserPaymentSettings error");

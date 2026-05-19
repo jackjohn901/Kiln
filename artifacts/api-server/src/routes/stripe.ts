@@ -9,6 +9,7 @@ import {
   auctionsTable,
   listingsTable,
   profilesTable,
+  userSettingsTable,
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -254,7 +255,35 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
     const session = await stripe.checkout.sessions.create(sessionParams);
 
     const manualPayout = listingIds.length > 0 && connectedAccountId === null;
-    res.json({ url: session.url, sessionId: session.id, manualPayout });
+
+    // For manual-payout orders, look up the artist's configured processing window
+    // so the buyer can be shown an accurate estimate at checkout.
+    let processingWindowDays: number | null = null;
+    if (manualPayout) {
+      const artistIds = [...new Set(
+        listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter((id): id is string => !!id),
+      )];
+      if (artistIds.length > 0) {
+        try {
+          const settingsRows = await db
+            .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+            .from(userSettingsTable)
+            .where(inArray(userSettingsTable.userId, artistIds));
+          for (const row of settingsRows) {
+            const ps = row.paymentSettings as Record<string, unknown> | null;
+            const w = ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null;
+            if (w !== null) {
+              processingWindowDays = processingWindowDays === null ? w : Math.max(processingWindowDays, w);
+            }
+          }
+        } catch (windowErr) {
+          // Non-critical: fall through, frontend will use the default label
+          logger.warn({ err: windowErr }, 'Could not fetch artist processingWindow for manual-payout response');
+        }
+      }
+    }
+
+    res.json({ url: session.url, sessionId: session.id, manualPayout, processingWindowDays });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe checkout error');
     const msg = err instanceof Error ? err.message : 'Checkout failed';

@@ -356,6 +356,24 @@ export default function Settings() {
                   onChange={(v) => setPayments((p) => ({ ...p, paypalMe: v }))}
                 />
                 <div>
+                  <label className="text-xs text-stone-500 mb-1 block">Processing window (business days)</label>
+                  <select
+                    value={payments.processingWindow ?? ""}
+                    onChange={(e) => setPayments((p) => ({ ...p, processingWindow: e.target.value ? Number(e.target.value) : undefined }))}
+                    className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                  >
+                    <option value="">Default (3–5 business days)</option>
+                    <option value="1">1 business day</option>
+                    <option value="2">2 business days</option>
+                    <option value="3">3 business days</option>
+                    <option value="5">5 business days</option>
+                    <option value="7">7 business days</option>
+                    <option value="10">10 business days</option>
+                    <option value="14">14 business days</option>
+                  </select>
+                  <p className="text-xs text-stone-600 mt-1">Buyers see this estimate on the checkout warning when you manage payouts manually.</p>
+                </div>
+                <div>
                   <label className="text-xs text-stone-500 mb-1 block">Note to buyers (optional)</label>
                   <textarea
                     value={payments.notes}

@@ -77,6 +77,7 @@ export default function CartCheckout() {
   const [checkoutError, setCheckoutError] = useState("");
   const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
   const [manualPayoutWarning, setManualPayoutWarning] = useState(false);
+  const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
 
   const shipping = subtotal > 500 ? 0 : 18;
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
@@ -192,6 +193,7 @@ export default function CartCheckout() {
         if (data.manualPayout) {
           setPendingCheckoutUrl(data.url);
           setManualPayoutWarning(true);
+          setProcessingWindowDays(typeof data.processingWindowDays === "number" ? data.processingWindowDays : null);
           setCheckingOut(false);
         } else {
           window.location.href = data.url;
@@ -366,7 +368,12 @@ export default function CartCheckout() {
                           <div>
                             <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
                             <p className="text-xs text-amber-200/70">
-                              This artist manages payouts manually. Your order will be processed within 3–5 business days.
+                              This artist manages payouts manually. Your order will be processed within{" "}
+                              {processingWindowDays !== null
+                                ? processingWindowDays === 1
+                                  ? "1 business day"
+                                  : `${processingWindowDays} business days`
+                                : "3–5 business days"}.
                             </p>
                           </div>
                         </div>

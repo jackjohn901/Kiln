@@ -6,6 +6,8 @@ export interface ArtistPayments {
   cashapp: string;
   paypalMe: string;
   notes: string;
+  /** Processing window in business days for manually-paid orders */
+  processingWindow?: number;
 }
 
 export const EMPTY_PAYMENTS: ArtistPayments = {
@@ -14,6 +16,7 @@ export const EMPTY_PAYMENTS: ArtistPayments = {
   cashapp: "",
   paypalMe: "",
   notes: "",
+  processingWindow: undefined,
 };
 
 export function readPaymentSettings(): ArtistPayments {
