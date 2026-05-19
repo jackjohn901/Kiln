@@ -243,12 +243,63 @@ router.post('/stripe/subscription-checkout', async (req, res): Promise<void> => 
       mode: 'subscription',
       success_url: `${baseUrl}${basePath}${successPath ?? '/'}?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}${basePath}${cancelPath ?? '/'}`,
-      metadata: { platform: 'kiln', artistId: artistId ?? '', tierId: tierId ?? '' },
+      metadata: {
+        platform: 'kiln',
+        artistId: artistId ?? '',
+        tierId: tierId ?? '',
+        ...(req.isAuthenticated() ? { userId: req.user.id } : {}),
+      },
     });
 
     res.json({ url: session.url, sessionId: session.id });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe subscription checkout error');
+    const msg = err instanceof Error ? err.message : 'Checkout failed';
+    res.status(500).json({ error: msg });
+  }
+});
+
+router.post('/stripe/gift-card-checkout', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  try {
+    const { amount, successPath, cancelPath } = req.body as {
+      amount: number;
+      successPath?: string;
+      cancelPath?: string;
+    };
+
+    if (!amount || amount < 1 || amount > 10000) {
+      res.status(400).json({ error: 'Amount must be between $1 and $10,000' }); return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+
+    const baseUrl = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : `http://localhost:${process.env.PORT ?? 5000}`;
+
+    const basePath = process.env.BASE_PATH ?? '';
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      customer_email: req.user.email ?? undefined,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          unit_amount: Math.round(amount * 100),
+          product_data: { name: `Kiln Gift Card — $${amount}` },
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${baseUrl}${basePath}${successPath ?? '/gift-cards'}?purchased=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${basePath}${cancelPath ?? '/gift-cards'}`,
+      metadata: { platform: 'kiln', type: 'gift_card', userId: req.user.id },
+    });
+
+    res.json({ url: session.url, sessionId: session.id });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Stripe gift-card checkout error');
     const msg = err instanceof Error ? err.message : 'Checkout failed';
     res.status(500).json({ error: msg });
   }

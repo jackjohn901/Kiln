@@ -102,15 +102,14 @@ export default function GiftCards() {
         amount: finalAmount, designId: design.id,
         recipientName, recipientEmail, senderName, message,
       }));
-      const res = await fetch("/api/stripe/checkout", {
+      const res = await fetch("/api/stripe/gift-card-checkout", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: [{ name: `Kiln Gift Card — $${finalAmount}`, price: finalAmount, quantity: 1, artistName: "Kiln" }],
+          amount: finalAmount,
           successPath: "/gift-cards?purchased=1",
           cancelPath: "/gift-cards",
-          metadata: { type: "gift_card" },
         }),
       });
       const data = await res.json() as { url?: string };

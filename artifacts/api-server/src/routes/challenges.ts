@@ -32,19 +32,28 @@ router.get("/challenges/:id", async (req, res): Promise<void> => {
   if (rows.length === 0) { res.status(404).json({ error: "Not found" }); return; }
   const c = rows[0];
   const now = new Date();
+  const isEnded = c.endsAt < now;
   const entries = await db.select().from(challengeEntriesTable)
     .where(eq(challengeEntriesTable.challengeId, c.id))
     .orderBy(desc(challengeEntriesTable.voteCount))
     .limit(20);
+  const winnerId = isEnded && entries.length > 0 && entries[0].voteCount > 0
+    ? entries[0].id
+    : null;
   res.json({
     challenge: {
       ...c,
       startsAt: c.startsAt.toISOString(),
       endsAt: c.endsAt.toISOString(),
       createdAt: c.createdAt.toISOString(),
-      status: c.endsAt < now ? "ended" : c.startsAt > now ? "upcoming" : "active",
+      status: isEnded ? "ended" : c.startsAt > now ? "upcoming" : "active",
+      winnerId,
     },
-    entries,
+    entries: entries.map((e, i) => ({
+      ...e,
+      createdAt: e.createdAt.toISOString(),
+      isWinner: isEnded && i === 0 && e.voteCount > 0,
+    })),
   });
 });
 

@@ -64,16 +64,26 @@ export default function PatronTiers() {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
   const [apiProfile, setApiProfile] = useState<ApiProfile | null>(null);
+  const [stripeSuccess, setStripeSuccess] = useState(false);
 
   const localArtist = getArtistById(artistId ?? "") ?? seedArtists.find(a => a.id === artistId);
 
+  const fetchTiers = (id: string) =>
+    fetch(`/api/patron-tiers/${id}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setTiers(data.tiers ?? []))
+      .catch(() => {});
+
   useEffect(() => {
     if (!artistId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("subscribed")) {
+      setStripeSuccess(true);
+      window.history.replaceState({}, "", window.location.pathname);
+      setTimeout(() => setStripeSuccess(false), 6000);
+    }
     Promise.all([
-      fetch(`/api/patron-tiers/${artistId}`, { credentials: "include" })
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(data => setTiers(data.tiers ?? []))
-        .catch(() => {}),
+      fetchTiers(artistId),
       !localArtist
         ? fetch(`/api/users/${artistId}/profile`, { credentials: "include" })
             .then(r => r.ok ? r.json() : Promise.reject())
@@ -81,6 +91,7 @@ export default function PatronTiers() {
             .catch(() => {})
         : Promise.resolve(),
     ]).finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artistId, localArtist]);
 
   const handleSubscribe = async (tierId: string, tierName: string) => {
@@ -160,6 +171,13 @@ export default function PatronTiers() {
             </div>
             <button onClick={() => handleSubscribe(currentTier.id, currentTier.name)} className="text-xs text-stone-600 hover:text-red-400 transition-colors">Cancel</button>
           </div>
+        )}
+
+        {stripeSuccess && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center">
+            <p className="text-sm font-semibold text-emerald-300">Payment confirmed — welcome as a patron! Your subscription is now active.</p>
+          </motion.div>
         )}
 
         {confirming && (
