@@ -1,5 +1,5 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { sendEmail, orderConfirmationEmail, newPatronEmail } from './lib/email';
+import { sendEmail, orderConfirmationEmail, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable } from '@workspace/db';
@@ -72,19 +72,55 @@ export class WebhookHandlers {
       if (event.type === 'account.updated') {
         const account = event.data.object as Stripe.Account;
         if (account.id) {
+          const disabledReason = account.requirements?.disabled_reason ?? null;
+          const isRestricted = disabledReason !== null;
+
           let newStatus: string;
           if (account.charges_enabled) {
             newStatus = 'active';
-          } else if (account.requirements?.disabled_reason) {
+          } else if (isRestricted) {
             newStatus = 'restricted';
           } else {
             newStatus = 'pending';
           }
+
+          const [profile] = await db
+            .select({
+              contactEmail: profilesTable.contactEmail,
+              displayName: profilesTable.displayName,
+              stripeRestrictionNotified: profilesTable.stripeRestrictionNotified,
+            })
+            .from(profilesTable)
+            .where(eq(profilesTable.stripeConnectedAccountId, account.id));
+
+          const statusUpdates: Partial<typeof profilesTable.$inferInsert> = { stripeConnectStatus: newStatus };
+
+          if (!isRestricted && profile?.stripeRestrictionNotified) {
+            statusUpdates.stripeRestrictionNotified = false;
+          }
+
           await db
             .update(profilesTable)
-            .set({ stripeConnectStatus: newStatus })
+            .set(statusUpdates)
             .where(eq(profilesTable.stripeConnectedAccountId, account.id));
-          logger.info({ accountId: account.id, newStatus }, 'Stripe account.updated: synced stripeConnectStatus');
+
+          if (isRestricted && profile && !profile.stripeRestrictionNotified && profile.contactEmail) {
+            const sent = await sendEmail({
+              to: profile.contactEmail,
+              subject: 'Action required: your Kiln payout account has been restricted',
+              html: stripeAccountRestrictedEmail(profile.displayName ?? ''),
+            });
+            if (sent) {
+              await db
+                .update(profilesTable)
+                .set({ stripeRestrictionNotified: true })
+                .where(eq(profilesTable.stripeConnectedAccountId, account.id));
+            } else {
+              logger.warn({ accountId: account.id }, 'Stripe restriction email delivery failed; will retry on next webhook ping');
+            }
+          }
+
+          logger.info({ accountId: account.id, newStatus, isRestricted }, 'Stripe account.updated: synced stripeConnectStatus');
         }
       }
 

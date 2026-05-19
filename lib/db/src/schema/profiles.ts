@@ -28,6 +28,7 @@ export const profilesTable = pgTable("profiles", {
   contactEmail: varchar("contact_email", { length: 255 }),
   stripeConnectedAccountId: text("stripe_connected_account_id"),
   stripeConnectStatus: varchar("stripe_connect_status", { length: 50 }),
+  stripeRestrictionNotified: boolean("stripe_restriction_notified").notNull().default(false),
   isFoundingArtist: boolean("is_founding_artist").notNull().default(false),
   foundingArtistNumber: integer("founding_artist_number"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

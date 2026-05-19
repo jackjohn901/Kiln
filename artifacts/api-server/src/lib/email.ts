@@ -159,6 +159,18 @@ export function outbidEmail(auctionTitle: string, newBid: number, bidderName: st
   `);
 }
 
+export function stripeAccountRestrictedEmail(displayName: string): string {
+  return shell(`
+    <h1 style="color:#f87171;font-size:22px;margin-bottom:4px;">Action Required: Payout Account Restricted</h1>
+    <p style="color:#78716c;margin-bottom:0;">Hi${displayName ? ` ${escHtml(displayName)}` : ''}, your Stripe payout account has been restricted.</p>
+    ${card(`
+      <p style="margin:0 0 8px;">Stripe has flagged your connected account and payouts may be paused until the issue is resolved.</p>
+      <p style="margin:0;color:#78716c;">Please complete any outstanding verification requirements to restore full access.</p>
+    `)}
+    ${btn(`${BASE_URL}/earnings`, "Complete Verification")}
+  `);
+}
+
 export function orderConfirmationEmail(customerEmail: string, orderId: string, amountTotal: number): string {
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Order Confirmed</h1>
