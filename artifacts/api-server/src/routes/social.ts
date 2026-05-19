@@ -12,6 +12,32 @@ import { awardBadge } from "./badges";
 
 const router = Router();
 
+/**
+ * When a new profile is created, automatically follow the platform creator.
+ * Controlled by the CREATOR_USER_ID env var — no-ops if unset.
+ */
+async function autoFollowCreator(newUserId: string): Promise<void> {
+  const creatorId = process.env.CREATOR_USER_ID;
+  if (!creatorId || newUserId === creatorId) return;
+
+  try {
+    await db.insert(followsTable)
+      .values({ followerId: newUserId, followingId: creatorId })
+      .onConflictDoNothing();
+
+    await Promise.all([
+      db.update(profilesTable)
+        .set({ followerCount: sql`${profilesTable.followerCount} + 1` })
+        .where(eq(profilesTable.userId, creatorId)),
+      db.update(profilesTable)
+        .set({ followingCount: sql`${profilesTable.followingCount} + 1` })
+        .where(eq(profilesTable.userId, newUserId)),
+    ]);
+  } catch {
+    // Non-fatal — don't block profile creation
+  }
+}
+
 // POST /users/:userId/follow — toggle follow
 router.post("/users/:userId/follow", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -218,6 +244,7 @@ router.get("/me/profile", async (req, res): Promise<void> => {
         avatarUrl: user.profileImageUrl ?? null,
         contactEmail: user.email ?? null,
       }).returning();
+      void autoFollowCreator(userId);
       res.json({ ...created, isFollowing: false, createdAt: created.createdAt.toISOString() }); return;
     }
     res.json({ ...profile, isFollowing: false, createdAt: profile.createdAt.toISOString() });
@@ -237,6 +264,7 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
     const [existing] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!existing) {
       const [created] = await db.insert(profilesTable).values({ userId, handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType: accountType ?? "artist" }).returning();
+      void autoFollowCreator(userId);
       res.json({ ...created, isFollowing: false, createdAt: created.createdAt.toISOString() }); return;
     }
     const [updated] = await db.update(profilesTable)
