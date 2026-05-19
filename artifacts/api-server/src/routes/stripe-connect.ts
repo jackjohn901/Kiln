@@ -222,16 +222,35 @@ router.get('/me/stripe/connect/balance', async (req, res): Promise<void> => {
       ).catch(() => ({ data: [] })),
     ]);
 
-    const usdAvailable = balance.available.find(b => b.currency === 'usd');
-    const usdPending   = balance.pending.find(b => b.currency === 'usd');
+    const currencyMap = new Map<string, { availableCents: number; pendingCents: number }>();
+
+    for (const bucket of balance.available) {
+      if (bucket.amount === 0) continue;
+      const entry = currencyMap.get(bucket.currency) ?? { availableCents: 0, pendingCents: 0 };
+      entry.availableCents += bucket.amount;
+      currencyMap.set(bucket.currency, entry);
+    }
+
+    for (const bucket of balance.pending) {
+      if (bucket.amount === 0) continue;
+      const entry = currencyMap.get(bucket.currency) ?? { availableCents: 0, pendingCents: 0 };
+      entry.pendingCents += bucket.amount;
+      currencyMap.set(bucket.currency, entry);
+    }
+
+    const balances = Array.from(currencyMap.entries()).map(([currency, amounts]) => ({
+      currency,
+      availableCents: amounts.availableCents,
+      pendingCents:   amounts.pendingCents,
+    }));
 
     const nextPayout = payouts.data[0] ?? null;
 
     res.json({
-      availableCents: usdAvailable?.amount ?? 0,
-      pendingCents:   usdPending?.amount   ?? 0,
-      nextPayoutDate: nextPayout?.arrival_date ?? null,
-      nextPayoutCents: nextPayout?.amount ?? null,
+      balances,
+      nextPayoutDate:     nextPayout?.arrival_date ?? null,
+      nextPayoutCents:    nextPayout?.amount       ?? null,
+      nextPayoutCurrency: nextPayout?.currency     ?? null,
     });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe Connect balance error');

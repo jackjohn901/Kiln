@@ -55,11 +55,17 @@ interface StripeConnectStatus {
   requirementsCurrentDeadline?: number | null;
 }
 
-interface StripeBalance {
+interface CurrencyBalance {
+  currency: string;
   availableCents: number;
   pendingCents: number;
+}
+
+interface StripeBalance {
+  balances: CurrencyBalance[];
   nextPayoutDate: number | null;
   nextPayoutCents: number | null;
+  nextPayoutCurrency: string | null;
 }
 
 interface PatronTier {
@@ -88,6 +94,14 @@ const STATUS_COLOR: Record<string, string> = {
 
 function formatPrice(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+function formatStripeAmount(minorUnits: number, currency: string): string {
+  const isoCode = currency.toUpperCase();
+  const fractionDigits = new Intl.NumberFormat("en-US", { style: "currency", currency: isoCode })
+    .resolvedOptions().minimumFractionDigits ?? 2;
+  const major = minorUnits / Math.pow(10, fractionDigits);
+  return major.toLocaleString("en-US", { style: "currency", currency: isoCode });
 }
 
 function formatDate(iso: string) {
@@ -544,29 +558,38 @@ export default function Earnings() {
                               Refresh
                             </button>
                           </div>
-                          <div className={`grid grid-cols-2 gap-2 transition-opacity duration-300 ${balanceRefreshing ? "opacity-50" : "opacity-100"}`}>
-                            <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3 relative overflow-hidden">
-                              {balanceRefreshing && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/3 to-transparent animate-[shimmer_1.5s_infinite]" />}
-                              <p className="text-[10px] text-stone-500 mb-1">Available</p>
-                              <p className="text-base font-bold text-emerald-400">
-                                {(stripeBalance.availableCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                              </p>
+                          <div className={`space-y-2 transition-opacity duration-300 ${balanceRefreshing ? "opacity-50" : "opacity-100"}`}>
+                            {/* Header row */}
+                            <div className="grid grid-cols-3 gap-x-2 px-1">
+                              <p className="text-[10px] text-stone-600 uppercase tracking-wide">Currency</p>
+                              <p className="text-[10px] text-stone-600 uppercase tracking-wide text-right">Available</p>
+                              <p className="text-[10px] text-stone-600 uppercase tracking-wide text-right">Pending</p>
                             </div>
-                            <div className="rounded-xl border border-white/8 bg-stone-800/50 p-3 relative overflow-hidden">
-                              {balanceRefreshing && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/3 to-transparent animate-[shimmer_1.5s_infinite]" />}
-                              <p className="text-[10px] text-stone-500 mb-1">Pending</p>
-                              <p className="text-base font-bold text-amber-400">
-                                {(stripeBalance.pendingCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
-                              </p>
-                            </div>
+                            {/* Per-currency rows — or empty-state */}
+                            {stripeBalance.balances.length === 0 && (
+                              <p className="text-xs text-stone-500 px-1">No balance yet — funds will appear here once you receive a payment.</p>
+                            )}
+                            {stripeBalance.balances.map(b => (
+                              <div key={b.currency} className="rounded-xl border border-white/8 bg-stone-800/50 px-3 py-2 grid grid-cols-3 gap-x-2 items-center relative overflow-hidden">
+                                {balanceRefreshing && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/3 to-transparent animate-[shimmer_1.5s_infinite]" />}
+                                <p className="text-xs font-semibold text-stone-300 uppercase">{b.currency}</p>
+                                <p className="text-sm font-bold text-emerald-400 text-right tabular-nums">
+                                  {formatStripeAmount(b.availableCents, b.currency)}
+                                </p>
+                                <p className="text-sm font-bold text-amber-400 text-right tabular-nums">
+                                  {formatStripeAmount(b.pendingCents, b.currency)}
+                                </p>
+                              </div>
+                            ))}
+                            {/* Next payout row */}
                             {stripeBalance.nextPayoutDate !== null && (
-                              <div className="col-span-2 rounded-xl border border-white/8 bg-stone-800/50 px-3 py-2 flex items-center justify-between">
+                              <div className="rounded-xl border border-white/8 bg-stone-800/50 px-3 py-2 flex items-center justify-between">
                                 <p className="text-[10px] text-stone-500">Next payout</p>
                                 <p className="text-xs font-medium text-stone-300">
                                   {new Date(stripeBalance.nextPayoutDate * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                   {stripeBalance.nextPayoutCents !== null && (
                                     <span className="ml-1.5 text-emerald-400">
-                                      {(stripeBalance.nextPayoutCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}
+                                      {formatStripeAmount(stripeBalance.nextPayoutCents, stripeBalance.nextPayoutCurrency ?? "usd")}
                                     </span>
                                   )}
                                 </p>
