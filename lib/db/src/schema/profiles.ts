@@ -28,6 +28,8 @@ export const profilesTable = pgTable("profiles", {
   contactEmail: varchar("contact_email", { length: 255 }),
   stripeConnectedAccountId: text("stripe_connected_account_id"),
   stripeConnectStatus: varchar("stripe_connect_status", { length: 50 }),
+  isFoundingArtist: boolean("is_founding_artist").notNull().default(false),
+  foundingArtistNumber: integer("founding_artist_number"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

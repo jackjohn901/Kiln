@@ -121,6 +121,8 @@ import Badges from "@/pages/Badges";
 import Search from "@/pages/Search";
 import AdminReports from "@/pages/AdminReports";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import FoundingArtist from "@/pages/FoundingArtist";
+import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 
@@ -322,6 +324,8 @@ function Router() {
       <Route path="/badges" component={Badges} />
       <Route path="/search" component={Search} />
       <Route path="/admin/reports" component={AdminReports} />
+      <Route path="/admin/founding-artists" component={AdminFoundingArtists} />
+      <Route path="/founding-artist" component={FoundingArtist} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route component={NotFound} />
       </Switch>

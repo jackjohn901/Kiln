@@ -681,6 +681,17 @@ export default function ArtistProfile() {
                 <Check size={11} className="text-white" />
               </span>
             )}
+            {(artist as { isFoundingArtist?: boolean; foundingArtistNumber?: number }).isFoundingArtist && (
+              <span
+                title={`Founding Artist #${(artist as { foundingArtistNumber?: number }).foundingArtistNumber ?? ""}`}
+                className="flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5"
+              >
+                <Flame size={10} className="text-amber-400" />
+                <span className="text-[10px] font-bold text-amber-300">
+                  Founding #{(artist as { foundingArtistNumber?: number }).foundingArtistNumber}
+                </span>
+              </span>
+            )}
             <div className="flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/25 px-2.5 py-0.5">
               <Flame size={11} className="text-amber-400" />
               <span className="text-xs font-bold text-amber-300">{score}</span>

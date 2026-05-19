@@ -55,3 +55,4 @@ export * from "./push_subscriptions";
 export * from "./giftCards";
 export * from "./payouts";
 export * from "./video_uploads";
+export * from "./founding_artist_applications";

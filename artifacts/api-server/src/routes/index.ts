@@ -70,6 +70,7 @@ import payoutsRouter from "./payouts";
 import newslettersRouter from "./newsletters";
 import mentorshipRouter from "./mentorship";
 import critiquesRouter from "./critiques";
+import foundingArtistRouter from "./founding-artist";
 
 const router: IRouter = Router();
 
@@ -144,5 +145,6 @@ router.use(payoutsRouter);
 router.use(newslettersRouter);
 router.use(mentorshipRouter);
 router.use(critiquesRouter);
+router.use(foundingArtistRouter);
 
 export default router;
