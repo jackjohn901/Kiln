@@ -11,10 +11,12 @@ import {
   Download, Grid3x3, SplitSquareHorizontal, Gift, Scissors,
   CheckSquare, UserCircle2, Calculator, Dna, GitBranch,
   Vote, Ghost, Radar, Timer, Network, Music2, Repeat2, Megaphone, ArrowLeftRight,
+  AlertTriangle,
 } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { useCart } from "@/contexts/CartContext";
+import { useStripeConnect } from "@/contexts/StripeConnectContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 const PRIMARY_TABS = [
@@ -119,6 +121,7 @@ export default function MobileNav() {
   const { profile } = useProfile();
   const { unreadCount, unreadMessageCount } = useSocial();
   const { itemCount } = useCart();
+  const { hasWarning, hasUrgent } = useStripeConnect();
   const [showMore, setShowMore] = useState(false);
 
   const totalBadge = unreadCount + unreadMessageCount;
@@ -132,6 +135,26 @@ export default function MobileNav() {
 
   return (
     <>
+      {/* Stripe verification warning banner — shown above the nav when action is needed */}
+      {profile && (hasUrgent || hasWarning) && (
+        <Link href="/earnings">
+          <div
+            className={`fixed bottom-16 left-0 right-0 z-50 md:hidden flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium cursor-pointer transition-colors ${
+              hasUrgent
+                ? "bg-rose-500/90 text-white"
+                : "bg-amber-500/90 text-stone-950"
+            }`}
+          >
+            <AlertTriangle size={13} className="flex-shrink-0" />
+            <span>
+              {hasUrgent
+                ? "Stripe account restricted — action required"
+                : "Stripe verification needed — tap to complete"}
+            </span>
+          </div>
+        </Link>
+      )}
+
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-white/10 bg-[#12100e]/95 backdrop-blur-md safe-area-pb">
         <div className="flex items-center justify-around h-16 px-1">
           {PRIMARY_TABS.map(({ href: tabHref, icon: Icon, label, accent }) => {
