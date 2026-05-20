@@ -613,14 +613,23 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
           if (buyerEmail && !manualPayoutReceiptSent.has(session.id)) {
             manualPayoutReceiptSent.add(session.id);
             try {
+              // Fetch canonical line items from Stripe — authoritative source for
+              // item name, quantity, and unit price as actually charged.
+              const stripeClient = await getUncachableStripeClient();
+              const stripeLineItems = await stripeClient.checkout.sessions.listLineItems(
+                session.id,
+                { limit: 100 },
+              );
+
+              // Listing IDs from metadata are in the same positional order as the
+              // Stripe line items created at checkout. Use them only for artist name
+              // enrichment via a DB lookup; never for price or quantity.
               const ids = meta.listingIds.split(',').filter(Boolean);
-              const qtys = (meta.listingQtys ?? '').split(',').map((q) => parseInt(q, 10) || 1);
 
               const listingRows = ids.length > 0
                 ? await db
                     .select({
                       id: listingsTable.id,
-                      title: listingsTable.title,
                       artistId: listingsTable.artistId,
                     })
                     .from(listingsTable)
@@ -635,15 +644,20 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                     .where(inArray(profilesTable.userId, artistIds))
                 : [];
               const artistNameMap = new Map(artistRows.map((a) => [a.userId, a.displayName ?? '']));
+              // Map listing ID → artist name by position index.
+              const listingArtistName = (idx: number): string | undefined => {
+                const listingId = ids[idx];
+                const listing = listingId ? listingRows.find((r) => r.id === listingId) : undefined;
+                return listing ? (artistNameMap.get(listing.artistId) ?? undefined) : undefined;
+              };
 
-              const receiptItems = ids.map((id, idx) => {
-                const listing = listingRows.find((r) => r.id === id);
-                return {
-                  title: listing?.title ?? id,
-                  quantity: qtys[idx] ?? 1,
-                  artistName: listing ? (artistNameMap.get(listing.artistId) ?? undefined) : undefined,
-                };
-              });
+              // Build receipt items from Stripe line items (authoritative).
+              const receiptItems = stripeLineItems.data.map((li, idx) => ({
+                title: li.description ?? ids[idx] ?? 'Item',
+                quantity: li.quantity ?? 1,
+                priceCents: li.price?.unit_amount ?? undefined,
+                artistName: listingArtistName(idx),
+              }));
 
               const html = manualPayoutReceiptEmail(
                 session.id,

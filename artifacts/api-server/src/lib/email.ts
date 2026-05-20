@@ -198,6 +198,7 @@ export function workshopBookingEmail(workshopTitle: string, artistName: string, 
 export interface ManualPayoutReceiptItem {
   title: string;
   quantity: number;
+  priceCents?: number;
   artistName?: string;
 }
 
@@ -208,12 +209,26 @@ export function manualPayoutReceiptEmail(
 ): string {
   const itemRows = items
     .map(
-      (item) =>
-        `<p style="margin:0 0 6px;">
-          <strong>${escHtml(item.title)}</strong>
-          ${item.quantity > 1 ? ` &times; ${item.quantity}` : ""}
-          ${item.artistName ? `<span style="color:#78716c;"> — by ${escHtml(item.artistName)}</span>` : ""}
-        </p>`,
+      (item) => {
+        const lineTotal = item.priceCents != null
+          ? item.priceCents * item.quantity
+          : null;
+        const priceStr = item.priceCents != null
+          ? `$${(item.priceCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+          : null;
+        const lineTotalStr = lineTotal != null
+          ? `$${(lineTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+          : null;
+
+        return `<div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 0 8px;gap:12px;">
+          <div>
+            <strong>${escHtml(item.title)}</strong>
+            ${item.artistName ? `<span style="color:#78716c;font-size:12px;display:block;">by ${escHtml(item.artistName)}</span>` : ""}
+            <span style="color:#78716c;font-size:12px;">Qty: ${item.quantity}${priceStr ? ` &times; ${priceStr}` : ""}</span>
+          </div>
+          ${lineTotalStr ? `<span style="white-space:nowrap;color:#fcd34d;font-weight:bold;">${lineTotalStr}</span>` : `<span style="white-space:nowrap;color:#fcd34d;font-weight:bold;">${priceStr ?? ""}</span>`}
+        </div>`;
+      }
     )
     .join("");
 
