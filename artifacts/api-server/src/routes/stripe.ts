@@ -974,13 +974,31 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 );
 
                 const artistIds = [...new Set(listingRows.map((r) => r.artistId))];
-                const artistRows = artistIds.length > 0
-                  ? await db
-                      .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
-                      .from(profilesTable)
-                      .where(inArray(profilesTable.userId, artistIds))
-                  : [];
+                const [artistRows, artistPaymentRows] = await Promise.all([
+                  artistIds.length > 0
+                    ? db
+                        .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
+                        .from(profilesTable)
+                        .where(inArray(profilesTable.userId, artistIds))
+                    : Promise.resolve([]),
+                  artistIds.length > 0
+                    ? db
+                        .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+                        .from(userSettingsTable)
+                        .where(inArray(userSettingsTable.userId, artistIds))
+                    : Promise.resolve([]),
+                ]);
                 const artistNameMap = new Map(artistRows.map((a) => [a.userId, a.displayName ?? '']));
+
+                // Derive processing window: take the maximum across all artists in the order.
+                let receiptProcessingWindowDays: number | null = null;
+                for (const row of artistPaymentRows) {
+                  const ps = row.paymentSettings as Record<string, unknown> | null;
+                  const w = ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null;
+                  if (w !== null) {
+                    receiptProcessingWindowDays = receiptProcessingWindowDays === null ? w : Math.max(receiptProcessingWindowDays, w);
+                  }
+                }
 
                 const receiptItems = stripeLineItems.data.map((li, idx) => {
                   const listingId = ids[idx];
@@ -998,6 +1016,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   session.id,
                   session.amount_total ?? 0,
                   receiptItems,
+                  receiptProcessingWindowDays,
                 );
 
                 await sendEmail({
