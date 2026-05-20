@@ -135,6 +135,7 @@ import ProjectDetail from "@/pages/ProjectDetail";
 import MyProjects from "@/pages/MyProjects";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
+import SaleNotificationListener from "@/components/SaleNotificationListener";
 
 const queryClient = new QueryClient();
 
@@ -350,6 +351,7 @@ function Router() {
       </Switch>
       <PushPrompt />
       <OnboardingModal />
+      <SaleNotificationListener />
     </>
   );
 }
