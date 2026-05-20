@@ -40,6 +40,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/inbox", icon: Mail, label: "Commission Inbox" },
       { href: "/commission-tracker", icon: CheckSquare, label: "Commission Tracker" },
       { href: "/collection", icon: BookMarked, label: "Collection" },
+      { href: "/coa", icon: FileText, label: "Certificates of Authenticity" },
       { href: "/gift-cards", icon: Gift, label: "Gift Cards" },
       { href: "/collector-journey", icon: TrendingUp, label: "Collector Journey" },
       { href: "/taste-graph", icon: Radar, label: "Taste Graph" },

@@ -5,6 +5,18 @@ import { desc, lt, eq, and, inArray } from "drizzle-orm";
 
 const router = Router();
 
+const ARTIST_LEVELS = ["Emerging", "Rising", "Established", "Master"] as const;
+
+function hashId(s: string): number {
+  let h = 0;
+  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+  return Math.abs(h);
+}
+
+function authorLevel(authorId: string): string {
+  return ARTIST_LEVELS[hashId(authorId) % 4];
+}
+
 function hotnessScore(
   likeCount: number,
   commentCount: number,
@@ -82,6 +94,7 @@ router.get("/feed", async (req, res) => {
         isLiked: likedIds.has(p.id),
         isSaved: savedIds.has(p.id),
         authorStreak: streakMap.get(p.authorId) ?? 0,
+        authorLevel: authorLevel(p.authorId),
         createdAt: p.createdAt.toISOString(),
       })),
       hasMore,
@@ -152,6 +165,7 @@ router.get("/feed/following", async (req, res) => {
         isLiked: likedIds.has(post.id),
         isSaved: savedIds.has(post.id),
         authorStreak: streakMap2.get(post.authorId) ?? 0,
+        authorLevel: authorLevel(post.authorId),
         createdAt: post.createdAt.toISOString(),
       })),
       hasMore,

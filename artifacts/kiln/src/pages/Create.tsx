@@ -175,6 +175,7 @@ export default function Create() {
       const res = await fetch("/api/ai/caption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ technique, stage, tags }),
       });
       const data = await res.json() as { captions?: string[] };

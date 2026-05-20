@@ -908,6 +908,7 @@ export default function Feed() {
           available: false,
           patronOnly: p.isPatronOnly ?? false,
           streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+          artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
           beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
         setFollowingApiReels(apiReels);
@@ -940,6 +941,7 @@ export default function Feed() {
           available: false,
           patronOnly: p.isPatronOnly ?? false,
           streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+          artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
           beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
         setUserPostReels((prev) => {
@@ -1038,6 +1040,7 @@ export default function Feed() {
           available: false,
           patronOnly: p.isPatronOnly ?? false,
           streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+          artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
           beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
         setUserPostReels((prev) => {
