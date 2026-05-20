@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 export interface KilnComment {
   id: string;
@@ -14,7 +15,7 @@ export interface KilnComment {
 
 export interface KilnNotification {
   id: string;
-  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription";
+  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription" | "sale";
   fromId: string;
   fromName: string;
   fromAvatarUrl: string;
@@ -437,6 +438,7 @@ function genId(): string {
 export function SocialProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SocialState>(readState);
   const { isAuthenticated } = useAuth();
+  const { subscribe: wsSubscribe } = useWebSocket();
 
   function update(updater: (prev: SocialState) => SocialState) {
     setState((prev) => {
@@ -533,6 +535,23 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       notifications: [{ ...n, id: genId(), read: false, createdAt: new Date().toISOString() }, ...s.notifications.slice(0, 99)],
     }));
   }, []);
+
+  // Subscribe to server-pushed notification events so the bell badge and
+  // notification list update in real time without a page refresh.
+  useEffect(() => {
+    const unsub = wsSubscribe("notification", (evt) => {
+      const e = evt as { text?: string; link?: string; notifType?: string; fromName?: string; fromId?: string; fromAvatarUrl?: string };
+      addNotification({
+        type: (e.notifType as KilnNotification["type"]) ?? "follow",
+        fromId: e.fromId ?? "",
+        fromName: e.fromName ?? "",
+        fromAvatarUrl: e.fromAvatarUrl ?? "",
+        text: e.text ?? "You have a new notification",
+        link: e.link ?? undefined,
+      });
+    });
+    return unsub;
+  }, [wsSubscribe, addNotification]);
 
   const markRead = useCallback((id: string) => {
     fetch(`/api/notifications/${id}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});

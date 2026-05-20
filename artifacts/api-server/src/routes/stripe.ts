@@ -11,11 +11,13 @@ import {
   profilesTable,
   usersTable,
   userSettingsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
+import { broadcast } from '../lib/websocket';
 import { getDigitalProduct } from '../lib/digitalProducts';
 import { sendEmail, manualPayoutReceiptEmail, newSaleEmail } from '../lib/email';
 
@@ -696,14 +698,6 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 const amountTotal = session.amount_total ?? 0;
 
                 for (const artist of artistUserRows) {
-                  if (!artist.email) continue;
-
-                  // Respect the artist's email-notification preference for new sales.
-                  // Default is opt-in (true); only skip if explicitly set to false.
-                  const artistSettings = artistSettingsMap.get(artist.id);
-                  const wantsEmail = artistSettings?.notif_email_new_sale !== false;
-                  if (!wantsEmail) continue;
-
                   const artistItems = ids
                     .map((id, idx) => {
                       const listing = listingRows.find((r) => r.id === id && r.artistId === artist.id);
@@ -714,11 +708,47 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
 
                   if (artistItems.length === 0) continue;
 
-                  const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
-                  await sendEmail({
-                    to: artist.email,
-                    subject: 'You have a new sale on Kiln',
-                    html,
+                  // Send email if the artist has opted in (default: opt-in).
+                  const artistSettings = artistSettingsMap.get(artist.id);
+                  const wantsEmail = artistSettings?.notif_email_new_sale !== false;
+                  if (wantsEmail && artist.email) {
+                    const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
+                    await sendEmail({
+                      to: artist.email,
+                      subject: 'You have a new sale on Kiln',
+                      html,
+                    });
+                  }
+
+                  // Always insert an in-app notification so the bell badge and
+                  // Notifications page reflect the new sale in real time.
+                  const itemSummary = artistItems.map((item) =>
+                    item.quantity > 1 ? `${item.title} ×${item.quantity}` : item.title,
+                  );
+                  const amountDollars = (amountTotal / 100).toFixed(2);
+                  const notifText = itemSummary.length === 1
+                    ? `New sale: "${itemSummary[0]}" — $${amountDollars}`
+                    : `New sale: ${itemSummary.length} items — $${amountDollars}`;
+
+                  await db.insert(notificationsTable).values({
+                    id: crypto.randomUUID(),
+                    userId: artist.id,
+                    type: 'sale',
+                    fromName: buyerName || 'A buyer',
+                    text: notifText,
+                    link: '/earnings',
+                    read: false,
+                  });
+
+                  // Push to the artist's active session immediately so the bell
+                  // badge and notification panel update without a page refresh.
+                  broadcast(artist.id, {
+                    type: 'notification',
+                    userId: artist.id,
+                    notifType: 'sale',
+                    fromName: buyerName || 'A buyer',
+                    text: notifText,
+                    link: '/earnings',
                   });
                 }
               }

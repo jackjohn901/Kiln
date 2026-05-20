@@ -7,7 +7,7 @@ export type WsEvent =
   | { type: "like"; postId: string; userId: string; likeCount: number }
   | { type: "follow"; followerId: string; followingId: string }
   | { type: "comment"; postId: string; commentId: string; authorId: string }
-  | { type: "notification"; userId: string; text: string; link?: string }
+  | { type: "notification"; userId: string; text: string; link?: string; notifType?: string; fromName?: string }
   | { type: "message"; threadId: string; senderId: string; recipientId: string }
   | { type: "bid"; auctionId: string; currentBid: number; bidCount: number; bidderName: string };
 
