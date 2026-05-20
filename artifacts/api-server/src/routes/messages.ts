@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { messageThreadsTable, messagesTable, profilesTable } from "@workspace/db";
-import { eq, or, desc, and } from "drizzle-orm";
+import { eq, or, desc, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 
@@ -23,7 +23,7 @@ router.get("/messages/threads", async (req, res): Promise<void> => {
         .from(profilesTable).where(eq(profilesTable.userId, otherId));
 
       const unreadMessages = await db.select({ id: messagesTable.id }).from(messagesTable)
-        .where(and(eq(messagesTable.threadId, t.id), eq(messagesTable.read, false)));
+        .where(and(eq(messagesTable.threadId, t.id), eq(messagesTable.read, false), ne(messagesTable.senderId, userId)));
       const unreadCount = unreadMessages.length;
 
       return {
@@ -70,7 +70,7 @@ router.get("/messages/threads/:threadId", async (req, res): Promise<void> => {
 
     await db.update(messagesTable)
       .set({ read: true })
-      .where(and(eq(messagesTable.threadId, threadId), eq(messagesTable.read, false)));
+      .where(and(eq(messagesTable.threadId, threadId), eq(messagesTable.read, false), ne(messagesTable.senderId, userId)));
 
     res.json({
       thread: {

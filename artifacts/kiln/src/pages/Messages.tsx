@@ -25,6 +25,7 @@ interface ApiMsg {
   senderName: string;
   senderAvatarUrl: string | null;
   text: string;
+  read: boolean;
   createdAt: string;
 }
 
@@ -161,7 +162,12 @@ export default function Messages() {
           const d = await r.json() as { messages?: ApiMsg[] };
           const incoming = [...(d.messages ?? [])].reverse();
           setApiMessages(prev => {
-            if (incoming.length !== prev.length || incoming[incoming.length - 1]?.id !== prev[prev.length - 1]?.id) {
+            const readChanged = incoming.some((m, i) => prev[i]?.id === m.id && prev[i].read !== m.read);
+            if (
+              incoming.length !== prev.length ||
+              incoming[incoming.length - 1]?.id !== prev[prev.length - 1]?.id ||
+              readChanged
+            ) {
               return incoming;
             }
             return prev;
@@ -457,20 +463,41 @@ export default function Messages() {
                 {apiMessages.length === 0 && (
                   <p className="text-center text-sm text-stone-600 py-8">No messages yet — say hello!</p>
                 )}
-                {apiMessages.map((msg) => (
-                  <div key={msg.id} className="flex justify-start">
-                    <img
-                      src={msg.senderAvatarUrl ?? `https://picsum.photos/seed/${msg.senderId}/60/60`}
-                      alt={msg.senderName}
-                      className="h-7 w-7 rounded-full object-cover mr-2 mt-1 shrink-0"
-                    />
-                    <div className="max-w-[75%] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm bg-stone-800 text-stone-200">
-                      <p className="text-[9px] text-stone-500 mb-0.5">{msg.senderName}</p>
-                      {msg.text}
-                      <p className="text-[10px] mt-1 text-stone-600">{timeShort(msg.createdAt)}</p>
-                    </div>
-                  </div>
-                ))}
+                {(() => {
+                  const lastReadSentId = [...apiMessages].reverse().find(
+                    (m) => m.senderId === profile.id && m.read
+                  )?.id ?? null;
+                  return apiMessages.map((msg) => {
+                    const isMe = msg.senderId === profile.id;
+                    return (
+                      <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                        <div className={`flex ${isMe ? "justify-end" : "justify-start"} w-full`}>
+                          {!isMe && (
+                            <img
+                              src={msg.senderAvatarUrl ?? `https://picsum.photos/seed/${msg.senderId}/60/60`}
+                              alt={msg.senderName}
+                              className="h-7 w-7 rounded-full object-cover mr-2 mt-1 shrink-0"
+                            />
+                          )}
+                          <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+                            isMe
+                              ? "bg-amber-500/20 text-amber-100 rounded-br-sm"
+                              : "bg-stone-800 text-stone-200 rounded-bl-sm"
+                          }`}>
+                            {!isMe && <p className="text-[9px] text-stone-500 mb-0.5">{msg.senderName}</p>}
+                            {msg.text}
+                            <p className={`text-[10px] mt-1 ${isMe ? "text-amber-400/60 text-right" : "text-stone-600"}`}>
+                              {timeShort(msg.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        {isMe && msg.id === lastReadSentId && (
+                          <p className="text-[10px] text-stone-500 mt-0.5 mr-0.5">Seen</p>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
                 <div ref={bottomRef} />
               </div>
 
