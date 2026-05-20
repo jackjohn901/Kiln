@@ -130,6 +130,9 @@ import KilnOpening from "@/pages/KilnOpening";
 import MaterialSources from "@/pages/MaterialSources";
 import ProcessPledge from "@/pages/ProcessPledge";
 import ListingCollaborators from "@/pages/ListingCollaborators";
+import CreateProject from "@/pages/CreateProject";
+import ProjectDetail from "@/pages/ProjectDetail";
+import MyProjects from "@/pages/MyProjects";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 
@@ -340,6 +343,9 @@ function Router() {
       <Route path="/material-sources" component={MaterialSources} />
       <Route path="/process-pledges" component={ProcessPledge} />
       <Route path="/listings/:id/collaborators" component={ListingCollaborators} />
+      <Route path="/projects/create" component={CreateProject} />
+      <Route path="/projects/mine" component={MyProjects} />
+      <Route path="/projects/:id" component={ProjectDetail} />
       <Route component={NotFound} />
       </Switch>
       <PushPrompt />

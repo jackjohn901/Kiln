@@ -7,6 +7,7 @@ import {
   Shield, Truck, Award, MapPin, ExternalLink, ChevronRight,
   Package, Ruler, Calendar, Palette, Star, MessageSquare,
   Bell, BellOff, DollarSign, X, Send, TrendingDown, Landmark,
+  QrCode, Download,
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import Nav from "@/components/Nav";
@@ -227,6 +228,8 @@ export default function ListingDetail() {
   const wishlisted = id ? isWishlisted(id) : false;
   const [copied, setCopied] = useState(false);
   const [showPriceAlert, setShowPriceAlert] = useState(false);
+  const [qrExpanded, setQrExpanded] = useState(false);
+  const [qrDownloading, setQrDownloading] = useState(false);
   const [priceAlertTarget, setPriceAlertTarget] = useState("");
   const [priceAlertSaved, setPriceAlertSaved] = useState(() => {
     const a = getPriceAlerts(); return id ? !!a[id] : false;
@@ -812,6 +815,76 @@ export default function ListingDetail() {
               </div>
             )}
           </motion.div>
+        </div>
+
+        {/* ── Print QR / Physical Certificate ── */}
+        <div className="mb-10">
+          <button
+            onClick={() => setQrExpanded((v) => !v)}
+            className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-stone-900/40 px-5 py-4 hover:border-amber-500/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <QrCode size={16} className="text-amber-400" />
+              <div className="text-left">
+                <p className="text-sm font-semibold text-stone-200">Physical Certificate</p>
+                <p className="text-xs text-stone-500">Print a QR code to attach to the physical piece</p>
+              </div>
+            </div>
+            <ChevronRight size={15} className={`text-stone-600 transition-transform ${qrExpanded ? "rotate-90" : ""}`} />
+          </button>
+          <AnimatePresence>
+            {qrExpanded && (() => {
+              const listingUrl = `${window.location.origin}${window.location.pathname.split("/kiln")[0]}/kiln/shop/${id}`;
+              const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&bgcolor=18160c&color=e8d5a3&qzone=2&data=${encodeURIComponent(listingUrl)}`;
+              async function handleDownload() {
+                setQrDownloading(true);
+                try {
+                  const r = await fetch(qrSrc);
+                  const blob = await r.blob();
+                  const href = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = href; a.download = `kiln-certificate-${id}.png`; a.click();
+                  URL.revokeObjectURL(href);
+                } catch { /* ignore */ }
+                finally { setQrDownloading(false); }
+              }
+              return (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-2 rounded-2xl border border-amber-500/15 bg-gradient-to-br from-stone-900 via-amber-950/20 to-stone-900 p-6">
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      <div className="rounded-xl overflow-hidden border border-amber-500/20 p-2 bg-[#18160c] shrink-0">
+                        <img src={qrSrc} alt="QR code" width={120} height={120} className="block" />
+                      </div>
+                      <div className="flex-1 text-center sm:text-left space-y-2">
+                        <p className="font-serif text-base text-amber-100">{listing?.title}</p>
+                        <p className="text-xs text-stone-500 leading-relaxed">
+                          Scan to view provenance, artist story, and original listing — attach to the physical piece for a permanent digital record.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                          <button
+                            onClick={handleDownload}
+                            disabled={qrDownloading}
+                            className="flex items-center justify-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-xs font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                          >
+                            <Download size={12} /> {qrDownloading ? "Downloading…" : "Download PNG"}
+                          </button>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(listingUrl).catch(() => {}); }}
+                            className="flex items-center justify-center gap-2 rounded-full border border-stone-700 px-4 py-2 text-xs text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-colors"
+                          >
+                            <Share2 size={12} /> Copy link
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })()}
+          </AnimatePresence>
         </div>
 
         {/* ── Reviews ── */}

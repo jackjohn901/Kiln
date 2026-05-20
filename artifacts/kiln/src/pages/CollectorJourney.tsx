@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -25,10 +25,32 @@ interface Milestone {
 
 const JOINED_DATE = "March 2025";
 
+interface CollectorLevel {
+  level: string; icon: string; color: string;
+  totalSpentCents: number; nextLevel: string | null;
+  nextLevelMinCents: number | null; progressPct: number;
+}
+
+const LEVEL_COLORS: Record<string, { badge: string; bar: string }> = {
+  stone:  { badge: "border-stone-500/30 bg-stone-500/10 text-stone-400",  bar: "from-stone-500 to-stone-400" },
+  amber:  { badge: "border-amber-500/30 bg-amber-500/10 text-amber-400",  bar: "from-amber-500 to-amber-300" },
+  orange: { badge: "border-orange-500/30 bg-orange-500/10 text-orange-400", bar: "from-orange-500 to-amber-400" },
+  violet: { badge: "border-violet-500/30 bg-violet-500/10 text-violet-400", bar: "from-violet-500 to-violet-300" },
+  yellow: { badge: "border-yellow-500/30 bg-yellow-500/10 text-yellow-400", bar: "from-yellow-500 to-amber-300" },
+};
+
 export default function CollectorJourney() {
   const { following, subscriptions, reelLikes, reelSaves } = useSocial();
   const { profile } = useProfile();
   const [journeyCopied, setJourneyCopied] = useState(false);
+  const [levelData, setLevelData] = useState<CollectorLevel | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me/collector-level", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d: CollectorLevel) => setLevelData(d))
+      .catch(() => {});
+  }, []);
 
   const followedArtists = useMemo(() =>
     following.slice(0, 6).map((id) => ALL_ARTISTS.find((a) => a.id === id)).filter(Boolean),
@@ -215,6 +237,44 @@ export default function CollectorJourney() {
               </p>
             </div>
           </div>
+
+          {/* Collector level badge */}
+          {levelData && (() => {
+            const colors = LEVEL_COLORS[levelData.color] ?? LEVEL_COLORS.amber;
+            const spentDollars = (levelData.totalSpentCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+            return (
+              <div className={`mb-4 rounded-xl border p-3 ${colors.badge}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{levelData.icon}</span>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider">{levelData.level}</p>
+                      <p className="text-[10px] opacity-70">{spentDollars} collected</p>
+                    </div>
+                  </div>
+                  {levelData.nextLevel && (
+                    <div className="text-right">
+                      <p className="text-[10px] opacity-60">Next: {levelData.nextLevel}</p>
+                      <p className="text-[10px] font-semibold opacity-80">{levelData.progressPct}%</p>
+                    </div>
+                  )}
+                  {!levelData.nextLevel && (
+                    <Crown size={14} className="opacity-80" />
+                  )}
+                </div>
+                {levelData.nextLevel && (
+                  <div className="h-1 w-full rounded-full bg-black/20 overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${levelData.progressPct}%` }}
+                      transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-4 gap-3 mb-5">
             {stats.map((s) => (

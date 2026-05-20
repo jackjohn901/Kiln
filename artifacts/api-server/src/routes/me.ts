@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable } from "@workspace/db";
+import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable } from "@workspace/db";
 import { eq, inArray, and } from "drizzle-orm";
 import crypto from "crypto";
 import { logger } from "../lib/logger";
@@ -476,6 +476,40 @@ router.get("/me/verification-application", async (req, res): Promise<void> => {
   const [row] = await db.select().from(verificationApplicationsTable)
     .where(eq(verificationApplicationsTable.userId, req.user.id));
   res.json(row ?? null);
+});
+
+const COLLECTOR_LEVELS = [
+  { name: "Admirer",     minCents: 0,       color: "stone",  icon: "👁" },
+  { name: "Patron",      minCents: 1,        color: "amber",  icon: "✨" },
+  { name: "Collector",   minCents: 50000,    color: "orange", icon: "🏺" },
+  { name: "Connoisseur", minCents: 200000,   color: "violet", icon: "💎" },
+  { name: "Curator",     minCents: 1000000,  color: "yellow", icon: "👑" },
+] as const;
+
+// GET /me/collector-level
+router.get("/me/collector-level", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [profile] = await db.select({ totalSpentCents: profilesTable.totalSpentCents })
+    .from(profilesTable).where(eq(profilesTable.userId, req.user.id));
+  const spent = profile?.totalSpentCents ?? 0;
+  let currentIdx = 0;
+  for (let i = COLLECTOR_LEVELS.length - 1; i >= 0; i--) {
+    if (spent >= COLLECTOR_LEVELS[i].minCents) { currentIdx = i; break; }
+  }
+  const current = COLLECTOR_LEVELS[currentIdx];
+  const next = COLLECTOR_LEVELS[currentIdx + 1] ?? null;
+  const progressPct = next
+    ? Math.min(100, Math.round(((spent - current.minCents) / (next.minCents - current.minCents)) * 100))
+    : 100;
+  res.json({
+    level: current.name,
+    icon: current.icon,
+    color: current.color,
+    totalSpentCents: spent,
+    nextLevel: next?.name ?? null,
+    nextLevelMinCents: next?.minCents ?? null,
+    progressPct,
+  });
 });
 
 export default router;

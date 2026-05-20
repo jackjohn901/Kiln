@@ -63,3 +63,5 @@ export * from "./artwork_provenance";
 export * from "./material_sources";
 export * from "./process_pledges";
 export * from "./listing_collaborators";
+export * from "./projects";
+export * from "./project_posts";
