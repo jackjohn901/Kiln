@@ -851,7 +851,6 @@ export default function ArtistProfile() {
               { key: "bio", icon: BookOpen, label: "Bio" },
               { key: "cv", icon: Award, label: "CV" },
               { key: "dna", icon: Activity, label: "DNA" },
-              { key: "sounds", icon: Music2, label: "Sounds" },
             ] as { key: Tab; icon: React.ElementType; label: string }[]
           ).map(({ key, icon: Icon, label }) => (
             <button

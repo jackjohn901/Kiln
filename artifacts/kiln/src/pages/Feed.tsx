@@ -588,7 +588,6 @@ function ReelCard({
         />
 
         <div className="pt-1 flex items-center gap-2 flex-wrap">
-          <MusicDisc trackId={reel.musicTrackId} spinning={isActive && !musicMuted} />
           {/* Original audio toggle — only relevant when there's actual video content */}
           {resolvedVideoUrl && (
             <button
@@ -742,16 +741,6 @@ function ReelCard({
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
 
-        {/* Music layer toggle */}
-        <button onClick={onToggleMusic} className="flex flex-col items-center gap-1">
-          {musicMuted ? (
-            <VolumeX size={22} className="text-white/60" />
-          ) : (
-            <Volume2 size={22} className="text-amber-400" />
-          )}
-          <span className="text-[9px] text-white/60">{musicMuted ? "Off" : "Music"}</span>
-        </button>
-
         {/* More options (algo feedback + report) */}
         <button
           onClick={() => setShowAlgoMenu(true)}
@@ -851,7 +840,7 @@ export default function Feed() {
   const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
   const [apiPostOffset, setApiPostOffset] = useState(20);
   const [hasMoreApiPosts, setHasMoreApiPosts] = useState(true);
-  const [musicMuted, setMusicMuted] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(true);
   const [videoAudioOn, setVideoAudioOn] = useState(true);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
   const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");

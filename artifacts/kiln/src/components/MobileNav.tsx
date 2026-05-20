@@ -56,8 +56,6 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/create-workshop", icon: BookOpen, label: "Create Workshop" },
       { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
       { href: "/subscription-boxes", icon: Gift, label: "Subscription Boxes" },
-      { href: "/music-studio", icon: Music2, label: "Music Studio" },
-      { href: "/sound-market", icon: Music2, label: "Sound Market" },
       { href: "/analytics", icon: BarChart2, label: "Analytics" },
       { href: "/earnings", icon: DollarSign, label: "Earnings" },
       { href: "/inventory", icon: Archive, label: "Inventory" },
