@@ -138,22 +138,31 @@ export default function MobileNav() {
     <>
       {/* Stripe verification warning banner — shown above the nav when action is needed */}
       {profile && (hasUrgent || hasWarning) && !bannerDismissed && (
-        <Link href="/earnings" onClick={dismissBanner}>
-          <div
-            className={`fixed bottom-16 left-0 right-0 z-50 md:hidden flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium cursor-pointer transition-colors ${
-              hasUrgent
-                ? "bg-rose-500/90 text-white"
-                : "bg-amber-500/90 text-stone-950"
-            }`}
-          >
+        <div
+          className={`fixed bottom-16 left-0 right-0 z-50 md:hidden flex items-center text-xs font-medium ${
+            hasUrgent
+              ? "bg-rose-500/90 text-white"
+              : "bg-amber-500/90 text-stone-950"
+          }`}
+        >
+          <Link href="/earnings" className="flex-1 flex items-center justify-center gap-2 px-4 py-2 cursor-pointer">
             <AlertTriangle size={13} className="flex-shrink-0" />
             <span>
               {hasUrgent
                 ? "Stripe account restricted — action required"
                 : "Stripe verification needed — tap to complete"}
             </span>
-          </div>
-        </Link>
+          </Link>
+          <button
+            onClick={dismissBanner}
+            aria-label="Dismiss Stripe warning"
+            className={`flex-shrink-0 flex items-center justify-center px-3 py-2 opacity-70 hover:opacity-100 transition-opacity ${
+              hasUrgent ? "hover:bg-rose-600/40" : "hover:bg-amber-600/20"
+            }`}
+          >
+            <X size={14} />
+          </button>
+        </div>
       )}
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-white/10 bg-[#12100e]/95 backdrop-blur-md safe-area-pb">

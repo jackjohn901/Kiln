@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone, AlertTriangle } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone, AlertTriangle, X } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -206,21 +206,34 @@ export default function Nav() {
 
             {/* Stripe verification warning — only shown to logged-in users with outstanding requirements */}
             {profile && (hasUrgent || hasWarning) && !bannerDismissed && (
-              <Link
-                href="/earnings"
-                title={hasUrgent ? "Stripe account restricted — action required" : "Stripe verification needed"}
-                onClick={dismissBanner}
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  hasUrgent
-                    ? "border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
-                    : "border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                }`}
-              >
-                <AlertTriangle size={13} className="flex-shrink-0" />
-                <span className="hidden sm:inline">
-                  {hasUrgent ? "Action required" : "Verify account"}
-                </span>
-              </Link>
+              <div className={`flex items-center gap-0.5 rounded-full border text-xs font-medium ${
+                hasUrgent
+                  ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                  : "border-amber-500/40 bg-amber-500/10 text-amber-300"
+              }`}>
+                <Link
+                  href="/earnings"
+                  title={hasUrgent ? "Stripe account restricted — action required" : "Stripe verification needed"}
+                  className={`flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-l-full transition-colors ${
+                    hasUrgent ? "hover:bg-rose-500/20" : "hover:bg-amber-500/20"
+                  }`}
+                >
+                  <AlertTriangle size={13} className="flex-shrink-0" />
+                  <span className="hidden sm:inline">
+                    {hasUrgent ? "Action required" : "Verify account"}
+                  </span>
+                </Link>
+                <button
+                  onClick={dismissBanner}
+                  title="Dismiss"
+                  aria-label="Dismiss Stripe warning"
+                  className={`flex items-center justify-center pr-2 pl-0.5 py-1.5 rounded-r-full transition-colors opacity-70 hover:opacity-100 ${
+                    hasUrgent ? "hover:bg-rose-500/20" : "hover:bg-amber-500/20"
+                  }`}
+                >
+                  <X size={12} />
+                </button>
+              </div>
             )}
 
             <Link
