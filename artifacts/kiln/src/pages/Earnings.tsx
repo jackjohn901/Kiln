@@ -4,6 +4,7 @@ import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
+  ShoppingBag, Clock,
 } from "lucide-react";
 
 type RefreshInterval = "30s" | "1m" | "5m" | "manual";
@@ -79,6 +80,17 @@ interface PatronTier {
   subscriberCount: number;
 }
 
+interface SaleOrder {
+  id: string;
+  buyerId: string;
+  title: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+  processingWindowDays: number | null;
+  processingWindowLabel: string | null;
+}
+
 const TYPE_CONFIG = {
   subscription: { icon: Star,          color: "text-amber-400",   bg: "bg-amber-500/15",   label: "Subscription" },
   tip:          { icon: DollarSign,    color: "text-emerald-400", bg: "bg-emerald-500/15", label: "Tip" },
@@ -132,6 +144,11 @@ export default function Earnings() {
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [payoutError, setPayoutError]   = useState("");
   const [showPayouts, setShowPayouts]   = useState(false);
+
+  // Sales state
+  const [sales, setSales]               = useState<SaleOrder[]>([]);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const [showSales, setShowSales]       = useState(false);
 
   // Patron tier state
   const [myTiers, setMyTiers]           = useState<PatronTier[]>([]);
@@ -293,6 +310,12 @@ export default function Earnings() {
       .then(data => setPayouts(data.payouts ?? []))
       .catch(() => {})
       .finally(() => setPayoutLoading(false));
+
+    fetch("/api/me/sales", { credentials: "include" })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setSales(data.orders ?? []))
+      .catch(() => {})
+      .finally(() => setSalesLoading(false));
   }, []);
 
   useEffect(() => {
@@ -803,6 +826,68 @@ export default function Earnings() {
                         </span>
                       </div>
                     ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Sales history */}
+            <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40">
+              <button
+                onClick={() => setShowSales(v => !v)}
+                className="flex w-full items-center justify-between p-4"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingBag size={14} className="text-stone-400" />
+                  <span className="text-sm font-medium text-stone-200">Sales</span>
+                  {sales.length > 0 && (
+                    <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-500">{sales.length}</span>
+                  )}
+                </div>
+                {showSales ? <ChevronUp size={14} className="text-stone-600" /> : <ChevronDown size={14} className="text-stone-600" />}
+              </button>
+
+              {showSales && (
+                <div className="border-t border-white/5 p-4 space-y-2">
+                  {salesLoading ? (
+                    <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-stone-600" /></div>
+                  ) : sales.length === 0 ? (
+                    <p className="text-xs text-stone-600 text-center py-4">No sales yet.</p>
+                  ) : (
+                    sales.map(sale => {
+                      const hasWindow = sale.processingWindowDays !== null || sale.processingWindowLabel !== null;
+                      const windowText = sale.processingWindowLabel?.trim()
+                        ? sale.processingWindowLabel
+                        : sale.processingWindowDays !== null
+                          ? `${sale.processingWindowDays} day${sale.processingWindowDays === 1 ? "" : "s"}`
+                          : null;
+                      return (
+                        <div key={sale.id} className="rounded-xl border border-white/5 bg-stone-900/60 p-3">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-stone-200 leading-tight truncate">{sale.title}</p>
+                              <p className="text-[10px] text-stone-600 mt-0.5">{formatDate(sale.createdAt)}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm font-bold text-emerald-400">+{formatPrice(sale.amount)}</p>
+                              <span className={`text-[10px] capitalize ${STATUS_COLOR[sale.status] ? "" : "text-stone-500"}`}>
+                                <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${STATUS_COLOR[sale.status] ?? "text-stone-500 bg-stone-800/50 border-white/8"}`}>
+                                  {sale.status}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                          <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${hasWindow ? "bg-amber-500/8 border border-amber-500/15" : "bg-stone-800/40 border border-white/5"}`}>
+                            <Clock size={11} className={hasWindow ? "text-amber-400/70 flex-shrink-0" : "text-stone-600 flex-shrink-0"} />
+                            <span className={`text-[11px] ${hasWindow ? "text-amber-300/80" : "text-stone-600"}`}>
+                              {hasWindow && windowText
+                                ? <>Processing window: <span className="font-medium">{windowText}</span></>
+                                : "Processing window: Not stamped"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}
