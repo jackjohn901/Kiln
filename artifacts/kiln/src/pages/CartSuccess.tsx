@@ -115,7 +115,7 @@ export default function CartSuccess() {
         <p className="text-stone-400 mb-1">Reference <span className="font-mono text-amber-300">{orderId}</span></p>
         {session?.customerEmail && (
           <p className="text-sm text-stone-500 mb-6">
-            Confirmation sent to <span className="text-stone-300">{session.customerEmail}</span>
+            Receipt emailed to <span className="text-stone-300">{session.customerEmail}</span>
           </p>
         )}
         {session?.amountTotal && (
