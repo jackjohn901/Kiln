@@ -1196,17 +1196,21 @@ export default function Feed() {
   }, [reels.length]);
 
   const unlockMusic = useCallback(() => {
+    // Step 1 — unlock Web Audio context (Chrome / Firefox / Android)
+    try {
+      const AC = (window.AudioContext ?? (window as unknown as Record<string, typeof AudioContext>).webkitAudioContext);
+      if (AC) { const c = new AC(); void c.resume().then(() => c.close()); }
+    } catch { /* ignore */ }
+    // Step 2 — iOS Safari requires a direct user-gesture play() on an HTML audio element.
+    // A zero-length silent WAV satisfies that requirement and grants page-wide audio permission.
+    try {
+      const sil = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
+      void sil.play().then(() => sil.pause()).catch(() => {});
+    } catch { /* ignore */ }
+    // Setting state triggers the music useEffect which will start the real track now that
+    // audio permission is granted — no audio created here to avoid the race condition.
     setMusicUnlocked(true);
-    if (!activeReel) return;
-    const track = getTrackById(activeReel.musicTrackId);
-    if (track) {
-      const audio = new Audio(track.url);
-      audio.loop = true;
-      audio.volume = 0.65;
-      audioRef.current = audio;
-      if (!musicMuted) audio.play().catch(() => {});
-    }
-  }, [activeReel, musicMuted]);
+  }, []);
 
   const handleToggleMusic = useCallback(() => {
     if (!musicUnlocked) {
