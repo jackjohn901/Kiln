@@ -351,15 +351,19 @@ export default function OrderDetail() {
             <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>
             {hasDeliveryEstimate && (
               <div className="flex items-start gap-2.5">
-                <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                <Clock size={15} className={`shrink-0 mt-0.5 ${isActive ? "text-amber-400" : "text-stone-600"}`} />
                 <div>
-                  <p className="text-sm text-stone-300">
-                    Delivery estimate:{" "}
-                    <span className="text-amber-300 font-semibold">{deliveryEstimateText}</span>
+                  <p className={`text-sm ${isActive ? "text-stone-300" : "text-stone-500"}`}>
+                    Processing window:{" "}
+                    <span className={isActive ? "text-amber-300 font-semibold" : "text-stone-500"}>
+                      {deliveryEstimateText}
+                    </span>
                   </p>
-                  <p className="text-xs text-stone-600 mt-0.5">
-                    The artist will prepare your order within this time.
-                  </p>
+                  {isActive && (
+                    <p className="text-xs text-stone-600 mt-0.5">
+                      The artist will prepare your order within this time.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
