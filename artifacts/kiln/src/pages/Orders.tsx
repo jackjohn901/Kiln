@@ -13,6 +13,7 @@ interface Order {
   status: string;
   imageUrl: string | null;
   trackingNumber: string | null;
+  processingWindowDays: number | null;
   createdAt: string;
 }
 
@@ -131,6 +132,15 @@ export default function Orders() {
                       <span className="text-sm font-semibold text-amber-300">{formatPrice(order.amount)}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
                     </div>
+                    {order.processingWindowDays != null && !["delivered", "cancelled", "shipped"].includes(order.status) && (
+                      <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
+                        <Clock size={10} className="text-amber-500/70 flex-shrink-0" />
+                        Processing window:{" "}
+                        <span className="text-amber-400/80">
+                          {order.processingWindowDays === 1 ? "1 business day" : `${order.processingWindowDays} business days`}
+                        </span>
+                      </p>
+                    )}
                     {order.trackingNumber && (
                       <p className="mt-1.5 text-[11px] text-stone-600">
                         Tracking: <span className="text-stone-400 font-mono">{order.trackingNumber}</span>
