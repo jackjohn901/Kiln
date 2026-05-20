@@ -435,7 +435,7 @@ export default function OrderDetail() {
         <div className="mt-6 space-y-3">
           <button
             onClick={() => {
-              const prefill = encodeURIComponent(`Re: ${order.title}`);
+              const prefill = encodeURIComponent(`Re: ${order.title} (${ordinalId(order.id)})`);
               navigate(`/messages/${order.sellerId}?prefill=${prefill}`);
             }}
             className="w-full flex items-center justify-center gap-2 rounded-full bg-stone-800 border border-white/10 py-2.5 text-sm text-stone-200 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
