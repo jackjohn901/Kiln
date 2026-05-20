@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2 } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -366,6 +366,20 @@ export default function Settings() {
                     className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
                   />
                   <p className="text-xs text-stone-600 mt-1">Buyers see this estimate at checkout. Leave blank to show the default "3–5 business days".</p>
+                  {payments.processingWindowLabel && payments.processingWindowLabel.trim() && (
+                    <div className="mt-3">
+                      <p className="text-xs text-stone-500 mb-1.5">Buyer preview</p>
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 flex items-start gap-2.5">
+                        <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
+                          <p className="text-xs text-amber-200/70">
+                            This artist manages payouts manually. Your order will be processed within {payments.processingWindowLabel.trim()}.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs text-stone-500 mb-1 block">Note to buyers (optional)</label>
