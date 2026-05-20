@@ -19,6 +19,11 @@ interface Order {
   createdAt: string;
 }
 
+interface SellerProcessingWindow {
+  processingWindowDays: number | null;
+  processingWindowLabel: string | null;
+}
+
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   drop:       { icon: Zap,          label: "Drop",        color: "text-amber-400 bg-amber-500/10" },
   listing:    { icon: ShoppingBag,  label: "Shop",        color: "text-blue-400 bg-blue-500/10" },
@@ -95,11 +100,46 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "active" | "completed">("all");
+  const [sellerWindows, setSellerWindows] = useState<Record<string, SellerProcessingWindow>>({});
 
   useEffect(() => {
     fetch("/api/me/orders", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => setOrders(data.orders ?? []))
+      .then(async (data) => {
+        const loaded: Order[] = data.orders ?? [];
+        setOrders(loaded);
+        const missingSellerIds = [
+          ...new Set(
+            loaded
+              .filter(o => o.processingWindowDays === null && o.processingWindowLabel === null && o.sellerId)
+              .map(o => o.sellerId)
+          ),
+        ];
+        if (missingSellerIds.length === 0) return;
+        const results = await Promise.allSettled(
+          missingSellerIds.map(sid =>
+            fetch(`/api/users/${sid}/payment-settings`)
+              .then(r => r.ok ? r.json() : Promise.reject())
+              .then(ps => ({
+                sellerId: sid,
+                processingWindowDays: typeof ps.processingWindow === "number" ? ps.processingWindow : null,
+                processingWindowLabel: typeof ps.processingWindowLabel === "string" && ps.processingWindowLabel.trim()
+                  ? ps.processingWindowLabel.trim()
+                  : null,
+              }))
+          )
+        );
+        const map: Record<string, SellerProcessingWindow> = {};
+        for (const r of results) {
+          if (r.status === "fulfilled") {
+            map[r.value.sellerId] = {
+              processingWindowDays: r.value.processingWindowDays,
+              processingWindowLabel: r.value.processingWindowLabel,
+            };
+          }
+        }
+        setSellerWindows(map);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -183,17 +223,18 @@ export default function Orders() {
                       <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
                         <Clock size={10} className="text-amber-500/70 flex-shrink-0" />
                         Processing window:{" "}
-                        {order.processingWindowLabel != null || order.processingWindowDays != null ? (
-                          <span className="text-amber-400/80">
-                            {order.processingWindowLabel
-                              ? order.processingWindowLabel
-                              : order.processingWindowDays === 1
-                                ? "1 business day"
-                                : `${order.processingWindowDays} business days`}
-                          </span>
-                        ) : (
-                          <span className="text-stone-600">Not specified</span>
-                        )}
+                        {(() => {
+                          const label = order.processingWindowLabel ?? sellerWindows[order.sellerId]?.processingWindowLabel ?? null;
+                          const days = order.processingWindowDays ?? sellerWindows[order.sellerId]?.processingWindowDays ?? null;
+                          if (label != null || days != null) {
+                            return (
+                              <span className="text-amber-400/80">
+                                {label ? label : days === 1 ? "1 business day" : `${days} business days`}
+                              </span>
+                            );
+                          }
+                          return <span className="text-stone-600">Not specified</span>;
+                        })()}
                       </p>
                     )}
                     {order.trackingNumber && (

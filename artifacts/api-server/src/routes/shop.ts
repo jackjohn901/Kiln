@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, userSettingsTable } from "@workspace/db";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -128,11 +128,25 @@ router.post("/listings/:id/inquire", async (req, res): Promise<void> => {
   if (!listing) { res.status(404).json({ error: "Not found" }); return; }
   const user = req.user;
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Collector";
+
+  const [settingsRow] = await db
+    .select({ paymentSettings: userSettingsTable.paymentSettings })
+    .from(userSettingsTable)
+    .where(eq(userSettingsTable.userId, listing.artistId));
+  const ps = (settingsRow?.paymentSettings as Record<string, unknown> | null) ?? {};
+  const processingWindowDays = typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+  const processingWindowLabel =
+    typeof ps.processingWindowLabel === "string" && ps.processingWindowLabel.trim()
+      ? ps.processingWindowLabel.trim()
+      : null;
+
   const [order] = await db.insert(ordersTable).values({
     id: crypto.randomUUID(), buyerId: user.id, sellerId: listing.artistId,
     type: "listing", refId: listing.id, title: listing.title,
     description: `Inquiry for: ${listing.title}`, imageUrl: listing.imageUrl ?? null,
     amount: listing.price, status: "inquiry",
+    processingWindowDays,
+    processingWindowLabel,
   }).returning();
   res.status(201).json({ ...order, createdAt: order.createdAt.toISOString(), updatedAt: order.updatedAt.toISOString() });
 });
