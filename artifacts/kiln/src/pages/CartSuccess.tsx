@@ -25,6 +25,7 @@ export default function CartSuccess() {
   const [loading, setLoading] = useState(true);
   const [orderId, setOrderId] = useState<string>(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
+  const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const orderCreated = useRef(false);
 
   useEffect(() => {
@@ -68,13 +69,16 @@ export default function CartSuccess() {
             body: JSON.stringify({ stripeSessionId: sessionId }),
           });
           if (res.ok) {
-            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[]; processingWindowDays?: number | null };
+            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[]; processingWindowDays?: number | null; processingWindowLabel?: string | null };
             if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
 
             // Use the processing window stored on the order record — authoritative snapshot
             // taken at purchase time, reliable across page refreshes and localStorage clears.
             if (typeof d.processingWindowDays === "number") {
               setProcessingWindowDays(d.processingWindowDays);
+            }
+            if (typeof d.processingWindowLabel === "string" && d.processingWindowLabel.trim()) {
+              setProcessingWindowLabel(d.processingWindowLabel.trim());
             }
           }
           // Clean up any stale pre-checkout data from localStorage.
@@ -170,15 +174,17 @@ export default function CartSuccess() {
 
         {/* Standard fulfillment info box */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-stone-400 text-left space-y-2 mb-8">
-          {processingWindowDays !== null && (
+          {(processingWindowLabel !== null || processingWindowDays !== null) && (
             <div className="flex items-center gap-2">
               <Clock size={14} className="text-amber-400 shrink-0" />
               <span>
-                Processing window:{" "}
+                Delivery estimate:{" "}
                 <span className="text-amber-300 font-medium">
-                  {processingWindowDays === 1
-                    ? "1 business day"
-                    : `${processingWindowDays} business days`}
+                  {processingWindowLabel
+                    ? processingWindowLabel
+                    : processingWindowDays === 1
+                      ? "1 business day"
+                      : `${processingWindowDays} business days`}
                 </span>
                 {" "}— the artist will prepare your order within this time.
               </span>

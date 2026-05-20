@@ -646,7 +646,7 @@ export default function CartCheckout() {
                       </div>
                       {(processingWindowLabel !== null || processingWindowDays !== null) && (
                         <div className="flex justify-between">
-                          <span className="flex items-center gap-1"><Package size={11} /> Processing window</span>
+                          <span className="flex items-center gap-1"><Package size={11} /> Delivery estimate</span>
                           <span className="text-amber-300">
                             {processingWindowLabel
                               ? processingWindowLabel

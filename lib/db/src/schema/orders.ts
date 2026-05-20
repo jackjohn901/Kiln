@@ -16,6 +16,7 @@ export const ordersTable = pgTable("orders", {
   trackingNumber: varchar("tracking_number", { length: 100 }),
   notes: text("notes"),
   processingWindowDays: integer("processing_window_days"),
+  processingWindowLabel: text("processing_window_label"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
