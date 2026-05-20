@@ -122,7 +122,7 @@ export default function MobileNav() {
   const { profile } = useProfile();
   const { unreadCount, unreadMessageCount } = useSocial();
   const { itemCount } = useCart();
-  const { hasWarning, hasUrgent } = useStripeConnect();
+  const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const [showMore, setShowMore] = useState(false);
 
   const totalBadge = unreadCount + unreadMessageCount;
@@ -137,8 +137,8 @@ export default function MobileNav() {
   return (
     <>
       {/* Stripe verification warning banner — shown above the nav when action is needed */}
-      {profile && (hasUrgent || hasWarning) && (
-        <Link href="/earnings">
+      {profile && (hasUrgent || hasWarning) && !bannerDismissed && (
+        <Link href="/earnings" onClick={dismissBanner}>
           <div
             className={`fixed bottom-16 left-0 right-0 z-50 md:hidden flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium cursor-pointer transition-colors ${
               hasUrgent

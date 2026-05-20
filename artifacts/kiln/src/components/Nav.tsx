@@ -14,7 +14,7 @@ export default function Nav() {
   const { profile, logout } = useProfile();
   const { unreadCount, unreadMessageCount, receivedInquiries, isVerified } = useSocial();
   const { itemCount } = useCart();
-  const { hasWarning, hasUrgent } = useStripeConnect();
+  const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -205,10 +205,11 @@ export default function Nav() {
             </button>
 
             {/* Stripe verification warning — only shown to logged-in users with outstanding requirements */}
-            {profile && (hasUrgent || hasWarning) && (
+            {profile && (hasUrgent || hasWarning) && !bannerDismissed && (
               <Link
                 href="/earnings"
                 title={hasUrgent ? "Stripe account restricted — action required" : "Stripe verification needed"}
+                onClick={dismissBanner}
                 className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                   hasUrgent
                     ? "border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"

@@ -18,6 +18,8 @@ interface StripeConnectContextValue {
   refresh: () => void;
   hasWarning: boolean;
   hasUrgent: boolean;
+  bannerDismissed: boolean;
+  dismissBanner: () => void;
 }
 
 const StripeConnectContext = createContext<StripeConnectContextValue>({
@@ -26,12 +28,24 @@ const StripeConnectContext = createContext<StripeConnectContextValue>({
   refresh: () => undefined,
   hasWarning: false,
   hasUrgent: false,
+  bannerDismissed: false,
+  dismissBanner: () => undefined,
 });
+
+const SESSION_KEY = "stripe-banner-dismissed";
 
 export function StripeConnectProvider({ children }: { children: ReactNode }) {
   const { profile } = useProfile();
   const [status, setStatus] = useState<StripeConnectStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () => sessionStorage.getItem(SESSION_KEY) === "true"
+  );
+
+  const dismissBanner = useCallback(() => {
+    sessionStorage.setItem(SESSION_KEY, "true");
+    setBannerDismissed(true);
+  }, []);
 
   const fetch_ = useCallback(async () => {
     if (!profile) {
@@ -75,7 +89,7 @@ export function StripeConnectProvider({ children }: { children: ReactNode }) {
 
   return (
     <StripeConnectContext.Provider
-      value={{ status, loading, refresh: () => { void fetch_(); }, hasWarning, hasUrgent }}
+      value={{ status, loading, refresh: () => { void fetch_(); }, hasWarning, hasUrgent, bannerDismissed, dismissBanner }}
     >
       {children}
     </StripeConnectContext.Provider>
