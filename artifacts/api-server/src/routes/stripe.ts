@@ -29,6 +29,7 @@ const router: IRouter = Router();
 const manualPayoutReceiptSent = new Set<string>();
 const manualPayoutArtistNotified = new Set<string>();
 const connectArtistNotified = new Set<string>();
+const connectBuyerReceiptSent = new Set<string>();
 
 interface CartLineItem {
   name: string;
@@ -808,6 +809,57 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   .from(listingsTable)
                   .where(inArray(listingsTable.id, ids))
               : [];
+
+            // 7a. Send the buyer an itemized receipt email.
+            //     Stripe Connect sessions do not automatically send a Kiln receipt,
+            //     so we mirror the manual-payout receipt flow here.
+            const connectBuyerEmail =
+              session.customer_email ?? session.customer_details?.email ?? null;
+            if (connectBuyerEmail && !connectBuyerReceiptSent.has(session.id)) {
+              connectBuyerReceiptSent.add(session.id);
+              try {
+                const stripeClient = await getUncachableStripeClient();
+                const stripeLineItems = await stripeClient.checkout.sessions.listLineItems(
+                  session.id,
+                  { limit: 100 },
+                );
+
+                const artistIds = [...new Set(listingRows.map((r) => r.artistId))];
+                const artistRows = artistIds.length > 0
+                  ? await db
+                      .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
+                      .from(profilesTable)
+                      .where(inArray(profilesTable.userId, artistIds))
+                  : [];
+                const artistNameMap = new Map(artistRows.map((a) => [a.userId, a.displayName ?? '']));
+
+                const receiptItems = stripeLineItems.data.map((li, idx) => {
+                  const listingId = ids[idx];
+                  const listing = listingId ? listingRows.find((r) => r.id === listingId) : undefined;
+                  const artistName = listing ? (artistNameMap.get(listing.artistId) ?? undefined) : undefined;
+                  return {
+                    title: li.description ?? listingId ?? 'Item',
+                    quantity: li.quantity ?? 1,
+                    priceCents: li.price?.unit_amount ?? undefined,
+                    artistName,
+                  };
+                });
+
+                const html = manualPayoutReceiptEmail(
+                  session.id,
+                  session.amount_total ?? 0,
+                  receiptItems,
+                );
+
+                await sendEmail({
+                  to: connectBuyerEmail,
+                  subject: 'Your Kiln order is confirmed',
+                  html,
+                });
+              } catch (receiptErr) {
+                logger.error({ err: receiptErr, sessionId: session.id }, 'Failed to send Stripe Connect buyer receipt email');
+              }
+            }
 
             const artistIds = [...new Set(listingRows.map((r) => r.artistId))];
 
