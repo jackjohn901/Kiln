@@ -1,7 +1,7 @@
 export interface Technique {
   id: string;
   name: string;
-  medium: "Glass" | "Metal" | "Ceramics" | "Fiber" | "Enamel" | "Wood";
+  medium: string;
   difficulty: "Beginner" | "Intermediate" | "Advanced";
   tagline: string;
   description: string;

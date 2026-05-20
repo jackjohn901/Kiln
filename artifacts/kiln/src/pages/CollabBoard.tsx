@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Plus, Users, MapPin, Clock, Tag, X, Check, Flame, MessageCircle } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import { ALL_CRAFTS } from "@/data/craftCategories";
 
 interface CollabPost {
   id: string;
@@ -105,11 +106,7 @@ const SEED_COLLABS: CollabPost[] = [
   },
 ];
 
-const MEDIUM_OPTIONS = [
-  "Glass Blowing", "Flamework", "Ceramics", "Raku", "Woodturning",
-  "Blacksmithing", "Metalsmithing", "Studio Jewelry", "Enamel", "Weaving",
-  "Fiber Arts", "Printmaking", "Mixed Media",
-];
+const MEDIUM_OPTIONS = ALL_CRAFTS;
 
 const COLLAB_KEY = "kiln_collabs_v1";
 

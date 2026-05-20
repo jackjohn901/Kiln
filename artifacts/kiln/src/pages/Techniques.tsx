@@ -4,8 +4,12 @@ import { BookOpen, ChevronRight, ArrowLeft, Wrench, Layers, Clock, Star, Users, 
 import Nav from "@/components/Nav";
 import { TECHNIQUES, getTechniquesByMedium, type Technique } from "@/data/techniques";
 import { ALL_REELS } from "@/data/reels";
+import { CRAFT_CATEGORIES } from "@/data/craftCategories";
 
-const MEDIUMS = ["All", "Glass", "Metal", "Ceramics", "Fiber", "Enamel", "Wood"];
+const MEDIUMS = [
+  "All",
+  ...CRAFT_CATEGORIES.map((c) => c.label),
+];
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   Beginner: "text-green-400 bg-green-500/10 border-green-500/20",

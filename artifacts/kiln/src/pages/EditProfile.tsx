@@ -5,11 +5,7 @@ import Nav from "@/components/Nav";
 import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-const MEDIUM_OPTIONS = [
-  "Glass Blowing", "Flameworking", "Kiln Forming", "Raku", "Ceramics", "Porcelain",
-  "Blacksmithing", "Metal Forging", "Bronze Casting", "Fiber Arts", "Weaving",
-  "Enamel", "Wood Turning", "Stone Carving", "Mosaic", "Leather", "Jewelry",
-];
+import { CRAFT_CATEGORIES } from "@/data/craftCategories";
 
 const COLLECTING_OPTIONS = [
   "Ceramics", "Glass", "Metalwork", "Fiber Arts", "Wood", "Jewelry",
@@ -404,39 +400,63 @@ export default function EditProfile() {
           {/* Account-type-specific interests/focus */}
           {(() => {
             const accountType = profile.accountType ?? "artist";
+            const useGrouped = accountType === "artist" || accountType === "enthusiast";
             let sectionTitle = "Mediums";
             let sectionDesc = "Select all that apply";
-            let options = MEDIUM_OPTIONS;
-            if (accountType === "collector") { sectionTitle = "Collecting Focus"; sectionDesc = "What kinds of craft do you collect?"; options = COLLECTING_OPTIONS; }
-            else if (accountType === "interior_decorator") { sectionTitle = "Project Specialties"; sectionDesc = "What kinds of projects do you work on?"; options = DECORATOR_OPTIONS; }
-            else if (accountType === "gallery") { sectionTitle = "Gallery Focus"; sectionDesc = "What types of work does your gallery represent?"; options = GALLERY_FOCUS_OPTIONS; }
-            else if (accountType === "museum") { sectionTitle = "Collection Focus"; sectionDesc = "What does your institution collect or exhibit?"; options = MUSEUM_FOCUS_OPTIONS; }
+            let flatOptions: string[] = [];
+            if (accountType === "collector") { sectionTitle = "Collecting Focus"; sectionDesc = "What kinds of craft do you collect?"; flatOptions = COLLECTING_OPTIONS; }
+            else if (accountType === "interior_decorator") { sectionTitle = "Project Specialties"; sectionDesc = "What kinds of projects do you work on?"; flatOptions = DECORATOR_OPTIONS; }
+            else if (accountType === "gallery") { sectionTitle = "Gallery Focus"; sectionDesc = "What types of work does your gallery represent?"; flatOptions = GALLERY_FOCUS_OPTIONS; }
+            else if (accountType === "museum") { sectionTitle = "Collection Focus"; sectionDesc = "What does your institution collect or exhibit?"; flatOptions = MUSEUM_FOCUS_OPTIONS; }
             else if (accountType === "enthusiast") { sectionTitle = "Craft Interests"; sectionDesc = "Which crafts are you passionate about?"; }
+            const pillClass = (active: boolean) =>
+              `rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                active
+                  ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                  : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-300"
+              }`;
             return (
               <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5">
                 <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-stone-600">
                   <Layers size={11} /> {sectionTitle}
                 </p>
                 <p className="mb-3 text-xs text-stone-700">{sectionDesc}</p>
-                <div className="flex flex-wrap gap-2">
-                  {options.map((m) => {
-                    const active = form.mediums.includes(m);
-                    return (
+                {useGrouped ? (
+                  <div className="space-y-4">
+                    {CRAFT_CATEGORIES.map((cat) => (
+                      <div key={cat.id}>
+                        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">
+                          {cat.emoji} {cat.label}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {cat.crafts.map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => toggleMedium(m)}
+                              className={pillClass(form.mediums.includes(m))}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {flatOptions.map((m) => (
                       <button
                         key={m}
                         type="button"
                         onClick={() => toggleMedium(m)}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                          active
-                            ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-                            : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-300"
-                        }`}
+                        className={pillClass(form.mediums.includes(m))}
                       >
                         {m}
                       </button>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })()}
