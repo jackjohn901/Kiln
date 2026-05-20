@@ -26,9 +26,12 @@ export default function SaleNotificationListener() {
           </span>
         ) as unknown as string,
         description: (
-          <span className="text-stone-300">
-            <span className="font-medium text-stone-200">{fromName}</span>{" "}
-            {text.replace(/^New sale:\s*/i, "")}
+          <span className="flex flex-col gap-0.5">
+            <span className="text-stone-300">
+              <span className="font-medium text-stone-200">{fromName}</span>{" "}
+              {text.replace(/^New sale:\s*/i, "")}
+            </span>
+            <span className="text-xs text-stone-500">just now</span>
           </span>
         ) as unknown as string,
         action: (
