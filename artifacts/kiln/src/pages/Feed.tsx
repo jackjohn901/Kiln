@@ -309,8 +309,11 @@ function ReelCard({
   const [showBoardPicker, setShowBoardPicker] = useState(false);
   const [showAlgoMenu, setShowAlgoMenu] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
-  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed } = useSocial();
+  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed, isFollowing, followArtist, unfollowArtist } = useSocial();
+  const { profile: myProfile } = useProfile();
   const isPatronGated = reel.patronOnly && !isSubscribed(reel.artistId);
+  const isOwnReel = !!myProfile && myProfile.id === reel.artistId;
+  const isFollowingArtist = isFollowing(reel.artistId);
   const liked = reelLikes[reel.id] ?? false;
   const saved = reelSaves[reel.id] ?? false;
   const reposted = reelReposts[reel.id] ?? false;
@@ -606,21 +609,42 @@ function ReelCard({
       {/* ── Right side actions ── */}
       <div className="absolute bottom-[88px] right-3 z-10 flex flex-col items-center gap-4">
         {/* Avatar */}
-        <Link href={`/artists/${reel.artistId}`} className="relative">
-          <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-stone-800 shadow-xl">
-            <img
-              src={reel.avatarUrl}
-              alt={reel.artistName}
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.artistId}/150/150`;
+        <div className="relative">
+          <Link href={`/artists/${reel.artistId}`}>
+            <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-stone-800 shadow-xl">
+              <img
+                src={reel.avatarUrl}
+                alt={reel.artistName}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.artistId}/150/150`;
+                }}
+              />
+            </div>
+          </Link>
+          {!isOwnReel && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isFollowingArtist) {
+                  unfollowArtist(reel.artistId);
+                } else {
+                  followArtist(reel.artistId, reel.artistName, reel.avatarUrl);
+                }
               }}
-            />
-          </div>
-          <div className="absolute -bottom-1.5 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full bg-amber-500 shadow-md">
-            <Plus size={11} className="text-stone-950" strokeWidth={3} />
-          </div>
-        </Link>
+              className={`absolute -bottom-1.5 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full shadow-md transition-colors ${
+                isFollowingArtist
+                  ? "bg-stone-600 border border-stone-400"
+                  : "bg-amber-500 hover:bg-amber-400"
+              }`}
+            >
+              {isFollowingArtist
+                ? <Check size={10} className="text-white" strokeWidth={3} />
+                : <Plus size={11} className="text-stone-950" strokeWidth={3} />
+              }
+            </button>
+          )}
+        </div>
 
         {/* Like */}
         <button
