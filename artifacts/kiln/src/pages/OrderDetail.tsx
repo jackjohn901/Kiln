@@ -125,6 +125,7 @@ export default function OrderDetail() {
     : order.processingWindowDays === 1
       ? "1 business day"
       : `${order.processingWindowDays} business days`;
+  const shipsWithinText = `Ships within ${deliveryEstimateText}`;
 
   const isActive = !["delivered", "cancelled"].includes(order.status);
 
@@ -353,11 +354,8 @@ export default function OrderDetail() {
               <div className="flex items-start gap-2.5">
                 <Clock size={15} className={`shrink-0 mt-0.5 ${isActive ? "text-amber-400" : "text-stone-600"}`} />
                 <div>
-                  <p className={`text-sm ${isActive ? "text-stone-300" : "text-stone-500"}`}>
-                    Processing window:{" "}
-                    <span className={isActive ? "text-amber-300 font-semibold" : "text-stone-500"}>
-                      {deliveryEstimateText}
-                    </span>
+                  <p className={`text-sm font-semibold ${isActive ? "text-amber-300" : "text-stone-500"}`}>
+                    {shipsWithinText}
                   </p>
                   {isActive && (
                     <p className="text-xs text-stone-600 mt-0.5">

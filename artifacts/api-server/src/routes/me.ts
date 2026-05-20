@@ -138,7 +138,28 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
 
     if (rows.length === 0) { res.status(404).json({ error: "Order not found" }); return; }
 
-    const order = rows[0];
+    let order = rows[0];
+
+    // If both processing window fields are NULL on the stamped order row, fall back to
+    // the seller's current payment settings so buyers still see an estimate when the
+    // backfill hasn't reached this order yet or the seller never configured one.
+    if (order.processingWindowDays === null && order.processingWindowLabel === null && order.sellerId) {
+      const [settingsRow] = await db
+        .select({ paymentSettings: userSettingsTable.paymentSettings })
+        .from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, order.sellerId))
+        .limit(1);
+      if (settingsRow) {
+        const ps = settingsRow.paymentSettings as Record<string, unknown> | null;
+        const liveDays = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+        const liveLabel = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+          ? (ps.processingWindowLabel as string).trim()
+          : null;
+        if (liveDays !== null || liveLabel !== null) {
+          order = { ...order, processingWindowDays: liveDays, processingWindowLabel: liveLabel };
+        }
+      }
+    }
 
     // If this order is part of a multi-item Stripe checkout session, fetch all sibling orders
     // (same session key, same buyer) so the receipt page can show the complete purchase.
