@@ -2,7 +2,7 @@ import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { sendEmail, orderConfirmationEmail, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
-import { patronSubscriptionsTable, patronTiersTable, profilesTable } from '@workspace/db';
+import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable } from '@workspace/db';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
@@ -132,10 +132,23 @@ export class WebhookHandlers {
         const orderId = session.id.slice(-8).toUpperCase();
 
         if (session.mode === 'payment' && email) {
+          // Look up the DB order UUID so the email can deep-link to the receipt
+          // page. Orders are created by the frontend after redirect, so there is a
+          // small race; fall back gracefully to the orders list when not yet found.
+          const dedupeKey = `stripe:${session.id}`;
+          const orderRow = await db
+            .select({ id: ordersTable.id })
+            .from(ordersTable)
+            .where(eq(ordersTable.notes, dedupeKey))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+            .catch(() => null);
+          const receiptOrderId = orderRow?.id ?? null;
+
           sendEmail({
             to: email,
             subject: `Your Kiln order #${orderId} is confirmed`,
-            html: orderConfirmationEmail(email, orderId, amount),
+            html: orderConfirmationEmail(email, orderId, amount, receiptOrderId ?? undefined),
           }).catch(() => {});
         }
 

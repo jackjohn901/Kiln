@@ -828,11 +828,24 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 artistName: listingArtistName(idx),
               }));
 
+              // Look up the DB order ID so the email can deep-link to the receipt.
+              // The order may not exist yet if the frontend confirm call races the webhook,
+              // so fall back gracefully to the orders list when not found.
+              const dedupeKey = `stripe:${session.id}`;
+              const orderRow = await db
+                .select({ id: ordersTable.id })
+                .from(ordersTable)
+                .where(eq(ordersTable.notes, dedupeKey))
+                .limit(1)
+                .then((rows) => rows[0] ?? null);
+              const receiptOrderId = orderRow?.id ?? null;
+
               const html = manualPayoutReceiptEmail(
                 session.id,
                 session.amount_total ?? 0,
                 receiptItems,
                 receiptProcessingWindowDays,
+                receiptOrderId,
               );
 
               await sendEmail({
@@ -1012,11 +1025,24 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   };
                 });
 
+                // Look up the DB order ID so the email can deep-link to the receipt.
+                // Fall back gracefully to the orders list if the order hasn't been
+                // created yet (frontend confirm call may race the webhook).
+                const connectDedupeKey = `stripe:${session.id}`;
+                const connectOrderRow = await db
+                  .select({ id: ordersTable.id })
+                  .from(ordersTable)
+                  .where(eq(ordersTable.notes, connectDedupeKey))
+                  .limit(1)
+                  .then((rows) => rows[0] ?? null);
+                const connectReceiptOrderId = connectOrderRow?.id ?? null;
+
                 const html = manualPayoutReceiptEmail(
                   session.id,
                   session.amount_total ?? 0,
                   receiptItems,
                   receiptProcessingWindowDays,
+                  connectReceiptOrderId,
                 );
 
                 await sendEmail({

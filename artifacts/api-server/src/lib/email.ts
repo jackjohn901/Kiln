@@ -171,7 +171,8 @@ export function stripeAccountRestrictedEmail(displayName: string): string {
   `);
 }
 
-export function orderConfirmationEmail(customerEmail: string, orderId: string, amountTotal: number): string {
+export function orderConfirmationEmail(customerEmail: string, orderId: string, amountTotal: number, receiptOrderId?: string): string {
+  const receiptUrl = receiptOrderId ? `${BASE_URL}/orders/${receiptOrderId}` : `${BASE_URL}/orders`;
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Order Confirmed</h1>
     ${card(`
@@ -179,7 +180,7 @@ export function orderConfirmationEmail(customerEmail: string, orderId: string, a
       <p style="margin:0 0 8px;">Amount: <strong style="color:#fcd34d;">$${(amountTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></p>
       <p style="margin:0;color:#78716c;">The artist will reach out within 2–3 business days with shipping details.</p>
     `)}
-    ${btn(`${BASE_URL}/orders`, "View Orders")}
+    ${btn(receiptUrl, "View your receipt")}
   `);
 }
 
@@ -207,6 +208,7 @@ export function manualPayoutReceiptEmail(
   amountTotalCents: number,
   items: ManualPayoutReceiptItem[],
   processingWindowDays?: number | null,
+  orderId?: string | null,
 ): string {
   const itemRows = items
     .map(
@@ -250,7 +252,7 @@ export function manualPayoutReceiptEmail(
         ? `<p style="margin:8px 0 0;color:#a8a29e;font-size:13px;">The artist typically processes orders within <strong style="color:#d6d3d1;">${processingWindowDays} business day${processingWindowDays === 1 ? '' : 's'}</strong>.</p>`
         : ''}
     `)}
-    ${btn(`${BASE_URL}/orders`, "View My Orders")}
+    ${btn(orderId ? `${BASE_URL}/orders/${orderId}` : `${BASE_URL}/orders`, "View your receipt")}
   `);
 }
 
