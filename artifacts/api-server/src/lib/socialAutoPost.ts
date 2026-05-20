@@ -1,7 +1,8 @@
 import { db } from "@workspace/db";
-import { socialConnectionsTable } from "@workspace/db";
+import { socialConnectionsTable, postsTable, listingsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { adaptCaptionForPlatform } from "./captionAdapter";
 
 type PostData = {
   id: string;
@@ -10,17 +11,22 @@ type PostData = {
   thumbnailUrl?: string | null;
 };
 
+type TrackOpts = {
+  updatePostId?: string;
+  updateListingId?: string;
+};
+
 function isServableUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   return !url.startsWith("blob:") && !url.startsWith("data:") && !url.startsWith("idb:");
 }
 
-async function postToInstagram(token: string, platformUserId: string, post: PostData): Promise<void> {
+async function postToInstagram(token: string, platformUserId: string, post: PostData, caption: string): Promise<void> {
   const mediaUrl = post.videoUrl || post.thumbnailUrl;
   if (!isServableUrl(mediaUrl)) return;
 
   const isVideo = isServableUrl(post.videoUrl);
-  const containerBody = new URLSearchParams({ access_token: token, caption: post.caption ?? "" });
+  const containerBody = new URLSearchParams({ access_token: token, caption });
   if (isVideo) {
     containerBody.set("video_url", post.videoUrl!);
     containerBody.set("media_type", "REELS");
@@ -48,7 +54,7 @@ async function postToInstagram(token: string, platformUserId: string, post: Post
   }
 }
 
-async function postToTikTok(token: string, post: PostData): Promise<void> {
+async function postToTikTok(token: string, post: PostData, caption: string): Promise<void> {
   if (!isServableUrl(post.videoUrl)) return;
 
   const res = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", {
@@ -56,7 +62,7 @@ async function postToTikTok(token: string, post: PostData): Promise<void> {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       post_info: {
-        title: (post.caption ?? "").slice(0, 150),
+        title: caption.slice(0, 150),
         privacy_level: "PUBLIC_TO_EVERYONE",
         disable_duet: false,
         disable_comment: false,
@@ -68,7 +74,7 @@ async function postToTikTok(token: string, post: PostData): Promise<void> {
   if (!res.ok) throw new Error(`TikTok: ${await res.text()}`);
 }
 
-async function postToFacebook(token: string, platformUserId: string, post: PostData): Promise<void> {
+async function postToFacebook(token: string, platformUserId: string, post: PostData, caption: string): Promise<void> {
   const mediaUrl = post.videoUrl || post.thumbnailUrl;
   if (!isServableUrl(mediaUrl)) return;
 
@@ -77,7 +83,7 @@ async function postToFacebook(token: string, platformUserId: string, post: PostD
     ? `https://graph.facebook.com/v19.0/${platformUserId}/videos`
     : `https://graph.facebook.com/v19.0/${platformUserId}/photos`;
 
-  const body = new URLSearchParams({ access_token: token, message: post.caption ?? "" });
+  const body = new URLSearchParams({ access_token: token, message: caption });
   if (isVideo) body.set("file_url", post.videoUrl!);
   else body.set("url", post.thumbnailUrl!);
 
@@ -85,29 +91,59 @@ async function postToFacebook(token: string, platformUserId: string, post: PostD
   if (!res.ok) throw new Error(`Facebook: ${await res.text()}`);
 }
 
-export async function autoPostToConnectedPlatforms(userId: string, post: PostData): Promise<void> {
+export async function autoPostToConnectedPlatforms(
+  userId: string,
+  post: PostData,
+  opts?: TrackOpts,
+): Promise<void> {
   try {
     const connections = await db
       .select()
       .from(socialConnectionsTable)
       .where(and(eq(socialConnectionsTable.userId, userId), eq(socialConnectionsTable.autoPost, true)));
 
+    if (connections.length === 0) return;
+
+    const originalCaption = post.caption ?? "";
+    const successfulPlatforms: string[] = [];
+
     await Promise.allSettled(
       connections.map(async (conn) => {
         try {
-          if (conn.platform === "instagram") {
-            await postToInstagram(conn.accessToken, conn.platformUserId, post);
-          } else if (conn.platform === "tiktok") {
-            await postToTikTok(conn.accessToken, post);
-          } else if (conn.platform === "facebook") {
-            await postToFacebook(conn.accessToken, conn.platformUserId, post);
+          const platform = conn.platform as "instagram" | "tiktok" | "facebook";
+          const adaptedCaption = await adaptCaptionForPlatform(originalCaption, platform);
+
+          if (platform === "instagram") {
+            await postToInstagram(conn.accessToken, conn.platformUserId, post, adaptedCaption);
+          } else if (platform === "tiktok") {
+            await postToTikTok(conn.accessToken, post, adaptedCaption);
+          } else if (platform === "facebook") {
+            await postToFacebook(conn.accessToken, conn.platformUserId, post, adaptedCaption);
           }
-          logger.info({ userId, platform: conn.platform, postId: post.id }, "Auto-posted to social platform");
+
+          successfulPlatforms.push(platform);
+          logger.info({ userId, platform, postId: post.id }, "Auto-posted to social platform");
         } catch (err) {
           logger.warn({ err, userId, platform: conn.platform, postId: post.id }, "Auto-post failed for platform");
         }
       }),
     );
+
+    if (successfulPlatforms.length === 0) return;
+
+    if (opts?.updatePostId) {
+      await db
+        .update(postsTable)
+        .set({ sharedPlatforms: successfulPlatforms })
+        .where(eq(postsTable.id, opts.updatePostId));
+    }
+
+    if (opts?.updateListingId) {
+      await db
+        .update(listingsTable)
+        .set({ sharedPlatforms: successfulPlatforms })
+        .where(eq(listingsTable.id, opts.updateListingId));
+    }
   } catch (err) {
     logger.warn({ err, userId }, "autoPostToConnectedPlatforms failed");
   }

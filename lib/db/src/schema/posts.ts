@@ -24,6 +24,7 @@ export const postsTable = pgTable("posts", {
   isDraft: boolean("is_draft").notNull().default(false),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   craftScore: integer("craft_score"),
+  sharedPlatforms: text("shared_platforms").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

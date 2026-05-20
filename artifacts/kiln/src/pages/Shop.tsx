@@ -37,7 +37,14 @@ interface ApiListing {
   isWishlisted: boolean;
   wishlistCount: number;
   tags: string[];
+  sharedPlatforms?: string[];
 }
+
+const PLATFORM_BADGE: Record<string, { label: string; bg: string; text: string }> = {
+  instagram: { label: "IG", bg: "bg-purple-500/20", text: "text-purple-400" },
+  tiktok: { label: "TT", bg: "bg-stone-700/60", text: "text-stone-300" },
+  facebook: { label: "FB", bg: "bg-blue-600/20", text: "text-blue-400" },
+};
 
 function formatPrice(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -211,7 +218,18 @@ export default function Shop() {
                     <p className="text-sm font-medium text-foreground leading-tight mb-1 hover:opacity-80 transition-opacity cursor-pointer">{listing.title}</p>
                   </Link>
                   {listing.year && <p className="text-[11px] text-muted-foreground mb-1">{listing.year} · {(listing.medium ?? "").split(",")[0]}</p>}
-                  {listing.dimensions && <p className="text-[10px] text-muted-foreground mb-3">{listing.dimensions}</p>}
+                  {listing.dimensions && <p className="text-[10px] text-muted-foreground mb-1">{listing.dimensions}</p>}
+                  {(listing.sharedPlatforms?.length ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 mb-2.5">
+                      {listing.sharedPlatforms!.map((p) => {
+                        const b = PLATFORM_BADGE[p];
+                        return b ? (
+                          <span key={p} className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${b.bg} ${b.text}`}>{b.label}</span>
+                        ) : null;
+                      })}
+                      <span className="text-[9px] text-stone-600">shared</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-base font-semibold text-foreground">{formatPrice(listing.price)}</span>
                     {!listing.isSold ? (

@@ -29,6 +29,7 @@ export const listingsTable = pgTable("listings", {
   originalArtistName: varchar("original_artist_name", { length: 255 }),
   originalListingId: varchar("original_listing_id", { length: 36 }),
   royaltyPercent: integer("royalty_percent").notNull().default(10),
+  sharedPlatforms: text("shared_platforms").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

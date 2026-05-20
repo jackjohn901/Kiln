@@ -17,6 +17,8 @@ export const dropsTable = pgTable("drops", {
   technique: varchar("technique", { length: 100 }),
   tags: text("tags").array().default([]),
   isPatronEarlyAccess: boolean("is_patron_early_access").notNull().default(false),
+  countdownPosted24h: boolean("countdown_posted_24h").notNull().default(false),
+  countdownPosted1h: boolean("countdown_posted_1h").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

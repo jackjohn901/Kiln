@@ -125,6 +125,7 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import FoundingArtist from "@/pages/FoundingArtist";
 import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
 import SocialSync from "@/pages/SocialSync";
+import KilnOpening from "@/pages/KilnOpening";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 
@@ -329,6 +330,7 @@ function Router() {
       <Route path="/admin/founding-artists" component={AdminFoundingArtists} />
       <Route path="/founding-artist" component={FoundingArtist} />
       <Route path="/social-sync" component={SocialSync} />
+      <Route path="/kiln-opening" component={KilnOpening} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route component={NotFound} />
       </Switch>

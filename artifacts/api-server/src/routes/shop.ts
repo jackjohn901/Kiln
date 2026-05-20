@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { listingsTable, wishlistsTable, ordersTable } from "@workspace/db";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import crypto from "crypto";
+import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
 
 const router = Router();
 
@@ -57,6 +58,14 @@ router.post("/listings", async (req, res): Promise<void> => {
       title, description, medium, technique, dimensions, weight, year: year ? Number(year) : null,
       edition, imageUrl, imageUrls: imageUrls ?? [], price: Number(price), shipsFrom, shipsTo: shipsTo ?? [], tags: tags ?? [],
     }).returning();
+
+    const caption = [title, description, technique ? `Technique: ${technique}` : null, medium ? `Medium: ${medium}` : null].filter(Boolean).join("\n");
+    autoPostToConnectedPlatforms(
+      user.id,
+      { id: listing.id, caption, thumbnailUrl: imageUrl ?? null, videoUrl: null },
+      { updateListingId: listing.id },
+    ).catch(() => {});
+
     res.status(201).json({ listing: { ...listing, createdAt: listing.createdAt.toISOString(), updatedAt: listing.updatedAt.toISOString() } });
   } catch (err) { req.log.error({ err }, "createListing error"); res.status(500).json({ error: "Failed to create listing" }); }
 });

@@ -49,12 +49,11 @@ router.post("/posts", async (req, res): Promise<void> => {
 
     // Auto-post to connected social platforms (non-blocking, only for published posts)
     if (!asDraft) {
-      autoPostToConnectedPlatforms(user.id, {
-        id: post.id,
-        caption: post.caption,
-        videoUrl: post.videoUrl ?? null,
-        thumbnailUrl: post.thumbnailUrl ?? null,
-      }).catch(() => {});
+      autoPostToConnectedPlatforms(
+        user.id,
+        { id: post.id, caption: post.caption, videoUrl: post.videoUrl ?? null, thumbnailUrl: post.thumbnailUrl ?? null },
+        { updatePostId: post.id },
+      ).catch(() => {});
     }
 
     db.select({ count: sql`COUNT(*)` })

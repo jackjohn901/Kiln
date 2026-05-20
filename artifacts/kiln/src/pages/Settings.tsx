@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -512,6 +512,16 @@ export default function Settings() {
                   <div>
                     <span className="text-sm text-stone-200">Social Sync</span>
                     <p className="text-xs text-stone-600 mt-0.5">Auto-post to Instagram, TikTok & Facebook</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/kiln-opening" className="flex items-center justify-between px-5 py-4 border-t border-white/5 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Flame size={16} className="text-orange-400" />
+                  <div>
+                    <span className="text-sm text-stone-200">Kiln Opening Reveal</span>
+                    <p className="text-xs text-stone-600 mt-0.5">Announce a kiln opening across all platforms</p>
                   </div>
                 </div>
                 <ChevronRight size={14} className="text-stone-600" />
