@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { commissionsTable, notificationsTable, usersTable } from "@workspace/db";
+import { commissionsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
 import { eq, or, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { sendEmail, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
@@ -22,8 +22,12 @@ router.post("/commissions", async (req, res): Promise<void> => {
       referenceUrls: referenceUrls ?? [], status: "pending",
     }).returning();
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions` });
-    const [artistUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId));
-    if (artistUser?.email) {
+    const [[artistUser], [artistSettings]] = await Promise.all([
+      db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId)),
+      db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, artistId)),
+    ]);
+    const wantsEmail = (artistSettings?.settings as Record<string, boolean> | null)?.notif_email_new_commission !== false;
+    if (wantsEmail && artistUser?.email) {
       sendEmail({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }).catch(() => {});
     }
     res.status(201).json({ ...commission, createdAt: commission.createdAt.toISOString(), updatedAt: commission.updatedAt.toISOString() });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { auctionsTable, auctionBidsTable, notificationsTable, usersTable } from "@workspace/db";
+import { auctionsTable, auctionBidsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
 import { eq, desc, and, gt } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
@@ -57,10 +57,14 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   const [updated] = await db.update(auctionsTable).set({ currentBid: bidAmount, currentBidderId: user.id, currentBidderName: name, bidCount: auction.bidCount + 1 }).where(eq(auctionsTable.id, auction.id)).returning();
   if (auction.currentBidderId && auction.currentBidderId !== user.id) {
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: auction.currentBidderId, type: "follow", fromId: user.id, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `outbid you on ${auction.title} with $${bidAmount.toLocaleString()}`, link: `/auctions/${auction.id}` });
-    db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, auction.currentBidderId))
-      .then(([prev]) => {
-        if (prev?.email) sendEmail({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) });
-      }).catch(() => {});
+    const prevBidderId = auction.currentBidderId;
+    Promise.all([
+      db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, prevBidderId)),
+      db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
+    ]).then(([[prev], [s]]) => {
+      const wantsEmail = (s?.settings as Record<string, boolean> | null)?.notif_email_outbid !== false;
+      if (wantsEmail && prev?.email) sendEmail({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }).catch(() => {});
+    }).catch(() => {});
   }
   broadcastAll({ type: "bid", auctionId: auction.id, currentBid: bidAmount, bidCount: auction.bidCount + 1, bidderName: name });
   res.json({ bid: { ...bid, createdAt: bid.createdAt.toISOString() }, auction: { ...updated, startDate: updated.startDate.toISOString(), endDate: updated.endDate.toISOString(), createdAt: updated.createdAt.toISOString() } });

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  followsTable, profilesTable, notificationsTable, postsTable,
+  followsTable, profilesTable, notificationsTable, postsTable, userSettingsTable,
 } from "@workspace/db";
 import { eq, and, sql, or, ilike, inArray, desc, isNull, lte } from "drizzle-orm";
 import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
@@ -106,10 +106,13 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
 
     // Email notification (fire-and-forget — skipped if Resend not configured or no contactEmail)
     const followerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "Someone";
-    db.select({ contactEmail: profilesTable.contactEmail })
-      .from(profilesTable).where(eq(profilesTable.userId, followingId)).limit(1)
-      .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }).catch(() => {}); })
-      .catch(() => {});
+    Promise.all([
+      db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, followingId)).limit(1),
+      db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, followingId)).limit(1),
+    ]).then(([[p], [s]]) => {
+      const wantsEmail = (s?.settings as Record<string, boolean> | null)?.notif_email_follows !== false;
+      if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }).catch(() => {});
+    }).catch(() => {});
 
     res.json({ following: true, followerCount: newCount });
   } catch (err) {

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable } from "@workspace/db";
+import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable, userSettingsTable } from "@workspace/db";
 import { sendEmail, newPatronEmail } from "../lib/email";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -67,10 +67,13 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
   await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: tier.artistId, type: "subscription", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `subscribed to your ${tier.name} tier`, link: `/patrons` });
 
   // Email notification (fire-and-forget)
-  db.select({ contactEmail: profilesTable.contactEmail })
-    .from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1)
-    .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }).catch(() => {}); })
-    .catch(() => {});
+  Promise.all([
+    db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1),
+    db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
+  ]).then(([[p], [s]]) => {
+    const wantsEmail = (s?.settings as Record<string, boolean> | null)?.notif_email_new_patron !== false;
+    if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }).catch(() => {});
+  }).catch(() => {});
 
   res.json({ subscribed: true });
 });

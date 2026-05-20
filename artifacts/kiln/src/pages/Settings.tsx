@@ -39,6 +39,9 @@ interface KilnSettings {
   notif_email_follows: boolean;
   notif_email_comments: boolean;
   notif_email_new_sale: boolean;
+  notif_email_new_commission: boolean;
+  notif_email_new_patron: boolean;
+  notif_email_outbid: boolean;
   privacy_profile_public: boolean;
   privacy_show_location: boolean;
   privacy_allow_messages: boolean;
@@ -68,6 +71,9 @@ function defaultSettings(): KilnSettings {
     notif_email_follows: false,
     notif_email_comments: false,
     notif_email_new_sale: true,
+    notif_email_new_commission: true,
+    notif_email_new_patron: true,
+    notif_email_outbid: true,
     privacy_profile_public: true,
     privacy_show_location: true,
     privacy_allow_messages: true,
@@ -282,6 +288,9 @@ export default function Settings() {
             <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
             <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
             <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
+            <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
+            <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
+            <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />
             <div className="py-3">
               <p className="text-sm text-stone-200 mb-1">Notification email address</p>
               <p className="text-xs text-stone-600 mb-2">Where we send email alerts. Never shown publicly.</p>
