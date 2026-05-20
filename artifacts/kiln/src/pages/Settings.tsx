@@ -39,6 +39,8 @@ interface KilnSettings {
   notif_email_follows: boolean;
   notif_email_comments: boolean;
   notif_email_new_sale: boolean;
+  notif_email_new_booking: boolean;
+  notif_email_commission_payment: boolean;
   notif_email_new_commission: boolean;
   notif_email_new_patron: boolean;
   notif_email_outbid: boolean;
@@ -71,6 +73,8 @@ function defaultSettings(): KilnSettings {
     notif_email_follows: false,
     notif_email_comments: false,
     notif_email_new_sale: true,
+    notif_email_new_booking: true,
+    notif_email_commission_payment: true,
     notif_email_new_commission: true,
     notif_email_new_patron: true,
     notif_email_outbid: true,
@@ -288,6 +292,8 @@ export default function Settings() {
             <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
             <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
             <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
+            <Toggle settingKey="notif_email_new_booking" label="New workshop bookings" desc="Email when a student books a seat in your workshop" />
+            <Toggle settingKey="notif_email_commission_payment" label="Commission payments" desc="Email when a deposit or final payment lands on a commission" />
             <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
             <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
             <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />

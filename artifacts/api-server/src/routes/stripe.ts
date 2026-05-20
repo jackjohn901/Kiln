@@ -19,7 +19,7 @@ import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 import { broadcast } from '../lib/websocket';
 import { getDigitalProduct } from '../lib/digitalProducts';
-import { sendEmail, manualPayoutReceiptEmail, newSaleEmail } from '../lib/email';
+import { sendEmail, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, commissionPaymentEmail } from '../lib/email';
 
 const router: IRouter = Router();
 
@@ -30,6 +30,8 @@ const manualPayoutReceiptSent = new Set<string>();
 const manualPayoutArtistNotified = new Set<string>();
 const connectArtistNotified = new Set<string>();
 const connectBuyerReceiptSent = new Set<string>();
+const workshopArtistNotified = new Set<string>();
+const commissionArtistNotified = new Set<string>();
 
 interface CartLineItem {
   name: string;
@@ -565,6 +567,9 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
         if (meta.type === 'workshop' && meta.workshopId && meta.userId) {
           const [w] = await db.select().from(workshopsTable)
             .where(eq(workshopsTable.id, meta.workshopId));
+          // Track whether this webhook event actually created a new booking so
+          // the artist notification is only sent on a real new confirmation.
+          let bookingConfirmed = false;
           if (w && w.spotsBooked < w.maxSpots) {
             const existing = await db.select({ id: workshopBookingsTable.id })
               .from(workshopBookingsTable)
@@ -583,6 +588,69 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
               await db.update(workshopsTable)
                 .set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` })
                 .where(eq(workshopsTable.id, meta.workshopId));
+              bookingConfirmed = true;
+            }
+          }
+
+          // Notify the workshop host artist only when a booking was actually confirmed.
+          // Gating on bookingConfirmed ensures we don't notify when:
+          //   - the workshop was full (seat not granted), or
+          //   - the booking already existed (webhook replay after process restart).
+          if (bookingConfirmed && w && !workshopArtistNotified.has(session.id)) {
+            workshopArtistNotified.add(session.id);
+            try {
+              const studentName = session.customer_details?.name ?? '';
+              const studentEmail = session.customer_email ?? session.customer_details?.email ?? '';
+              const amountCents = session.amount_total ?? 0;
+
+              const [artistUserRow, artistSettingsRow] = await Promise.all([
+                db.select({ id: usersTable.id, email: usersTable.email })
+                  .from(usersTable)
+                  .where(eq(usersTable.id, w.artistId))
+                  .then((rows) => rows[0] ?? null),
+                db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                  .from(userSettingsTable)
+                  .where(eq(userSettingsTable.userId, w.artistId))
+                  .then((rows) => rows[0] ?? null),
+              ]);
+
+              if (artistUserRow) {
+                const artistSettings = artistSettingsRow?.settings as Record<string, unknown> | null;
+                const wantsEmail = artistSettings?.notif_email_new_booking !== false;
+                if (wantsEmail && artistUserRow.email) {
+                  const html = newWorkshopBookingArtistEmail(studentName, studentEmail, w.title, amountCents);
+                  await sendEmail({
+                    to: artistUserRow.email,
+                    subject: `New booking for "${w.title}"`,
+                    html,
+                  });
+                }
+
+                const notifText = studentName
+                  ? `${studentName} booked a seat in "${w.title}"`
+                  : `A student booked a seat in "${w.title}"`;
+
+                await db.insert(notificationsTable).values({
+                  id: crypto.randomUUID(),
+                  userId: w.artistId,
+                  type: 'workshop_booking',
+                  fromName: studentName || 'A student',
+                  text: notifText,
+                  link: '/workshops',
+                  read: false,
+                });
+
+                broadcast(w.artistId, {
+                  type: 'notification',
+                  userId: w.artistId,
+                  notifType: 'workshop_booking',
+                  fromName: studentName || 'A student',
+                  text: notifText,
+                  link: '/workshops',
+                });
+              }
+            } catch (workshopNotifErr) {
+              logger.error({ err: workshopNotifErr, sessionId: session.id }, 'Failed to send workshop booking artist notification');
             }
           }
         }
@@ -597,6 +665,87 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
             await db.update(commissionsTable)
               .set({ finalPaid: true })
               .where(eq(commissionsTable.id, meta.commissionId));
+          }
+
+          // Notify the commissioned artist about the payment.
+          if (!commissionArtistNotified.has(session.id)) {
+            commissionArtistNotified.add(session.id);
+            try {
+              const [commission] = await db.select({
+                id: commissionsTable.id,
+                artistId: commissionsTable.artistId,
+                clientName: commissionsTable.clientName,
+                clientEmail: commissionsTable.clientEmail,
+                workType: commissionsTable.workType,
+              })
+                .from(commissionsTable)
+                .where(eq(commissionsTable.id, meta.commissionId));
+
+              if (commission) {
+                const amountCents = session.amount_total ?? 0;
+                const clientEmail = commission.clientEmail
+                  ?? session.customer_email
+                  ?? session.customer_details?.email
+                  ?? '';
+
+                const [artistUserRow, artistSettingsRow] = await Promise.all([
+                  db.select({ id: usersTable.id, email: usersTable.email })
+                    .from(usersTable)
+                    .where(eq(usersTable.id, commission.artistId))
+                    .then((rows) => rows[0] ?? null),
+                  db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                    .from(userSettingsTable)
+                    .where(eq(userSettingsTable.userId, commission.artistId))
+                    .then((rows) => rows[0] ?? null),
+                ]);
+
+                if (artistUserRow) {
+                  const artistSettings = artistSettingsRow?.settings as Record<string, unknown> | null;
+                  const wantsEmail = artistSettings?.notif_email_commission_payment !== false;
+                  if (wantsEmail && artistUserRow.email) {
+                    const html = commissionPaymentEmail(
+                      commission.clientName,
+                      clientEmail,
+                      commission.id,
+                      commission.workType ?? '',
+                      meta.milestone,
+                      amountCents,
+                    );
+                    const milestoneLabel = meta.milestone === 'deposit' ? 'deposit' : 'final payment';
+                    await sendEmail({
+                      to: artistUserRow.email,
+                      subject: `Commission ${milestoneLabel} received from ${commission.clientName}`,
+                      html,
+                    });
+                  }
+
+                  const milestoneLabel = meta.milestone === 'deposit' ? 'Deposit' : meta.milestone === 'final' ? 'Final payment' : meta.milestone;
+                  const amountDollars = (amountCents / 100).toFixed(2);
+                  const notifText = `${milestoneLabel} received from ${commission.clientName} — $${amountDollars}`;
+
+                  await db.insert(notificationsTable).values({
+                    id: crypto.randomUUID(),
+                    userId: commission.artistId,
+                    type: 'commission_payment',
+                    fromName: commission.clientName,
+                    text: notifText,
+                    link: '/commissions',
+                    read: false,
+                  });
+
+                  broadcast(commission.artistId, {
+                    type: 'notification',
+                    userId: commission.artistId,
+                    notifType: 'commission_payment',
+                    fromName: commission.clientName,
+                    text: notifText,
+                    link: '/commissions',
+                  });
+                }
+              }
+            } catch (commissionNotifErr) {
+              logger.error({ err: commissionNotifErr, sessionId: session.id }, 'Failed to send commission payment artist notification');
+            }
           }
         }
 

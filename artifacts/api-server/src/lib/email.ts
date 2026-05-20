@@ -295,6 +295,58 @@ export function newSaleEmail(
   `);
 }
 
+export function newWorkshopBookingArtistEmail(
+  buyerName: string,
+  buyerEmail: string,
+  workshopTitle: string,
+  amountCents: number,
+): string {
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Workshop Booking! 🎓</h1>
+    <p style="color:#78716c;margin-bottom:0;">A student just booked a seat in your workshop.</p>
+    ${card(`
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Workshop</p>
+      <p style="margin:0 0 12px;"><strong>${escHtml(workshopTitle)}</strong></p>
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Student</p>
+      <p style="margin:0 0 4px;"><strong>${escHtml(buyerName || 'A student')}</strong></p>
+      <p style="margin:0;color:#78716c;">${escHtml(buyerEmail)}</p>
+    `)}
+    ${card(`
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Payment received</p>
+      <p style="margin:0;font-size:18px;"><strong style="color:#fcd34d;">$${(amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></p>
+    `)}
+    ${btn(`${BASE_URL}/workshops`, "View Workshop")}
+  `);
+}
+
+export function commissionPaymentEmail(
+  clientName: string,
+  clientEmail: string,
+  commissionId: string,
+  workType: string,
+  milestone: string,
+  amountCents: number,
+): string {
+  const milestoneLabel = milestone === 'deposit' ? 'Deposit' : milestone === 'final' ? 'Final Payment' : milestone;
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Commission Payment Received! 💰</h1>
+    <p style="color:#78716c;margin-bottom:0;">A payment has been made on your commission.</p>
+    ${card(`
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Commission</p>
+      <p style="margin:0 0 4px;"><strong>${escHtml(workType || 'Custom work')}</strong></p>
+      <p style="margin:0 0 12px;color:#78716c;font-size:12px;">Ref: ${escHtml(commissionId)}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Client</p>
+      <p style="margin:0 0 4px;"><strong>${escHtml(clientName)}</strong></p>
+      <p style="margin:0;color:#78716c;">${escHtml(clientEmail)}</p>
+    `)}
+    ${card(`
+      <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">${escHtml(milestoneLabel)} received</p>
+      <p style="margin:0;font-size:18px;"><strong style="color:#fcd34d;">$${(amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></p>
+    `)}
+    ${btn(`${BASE_URL}/commissions`, "View Commission")}
+  `);
+}
+
 function escHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
