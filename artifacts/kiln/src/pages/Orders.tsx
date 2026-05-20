@@ -124,7 +124,7 @@ function groupOrders(orders: Order[]): OrderGroup[] {
   const sessionMap = new Map<string, Order[]>();
 
   for (const order of orders) {
-    if (order.manualPayout && order.notes && order.notes.startsWith("stripe:")) {
+    if (order.notes && order.notes.startsWith("stripe:")) {
       const existing = sessionMap.get(order.notes);
       if (existing) {
         existing.push(order);
@@ -272,7 +272,12 @@ export default function Orders() {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-amber-300">{formatPrice(combinedAmount)}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-amber-300">{formatPrice(combinedAmount)}</span>
+                        {isGroup && groupOrders.length > 1 && (
+                          <span className="text-[10px] text-stone-500">{groupOrders.length} items</span>
+                        )}
+                      </span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
                     </div>
                     {!["delivered", "cancelled"].includes(primary.status) && (

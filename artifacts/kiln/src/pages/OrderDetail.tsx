@@ -66,6 +66,7 @@ function ordinalId(id: string) {
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
+  const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -76,8 +77,19 @@ export default function OrderDetail() {
         if (r.status === 404) { setNotFound(true); return null; }
         return r.ok ? r.json() : null;
       })
-      .then(data => {
-        if (data?.order) setOrder(data.order);
+      .then(async data => {
+        if (!data?.order) return;
+        const primary: Order = data.order;
+        setOrder(primary);
+        if (primary.notes && primary.notes.startsWith("stripe:")) {
+          const allData = await fetch("/api/me/orders", { credentials: "include" })
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null);
+          const siblings: Order[] = (allData?.orders ?? []).filter(
+            (o: Order) => o.notes === primary.notes
+          );
+          setSiblingOrders(siblings.length > 1 ? siblings : []);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -122,6 +134,9 @@ export default function OrderDetail() {
 
   const isActive = !["delivered", "cancelled"].includes(order.status);
 
+  const isCartOrder = siblingOrders.length > 1;
+  const cartTotal = isCartOrder ? siblingOrders.reduce((sum, o) => sum + o.amount, 0) : order.amount;
+
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
@@ -151,27 +166,69 @@ export default function OrderDetail() {
         </div>
 
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
-          <div className="flex items-start gap-4">
-            <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
-              {order.imageUrl ? (
-                <img src={order.imageUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className={`h-full w-full flex items-center justify-center rounded-xl ${typeConf.color}`}>
-                  <TypeIcon size={22} />
+          {isCartOrder ? (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">
+                Items ({siblingOrders.length})
+              </p>
+              <div className="space-y-3">
+                {siblingOrders.map((item, idx) => {
+                  const itemTypeConf = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.inquiry!;
+                  const ItemIcon = itemTypeConf.icon;
+                  return (
+                    <div key={item.id} className={idx > 0 ? "pt-3 border-t border-white/6" : ""}>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-stone-800">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className={`h-full w-full flex items-center justify-center rounded-lg ${itemTypeConf.color}`}>
+                              <ItemIcon size={14} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-stone-100 leading-snug truncate">{item.title}</p>
+                          {item.description && (
+                            <p className="text-[11px] text-stone-500 truncate">{item.description}</p>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold text-amber-300 tabular-nums shrink-0">
+                          {formatPrice(item.amount)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 pt-3 border-t border-white/8 flex items-center justify-between">
+                <span className="text-xs text-stone-400 font-medium">Total</span>
+                <span className="text-base font-bold text-amber-300">{formatPrice(cartTotal)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-start gap-4">
+              <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
+                {order.imageUrl ? (
+                  <img src={order.imageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className={`h-full w-full flex items-center justify-center rounded-xl ${typeConf.color}`}>
+                    <TypeIcon size={22} />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-stone-100 leading-snug">{order.title}</p>
+                {order.description && (
+                  <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">{order.description}</p>
+                )}
+                <div className="mt-2 flex items-center justify-between">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
+                  <span className="text-base font-bold text-amber-300">{formatPrice(order.amount)}</span>
                 </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-stone-100 leading-snug">{order.title}</p>
-              {order.description && (
-                <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">{order.description}</p>
-              )}
-              <div className="mt-2 flex items-center justify-between">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
-                <span className="text-base font-bold text-amber-300">{formatPrice(order.amount)}</span>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {(isActive || hasDeliveryEstimate) && (
