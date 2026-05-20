@@ -280,24 +280,21 @@ export default function Orders() {
                       </span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
                     </div>
-                    {!["delivered", "cancelled"].includes(primary.status) && (
-                      <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
-                        <Clock size={10} className="text-amber-500/70 flex-shrink-0" />
-                        Processing window:{" "}
-                        {(() => {
-                          const label = primary.processingWindowLabel ?? sellerWindows[primary.sellerId]?.processingWindowLabel ?? null;
-                          const days = primary.processingWindowDays ?? sellerWindows[primary.sellerId]?.processingWindowDays ?? null;
-                          if (label != null || days != null) {
-                            return (
-                              <span className="text-amber-400/80">
-                                {label ? label : days === 1 ? "1 business day" : `${days} business days`}
-                              </span>
-                            );
-                          }
-                          return <span className="text-stone-600">Not specified</span>;
-                        })()}
-                      </p>
-                    )}
+                    {(() => {
+                      const label = primary.processingWindowLabel ?? sellerWindows[primary.sellerId]?.processingWindowLabel ?? null;
+                      const days = primary.processingWindowDays ?? sellerWindows[primary.sellerId]?.processingWindowDays ?? null;
+                      if (label == null && days == null) return null;
+                      const muted = ["delivered", "cancelled"].includes(primary.status);
+                      return (
+                        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
+                          <Clock size={10} className={`${muted ? "text-stone-600" : "text-amber-500/70"} flex-shrink-0`} />
+                          Processing window:{" "}
+                          <span className={muted ? "text-stone-600" : "text-amber-400/80"}>
+                            {label ? label : days === 1 ? "1 business day" : `${days} business days`}
+                          </span>
+                        </p>
+                      );
+                    })()}
                     {primary.trackingNumber && (
                       <p className="mt-1.5 text-[11px] text-stone-600">
                         Tracking: <span className="text-stone-400 font-mono">{primary.trackingNumber}</span>
