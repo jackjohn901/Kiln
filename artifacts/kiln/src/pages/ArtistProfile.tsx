@@ -256,6 +256,11 @@ interface DbUserProfile {
   followingCount: number;
   postCount: number;
   isFollowing: boolean;
+  whyICreate: string | null;
+  inspirations: string | null;
+  artistStatement: string | null;
+  collectorStory: string | null;
+  accountType: string | null;
 }
 
 interface DbUserPost {
@@ -1132,11 +1137,40 @@ export default function ArtistProfile() {
                 <p className="text-sm text-stone-400 leading-relaxed">{displayBio}</p>
               </div>
 
-              {artist.artistStatement && (
+              {/* Why I Create — artist's purpose */}
+              {(dbProfile?.whyICreate || artist.quote) && (
+                <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-5">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-600">Why I Create</p>
+                  <p className="text-sm text-amber-100/80 leading-relaxed italic">
+                    "{dbProfile?.whyICreate || artist.quote}"
+                  </p>
+                </div>
+              )}
+
+              {/* Collector Story */}
+              {(dbProfile?.accountType === "collector" || dbProfile?.collectorStory) && dbProfile?.collectorStory && (
+                <div className="rounded-2xl border border-purple-500/15 bg-purple-500/5 p-5">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-purple-500">Why I Collect</p>
+                  <p className="text-sm text-purple-100/80 leading-relaxed italic">
+                    "{dbProfile.collectorStory}"
+                  </p>
+                </div>
+              )}
+
+              {/* Inspirations */}
+              {dbProfile?.inspirations && (
+                <div>
+                  <h3 className="mb-2 font-serif text-lg text-amber-100">Inspirations & Influences</h3>
+                  <p className="text-sm text-stone-400 leading-relaxed">{dbProfile.inspirations}</p>
+                </div>
+              )}
+
+              {/* Artist Statement — from DB or static data */}
+              {(dbProfile?.artistStatement || artist.artistStatement) && (
                 <div>
                   <h3 className="mb-2 font-serif text-lg text-amber-100">Artist Statement</h3>
                   <blockquote className="border-l-2 border-amber-500/40 pl-4 italic text-sm text-stone-400 leading-relaxed">
-                    {artist.artistStatement}
+                    {dbProfile?.artistStatement || artist.artistStatement}
                   </blockquote>
                 </div>
               )}

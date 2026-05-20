@@ -15,6 +15,10 @@ export interface UserProfile {
   coverUrl: string;
   isCustom: boolean;
   accountType?: string;
+  whyICreate?: string;
+  inspirations?: string;
+  artistStatement?: string;
+  collectorStory?: string;
 }
 
 interface ProfileContextType {

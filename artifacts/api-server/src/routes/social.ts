@@ -263,16 +263,16 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const userId = req.user.id;
-  const { handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType } = req.body;
+  const { handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType, whyICreate, inspirations, artistStatement, collectorStory } = req.body;
   try {
     const [existing] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!existing) {
-      const [created] = await db.insert(profilesTable).values({ userId, handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType: accountType ?? "artist" }).returning();
+      const [created] = await db.insert(profilesTable).values({ userId, handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType: accountType ?? "artist", whyICreate, inspirations, artistStatement, collectorStory }).returning();
       void autoFollowCreator(userId);
       res.json({ ...created, isFollowing: false, createdAt: created.createdAt.toISOString() }); return;
     }
     const [updated] = await db.update(profilesTable)
-      .set({ handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, ...(accountType ? { accountType } : {}) })
+      .set({ handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, ...(accountType ? { accountType } : {}), whyICreate: whyICreate ?? null, inspirations: inspirations ?? null, artistStatement: artistStatement ?? null, collectorStory: collectorStory ?? null })
       .where(eq(profilesTable.userId, userId))
       .returning();
     res.json({ ...updated, isFollowing: false, createdAt: updated.createdAt.toISOString() });

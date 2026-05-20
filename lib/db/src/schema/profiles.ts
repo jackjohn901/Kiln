@@ -31,6 +31,10 @@ export const profilesTable = pgTable("profiles", {
   stripeRestrictionNotified: boolean("stripe_restriction_notified").notNull().default(false),
   isFoundingArtist: boolean("is_founding_artist").notNull().default(false),
   foundingArtistNumber: integer("founding_artist_number"),
+  whyICreate: text("why_i_create"),
+  inspirations: text("inspirations"),
+  artistStatement: text("artist_statement"),
+  collectorStory: text("collector_story"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

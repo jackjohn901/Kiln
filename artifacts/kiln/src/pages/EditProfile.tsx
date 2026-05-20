@@ -115,6 +115,10 @@ export default function EditProfile() {
       avatarUrl: "",
       coverUrl: "",
       isCustom: true,
+      whyICreate: "",
+      inspirations: "",
+      artistStatement: "",
+      collectorStory: "",
     }
   );
 
@@ -232,6 +236,10 @@ export default function EditProfile() {
           website: form.website,
           avatarUrl: form.avatarUrl,
           bannerUrl: form.coverUrl,
+          whyICreate: form.whyICreate ?? "",
+          inspirations: form.inspirations ?? "",
+          artistStatement: form.artistStatement ?? "",
+          collectorStory: form.collectorStory ?? "",
         }),
       });
     } catch {
@@ -396,6 +404,90 @@ export default function EditProfile() {
               />
             </div>
           </div>
+
+          {/* Story & Purpose — artist/enthusiast */}
+          {(profile.accountType === "artist" || !profile.accountType || profile.accountType === "enthusiast") && (
+            <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5 space-y-5">
+              <div>
+                <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-stone-600">
+                  ✦ Story & Purpose
+                </p>
+                <p className="text-xs text-stone-700">The why behind your work — shown on your profile to collectors and followers.</p>
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                  Why I Create
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={600}
+                  value={form.whyICreate ?? ""}
+                  onChange={(e) => setForm({ ...form, whyICreate: e.target.value })}
+                  placeholder="What drives you to make? What would be missing from your life without this work?"
+                  className="w-full resize-none rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                />
+                <p className="mt-1 text-right text-xs text-stone-700">{(form.whyICreate ?? "").length}/600</p>
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                  Inspirations & Influences
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={600}
+                  value={form.inspirations ?? ""}
+                  onChange={(e) => setForm({ ...form, inspirations: e.target.value })}
+                  placeholder="Who or what inspires your work? Artists, places, materials, ideas, traditions…"
+                  className="w-full resize-none rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                />
+                <p className="mt-1 text-right text-xs text-stone-700">{(form.inspirations ?? "").length}/600</p>
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                  Artist Statement
+                </label>
+                <textarea
+                  rows={4}
+                  maxLength={800}
+                  value={form.artistStatement ?? ""}
+                  onChange={(e) => setForm({ ...form, artistStatement: e.target.value })}
+                  placeholder="A formal statement about your practice — what your work is about, the ideas it explores, how it connects to the world."
+                  className="w-full resize-none rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                />
+                <p className="mt-1 text-right text-xs text-stone-700">{(form.artistStatement ?? "").length}/800</p>
+              </div>
+            </div>
+          )}
+
+          {/* Collector Story */}
+          {profile.accountType === "collector" && (
+            <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-5 space-y-5">
+              <div>
+                <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-stone-600">
+                  ✦ Your Collector Story
+                </p>
+                <p className="text-xs text-stone-700">Help artists understand why you collect — your taste, your purpose, what collecting means to you.</p>
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-stone-500">
+                  Why I Collect
+                </label>
+                <textarea
+                  rows={4}
+                  maxLength={800}
+                  value={form.collectorStory ?? ""}
+                  onChange={(e) => setForm({ ...form, collectorStory: e.target.value })}
+                  placeholder="What draws you to collecting craft? What does bringing a piece into your home or collection mean to you?"
+                  className="w-full resize-none rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                />
+                <p className="mt-1 text-right text-xs text-stone-700">{(form.collectorStory ?? "").length}/800</p>
+              </div>
+            </div>
+          )}
 
           {/* Account-type-specific interests/focus */}
           {(() => {
