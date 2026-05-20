@@ -110,7 +110,8 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
       db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, followingId)).limit(1),
       db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, followingId)).limit(1),
     ]).then(([[p], [s]]) => {
-      const wantsEmail = (s?.settings as Record<string, boolean> | null)?.notif_email_follows !== false;
+      const emailSettings = s?.settings as Record<string, boolean> | null;
+      const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_follows !== false;
       if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }).catch(() => {});
     }).catch(() => {});
 

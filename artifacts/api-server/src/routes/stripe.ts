@@ -615,8 +615,8 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
               ]);
 
               if (artistUserRow) {
-                const artistSettings = artistSettingsRow?.settings as Record<string, unknown> | null;
-                const wantsEmail = artistSettings?.notif_email_new_booking !== false;
+                const artistSettings = artistSettingsRow?.settings as Record<string, boolean> | null;
+                const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_new_booking !== false;
                 if (wantsEmail && artistUserRow.email) {
                   const html = newWorkshopBookingArtistEmail(studentName, studentEmail, w.title, amountCents);
                   await sendEmail({
@@ -700,8 +700,8 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 ]);
 
                 if (artistUserRow) {
-                  const artistSettings = artistSettingsRow?.settings as Record<string, unknown> | null;
-                  const wantsEmail = artistSettings?.notif_email_commission_payment !== false;
+                  const artistSettings = artistSettingsRow?.settings as Record<string, boolean> | null;
+                  const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_commission_payment !== false;
                   if (wantsEmail && artistUserRow.email) {
                     const html = commissionPaymentEmail(
                       commission.clientName,
@@ -894,7 +894,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
 
                   // Send email if the artist has opted in (default: opt-in).
                   const artistSettings = artistSettingsMap.get(artist.id);
-                  const wantsEmail = artistSettings?.notif_email_new_sale !== false;
+                  const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_new_sale !== false;
                   if (wantsEmail && artist.email) {
                     const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
                     await sendEmail({
@@ -1045,7 +1045,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
 
                 // Respect the artist's email notification preference (default: opt-in).
                 const artistSettings = artistSettingsMap.get(artist.id);
-                const wantsEmail = artistSettings?.notif_email_new_sale !== false;
+                const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_new_sale !== false;
                 if (wantsEmail && artist.email) {
                   const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
                   await sendEmail({

@@ -71,7 +71,8 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
     db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1),
     db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
   ]).then(([[p], [s]]) => {
-    const wantsEmail = (s?.settings as Record<string, boolean> | null)?.notif_email_new_patron !== false;
+    const emailSettings = (s?.settings as Record<string, boolean> | null);
+    const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_new_patron !== false;
     if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }).catch(() => {});
   }).catch(() => {});
 

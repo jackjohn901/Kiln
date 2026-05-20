@@ -35,6 +35,7 @@ interface KilnSettings {
   notif_commissions: boolean;
   notif_workshops: boolean;
   notif_drops: boolean;
+  notif_email_paused: boolean;
   notif_email_digest: boolean;
   notif_email_follows: boolean;
   notif_email_comments: boolean;
@@ -69,6 +70,7 @@ function defaultSettings(): KilnSettings {
     notif_commissions: true,
     notif_workshops: true,
     notif_drops: true,
+    notif_email_paused: false,
     notif_email_digest: false,
     notif_email_follows: false,
     notif_email_comments: false,
@@ -288,6 +290,24 @@ export default function Settings() {
             <Toggle settingKey="notif_workshops" label="Workshop updates" desc="Bookings and reminders" />
             <Toggle settingKey="notif_drops" label="Drop alerts" desc="New drops from artists you follow" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Email</p>
+            <div className="flex items-center justify-between py-3 border-b border-white/5">
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="text-sm text-stone-200">Pause all email notifications</p>
+                <p className="text-xs text-stone-600 mt-0.5">Mute every notification email in one switch — individual settings are preserved</p>
+              </div>
+              <button
+                onClick={() => toggle("notif_email_paused")}
+                className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${settings.notif_email_paused ? "bg-red-500" : "bg-stone-700"}`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings.notif_email_paused ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+            {settings.notif_email_paused && (
+              <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-red-500/10 border border-red-500/20 mb-1">
+                <VolumeX size={13} className="text-red-400 shrink-0" />
+                <p className="text-xs text-red-300">All email notifications are paused. Toggle individual settings below to resume specific ones when you unpause.</p>
+              </div>
+            )}
             <Toggle settingKey="notif_email_digest" label="Weekly digest" desc="Top posts, opportunities, and updates" />
             <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
             <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />

@@ -62,7 +62,8 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, prevBidderId)),
       db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
     ]).then(([[prev], [s]]) => {
-      const wantsEmail = (s?.settings as Record<string, boolean> | null)?.notif_email_outbid !== false;
+      const emailSettings = (s?.settings as Record<string, boolean> | null);
+      const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_outbid !== false;
       if (wantsEmail && prev?.email) sendEmail({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }).catch(() => {});
     }).catch(() => {});
   }

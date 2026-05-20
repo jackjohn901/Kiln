@@ -26,7 +26,8 @@ router.post("/commissions", async (req, res): Promise<void> => {
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId)),
       db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, artistId)),
     ]);
-    const wantsEmail = (artistSettings?.settings as Record<string, boolean> | null)?.notif_email_new_commission !== false;
+    const emailSettings = (artistSettings?.settings as Record<string, boolean> | null);
+    const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_new_commission !== false;
     if (wantsEmail && artistUser?.email) {
       sendEmail({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }).catch(() => {});
     }
