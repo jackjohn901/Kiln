@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, likesTable, savesTable, followsTable, userSettingsTable } from "@workspace/db";
+import { postsTable, likesTable, savesTable, followsTable, userSettingsTable, streaksTable } from "@workspace/db";
 import { desc, lt, eq, and, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -67,12 +67,21 @@ router.get("/feed", async (req, res) => {
       savedIds = new Set(saves.map((s) => s.postId));
     }
 
+    // Batch-fetch author streaks
+    const authorIds = [...new Set(slice.map((p) => p.authorId))];
+    const streakRows = authorIds.length
+      ? await db.select({ userId: streaksTable.userId, currentStreak: streaksTable.currentStreak })
+          .from(streaksTable).where(inArray(streaksTable.userId, authorIds))
+      : [];
+    const streakMap = new Map(streakRows.map((s) => [s.userId, s.currentStreak]));
+
     res.json({
       posts: slice.map(({ _score: _, ...p }) => ({
         ...p,
         tags: p.tags ?? [],
         isLiked: likedIds.has(p.id),
         isSaved: savedIds.has(p.id),
+        authorStreak: streakMap.get(p.authorId) ?? 0,
         createdAt: p.createdAt.toISOString(),
       })),
       hasMore,
@@ -128,12 +137,21 @@ router.get("/feed/following", async (req, res) => {
     const likedIds = new Set(likes.map((l) => l.postId));
     const savedIds = new Set(saves.map((s) => s.postId));
 
+    // Batch-fetch author streaks
+    const authorIds2 = [...new Set(page.map((p) => p.authorId))];
+    const streakRows2 = authorIds2.length
+      ? await db.select({ userId: streaksTable.userId, currentStreak: streaksTable.currentStreak })
+          .from(streaksTable).where(inArray(streaksTable.userId, authorIds2))
+      : [];
+    const streakMap2 = new Map(streakRows2.map((s) => [s.userId, s.currentStreak]));
+
     res.json({
       posts: page.map((post) => ({
         ...post,
         tags: post.tags ?? [],
         isLiked: likedIds.has(post.id),
         isSaved: savedIds.has(post.id),
+        authorStreak: streakMap2.get(post.authorId) ?? 0,
         createdAt: post.createdAt.toISOString(),
       })),
       hasMore,

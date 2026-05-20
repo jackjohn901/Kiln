@@ -77,6 +77,7 @@ import provenanceRouter from "./provenance";
 import materialSourcesRouter from "./material-sources";
 import processPledgesRouter from "./process-pledges";
 import collaborationsRouter from "./collaborations";
+import firstAccessRouter from "./first-access";
 
 const router: IRouter = Router();
 
@@ -158,5 +159,6 @@ router.use(provenanceRouter);
 router.use(materialSourcesRouter);
 router.use(processPledgesRouter);
 router.use(collaborationsRouter);
+router.use(firstAccessRouter);
 
 export default router;

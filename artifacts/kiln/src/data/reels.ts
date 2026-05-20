@@ -21,7 +21,12 @@ export interface Reel {
   available: boolean;
   patronOnly?: boolean;
   collabArtistName?: string;
+  streak?: number;
+  artistLevel?: "Emerging" | "Rising" | "Established" | "Master";
+  beforeImageUrl?: string;
 }
+
+const ARTIST_LEVELS = ["Emerging", "Rising", "Established", "Master"] as const;
 
 function hash(s: string): number {
   let h = 0;
@@ -89,6 +94,8 @@ function buildReels(): Reel[] {
       avatarUrl: a.images[0]?.url ?? `https://picsum.photos/seed/${a.id}-avatar/150/150`,
       musicTrackId: musicTracks[hash(a.id + v.id) % musicTracks.length].id,
       available: isAvailable(a.id + v.id),
+      streak: statVal(a.id + "streak", 1, 120),
+      artistLevel: ARTIST_LEVELS[hash(a.id) % 4],
     }))
   );
   const byArtist = new Map<string, typeof raw>();

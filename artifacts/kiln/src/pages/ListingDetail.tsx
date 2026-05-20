@@ -205,6 +205,7 @@ export default function ListingDetail() {
   const { profile } = useProfile();
   const [apiReviews, setApiReviews] = useState<Array<{ id: string; reviewerId: string; reviewerName: string; reviewerAvatarUrl: string | null; rating: number; body: string | null; isVerifiedPurchase: boolean; createdAt: string; }>>([]);
   const [reviewsLoaded, setReviewsLoaded] = useState(false);
+  const [firstAccess, setFirstAccess] = useState<{ hasAccess: boolean; expiresAt: string | null } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -213,6 +214,14 @@ export default function ListingDetail() {
       setReviewsLoaded(true);
     }).catch(() => setReviewsLoaded(true));
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !profile) return;
+    fetch(`/api/listings/${id}/first-access`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.hasAccess) setFirstAccess(d); })
+      .catch(() => {});
+  }, [id, profile]);
 
   const { isWishlisted, toggleWishlist } = useWishlist();
   const wishlisted = id ? isWishlisted(id) : false;
@@ -425,6 +434,24 @@ export default function ListingDetail() {
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="mx-auto max-w-5xl px-4 pb-32 pt-6">
+
+        {/* Collector first-access banner */}
+        {firstAccess?.hasAccess && (
+          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
+              <Award size={15} className="text-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-200">You have first access</p>
+              <p className="text-xs text-stone-400">
+                As one of this artist's top collectors, you have a 24-hour head start before this listing goes public.
+                {firstAccess.expiresAt && (
+                  <> Expires {new Date(firstAccess.expiresAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.</>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-6 text-xs text-stone-600">

@@ -8,6 +8,7 @@ export interface KilnFiringStatus {
   notes?: string;
   startedAt: string;
   estimatedHours: number;
+  firingId?: string;
 }
 
 export const KILN_STATUS_STORAGE_KEY = "kiln_firing_status_v1";

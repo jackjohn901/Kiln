@@ -308,6 +308,7 @@ function ReelCard({
   const [showReport, setShowReport] = useState(false);
   const [showBoardPicker, setShowBoardPicker] = useState(false);
   const [showAlgoMenu, setShowAlgoMenu] = useState(false);
+  const [showBefore, setShowBefore] = useState(false);
   const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed } = useSocial();
   const isPatronGated = reel.patronOnly && !isSubscribed(reel.artistId);
   const liked = reelLikes[reel.id] ?? false;
@@ -452,6 +453,27 @@ function ReelCard({
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/40" />
 
+      {/* Before/After reveal overlay */}
+      {reel.beforeImageUrl && showBefore && (
+        <div className="absolute inset-0 z-[15]">
+          <img src={reel.beforeImageUrl} alt="Before" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/40" />
+        </div>
+      )}
+      {/* Before/After toggle pill */}
+      {reel.beforeImageUrl && (
+        <div className="absolute top-4 left-1/2 z-20 flex -translate-x-1/2 overflow-hidden rounded-full border border-white/20 bg-black/60 backdrop-blur-sm">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowBefore(false); }}
+            className={`px-3 py-1 text-[10px] font-bold transition-colors ${!showBefore ? "bg-amber-500 text-stone-950" : "text-stone-400 hover:text-white"}`}
+          >AFTER</button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowBefore(true); }}
+            className={`px-3 py-1 text-[10px] font-bold transition-colors ${showBefore ? "bg-stone-300 text-stone-950" : "text-stone-400 hover:text-white"}`}
+          >BEFORE</button>
+        </div>
+      )}
+
       {/* Patron gate overlay */}
       {isPatronGated && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 backdrop-blur-xl bg-black/60">
@@ -508,6 +530,29 @@ function ReelCard({
               </span>
             );
           })()}
+          {(reel.streak ?? 0) >= 3 && (
+            <span className="flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 backdrop-blur-sm">
+              <Flame size={9} className="text-rose-400" />
+              <span className="text-[9px] font-bold text-rose-300">{reel.streak}d</span>
+            </span>
+          )}
+          {reel.artistLevel && (
+            <span className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 border backdrop-blur-sm ${
+              reel.artistLevel === "Master" ? "bg-amber-500/20 border-amber-500/30" :
+              reel.artistLevel === "Established" ? "bg-purple-500/20 border-purple-500/30" :
+              reel.artistLevel === "Rising" ? "bg-sky-500/20 border-sky-500/30" :
+              "bg-stone-500/20 border-stone-500/30"
+            }`}>
+              <span className="text-[9px]">
+                {reel.artistLevel === "Master" ? "🔥" : reel.artistLevel === "Established" ? "⭐" : reel.artistLevel === "Rising" ? "⬆️" : "🌱"}
+              </span>
+              <span className={`text-[9px] font-bold ${
+                reel.artistLevel === "Master" ? "text-amber-300" :
+                reel.artistLevel === "Established" ? "text-purple-300" :
+                reel.artistLevel === "Rising" ? "text-sky-300" : "text-stone-400"
+              }`}>{reel.artistLevel}</span>
+            </span>
+          )}
         </div>
 
         <Link href={`/artists/${reel.artistId}`}>
@@ -862,6 +907,8 @@ export default function Feed() {
           musicTrackId: defaultMusicId,
           available: false,
           patronOnly: p.isPatronOnly ?? false,
+          streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+          beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
         setFollowingApiReels(apiReels);
       })
@@ -892,6 +939,8 @@ export default function Feed() {
           musicTrackId: defaultMusicId,
           available: false,
           patronOnly: p.isPatronOnly ?? false,
+          streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+          beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
         setUserPostReels((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));
@@ -988,6 +1037,8 @@ export default function Feed() {
           musicTrackId: defaultMusicId,
           available: false,
           patronOnly: p.isPatronOnly ?? false,
+          streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+          beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
         setUserPostReels((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));

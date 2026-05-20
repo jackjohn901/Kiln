@@ -19,6 +19,7 @@ interface Drop {
   dropDate: string;
   technique: string | null;
   isOnWaitlist: boolean;
+  waitlistCount?: number;
 }
 
 function formatPrice(n: number) {
@@ -126,6 +127,12 @@ function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (i
         <div>
           <p className="text-lg font-semibold text-amber-300">{formatPrice(drop.price)}</p>
           <p className="text-xs text-stone-500">{drop.technique ?? "Studio work"} · Ed. {drop.edition}</p>
+          {drop.status === "upcoming" && (drop.waitlistCount ?? 0) > 0 && (
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-amber-400/80">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+              {drop.waitlistCount} {drop.waitlistCount === 1 ? "person" : "people"} waiting
+            </p>
+          )}
         </div>
         {!isSold && drop.status === "live" && (
           <button onClick={handleBuyNow} disabled={buyingNow}

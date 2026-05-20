@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { dropsTable, dropWaitlistsTable, notificationsTable } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -19,7 +19,16 @@ router.get("/drops", async (req, res): Promise<void> => {
       const w = await db.select({ dropId: dropWaitlistsTable.dropId }).from(dropWaitlistsTable).where(eq(dropWaitlistsTable.userId, viewerId));
       waitlistIds = new Set(w.map(x => x.dropId));
     }
-    res.json({ drops: rows.map(d => ({ ...d, isOnWaitlist: waitlistIds.has(d.id), dropDate: d.dropDate.toISOString(), createdAt: d.createdAt.toISOString() })) });
+    // Batch waitlist counts for all drops
+    const dropIds = rows.map(d => d.id);
+    const countRows = dropIds.length
+      ? await db.select({ dropId: dropWaitlistsTable.dropId, count: sql<number>`cast(count(*) as int)` })
+          .from(dropWaitlistsTable)
+          .where(inArray(dropWaitlistsTable.dropId, dropIds))
+          .groupBy(dropWaitlistsTable.dropId)
+      : [];
+    const waitlistCounts = new Map(countRows.map(r => [r.dropId, r.count]));
+    res.json({ drops: rows.map(d => ({ ...d, isOnWaitlist: waitlistIds.has(d.id), waitlistCount: waitlistCounts.get(d.id) ?? 0, dropDate: d.dropDate.toISOString(), createdAt: d.createdAt.toISOString() })) });
   } catch (err) { req.log.error({ err }, "getDrops error"); res.status(500).json({ error: "Failed to load drops" }); }
 });
 
@@ -30,7 +39,8 @@ router.get("/drops/:id", async (req, res): Promise<void> => {
   const viewerId = req.isAuthenticated() ? req.user.id : null;
   let isOnWaitlist = false;
   if (viewerId) { const [w] = await db.select().from(dropWaitlistsTable).where(and(eq(dropWaitlistsTable.dropId, drop.id), eq(dropWaitlistsTable.userId, viewerId))); isOnWaitlist = !!w; }
-  res.json({ ...drop, isOnWaitlist, dropDate: drop.dropDate.toISOString(), createdAt: drop.createdAt.toISOString() });
+  const [countRow] = await db.select({ count: sql<number>`cast(count(*) as int)` }).from(dropWaitlistsTable).where(eq(dropWaitlistsTable.dropId, drop.id));
+  res.json({ ...drop, isOnWaitlist, waitlistCount: countRow?.count ?? 0, dropDate: drop.dropDate.toISOString(), createdAt: drop.createdAt.toISOString() });
 });
 
 // POST /drops — create drop

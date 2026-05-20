@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Flame, Clock, Box, CheckCircle, X, Plus, Thermometer, Wind } from "lucide-react";
+import { ChevronLeft, Flame, Clock, Box, CheckCircle, X, Plus, Thermometer, Wind, Eye } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   SEED_KILN_STATUSES, getUserKilnStatus, saveUserKilnStatus,
   getFiringProgress, getFiringETA, getHoursAgo,
@@ -40,8 +41,8 @@ function getLiveTemp(cone: string, progress: number): string {
   return `~${liveTemp.toLocaleString()}°F`;
 }
 
-function FiringCard({ status, isMine = false, onClear }: {
-  status: KilnFiringStatus; isMine?: boolean; onClear?: () => void;
+function FiringCard({ status, isMine = false, onClear, viewerCount = 0 }: {
+  status: KilnFiringStatus; isMine?: boolean; onClear?: () => void; viewerCount?: number;
 }) {
   const [progress, setProgress] = useState(getFiringProgress(status));
   const [eta, setEta] = useState(getFiringETA(status));
@@ -88,6 +89,12 @@ function FiringCard({ status, isMine = false, onClear }: {
               )}
               {isMine && <p className="text-sm font-semibold text-amber-200">Your firing</p>}
               <p className="text-xs text-stone-500 mt-0.5">{status.cone}</p>
+              {viewerCount > 0 && (
+                <span className="mt-1.5 flex w-fit items-center gap-1 rounded-full bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+                  <Eye size={8} className="text-rose-400 animate-pulse" />
+                  {viewerCount} watching live
+                </span>
+              )}
             </div>
             {isMine && onClear && (
               <button
@@ -169,16 +176,19 @@ function apiFiringToStatus(f: ApiFiring): KilnFiringStatus {
     notes: f.notes || undefined,
     startedAt: f.startedAt,
     estimatedHours: f.estimatedHours,
+    firingId: f.id,
   };
 }
 
 export default function KilnStatus() {
   const { following } = useSocial();
   const { profile } = useProfile();
+  const { subscribe, send } = useWebSocket();
   const [myStatus, setMyStatus] = useState<KilnFiringStatus | null>(() => getUserKilnStatus());
   const [myFiringId, setMyFiringId] = useState<string | null>(null);
   const [apiFirings, setApiFirings] = useState<ApiFiring[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
 
   const [cone, setCone] = useState(CONE_OPTIONS[1]!);
   const [fuel, setFuel] = useState("Electric");
@@ -201,6 +211,16 @@ export default function KilnStatus() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!apiFirings.length) return;
+    const unsub = subscribe("firing-viewers", (evt) => {
+      const { firingId, count } = evt as { firingId: string; count: number };
+      if (firingId) setViewerCounts(prev => ({ ...prev, [firingId]: count }));
+    });
+    apiFirings.forEach(f => send({ type: "join-firing", firingId: f.id }));
+    return unsub;
+  }, [apiFirings, subscribe, send]);
 
   const apiIds = new Set(apiFirings.map(f => f.userId));
   const followedFirings = [
@@ -281,7 +301,7 @@ export default function KilnStatus() {
           </div>
 
           {myStatus && (
-            <FiringCard status={myStatus} isMine onClear={clearStatus} />
+            <FiringCard status={myStatus} isMine onClear={clearStatus} viewerCount={myFiringId ? (viewerCounts[myFiringId] ?? 0) : 0} />
           )}
 
           <AnimatePresence>
@@ -387,7 +407,7 @@ export default function KilnStatus() {
           <div className="mb-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">🔥 Artists you follow — firing now</h2>
             <div className="space-y-3">
-              {followedFirings.map((s) => <FiringCard key={s.artistId} status={s} />)}
+              {followedFirings.map((s) => <FiringCard key={s.artistId} status={s} viewerCount={s.firingId ? (viewerCounts[s.firingId] ?? 0) : 0} />)}
             </div>
           </div>
         )}
@@ -397,7 +417,7 @@ export default function KilnStatus() {
           <h2 className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">Community — active firings</h2>
           <div className="space-y-3">
             {(followedFirings.length > 0 ? otherFirings : SEED_KILN_STATUSES).map((s) => (
-              <FiringCard key={s.artistId} status={s} />
+              <FiringCard key={s.artistId} status={s} viewerCount={s.firingId ? (viewerCounts[s.firingId] ?? 0) : 0} />
             ))}
           </div>
         </div>

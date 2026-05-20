@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
-  Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark,
+  Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark, Images,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
@@ -109,9 +109,13 @@ export default function Create() {
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
   const [durationError, setDurationError] = useState("");
   const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [isReveal, setIsReveal] = useState(false);
+  const [beforeFile, setBeforeFile] = useState<File | null>(null);
+  const [beforePreview, setBeforePreview] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const additionalInputRef = useRef<HTMLInputElement>(null);
+  const beforeInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_VIDEO_SECONDS = 60;
 
@@ -246,6 +250,17 @@ export default function Create() {
         }
       }
 
+      // Upload "before" image for reveal format
+      let beforeImageUrl: string | null = null;
+      if (isReveal && beforeFile) {
+        try {
+          const r = await upload(beforeFile);
+          beforeImageUrl = r.servingUrl;
+        } catch {
+          try { beforeImageUrl = await fileToDataUrl(beforeFile); } catch { /* skip */ }
+        }
+      }
+
       // Upload additional carousel images
       const extraUrls: string[] = [];
       for (const extraFile of additionalFiles) {
@@ -296,6 +311,7 @@ export default function Create() {
           thumbnailUrl: mediaType === "image" ? mediaUrl : null,
           technique: technique || null,
           tags: [...(technique ? [technique] : []), ...(stage ? [stage] : []), ...tags],
+          beforeImageUrl: beforeImageUrl,
           isPatronOnly,
           scheduledAt: scheduledAt || null,
           isDraft: scheduledAt ? true : false,
@@ -856,6 +872,53 @@ export default function Create() {
               </button>
               {isPatronOnly && (
                 <p className="mt-2 text-xs text-amber-600/80">This post will be blurred in the feed for non-patrons with an invitation to subscribe.</p>
+              )}
+            </div>
+
+            {/* Reveal format toggle */}
+            <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-4 space-y-3">
+              <button
+                onClick={() => { setIsReveal(v => !v); if (isReveal) { setBeforeFile(null); setBeforePreview(""); } }}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Images size={14} className={isReveal ? "text-amber-400" : "text-stone-500"} />
+                  <div>
+                    <p className={`text-sm font-medium ${isReveal ? "text-amber-200" : "text-stone-300"}`}>Before / After reveal</p>
+                    <p className="text-xs text-stone-600">Upload a "before" photo to create a reveal moment in the feed</p>
+                  </div>
+                </div>
+                <div className={`h-5 w-9 rounded-full transition-colors ${isReveal ? "bg-amber-500" : "bg-stone-700"} relative`}>
+                  <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isReveal ? "translate-x-4" : "translate-x-0.5"}`} />
+                </div>
+              </button>
+              {isReveal && (
+                <div className="pt-2 border-t border-white/8 space-y-2">
+                  <p className="text-xs text-stone-500">Your current media is the "after" — upload the "before":</p>
+                  <input ref={beforeInputRef} type="file" accept="image/*" className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setBeforeFile(f);
+                      setBeforePreview(URL.createObjectURL(f));
+                      e.target.value = "";
+                    }}
+                  />
+                  {beforePreview ? (
+                    <div className="relative">
+                      <img src={beforePreview} alt="Before" className="w-full max-h-32 rounded-xl object-cover" />
+                      <button onClick={() => { setBeforeFile(null); setBeforePreview(""); }}
+                        className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-red-500/70 transition-colors">
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => beforeInputRef.current?.click()}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 py-3 text-xs text-stone-500 hover:border-amber-500/30 hover:text-amber-400 transition-colors">
+                      <ImageIcon size={13} /> Upload before image
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 

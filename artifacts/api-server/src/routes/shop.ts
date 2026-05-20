@@ -4,6 +4,7 @@ import { listingsTable, wishlistsTable, ordersTable } from "@workspace/db";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
+import { grantFirstAccessToTopSavers } from "./first-access";
 
 const router = Router();
 
@@ -65,6 +66,9 @@ router.post("/listings", async (req, res): Promise<void> => {
       { id: listing.id, caption, thumbnailUrl: imageUrl ?? null, videoUrl: null },
       { updateListingId: listing.id },
     ).catch(() => {});
+
+    // Grant 24h first-access to the artist's top savers (non-blocking)
+    grantFirstAccessToTopSavers(listing.id, user.id).catch(() => {});
 
     res.status(201).json({ listing: { ...listing, createdAt: listing.createdAt.toISOString(), updatedAt: listing.updatedAt.toISOString() } });
   } catch (err) { req.log.error({ err }, "createListing error"); res.status(500).json({ error: "Failed to create listing" }); }

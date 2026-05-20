@@ -53,5 +53,11 @@ export function useWebSocket() {
     return () => { handlers.get(type)?.delete(handler); };
   }, []);
 
-  return { subscribe };
+  const send = useCallback((data: Record<string, unknown>) => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(data));
+    }
+  }, []);
+
+  return { subscribe, send };
 }
