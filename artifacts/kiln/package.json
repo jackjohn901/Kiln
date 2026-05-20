@@ -76,6 +76,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@imgly/background-removal": "^1.7.0",
     "@mux/mux-player-react": "^3.13.0",
     "@uppy/aws-s3": "^5.1.0",
     "@uppy/core": "^5.2.0",

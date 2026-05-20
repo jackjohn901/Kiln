@@ -3,6 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
+import BgRemoveToggle from "@/components/BgRemoveToggle";
 
 const MEDIUMS = [
   "Blown Glass", "Cast Glass", "Fused Glass", "Flameworked Glass",
@@ -46,6 +47,8 @@ export default function CreateListing() {
     }
   }, [search]);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [bgFile, setBgFile] = useState<File | null>(null);
+  const [bgPreview, setBgPreview] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
@@ -71,6 +74,8 @@ export default function CreateListing() {
     if (!f) return;
     setImageFile(f);
     setImagePreview(URL.createObjectURL(f));
+    setBgFile(null);
+    setBgPreview("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -80,12 +85,13 @@ export default function CreateListing() {
     setSubmitting(true);
     try {
       let imageUrl = form.imageUrl;
-      if (imageFile) {
+      const fileToUpload = bgFile ?? imageFile;
+      if (fileToUpload) {
         try {
-          const r = await upload(imageFile);
+          const r = await upload(fileToUpload);
           imageUrl = r.servingUrl;
         } catch {
-          imageUrl = imagePreview;
+          imageUrl = bgPreview || imagePreview;
         }
       }
       const res = await fetch("/api/listings", {
@@ -159,15 +165,22 @@ export default function CreateListing() {
             <label className="mb-2 block text-sm font-medium text-stone-400">Photo</label>
             <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
             {imagePreview ? (
-              <div className="relative w-full aspect-square overflow-hidden rounded-xl border border-white/10 bg-stone-900">
-                <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => { setImagePreview(""); setImageFile(null); }}
-                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
-                >
-                  <X size={14} />
-                </button>
+              <div className="space-y-3">
+                <div className="relative w-full aspect-square overflow-hidden rounded-xl border border-white/10 bg-stone-900">
+                  <img src={bgPreview || imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImagePreview(""); setImageFile(null); setBgFile(null); setBgPreview(""); }}
+                    className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <BgRemoveToggle
+                  sourceFile={imageFile}
+                  onResult={(url, file) => { setBgPreview(url); setBgFile(file); }}
+                  onReset={() => { setBgPreview(""); setBgFile(null); }}
+                />
               </div>
             ) : (
               <button

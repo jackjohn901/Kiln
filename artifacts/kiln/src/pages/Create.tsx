@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
+import BgRemoveToggle from "@/components/BgRemoveToggle";
 import MusicPicker from "@/components/MusicPicker";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -72,6 +73,8 @@ export default function Create() {
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [bgFile, setBgFile] = useState<File | null>(null);
+  const [bgPreview, setBgPreview] = useState("");
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
   const [filterCss, setFilterCss] = useState("");
@@ -137,6 +140,8 @@ export default function Create() {
       setFile(f);
       setMediaType("image");
       setPreviewUrl(URL.createObjectURL(f));
+      setBgFile(null);
+      setBgPreview("");
       setStep("edit");
     }
   }, []);
@@ -230,12 +235,14 @@ export default function Create() {
           mediaUrl = await storeBlob(file);
         }
       } else if (file) {
-        // Images: try server upload, fall back to base64
+        // Images: prefer bg-removed file if available, then try server upload
+        const imgFile = bgFile ?? file;
+        if (bgPreview) mediaUrl = bgPreview;
         try {
-          const result = await upload(file);
+          const result = await upload(imgFile);
           mediaUrl = result.servingUrl;
         } catch {
-          try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
+          try { mediaUrl = await fileToDataUrl(imgFile); } catch { /* keep previewUrl */ }
         }
       }
 
@@ -507,13 +514,22 @@ export default function Create() {
           <div className="space-y-4">
             {mediaType === "image" ? (
               <ImageEditor
-                previewUrl={previewUrl}
+                previewUrl={bgPreview || previewUrl}
                 onChange={(s, css) => { setFilterSettings(s); setFilterCss(css); }}
               />
             ) : (
               <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
                 <video src={previewUrl} controls className="h-full w-full" />
               </div>
+            )}
+
+            {/* Background removal — images only */}
+            {mediaType === "image" && (
+              <BgRemoveToggle
+                sourceFile={file}
+                onResult={(url, f) => { setBgPreview(url); setBgFile(f); }}
+                onReset={() => { setBgPreview(""); setBgFile(null); }}
+              />
             )}
 
             {/* Music picker toggle */}
