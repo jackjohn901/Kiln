@@ -28,6 +28,7 @@ const router: IRouter = Router();
 // lifetime (cleared on restart), which covers the typical retry window.
 const manualPayoutReceiptSent = new Set<string>();
 const manualPayoutArtistNotified = new Set<string>();
+const connectArtistNotified = new Set<string>();
 
 interface CartLineItem {
   name: string;
@@ -788,6 +789,102 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
             } catch (artistEmailErr) {
               logger.error({ err: artistEmailErr, sessionId: session.id }, 'Failed to send manual-payout artist notification email');
             }
+          }
+        }
+
+        // 7. Stripe Connect listing sale — send artist notification email and
+        //    create an in-app notification. This mirrors the manual-payout path
+        //    (section 6b) but fires when the order was routed through the artist's
+        //    connected Stripe account (manualPayout is NOT set).
+        if (!meta.manualPayout && meta.listingIds && !connectArtistNotified.has(session.id)) {
+          connectArtistNotified.add(session.id);
+          try {
+            const ids = meta.listingIds.split(',').filter(Boolean);
+            const qtys = (meta.listingQtys ?? '').split(',').map((q) => parseInt(q, 10) || 1);
+
+            const listingRows = ids.length > 0
+              ? await db
+                  .select({ id: listingsTable.id, title: listingsTable.title, artistId: listingsTable.artistId })
+                  .from(listingsTable)
+                  .where(inArray(listingsTable.id, ids))
+              : [];
+
+            const artistIds = [...new Set(listingRows.map((r) => r.artistId))];
+
+            if (artistIds.length > 0) {
+              const [artistUserRows, artistSettingsRows] = await Promise.all([
+                db
+                  .select({ id: usersTable.id, email: usersTable.email })
+                  .from(usersTable)
+                  .where(inArray(usersTable.id, artistIds)),
+                db
+                  .select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                  .from(userSettingsTable)
+                  .where(inArray(userSettingsTable.userId, artistIds)),
+              ]);
+
+              const artistSettingsMap = new Map(
+                artistSettingsRows.map((r) => [r.userId, r.settings as Record<string, unknown> | null]),
+              );
+
+              const buyerName = session.customer_details?.name ?? '';
+              const buyerEmail = session.customer_email ?? session.customer_details?.email ?? '';
+              const amountTotal = session.amount_total ?? 0;
+
+              for (const artist of artistUserRows) {
+                const artistItems = ids
+                  .map((id, idx) => {
+                    const listing = listingRows.find((r) => r.id === id && r.artistId === artist.id);
+                    if (!listing) return null;
+                    return { title: listing.title, quantity: qtys[idx] ?? 1 };
+                  })
+                  .filter((item): item is { title: string; quantity: number } => item !== null);
+
+                if (artistItems.length === 0) continue;
+
+                // Respect the artist's email notification preference (default: opt-in).
+                const artistSettings = artistSettingsMap.get(artist.id);
+                const wantsEmail = artistSettings?.notif_email_new_sale !== false;
+                if (wantsEmail && artist.email) {
+                  const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
+                  await sendEmail({
+                    to: artist.email,
+                    subject: 'You have a new sale on Kiln',
+                    html,
+                  });
+                }
+
+                // Always insert an in-app notification regardless of email preference.
+                const itemSummary = artistItems.map((item) =>
+                  item.quantity > 1 ? `${item.title} ×${item.quantity}` : item.title,
+                );
+                const amountDollars = (amountTotal / 100).toFixed(2);
+                const notifText = itemSummary.length === 1
+                  ? `New sale: "${itemSummary[0]}" — $${amountDollars}`
+                  : `New sale: ${itemSummary.length} items — $${amountDollars}`;
+
+                await db.insert(notificationsTable).values({
+                  id: crypto.randomUUID(),
+                  userId: artist.id,
+                  type: 'sale',
+                  fromName: buyerName || 'A buyer',
+                  text: notifText,
+                  link: '/earnings',
+                  read: false,
+                });
+
+                broadcast(artist.id, {
+                  type: 'notification',
+                  userId: artist.id,
+                  notifType: 'sale',
+                  fromName: buyerName || 'A buyer',
+                  text: notifText,
+                  link: '/earnings',
+                });
+              }
+            }
+          } catch (connectArtistEmailErr) {
+            logger.error({ err: connectArtistEmailErr, sessionId: session.id }, 'Failed to send Stripe Connect artist notification');
           }
         }
 
