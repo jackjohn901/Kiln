@@ -78,19 +78,11 @@ export default function OrderDetail() {
         if (r.status === 404) { setNotFound(true); return null; }
         return r.ok ? r.json() : null;
       })
-      .then(async data => {
+      .then(data => {
         if (!data?.order) return;
-        const primary: Order = data.order;
-        setOrder(primary);
-        if (primary.notes && primary.notes.startsWith("stripe:")) {
-          const allData = await fetch("/api/me/orders", { credentials: "include" })
-            .then(r => r.ok ? r.json() : null)
-            .catch(() => null);
-          const siblings: Order[] = (allData?.orders ?? []).filter(
-            (o: Order) => o.notes === primary.notes
-          );
-          setSiblingOrders(siblings.length > 1 ? siblings : []);
-        }
+        setOrder(data.order as Order);
+        const siblings: Order[] = data.siblingOrders ?? [];
+        setSiblingOrders(siblings.length > 1 ? siblings : []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -306,7 +298,7 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {order.notes && (
+        {order.notes && !order.notes.startsWith("stripe:") && (
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Notes</p>
             <div className="flex items-start gap-2">

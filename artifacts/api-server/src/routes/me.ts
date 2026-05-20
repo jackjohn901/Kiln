@@ -105,11 +105,13 @@ router.get("/me/orders", async (req, res): Promise<void> => {
   }
 });
 
-// GET /me/orders/:id — fetch a single order for the current user
+// GET /me/orders/:id — fetch a single order for the current user.
+// When the order belongs to a multi-item Stripe session (notes starts with "stripe:"),
+// the response also includes all sibling orders from that same session as `siblingOrders`.
 router.get("/me/orders/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
-    const rows = await db.select({
+    const orderColumns = {
       id: ordersTable.id,
       type: ordersTable.type,
       refId: ordersTable.refId,
@@ -128,12 +130,25 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
       manualPayout: ordersTable.manualPayout,
       createdAt: ordersTable.createdAt,
       updatedAt: ordersTable.updatedAt,
-    }).from(ordersTable)
+    } as const;
+
+    const rows = await db.select(orderColumns).from(ordersTable)
       .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.buyerId, req.user.id)))
       .limit(1);
 
     if (rows.length === 0) { res.status(404).json({ error: "Order not found" }); return; }
-    res.json({ order: rows[0] });
+
+    const order = rows[0];
+
+    // If this order is part of a multi-item Stripe checkout session, fetch all sibling orders
+    // (same session key, same buyer) so the receipt page can show the complete purchase.
+    let siblingOrders: typeof rows = [];
+    if (order.notes && order.notes.startsWith("stripe:")) {
+      siblingOrders = await db.select(orderColumns).from(ordersTable)
+        .where(and(eq(ordersTable.notes, order.notes), eq(ordersTable.buyerId, req.user.id)));
+    }
+
+    res.json({ order, siblingOrders });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });
