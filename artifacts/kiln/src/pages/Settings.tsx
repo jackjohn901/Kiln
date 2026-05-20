@@ -548,6 +548,50 @@ export default function Settings() {
                 </div>
               )}
 
+              {/* Buyer preview */}
+              <div>
+                <p className="text-xs text-stone-500 mb-2">Buyer preview</p>
+                <div className="rounded-xl border border-white/8 bg-stone-800/40 overflow-hidden divide-y divide-white/5">
+                  {(
+                    [
+                      { label: "Domestic buyer (USA)", flag: "🇺🇸", type: "domestic" as const },
+                      { label: "International buyer", flag: "🌍", type: "international" as const },
+                    ] as const
+                  ).map(({ label, flag, type }) => {
+                    const sampleTotal = 45;
+                    let cost: string;
+                    if (shipping.offerFreeShipping) {
+                      cost = "Free shipping";
+                    } else if (shipping.freeThreshold > 0 && sampleTotal >= shipping.freeThreshold) {
+                      cost = "Free shipping";
+                    } else {
+                      const rate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
+                      cost = rate === 0 ? "Free shipping" : `$${rate.toFixed(2)}`;
+                    }
+                    const isFree = cost === "Free shipping";
+                    return (
+                      <div key={type} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base leading-none">{flag}</span>
+                          <div>
+                            <p className="text-xs text-stone-300">{label}</p>
+                            <p className="text-[10px] text-stone-600 mt-0.5">Sample $45 order</p>
+                          </div>
+                        </div>
+                        <span className={`text-sm font-semibold ${isFree ? "text-emerald-400" : "text-stone-200"}`}>
+                          {cost}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {!shipping.offerFreeShipping && shipping.freeThreshold > 0 && (
+                  <p className="text-[10px] text-stone-600 mt-1.5">
+                    Orders over ${shipping.freeThreshold.toFixed(0)} qualify for free shipping
+                  </p>
+                )}
+              </div>
+
               <button
                 onClick={() => saveShipping(shipping)}
                 className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"

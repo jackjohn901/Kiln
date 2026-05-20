@@ -217,6 +217,58 @@ export default function ShippingSettingsScreen() {
               </View>
             </View>
 
+            {/* Buyer preview */}
+            <View style={styles.previewSection}>
+              <Text style={[styles.previewHeading, { color: colors.mutedForeground }]}>
+                Buyer preview
+              </Text>
+              <View style={[styles.previewCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                {(
+                  [
+                    { label: "Domestic buyer (USA)", flag: "🇺🇸", type: "domestic" as const },
+                    { label: "International buyer", flag: "🌍", type: "international" as const },
+                  ] as const
+                ).map(({ label, flag, type }, idx) => {
+                  const sampleTotal = 45;
+                  let cost: string;
+                  if (shipping.offerFreeShipping) {
+                    cost = "Free shipping";
+                  } else if (shipping.freeThreshold > 0 && sampleTotal >= shipping.freeThreshold) {
+                    cost = "Free shipping";
+                  } else {
+                    const rate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
+                    cost = rate === 0 ? "Free shipping" : `$${rate.toFixed(2)}`;
+                  }
+                  const isFree = cost === "Free shipping";
+                  return (
+                    <View
+                      key={type}
+                      style={[
+                        styles.previewRow,
+                        idx === 0 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border } : undefined,
+                      ]}
+                    >
+                      <View style={styles.previewRowLeft}>
+                        <Text style={styles.previewFlag}>{flag}</Text>
+                        <View>
+                          <Text style={[styles.previewRowLabel, { color: colors.foreground }]}>{label}</Text>
+                          <Text style={[styles.previewRowSub, { color: colors.mutedForeground }]}>Sample $45 order</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.previewCost, { color: isFree ? "#34D399" : colors.foreground }]}>
+                        {cost}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {!shipping.offerFreeShipping && shipping.freeThreshold > 0 && (
+                <Text style={[styles.previewNote, { color: colors.mutedForeground }]}>
+                  Orders over ${shipping.freeThreshold.toFixed(0)} qualify for free shipping
+                </Text>
+              )}
+            </View>
+
             <Pressable
               style={[
                 styles.saveBtn,
@@ -321,4 +373,24 @@ const styles = StyleSheet.create({
   },
   tipText: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 },
   tipBold: { fontFamily: "Inter_500Medium" },
+  previewSection: { gap: 8 },
+  previewHeading: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  previewCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  previewRowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  previewFlag: { fontSize: 18 },
+  previewRowLabel: { fontFamily: "Inter_500Medium", fontSize: 13 },
+  previewRowSub: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 },
+  previewCost: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  previewNote: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 15 },
 });
