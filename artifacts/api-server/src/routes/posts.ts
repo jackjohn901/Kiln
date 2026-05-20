@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 import { updateStreak } from "./streaks";
 import { awardBadge } from "./badges";
+import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
 
 const router = Router();
 
@@ -45,6 +46,16 @@ router.post("/posts", async (req, res): Promise<void> => {
     }).returning();
 
     updateStreak(user.id).catch(() => {});
+
+    // Auto-post to connected social platforms (non-blocking, only for published posts)
+    if (!asDraft) {
+      autoPostToConnectedPlatforms(user.id, {
+        id: post.id,
+        caption: post.caption,
+        videoUrl: post.videoUrl ?? null,
+        thumbnailUrl: post.thumbnailUrl ?? null,
+      }).catch(() => {});
+    }
 
     db.select({ count: sql`COUNT(*)` })
       .from(postsTable)

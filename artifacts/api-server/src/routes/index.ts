@@ -71,6 +71,7 @@ import newslettersRouter from "./newsletters";
 import mentorshipRouter from "./mentorship";
 import critiquesRouter from "./critiques";
 import foundingArtistRouter from "./founding-artist";
+import socialConnectRouter from "./social-connect";
 
 const router: IRouter = Router();
 
@@ -146,5 +147,6 @@ router.use(newslettersRouter);
 router.use(mentorshipRouter);
 router.use(critiquesRouter);
 router.use(foundingArtistRouter);
+router.use(socialConnectRouter);
 
 export default router;

@@ -124,6 +124,7 @@ import AdminReports from "@/pages/AdminReports";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import FoundingArtist from "@/pages/FoundingArtist";
 import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
+import SocialSync from "@/pages/SocialSync";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 
@@ -327,6 +328,7 @@ function Router() {
       <Route path="/admin/reports" component={AdminReports} />
       <Route path="/admin/founding-artists" component={AdminFoundingArtists} />
       <Route path="/founding-artist" component={FoundingArtist} />
+      <Route path="/social-sync" component={SocialSync} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route component={NotFound} />
       </Switch>

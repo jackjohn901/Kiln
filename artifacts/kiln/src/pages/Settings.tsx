@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -489,6 +489,16 @@ export default function Settings() {
                 <div className="flex items-center gap-3">
                   <Shield size={16} className="text-blue-400" />
                   <span className="text-sm text-stone-200">Apply for verification</span>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/social-sync" className="flex items-center justify-between px-5 py-4 border-t border-white/5 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Share2 size={16} className="text-amber-400" />
+                  <div>
+                    <span className="text-sm text-stone-200">Social Sync</span>
+                    <p className="text-xs text-stone-600 mt-0.5">Auto-post to Instagram, TikTok & Facebook</p>
+                  </div>
                 </div>
                 <ChevronRight size={14} className="text-stone-600" />
               </Link>
