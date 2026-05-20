@@ -38,6 +38,7 @@ interface KilnSettings {
   notif_email_digest: boolean;
   notif_email_follows: boolean;
   notif_email_comments: boolean;
+  notif_email_new_sale: boolean;
   privacy_profile_public: boolean;
   privacy_show_location: boolean;
   privacy_allow_messages: boolean;
@@ -66,6 +67,7 @@ function defaultSettings(): KilnSettings {
     notif_email_digest: false,
     notif_email_follows: false,
     notif_email_comments: false,
+    notif_email_new_sale: true,
     privacy_profile_public: true,
     privacy_show_location: true,
     privacy_allow_messages: true,
@@ -279,6 +281,7 @@ export default function Settings() {
             <Toggle settingKey="notif_email_digest" label="Weekly digest" desc="Top posts, opportunities, and updates" />
             <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
             <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
+            <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
             <div className="py-3">
               <p className="text-sm text-stone-200 mb-1">Notification email address</p>
               <p className="text-xs text-stone-600 mb-2">Where we send email alerts. Never shown publicly.</p>

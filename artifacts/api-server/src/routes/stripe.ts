@@ -676,10 +676,20 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
               const artistIds = [...new Set(listingRows.map((r) => r.artistId))];
 
               if (artistIds.length > 0) {
-                const artistUserRows = await db
-                  .select({ id: usersTable.id, email: usersTable.email })
-                  .from(usersTable)
-                  .where(inArray(usersTable.id, artistIds));
+                const [artistUserRows, artistSettingsRows] = await Promise.all([
+                  db
+                    .select({ id: usersTable.id, email: usersTable.email })
+                    .from(usersTable)
+                    .where(inArray(usersTable.id, artistIds)),
+                  db
+                    .select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                    .from(userSettingsTable)
+                    .where(inArray(userSettingsTable.userId, artistIds)),
+                ]);
+
+                const artistSettingsMap = new Map(
+                  artistSettingsRows.map((r) => [r.userId, r.settings as Record<string, unknown> | null]),
+                );
 
                 const buyerName = session.customer_details?.name ?? '';
                 const buyerEmail = session.customer_email ?? session.customer_details?.email ?? '';
@@ -687,6 +697,12 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
 
                 for (const artist of artistUserRows) {
                   if (!artist.email) continue;
+
+                  // Respect the artist's email-notification preference for new sales.
+                  // Default is opt-in (true); only skip if explicitly set to false.
+                  const artistSettings = artistSettingsMap.get(artist.id);
+                  const wantsEmail = artistSettings?.notif_email_new_sale !== false;
+                  if (!wantsEmail) continue;
 
                   const artistItems = ids
                     .map((id, idx) => {
