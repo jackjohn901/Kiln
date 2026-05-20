@@ -76,10 +76,29 @@ router.get("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
     const { desc } = await import("drizzle-orm");
-    const orders = await db.select().from(ordersTable)
+    const rows = await db.select({
+      id: ordersTable.id,
+      type: ordersTable.type,
+      refId: ordersTable.refId,
+      title: ordersTable.title,
+      description: ordersTable.description,
+      imageUrl: ordersTable.imageUrl,
+      amount: ordersTable.amount,
+      currency: ordersTable.currency,
+      status: ordersTable.status,
+      sellerId: ordersTable.sellerId,
+      shippingAddress: ordersTable.shippingAddress,
+      trackingNumber: ordersTable.trackingNumber,
+      notes: ordersTable.notes,
+      processingWindowDays: ordersTable.processingWindowDays,
+      processingWindowLabel: ordersTable.processingWindowLabel,
+      manualPayout: ordersTable.manualPayout,
+      createdAt: ordersTable.createdAt,
+      updatedAt: ordersTable.updatedAt,
+    }).from(ordersTable)
       .where(eq(ordersTable.buyerId, req.user.id))
       .orderBy(desc(ordersTable.createdAt));
-    res.json({ orders });
+    res.json({ orders: rows });
   } catch (err) {
     logger.error({ err }, "me/orders GET error");
     res.status(500).json({ error: "Failed to load orders" });
