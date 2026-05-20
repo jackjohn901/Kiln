@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 import Nav from "@/components/Nav";
 
 interface Order {
@@ -54,9 +54,9 @@ function formatDate(iso: string) {
 function ManualReceiptSection({ order }: { order: Order }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-2 border-t border-white/6 pt-2">
+    <div className="mt-2 border-t border-white/6 pt-2" onClick={e => e.preventDefault()}>
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
         className="flex items-center gap-1 text-[11px] text-amber-400/80 hover:text-amber-300 transition-colors"
       >
         {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
@@ -193,7 +193,8 @@ export default function Orders() {
             const TypeIcon = typeConf.icon;
             const StatusIcon = statusConf.icon;
             return (
-              <div key={order.id} className="rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+              <Link key={order.id} href={`/orders/${order.id}`}>
+              <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-4 hover:border-amber-500/20 hover:bg-stone-900/70 transition-colors cursor-pointer">
                 <div className="flex items-start gap-3">
                   <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
                     {order.imageUrl ? (
@@ -246,6 +247,7 @@ export default function Orders() {
                 </div>
                 {order.manualPayout && <ManualReceiptSection order={order} />}
               </div>
+              </Link>
             );
           })}
         </div>
