@@ -270,6 +270,22 @@ export default function ProfileScreen() {
 
       {!isEditing && (
         <>
+          {/* Quick links */}
+          <View style={[styles.quickLinks, { borderColor: colors.border }]}>
+            <Pressable
+              style={[styles.quickLinkItem, { borderBottomColor: colors.border }]}
+              onPress={() => router.push("/payment-settings" as any)}
+            >
+              <View style={styles.quickLinkLeft}>
+                <Feather name="credit-card" size={16} color={colors.primary} />
+                <Text style={[styles.quickLinkLabel, { color: colors.foreground }]}>
+                  Payment Methods
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
+
           {/* Tab switcher */}
           <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
             {(["posts", "saved"] as const).map((tab) => (
@@ -418,6 +434,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  quickLinks: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  quickLinkItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  quickLinkLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  quickLinkLabel: { fontFamily: "Inter_500Medium", fontSize: 14 },
   tabBar: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
