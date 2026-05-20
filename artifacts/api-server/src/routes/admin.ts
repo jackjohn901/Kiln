@@ -1,6 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, reportsTable, verificationApplicationsTable, profilesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import {
+  db, reportsTable, verificationApplicationsTable, profilesTable,
+  postsTable, followsTable, likesTable, ordersTable,
+  commissionsTable, workshopsTable, workshopBookingsTable,
+} from "@workspace/db";
+import { eq, desc, sql, gte, count } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -137,6 +141,145 @@ router.patch("/admin/verifications/:id/reject", async (req, res): Promise<void> 
   } catch (err) {
     req.log.error({ err }, "admin.rejectVerification error");
     res.status(500).json({ error: "Failed to reject" });
+  }
+});
+
+// GET /api/admin/platform-stats — owner-only platform-wide analytics
+// Gated by CREATOR_USER_ID env var (only the platform owner can access this)
+function isCreator(userId: string): boolean {
+  const creatorId = (process.env["CREATOR_USER_ID"] ?? "").trim();
+  return creatorId.length > 0 && userId === creatorId;
+}
+
+router.get("/admin/platform-stats", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isCreator(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfToday.getDate() - 7);
+  const startOfMonth = new Date(startOfToday); startOfMonth.setDate(startOfToday.getDate() - 30);
+  const startOf90Days = new Date(startOfToday); startOf90Days.setDate(startOfToday.getDate() - 90);
+
+  try {
+    const [
+      totalUsersRows,
+      newTodayRows,
+      newThisWeekRows,
+      newThisMonthRows,
+      totalPostsRows,
+      postsThisWeekRows,
+      totalLikesRows,
+      totalFollowsRows,
+      totalOrdersRows,
+      totalCommissionsRows,
+      totalWorkshopBookingsRows,
+      trendingPostsRows,
+      topArtistsRows,
+      newUsersByDayRows,
+      newPostsByDayRows,
+    ] = await Promise.all([
+      // Total users
+      db.select({ count: sql<number>`count(*)::int` }).from(profilesTable),
+      // New users today
+      db.select({ count: sql<number>`count(*)::int` }).from(profilesTable)
+        .where(gte(profilesTable.createdAt, startOfToday)),
+      // New users this week
+      db.select({ count: sql<number>`count(*)::int` }).from(profilesTable)
+        .where(gte(profilesTable.createdAt, startOfWeek)),
+      // New users this month
+      db.select({ count: sql<number>`count(*)::int` }).from(profilesTable)
+        .where(gte(profilesTable.createdAt, startOfMonth)),
+      // Total posts
+      db.select({ count: sql<number>`count(*)::int` }).from(postsTable)
+        .where(eq(postsTable.isDraft, false)),
+      // Posts this week
+      db.select({ count: sql<number>`count(*)::int` }).from(postsTable)
+        .where(sql`${postsTable.isDraft} = false AND ${postsTable.createdAt} >= ${startOfWeek}`),
+      // Total likes
+      db.select({ count: sql<number>`count(*)::int` }).from(likesTable),
+      // Total follows
+      db.select({ count: sql<number>`count(*)::int` }).from(followsTable),
+      // Total orders
+      db.select({ count: sql<number>`count(*)::int` }).from(ordersTable),
+      // Total commissions
+      db.select({ count: sql<number>`count(*)::int` }).from(commissionsTable),
+      // Total workshop bookings
+      db.select({ count: sql<number>`count(*)::int` }).from(workshopBookingsTable),
+      // Trending posts (most liked in last 7 days)
+      db.select({
+        id: postsTable.id,
+        caption: postsTable.caption,
+        thumbnailUrl: postsTable.thumbnailUrl,
+        likeCount: postsTable.likeCount,
+        commentCount: postsTable.commentCount,
+        viewCount: postsTable.viewCount,
+        authorId: postsTable.authorId,
+        createdAt: postsTable.createdAt,
+      }).from(postsTable)
+        .where(sql`${postsTable.isDraft} = false AND ${postsTable.createdAt} >= ${startOfWeek}`)
+        .orderBy(desc(postsTable.likeCount))
+        .limit(10),
+      // Top artists by follower count
+      db.select({
+        userId: profilesTable.userId,
+        displayName: profilesTable.displayName,
+        avatarUrl: profilesTable.avatarUrl,
+        followerCount: profilesTable.followerCount,
+        location: profilesTable.location,
+      }).from(profilesTable)
+        .orderBy(desc(profilesTable.followerCount))
+        .limit(10),
+      // New users per day for last 90 days
+      db.select({
+        day: sql<string>`to_char(${profilesTable.createdAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      }).from(profilesTable)
+        .where(gte(profilesTable.createdAt, startOf90Days))
+        .groupBy(sql`to_char(${profilesTable.createdAt}, 'YYYY-MM-DD')`)
+        .orderBy(sql`to_char(${profilesTable.createdAt}, 'YYYY-MM-DD')`),
+      // New posts per day for last 90 days
+      db.select({
+        day: sql<string>`to_char(${postsTable.createdAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      }).from(postsTable)
+        .where(sql`${postsTable.isDraft} = false AND ${postsTable.createdAt} >= ${startOf90Days}`)
+        .groupBy(sql`to_char(${postsTable.createdAt}, 'YYYY-MM-DD')`)
+        .orderBy(sql`to_char(${postsTable.createdAt}, 'YYYY-MM-DD')`),
+    ]);
+
+    // Build day maps for charts
+    const usersByDay: Record<string, number> = {};
+    for (const row of newUsersByDayRows) usersByDay[row.day] = row.count;
+
+    const postsByDay: Record<string, number> = {};
+    for (const row of newPostsByDayRows) postsByDay[row.day] = row.count;
+
+    res.json({
+      asOf: now.toISOString(),
+      totals: {
+        users: totalUsersRows[0]?.count ?? 0,
+        newUsersToday: newTodayRows[0]?.count ?? 0,
+        newUsersThisWeek: newThisWeekRows[0]?.count ?? 0,
+        newUsersThisMonth: newThisMonthRows[0]?.count ?? 0,
+        posts: totalPostsRows[0]?.count ?? 0,
+        postsThisWeek: postsThisWeekRows[0]?.count ?? 0,
+        likes: totalLikesRows[0]?.count ?? 0,
+        follows: totalFollowsRows[0]?.count ?? 0,
+        orders: totalOrdersRows[0]?.count ?? 0,
+        commissions: totalCommissionsRows[0]?.count ?? 0,
+        workshopBookings: totalWorkshopBookingsRows[0]?.count ?? 0,
+      },
+      trendingPosts: trendingPostsRows.map((p) => ({
+        ...p,
+        createdAt: p.createdAt.toISOString(),
+      })),
+      topArtists: topArtistsRows,
+      charts: { usersByDay, postsByDay },
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin.platformStats error");
+    res.status(500).json({ error: "Failed to load platform stats" });
   }
 });
 

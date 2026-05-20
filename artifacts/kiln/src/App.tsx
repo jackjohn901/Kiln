@@ -122,6 +122,7 @@ import Referrals from "@/pages/Referrals";
 import Badges from "@/pages/Badges";
 import Search from "@/pages/Search";
 import AdminReports from "@/pages/AdminReports";
+import PlatformAnalytics from "@/pages/PlatformAnalytics";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import FoundingArtist from "@/pages/FoundingArtist";
 import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
@@ -335,6 +336,7 @@ function Router() {
       <Route path="/referrals" component={Referrals} />
       <Route path="/badges" component={Badges} />
       <Route path="/search" component={Search} />
+      <Route path="/admin/platform" component={PlatformAnalytics} />
       <Route path="/admin/reports" component={AdminReports} />
       <Route path="/admin/founding-artists" component={AdminFoundingArtists} />
       <Route path="/founding-artist" component={FoundingArtist} />
