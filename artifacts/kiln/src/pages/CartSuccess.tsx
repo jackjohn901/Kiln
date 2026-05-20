@@ -24,6 +24,7 @@ export default function CartSuccess() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [orderId, setOrderId] = useState<string>(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
+  const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const orderCreated = useRef(false);
@@ -70,7 +71,10 @@ export default function CartSuccess() {
           });
           if (res.ok) {
             const d = await res.json() as { orderIds?: string[]; sellerIds?: string[]; processingWindowDays?: number | null; processingWindowLabel?: string | null };
-            if (d.orderIds?.[0]) setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
+            if (d.orderIds?.[0]) {
+              setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
+              setReceiptOrderId(d.orderIds[0]);
+            }
 
             // Use the processing window stored on the order record — authoritative snapshot
             // taken at purchase time, reliable across page refreshes and localStorage clears.
@@ -200,12 +204,20 @@ export default function CartSuccess() {
           </div>
         </div>
 
-        <div className="flex gap-3 justify-center">
-          <Link href="/orders">
-            <button className="flex items-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
-              View Orders <ArrowRight size={14} />
-            </button>
-          </Link>
+        <div className="flex gap-3 justify-center flex-wrap">
+          {receiptOrderId ? (
+            <Link href={`/orders/${receiptOrderId}`}>
+              <button className="flex items-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
+                View Receipt <ArrowRight size={14} />
+              </button>
+            </Link>
+          ) : (
+            <Link href="/orders">
+              <button className="flex items-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
+                View Orders <ArrowRight size={14} />
+              </button>
+            </Link>
+          )}
           <Link href="/shop">
             <button className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors">
               Continue Shopping
