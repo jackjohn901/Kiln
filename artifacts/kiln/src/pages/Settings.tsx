@@ -290,6 +290,39 @@ export default function Settings() {
             <Toggle settingKey="notif_workshops" label="Workshop updates" desc="Bookings and reminders" />
             <Toggle settingKey="notif_drops" label="Drop alerts" desc="New drops from artists you follow" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Email</p>
+            {(() => {
+              const EMAIL_KEYS: (keyof KilnSettings)[] = [
+                "notif_email_digest",
+                "notif_email_follows",
+                "notif_email_comments",
+                "notif_email_new_sale",
+                "notif_email_new_booking",
+                "notif_email_commission_payment",
+                "notif_email_new_commission",
+                "notif_email_new_patron",
+                "notif_email_outbid",
+              ];
+              const total = EMAIL_KEYS.length;
+              const active = EMAIL_KEYS.filter((k) => settings[k]).length;
+              if (!contactEmail.trim()) {
+                return (
+                  <div className="flex items-start gap-2 py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-2">
+                    <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-300">No notification email set — add one below so you don't miss important alerts.</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-stone-800/60 border border-white/8 mb-2">
+                  <Mail size={13} className="text-amber-400 shrink-0" />
+                  <p className="text-xs text-stone-400">
+                    Sending to <span className="text-stone-200 font-medium">{contactEmail.trim()}</span>
+                    {" — "}
+                    <span className={active === 0 ? "text-stone-500" : "text-emerald-400"}>{active} of {total} types active</span>
+                  </p>
+                </div>
+              );
+            })()}
             <div className="flex items-center justify-between py-3 border-b border-white/5">
               <div className="flex-1 min-w-0 pr-4">
                 <p className="text-sm text-stone-200">Pause all email notifications</p>
