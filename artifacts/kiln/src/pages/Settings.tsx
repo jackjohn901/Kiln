@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -98,8 +98,14 @@ type Section = "notifications" | "privacy" | "display" | "account" | "payments" 
 
 export default function Settings() {
   const { profile, logout } = useProfile();
+  const search = useSearch();
   const [settings, setSettings] = useState<KilnSettings>(readSettings);
-  const [section, setSection] = useState<Section | null>(null);
+  const [section, setSection] = useState<Section | null>(() => {
+    const params = new URLSearchParams(search);
+    const s = params.get("section");
+    const valid: Section[] = ["notifications", "privacy", "display", "account", "payments", "shipping"];
+    return (s && (valid as string[]).includes(s)) ? (s as Section) : null;
+  });
   const [saved, setSaved] = useState(false);
   const [payments, setPayments] = useState<ArtistPayments>(readPaymentSettings);
   const [paymentSaved, setPaymentSaved] = useState(false);

@@ -884,19 +884,30 @@ export default function Earnings() {
 
             {/* Sales history */}
             <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40">
-              <button
-                onClick={() => setShowSales(v => !v)}
-                className="flex w-full items-center justify-between p-4"
-              >
-                <div className="flex items-center gap-2">
+              <div className="flex w-full items-center justify-between px-4 py-3">
+                <button
+                  onClick={() => setShowSales(v => !v)}
+                  className="flex flex-1 items-center gap-2 text-left"
+                >
                   <ShoppingBag size={14} className="text-stone-400" />
                   <span className="text-sm font-medium text-stone-200">Sales</span>
                   {sales.length > 0 && (
                     <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-500">{sales.length}</span>
                   )}
+                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/settings?section=payments"
+                    className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1 text-[11px] text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+                  >
+                    <Clock size={10} />
+                    Edit processing window
+                  </Link>
+                  <button onClick={() => setShowSales(v => !v)} className="text-stone-600 hover:text-stone-400 transition-colors">
+                    {showSales ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
                 </div>
-                {showSales ? <ChevronUp size={14} className="text-stone-600" /> : <ChevronDown size={14} className="text-stone-600" />}
-              </button>
+              </div>
 
               {showSales && (
                 <div className="border-t border-white/5 p-4 space-y-2">
