@@ -4,7 +4,7 @@ import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock, Bell,
+  ShoppingBag, Clock, Bell, User, Package,
 } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -84,12 +84,17 @@ interface PatronTier {
 interface SaleOrder {
   id: string;
   buyerId: string;
+  type: string;
   title: string;
   amount: number;
+  currency: string;
   status: string;
   createdAt: string;
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
+  manualPayout: boolean;
+  buyerDisplayName: string | null;
+  buyerHandle: string | null;
 }
 
 const TYPE_CONFIG = {
@@ -907,31 +912,48 @@ export default function Earnings() {
                         : sale.processingWindowDays !== null
                           ? `${sale.processingWindowDays} day${sale.processingWindowDays === 1 ? "" : "s"}`
                           : null;
+                      const buyerLabel = sale.buyerDisplayName?.trim()
+                        ? sale.buyerDisplayName
+                        : sale.buyerHandle
+                          ? `@${sale.buyerHandle}`
+                          : "Anonymous buyer";
+                      const orderTypeLabel = sale.manualPayout ? "Manual" : "Connect";
                       return (
-                        <div key={sale.id} className="rounded-xl border border-white/5 bg-stone-900/60 p-3">
+                        <Link key={sale.id} href={`/orders/${sale.id}`} className="block rounded-xl border border-white/5 bg-stone-900/60 p-3 hover:border-amber-500/20 hover:bg-stone-900/80 transition-colors group">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-stone-200 leading-tight truncate">{sale.title}</p>
-                              <p className="text-[10px] text-stone-600 mt-0.5">{formatDate(sale.createdAt)}</p>
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <Package size={11} className="text-stone-500 flex-shrink-0" />
+                                <p className="text-sm font-medium text-stone-200 leading-tight truncate group-hover:text-amber-200 transition-colors">{sale.title}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <User size={10} className="text-stone-600 flex-shrink-0" />
+                                <p className="text-[11px] text-stone-500 truncate">{buyerLabel}</p>
+                                <span className="text-stone-700">·</span>
+                                <p className="text-[10px] text-stone-600 flex-shrink-0">{formatDate(sale.createdAt)}</p>
+                              </div>
                             </div>
-                            <div className="text-right flex-shrink-0">
+                            <div className="text-right flex-shrink-0 space-y-1">
                               <p className="text-sm font-bold text-emerald-400">+{formatPrice(sale.amount)}</p>
-                              <span className={`text-[10px] capitalize ${STATUS_COLOR[sale.status] ? "" : "text-stone-500"}`}>
+                              <div className="flex items-center gap-1 justify-end">
                                 <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${STATUS_COLOR[sale.status] ?? "text-stone-500 bg-stone-800/50 border-white/8"}`}>
                                   {sale.status}
                                 </span>
-                              </span>
+                                <span className="rounded-full border border-white/8 bg-stone-800/50 px-1.5 py-0.5 text-[10px] text-stone-500">
+                                  {orderTypeLabel}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${hasWindow ? "bg-amber-500/8 border border-amber-500/15" : "bg-stone-800/40 border border-white/5"}`}>
-                            <Clock size={11} className={hasWindow ? "text-amber-400/70 flex-shrink-0" : "text-stone-600 flex-shrink-0"} />
-                            <span className={`text-[11px] ${hasWindow ? "text-amber-300/80" : "text-stone-600"}`}>
-                              {hasWindow && windowText
-                                ? <>Processing window: <span className="font-medium">{windowText}</span></>
-                                : "Processing window: Not stamped"}
-                            </span>
-                          </div>
-                        </div>
+                          {hasWindow && (
+                            <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-amber-500/8 border border-amber-500/15">
+                              <Clock size={11} className="text-amber-400/70 flex-shrink-0" />
+                              <span className="text-[11px] text-amber-300/80">
+                                Processing window: <span className="font-medium">{windowText}</span>
+                              </span>
+                            </div>
+                          )}
+                        </Link>
                       );
                     })
                   )}

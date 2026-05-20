@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable, userSettingsTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable } from "@workspace/db";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -173,11 +173,43 @@ router.get("/me/orders", async (req, res): Promise<void> => {
   res.json({ orders: rows.map(o => ({ ...o, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() })) });
 });
 
-// GET /me/sales — my sales (as seller)
+// GET /me/sales — my sales (as seller) with buyer profile info
 router.get("/me/sales", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const rows = await db.select().from(ordersTable).where(eq(ordersTable.sellerId, req.user.id)).orderBy(desc(ordersTable.createdAt));
-  res.json({ orders: rows.map(o => ({ ...o, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() })) });
+  const rows = await db
+    .select({
+      id: ordersTable.id,
+      buyerId: ordersTable.buyerId,
+      type: ordersTable.type,
+      refId: ordersTable.refId,
+      title: ordersTable.title,
+      description: ordersTable.description,
+      imageUrl: ordersTable.imageUrl,
+      amount: ordersTable.amount,
+      currency: ordersTable.currency,
+      status: ordersTable.status,
+      shippingAddress: ordersTable.shippingAddress,
+      trackingNumber: ordersTable.trackingNumber,
+      notes: ordersTable.notes,
+      processingWindowDays: ordersTable.processingWindowDays,
+      processingWindowLabel: ordersTable.processingWindowLabel,
+      manualPayout: ordersTable.manualPayout,
+      createdAt: ordersTable.createdAt,
+      updatedAt: ordersTable.updatedAt,
+      buyerDisplayName: profilesTable.displayName,
+      buyerHandle: profilesTable.handle,
+    })
+    .from(ordersTable)
+    .leftJoin(profilesTable, eq(ordersTable.buyerId, profilesTable.userId))
+    .where(eq(ordersTable.sellerId, req.user.id))
+    .orderBy(desc(ordersTable.createdAt));
+  res.json({
+    orders: rows.map(o => ({
+      ...o,
+      createdAt: o.createdAt.toISOString(),
+      updatedAt: o.updatedAt.toISOString(),
+    })),
+  });
 });
 
 export default router;
