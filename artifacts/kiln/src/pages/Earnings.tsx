@@ -930,7 +930,7 @@ export default function Earnings() {
                           : "Anonymous buyer";
                       const orderTypeLabel = sale.manualPayout ? "Manual" : "Connect";
                       return (
-                        <Link key={sale.id} href={`/orders/${sale.id}`} className="block rounded-xl border border-white/5 bg-stone-900/60 p-3 hover:border-amber-500/20 hover:bg-stone-900/80 transition-colors group">
+                        <Link key={sale.id} href={`/sales/${sale.id}`} className="block rounded-xl border border-white/5 bg-stone-900/60 p-3 hover:border-amber-500/20 hover:bg-stone-900/80 transition-colors group">
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 mb-0.5">

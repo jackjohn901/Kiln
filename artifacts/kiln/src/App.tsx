@@ -32,6 +32,7 @@ import ApplyVerified from "@/pages/ApplyVerified";
 import EditProfile from "@/pages/EditProfile";
 import Orders from "@/pages/Orders";
 import OrderDetail from "@/pages/OrderDetail";
+import SaleDetail from "@/pages/SaleDetail";
 import Drafts from "@/pages/Drafts";
 import FollowerList from "@/pages/FollowerList";
 import TagFeed from "@/pages/TagFeed";
@@ -244,6 +245,7 @@ function Router() {
       <Route path="/edit-profile" component={EditProfile} />
       <Route path="/orders" component={Orders} />
       <Route path="/orders/:id" component={OrderDetail} />
+      <Route path="/sales/:id" component={SaleDetail} />
       <Route path="/drafts" component={Drafts} />
       <Route path="/tag/:tag" component={TagFeed} />
       <Route path="/posts/:id" component={PostDetail} />

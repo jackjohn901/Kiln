@@ -166,6 +166,55 @@ router.get("/me/listings", async (req, res): Promise<void> => {
   res.json({ listings: rows.map(l => ({ ...l, createdAt: l.createdAt.toISOString(), updatedAt: l.updatedAt.toISOString() })) });
 });
 
+// GET /me/sales/:id — single sale detail for the current seller
+router.get("/me/sales/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const rows = await db
+      .select({
+        id: ordersTable.id,
+        buyerId: ordersTable.buyerId,
+        type: ordersTable.type,
+        refId: ordersTable.refId,
+        title: ordersTable.title,
+        description: ordersTable.description,
+        imageUrl: ordersTable.imageUrl,
+        amount: ordersTable.amount,
+        currency: ordersTable.currency,
+        status: ordersTable.status,
+        shippingAddress: ordersTable.shippingAddress,
+        trackingNumber: ordersTable.trackingNumber,
+        notes: ordersTable.notes,
+        processingWindowDays: ordersTable.processingWindowDays,
+        processingWindowLabel: ordersTable.processingWindowLabel,
+        manualPayout: ordersTable.manualPayout,
+        createdAt: ordersTable.createdAt,
+        updatedAt: ordersTable.updatedAt,
+        buyerDisplayName: profilesTable.displayName,
+        buyerHandle: profilesTable.handle,
+      })
+      .from(ordersTable)
+      .leftJoin(profilesTable, eq(ordersTable.buyerId, profilesTable.userId))
+      .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.sellerId, req.user.id)))
+      .limit(1);
+
+    if (rows.length === 0) { res.status(404).json({ error: "Sale not found" }); return; }
+
+    const sale = rows[0];
+
+    res.json({
+      sale: {
+        ...sale,
+        createdAt: sale.createdAt.toISOString(),
+        updatedAt: sale.updatedAt.toISOString(),
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "me/sales/:id GET error");
+    res.status(500).json({ error: "Failed to load sale" });
+  }
+});
+
 // GET /me/orders — my orders (as buyer)
 router.get("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
