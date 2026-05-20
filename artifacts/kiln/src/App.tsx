@@ -126,6 +126,9 @@ import FoundingArtist from "@/pages/FoundingArtist";
 import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
 import SocialSync from "@/pages/SocialSync";
 import KilnOpening from "@/pages/KilnOpening";
+import MaterialSources from "@/pages/MaterialSources";
+import ProcessPledge from "@/pages/ProcessPledge";
+import ListingCollaborators from "@/pages/ListingCollaborators";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 
@@ -332,6 +335,9 @@ function Router() {
       <Route path="/social-sync" component={SocialSync} />
       <Route path="/kiln-opening" component={KilnOpening} />
       <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/material-sources" component={MaterialSources} />
+      <Route path="/process-pledges" component={ProcessPledge} />
+      <Route path="/listings/:id/collaborators" component={ListingCollaborators} />
       <Route component={NotFound} />
       </Switch>
       <PushPrompt />

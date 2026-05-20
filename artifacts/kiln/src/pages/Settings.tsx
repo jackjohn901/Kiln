@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -525,6 +525,46 @@ export default function Settings() {
                   <div>
                     <span className="text-sm text-stone-200">Kiln Opening Reveal</span>
                     <p className="text-xs text-stone-600 mt-0.5">Announce a kiln opening across all platforms</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/kiln-status" className="flex items-center justify-between px-5 py-4 border-t border-white/5 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Flame size={16} className="text-amber-500" />
+                  <div>
+                    <span className="text-sm text-stone-200">In the Kiln</span>
+                    <p className="text-xs text-stone-600 mt-0.5">Share active firings — kiln as content creator</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/provenance" className="flex items-center justify-between px-5 py-4 border-t border-white/5 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Link2 size={16} className="text-emerald-400" />
+                  <div>
+                    <span className="text-sm text-stone-200">Provenance Chain</span>
+                    <p className="text-xs text-stone-600 mt-0.5">Permanent ownership records across all resales</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/material-sources" className="flex items-center justify-between px-5 py-4 border-t border-white/5 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Leaf size={16} className="text-emerald-400" />
+                  <div>
+                    <span className="text-sm text-stone-200">Material Sources</span>
+                    <p className="text-xs text-stone-600 mt-0.5">Map your ingredients from earth to finished work</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/process-pledges" className="flex items-center justify-between px-5 py-4 border-t border-white/5 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <BookOpen size={16} className="text-sky-400" />
+                  <div>
+                    <span className="text-sm text-stone-200">Process Pledges</span>
+                    <p className="text-xs text-stone-600 mt-0.5">Commit to sharing your full making journey</p>
                   </div>
                 </div>
                 <ChevronRight size={14} className="text-stone-600" />

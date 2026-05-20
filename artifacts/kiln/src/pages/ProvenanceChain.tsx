@@ -89,7 +89,8 @@ function royaltyEarned(piece: ProvenancePiece): number {
 }
 
 export default function ProvenanceChain() {
-  const [pieces, setPieces] = useState<ProvenancePiece[]>(readPieces);
+  const [pieces, setPieces] = useState<ProvenancePiece[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ProvenancePiece | null>(null);
   const [showRegister, setShowRegister] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
@@ -98,45 +99,49 @@ export default function ProvenanceChain() {
   const [form, setForm] = useState({ title: "", medium: "", year: new Date().getFullYear().toString(), royalty: "10", imageUrl: "" });
   const [transferForm, setTransferForm] = useState({ ownerName: "", acquiredFor: "", note: "" });
 
-  useEffect(() => { savePieces(pieces); }, [pieces]);
+  useEffect(() => {
+    fetch("/api/me/provenance", { credentials: "include" })
+      .then((r) => r.ok ? r.json() as Promise<{ pieces: ProvenancePiece[] }> : null)
+      .then((data) => { if (data) setPieces(data.pieces); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
-  function registerPiece() {
+  async function registerPiece() {
     if (!form.title.trim()) return;
-    const piece: ProvenancePiece = {
-      id: genId(),
-      title: form.title,
-      artistName: "You",
-      artistId: "__current_user__",
-      medium: form.medium || "Mixed Media",
-      year: form.year,
-      imageUrl: form.imageUrl || `https://picsum.photos/seed/${genId()}/400/300`,
-      royaltyPercent: parseFloat(form.royalty) || 10,
-      registeredAt: new Date().toISOString(),
-      chain: [{ id: genId(), ownerName: "You", ownerId: "__current_user__", acquiredAt: new Date().toISOString(), note: "Piece registered at creation", isArtist: true }],
-    };
-    setPieces((prev) => [piece, ...prev]);
-    setForm({ title: "", medium: "", year: new Date().getFullYear().toString(), royalty: "10", imageUrl: "" });
-    setShowRegister(false);
-    setSelected(piece);
+    try {
+      const res = await fetch("/api/me/provenance", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: form.title, medium: form.medium, year: form.year, royaltyPercent: form.royalty, imageUrl: form.imageUrl }),
+      });
+      if (res.ok) {
+        const piece = await res.json() as ProvenancePiece;
+        setPieces((prev) => [piece, ...prev]);
+        setForm({ title: "", medium: "", year: new Date().getFullYear().toString(), royalty: "10", imageUrl: "" });
+        setShowRegister(false);
+        setSelected(piece);
+      }
+    } catch { /* silent */ }
   }
 
-  function addTransfer() {
+  async function addTransfer() {
     if (!selected || !transferForm.ownerName.trim()) return;
-    const record: ProvenanceRecord = {
-      id: genId(),
-      ownerName: transferForm.ownerName,
-      ownerId: transferForm.ownerName.toLowerCase().replace(/\s+/g, "-"),
-      acquiredAt: new Date().toISOString(),
-      acquiredFor: transferForm.acquiredFor || undefined,
-      note: transferForm.note || undefined,
-    };
-    const updated = pieces.map((p) =>
-      p.id === selected.id ? { ...p, chain: [...p.chain, record] } : p
-    );
-    setPieces(updated);
-    setSelected(updated.find((p) => p.id === selected.id) ?? null);
-    setTransferForm({ ownerName: "", acquiredFor: "", note: "" });
-    setShowTransfer(false);
+    try {
+      const res = await fetch(`/api/me/provenance/${selected.id}/transfer`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(transferForm),
+      });
+      if (res.ok) {
+        const updatedPiece = await res.json() as ProvenancePiece;
+        const updated = pieces.map((p) => p.id === selected.id ? updatedPiece : p);
+        setPieces(updated);
+        setSelected(updatedPiece);
+        setTransferForm({ ownerName: "", acquiredFor: "", note: "" });
+        setShowTransfer(false);
+      }
+    } catch { /* silent */ }
   }
 
   function copyId(id: string) {
@@ -145,7 +150,7 @@ export default function ProvenanceChain() {
     setTimeout(() => setCopied(null), 2000);
   }
 
-  const totalRoyalties = pieces.filter(p => p.artistId === "__current_user__").reduce((s, p) => s + royaltyEarned(p), 0);
+  const totalRoyalties = pieces.reduce((s, p) => s + royaltyEarned(p), 0);
 
   return (
     <div className="min-h-screen bg-[#12100e] pb-32 pt-2">

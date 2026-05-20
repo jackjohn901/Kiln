@@ -57,3 +57,8 @@ export * from "./payouts";
 export * from "./video_uploads";
 export * from "./founding_artist_applications";
 export * from "./social_connections";
+export * from "./kiln_sessions";
+export * from "./artwork_provenance";
+export * from "./material_sources";
+export * from "./process_pledges";
+export * from "./listing_collaborators";

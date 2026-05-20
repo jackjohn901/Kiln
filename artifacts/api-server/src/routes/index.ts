@@ -73,6 +73,10 @@ import critiquesRouter from "./critiques";
 import foundingArtistRouter from "./founding-artist";
 import socialConnectRouter from "./social-connect";
 import socialWebhooksRouter from "./social-webhooks";
+import provenanceRouter from "./provenance";
+import materialSourcesRouter from "./material-sources";
+import processPledgesRouter from "./process-pledges";
+import collaborationsRouter from "./collaborations";
 
 const router: IRouter = Router();
 
@@ -150,5 +154,9 @@ router.use(critiquesRouter);
 router.use(foundingArtistRouter);
 router.use(socialConnectRouter);
 router.use(socialWebhooksRouter);
+router.use(provenanceRouter);
+router.use(materialSourcesRouter);
+router.use(processPledgesRouter);
+router.use(collaborationsRouter);
 
 export default router;
