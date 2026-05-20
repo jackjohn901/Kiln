@@ -3,7 +3,8 @@ import { Link } from "wouter";
 import {
   ChevronLeft, Users, FileText, Heart, UserCheck,
   ShoppingBag, Hammer, Briefcase, TrendingUp, RefreshCw,
-  ArrowUp, ArrowDown, Eye,
+  ArrowUp, ArrowDown, Eye, Sparkles, AlertTriangle, Lightbulb,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +40,15 @@ interface TopArtist {
   avatarUrl?: string | null;
   followerCount: number;
   location?: string | null;
+}
+
+interface AiInsight {
+  priority: "high" | "medium" | "low";
+  category: "growth" | "engagement" | "content" | "commerce" | "retention" | "feature";
+  title: string;
+  insight: string;
+  action: string;
+  impact: string;
 }
 
 interface PlatformStats {
@@ -131,6 +141,10 @@ export default function PlatformAnalytics() {
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<ChartPeriod>("30d");
   const [refreshing, setRefreshing] = useState(false);
+  const [insights, setInsights] = useState<AiInsight[] | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [expandedInsight, setExpandedInsight] = useState<number | null>(null);
 
   const load = async () => {
     setRefreshing(true);
@@ -146,6 +160,35 @@ export default function PlatformAnalytics() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const loadInsights = async (currentStats: PlatformStats) => {
+    setInsightsLoading(true);
+    setInsightsError(null);
+    setInsights(null);
+    setExpandedInsight(null);
+    try {
+      const payload = {
+        totals: currentStats.totals,
+        trendingPostCount: currentStats.trendingPosts.length,
+        topTrendingLikes: currentStats.trendingPosts[0]?.likeCount ?? 0,
+        topArtistFollowers: currentStats.topArtists[0]?.followerCount ?? 0,
+        charts: currentStats.charts,
+      };
+      const res = await fetch("/api/admin/platform-insights", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as { insights: AiInsight[] };
+      setInsights(Array.isArray(data.insights) ? data.insights : []);
+    } catch {
+      setInsightsError("Could not generate insights. Try again.");
+    } finally {
+      setInsightsLoading(false);
     }
   };
 
@@ -359,6 +402,105 @@ export default function PlatformAnalytics() {
                       </div>
                     </Link>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* AI Insights panel */}
+            <div className="mb-4 rounded-2xl border border-amber-500/20 bg-stone-900/60 p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
+                    <Sparkles size={14} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-stone-200">AI Growth Advisor</h2>
+                    <p className="text-xs text-stone-500 mt-0.5">Analyzes your data and suggests what to do next</p>
+                  </div>
+                </div>
+                {!insightsLoading && (
+                  <button
+                    onClick={() => stats && loadInsights(stats)}
+                    disabled={insightsLoading}
+                    className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-50"
+                  >
+                    <Sparkles size={11} />
+                    {insights ? "Refresh" : "Analyze"}
+                  </button>
+                )}
+              </div>
+
+              {insightsLoading && (
+                <div className="flex flex-col items-center gap-3 py-8 text-center">
+                  <div className="h-8 w-8 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+                  <p className="text-xs text-stone-500">Analyzing your platform data…</p>
+                </div>
+              )}
+
+              {insightsError && (
+                <div className="flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
+                  <AlertTriangle size={14} /> {insightsError}
+                  <button onClick={() => stats && loadInsights(stats)} className="ml-auto underline">Retry</button>
+                </div>
+              )}
+
+              {!insights && !insightsLoading && !insightsError && (
+                <div className="flex flex-col items-center gap-3 py-6 text-center">
+                  <Lightbulb size={28} className="text-stone-700" />
+                  <p className="text-xs text-stone-500 max-w-xs">
+                    Tap <strong className="text-stone-400">Analyze</strong> to get 6 AI-generated recommendations based on your live platform data — covering growth, engagement, content, and commerce.
+                  </p>
+                </div>
+              )}
+
+              {insights && insights.length > 0 && (
+                <div className="space-y-2">
+                  {insights.map((item, i) => {
+                    const priorityColor = item.priority === "high"
+                      ? "text-red-400 bg-red-500/10 border-red-500/20"
+                      : item.priority === "medium"
+                      ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                      : "text-sky-400 bg-sky-500/10 border-sky-500/20";
+                    const categoryColor: Record<string, string> = {
+                      growth: "text-emerald-400", engagement: "text-purple-400",
+                      content: "text-blue-400", commerce: "text-amber-400",
+                      retention: "text-orange-400", feature: "text-teal-400",
+                    };
+                    const isExpanded = expandedInsight === i;
+                    return (
+                      <div key={i} className="rounded-xl border border-white/8 bg-stone-800/50 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedInsight(isExpanded ? null : i)}
+                          className="w-full flex items-center gap-3 p-3 text-left hover:bg-stone-800/80 transition-colors"
+                        >
+                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${priorityColor}`}>
+                            {item.priority}
+                          </span>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 ${categoryColor[item.category] ?? "text-stone-400"}`}>
+                            {item.category}
+                          </span>
+                          <span className="flex-1 text-xs font-semibold text-stone-200 truncate">{item.title}</span>
+                          {isExpanded ? <ChevronUp size={14} className="text-stone-600 shrink-0" /> : <ChevronDown size={14} className="text-stone-600 shrink-0" />}
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
+                            <div>
+                              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">What the data shows</p>
+                              <p className="text-xs text-stone-300">{item.insight}</p>
+                            </div>
+                            <div className="rounded-lg bg-amber-500/8 border border-amber-500/15 p-3">
+                              <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">Action this week</p>
+                              <p className="text-xs text-amber-200/90">{item.action}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Expected impact</p>
+                              <p className="text-xs text-stone-400">{item.impact}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

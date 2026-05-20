@@ -5,6 +5,7 @@ import {
   commissionsTable, workshopsTable, workshopBookingsTable,
 } from "@workspace/db";
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
+import { openai } from "@workspace/integrations-openai-ai-server";
 
 const router: IRouter = Router();
 
@@ -141,6 +142,50 @@ router.patch("/admin/verifications/:id/reject", async (req, res): Promise<void> 
   } catch (err) {
     req.log.error({ err }, "admin.rejectVerification error");
     res.status(500).json({ error: "Failed to reject" });
+  }
+});
+
+// POST /api/admin/platform-insights — AI analysis of platform stats, owner-only
+router.post("/admin/platform-insights", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isCreator(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const stats = req.body as Record<string, unknown>;
+
+  try {
+    const prompt = `You are an expert growth advisor for Kiln, a craft artist creator platform (like TikTok/Instagram for ceramics, glasswork, weaving, woodwork, metalwork, and pottery).
+
+Here is the current platform analytics data:
+${JSON.stringify(stats, null, 2)}
+
+Analyze this data and return exactly 6 actionable insights as a JSON array. Each insight must have:
+- "priority": "high" | "medium" | "low"
+- "category": one of "growth", "engagement", "content", "commerce", "retention", "feature"
+- "title": short title (max 8 words)
+- "insight": one clear sentence describing what the data shows
+- "action": one specific action the platform owner should take this week
+- "impact": one sentence on expected outcome
+
+Focus on what's working, what needs attention, and concrete next steps for both the web platform and mobile app. Be specific — reference the actual numbers from the data. Return ONLY valid JSON, no markdown, no explanation.`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.4",
+      max_completion_tokens: 2048,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = response.choices[0]?.message?.content ?? "[]";
+    let insights: unknown;
+    try {
+      insights = JSON.parse(raw);
+    } catch {
+      insights = [];
+    }
+
+    res.json({ insights, generatedAt: new Date().toISOString() });
+  } catch (err) {
+    req.log.error({ err }, "admin.platformInsights error");
+    res.status(500).json({ error: "Failed to generate insights" });
   }
 });
 
