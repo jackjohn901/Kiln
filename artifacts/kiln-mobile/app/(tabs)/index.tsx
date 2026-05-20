@@ -24,7 +24,6 @@ import { useColors } from "@/hooks/useColors";
 import { useGetFeed } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { apiGet, apiPost, relativeTime } from "@/lib/api";
-import { useWebSocket } from "@/lib/useWebSocket";
 import { router } from "expo-router";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -300,8 +299,6 @@ export default function FeedScreen() {
   const flatRef = useRef<FlatList>(null);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-
-  useWebSocket();
 
   const { data, isLoading } = useGetFeed(
     { limit: 20 },

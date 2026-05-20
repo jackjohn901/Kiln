@@ -18,6 +18,7 @@ import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { SaleNotificationListener } from "@/components/SaleNotificationListener";
 import { AuthProvider } from "@/lib/auth";
 import { useAppUpdates } from "@/hooks/useAppUpdates";
 
@@ -44,6 +45,7 @@ function RootLayoutNav() {
         <Stack.Screen name="chat/[threadId]" options={{ headerShown: true, headerTitle: "", headerBackTitle: "Back" }} />
       </Stack>
       <UpdateBanner updateState={updateState} />
+      <SaleNotificationListener />
     </View>
   );
 }

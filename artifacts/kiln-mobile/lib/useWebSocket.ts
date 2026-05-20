@@ -2,10 +2,22 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 
-export function useWebSocket() {
+export interface SaleEvent {
+  text: string;
+  link: string;
+  fromName: string;
+}
+
+interface UseWebSocketOptions {
+  onSaleNotification?: (evt: SaleEvent) => void;
+}
+
+export function useWebSocket(options?: UseWebSocketOptions) {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
+  const onSaleRef = useRef(options?.onSaleNotification);
+  onSaleRef.current = options?.onSaleNotification;
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -39,6 +51,13 @@ export function useWebSocket() {
               break;
             case "notification":
               queryClient.invalidateQueries({ queryKey: ["notifications"] });
+              if (data.notifType === "sale" && onSaleRef.current) {
+                onSaleRef.current({
+                  text: (data.text as string | undefined) ?? "You have a new sale!",
+                  link: (data.link as string | undefined) ?? "/earnings",
+                  fromName: (data.fromName as string | undefined) ?? "A buyer",
+                });
+              }
               break;
             case "message":
               queryClient.invalidateQueries({ queryKey: ["message-threads"] });
