@@ -4,7 +4,7 @@ import {
   postsTable, followsTable, likesTable, ordersTable,
   commissionsTable, workshopsTable, workshopBookingsTable,
 } from "@workspace/db";
-import { eq, desc, sql, gte, count } from "drizzle-orm";
+import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -280,6 +280,85 @@ router.get("/admin/platform-stats", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.platformStats error");
     res.status(500).json({ error: "Failed to load platform stats" });
+  }
+});
+
+// POST /admin/backfill-order-notes
+// One-time migration: stamp orphaned manual-payout order rows with the Stripe
+// session key from the "first" order in the same bulk checkout. Orders created
+// before the grouping fix only stored the dedupeKey on the first row; subsequent
+// items in the cart had notes = null, so they didn't appear grouped on receipts.
+//
+// Safety: pass ?dry_run=true to preview affected rows without writing anything.
+//
+// Matching criteria for orphans:
+//   - same buyer_id as the anchor
+//   - manual_payout = true
+//   - notes IS NULL
+//   - created_at within 30 seconds of the anchor's created_at
+router.post("/admin/backfill-order-notes", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const dryRun = req.query["dry_run"] === "true";
+
+  try {
+    // Find all anchor orders that already carry a Stripe session dedupeKey.
+    const anchors = await db
+      .select({
+        id: ordersTable.id,
+        buyerId: ordersTable.buyerId,
+        notes: ordersTable.notes,
+        createdAt: ordersTable.createdAt,
+      })
+      .from(ordersTable)
+      .where(
+        and(
+          eq(ordersTable.manualPayout, true),
+          sql`${ordersTable.notes} LIKE 'stripe:%'`
+        )
+      );
+
+    const backfilledIds: string[] = [];
+
+    for (const anchor of anchors) {
+      if (!anchor.notes) continue;
+
+      // Find sibling orders that are missing the session key.
+      const orphans = await db
+        .select({ id: ordersTable.id })
+        .from(ordersTable)
+        .where(
+          and(
+            eq(ordersTable.buyerId, anchor.buyerId),
+            eq(ordersTable.manualPayout, true),
+            isNull(ordersTable.notes),
+            sql`${ordersTable.createdAt} BETWEEN
+              ${anchor.createdAt}::timestamptz - INTERVAL '30 seconds'
+              AND
+              ${anchor.createdAt}::timestamptz + INTERVAL '30 seconds'`
+          )
+        );
+
+      for (const orphan of orphans) {
+        backfilledIds.push(orphan.id);
+        if (!dryRun) {
+          await db
+            .update(ordersTable)
+            .set({ notes: anchor.notes })
+            .where(eq(ordersTable.id, orphan.id));
+        }
+      }
+    }
+
+    res.json({
+      dryRun,
+      backfilled: backfilledIds.length,
+      orderIds: backfilledIds,
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin.backfillOrderNotes error");
+    res.status(500).json({ error: "Failed to backfill order notes" });
   }
 });
 
