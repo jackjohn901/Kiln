@@ -206,6 +206,7 @@ export function manualPayoutReceiptEmail(
   sessionId: string,
   amountTotalCents: number,
   items: ManualPayoutReceiptItem[],
+  processingWindowDays?: number | null,
 ): string {
   const itemRows = items
     .map(
@@ -244,7 +245,10 @@ export function manualPayoutReceiptEmail(
     `)}
     ${card(`
       <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">What happens next?</p>
-      <p style="margin:0;color:#d6d3d1;">This order is fulfilled directly by the artist. They will contact you within 2–5 business days with shipping details and a tracking number once your item is on its way.</p>
+      <p style="margin:0;color:#d6d3d1;">This order is fulfilled directly by the artist. They will contact you with shipping details and a tracking number once your item is on its way.</p>
+      ${processingWindowDays != null
+        ? `<p style="margin:8px 0 0;color:#a8a29e;font-size:13px;">The artist typically processes orders within <strong style="color:#d6d3d1;">${processingWindowDays} business day${processingWindowDays === 1 ? '' : 's'}</strong>.</p>`
+        : ''}
     `)}
     ${btn(`${BASE_URL}/orders`, "View My Orders")}
   `);
