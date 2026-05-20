@@ -4,8 +4,9 @@ import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock,
+  ShoppingBag, Clock, Bell,
 } from "lucide-react";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 type RefreshInterval = "30s" | "1m" | "5m" | "manual";
 const REFRESH_MS: Record<RefreshInterval, number | null> = {
@@ -130,10 +131,13 @@ function formatDate(iso: string) {
 export default function Earnings() {
   const { profile } = useProfile();
   const search = useSearch();
+  const { subscribe } = useWebSocket();
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
   const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, total: 0 });
   const [loading, setLoading]     = useState(true);
+  const [saleBanner, setSaleBanner] = useState<string | null>(null);
+  const saleBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Payout state
   const [payouts, setPayouts]           = useState<PayoutRecord[]>([]);
@@ -295,28 +299,50 @@ export default function Earnings() {
     finally { setDisconnectingStripe(false); }
   }
 
+  const fetchEarnings = useCallback(async () => {
+    try {
+      const r = await fetch("/api/me/earnings", { credentials: "include" });
+      if (!r.ok) return;
+      const data = await r.json() as { earnings?: EarningLine[]; totals?: EarningTotals };
+      setEarnings(data.earnings ?? []);
+      setTotals(data.totals ?? { tips: 0, subscriptions: 0, total: 0 });
+    } catch { /* ignore */ }
+  }, []);
+
+  const fetchSales = useCallback(async () => {
+    try {
+      const r = await fetch("/api/me/sales", { credentials: "include" });
+      if (!r.ok) return;
+      const data = await r.json() as { orders?: SaleOrder[] };
+      setSales(data.orders ?? []);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
-    fetch("/api/me/earnings", { credentials: "include" })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        setEarnings(data.earnings ?? []);
-        setTotals(data.totals ?? { tips: 0, subscriptions: 0, total: 0 });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    fetchEarnings().finally(() => setLoading(false));
 
     fetch("/api/payouts", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => setPayouts(data.payouts ?? []))
+      .then(data => setPayouts((data as { payouts?: PayoutRecord[] }).payouts ?? []))
       .catch(() => {})
       .finally(() => setPayoutLoading(false));
 
-    fetch("/api/me/sales", { credentials: "include" })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => setSales(data.orders ?? []))
-      .catch(() => {})
-      .finally(() => setSalesLoading(false));
-  }, []);
+    fetchSales().finally(() => setSalesLoading(false));
+  }, [fetchEarnings, fetchSales]);
+
+  useEffect(() => {
+    return subscribe("notification", (evt) => {
+      if ((evt.notifType as string | undefined) !== "sale") return;
+      void fetchEarnings();
+      void fetchSales();
+      if (stripeConnect?.chargesEnabled) void fetchBalance(true);
+      const text = (evt.text as string | undefined) ?? "New sale!";
+      const label = text.replace(/^New sale:\s*/i, "").trim() || "New sale!";
+      setSaleBanner(label);
+      if (saleBannerTimerRef.current) clearTimeout(saleBannerTimerRef.current);
+      saleBannerTimerRef.current = setTimeout(() => setSaleBanner(null), 8000);
+    });
+  }, [subscribe, fetchEarnings, fetchSales, fetchBalance, stripeConnect?.chargesEnabled]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -396,6 +422,26 @@ export default function Earnings() {
             <Banknote size={13} /> Request Payout
           </button>
         </div>
+
+        {/* New-sale notification banner */}
+        {saleBanner && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <Bell size={15} className="shrink-0 text-emerald-400" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-emerald-300">New sale!</p>
+              <p className="text-xs text-emerald-400/80 truncate">{saleBanner}</p>
+            </div>
+            <button
+              onClick={() => {
+                setSaleBanner(null);
+                if (saleBannerTimerRef.current) clearTimeout(saleBannerTimerRef.current);
+              }}
+              className="shrink-0 rounded-full p-1 hover:bg-white/5 text-emerald-500/60 hover:text-emerald-400 transition-colors"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
