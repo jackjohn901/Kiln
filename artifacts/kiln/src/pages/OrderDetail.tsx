@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
@@ -65,6 +65,7 @@ function ordinalId(id: string) {
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
   const [order, setOrder] = useState<Order | null>(null);
   const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,17 +316,29 @@ export default function OrderDetail() {
           </div>
         )}
 
-        <div className="mt-6 flex gap-3">
-          <Link href="/orders" className="flex-1">
-            <button className="w-full rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors">
-              Back to Orders
-            </button>
-          </Link>
-          <Link href="/shop" className="flex-1">
-            <button className="w-full rounded-full bg-amber-500/15 border border-amber-500/30 py-2.5 text-sm text-amber-300 hover:bg-amber-500/25 transition-colors">
-              Continue Shopping
-            </button>
-          </Link>
+        <div className="mt-6 space-y-3">
+          <button
+            onClick={() => {
+              const prefill = encodeURIComponent(`Re: ${order.title}`);
+              navigate(`/messages/${order.sellerId}?prefill=${prefill}`);
+            }}
+            className="w-full flex items-center justify-center gap-2 rounded-full bg-stone-800 border border-white/10 py-2.5 text-sm text-stone-200 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
+          >
+            <MessageSquare size={15} />
+            Message artist
+          </button>
+          <div className="flex gap-3">
+            <Link href="/orders" className="flex-1">
+              <button className="w-full rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors">
+                Back to Orders
+              </button>
+            </Link>
+            <Link href="/shop" className="flex-1">
+              <button className="w-full rounded-full bg-amber-500/15 border border-amber-500/30 py-2.5 text-sm text-amber-300 hover:bg-amber-500/25 transition-colors">
+                Continue Shopping
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

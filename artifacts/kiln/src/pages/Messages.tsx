@@ -75,8 +75,14 @@ function ThreadItem({ thread, active, onClick }: { thread: MessageThread; active
   );
 }
 
+interface PendingRecipient {
+  id: string;
+  name: string;
+  avatar: string | null;
+}
+
 export default function Messages() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [composing, setComposing] = useState(false);
   const [composeSearch, setComposeSearch] = useState("");
   const params = useParams<{ participantId?: string }>();
@@ -88,17 +94,42 @@ export default function Messages() {
   const [apiThreads, setApiThreads] = useState<ApiThread[]>([]);
   const [activeApiThreadId, setActiveApiThreadId] = useState<string | null>(null);
   const [apiMessages, setApiMessages] = useState<ApiMsg[]>([]);
+  const [pendingRecipient, setPendingRecipient] = useState<PendingRecipient | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeThread = activeThreadId ? threads.find((t) => t.id === activeThreadId) : null;
   const activeApiThread = apiThreads.find(t => t.id === activeApiThreadId) ?? null;
 
   useEffect(() => {
-    if (params.participantId) {
-      const thread = threads.find((t) => t.participantId === params.participantId);
-      if (thread) setActiveThreadId(thread.id);
+    if (!params.participantId) return;
+
+    const prefill = new URLSearchParams(window.location.search).get("prefill");
+    if (prefill) setNewMsg(prefill);
+
+    const staticThread = threads.find((t) => t.participantId === params.participantId);
+    if (staticThread) {
+      setActiveThreadId(staticThread.id);
+      setActiveApiThreadId(null);
+      setPendingRecipient(null);
+      return;
     }
-  }, [params.participantId, threads]);
+
+    const apiThread = apiThreads.find((t) => t.otherUserId === params.participantId);
+    if (apiThread) {
+      void openApiThread(apiThread.id);
+      setPendingRecipient(null);
+      return;
+    }
+
+    const knownArtist = ALL_ARTISTS.find((a) => a.id === params.participantId);
+    setPendingRecipient({
+      id: params.participantId,
+      name: knownArtist?.name ?? params.participantId,
+      avatar: knownArtist?.images?.[0]?.url ?? null,
+    });
+    setActiveThreadId(null);
+    setActiveApiThreadId(null);
+  }, [params.participantId, threads, apiThreads, location]);
 
   useEffect(() => {
     if (activeThread) {
@@ -184,6 +215,39 @@ export default function Messages() {
     } catch {}
   }
 
+  async function handlePendingSend() {
+    if (!newMsg.trim() || !pendingRecipient) return;
+    const text = newMsg.trim();
+    setNewMsg("");
+    try {
+      const r = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ recipientId: pendingRecipient.id, text }),
+      });
+      if (r.ok) {
+        const msg = await r.json() as ApiMsg;
+        const threadsRes = await fetch("/api/messages/threads", { credentials: "include" });
+        if (threadsRes.ok) {
+          const d = await threadsRes.json() as { threads?: ApiThread[] };
+          if (Array.isArray(d?.threads)) {
+            setApiThreads(d.threads);
+            const newThread = d.threads.find((t) => t.otherUserId === pendingRecipient.id);
+            if (newThread) {
+              setActiveApiThreadId(newThread.id);
+              setApiMessages([msg]);
+              setPendingRecipient(null);
+              return;
+            }
+          }
+        }
+        setApiMessages([msg]);
+        setPendingRecipient(null);
+      }
+    } catch {}
+  }
+
   if (!profile) {
     return (
       <div className="min-h-screen bg-[#12100e]">
@@ -205,7 +269,7 @@ export default function Messages() {
       <Nav />
       <div className="flex-1 flex mx-auto w-full max-w-4xl" style={{ height: "calc(100vh - 56px)" }}>
         {/* Thread list */}
-        <div className={`w-full md:w-72 shrink-0 border-r border-white/10 flex flex-col ${(activeThread || activeApiThread) ? "hidden md:flex" : "flex"}`}>
+        <div className={`w-full md:w-72 shrink-0 border-r border-white/10 flex flex-col ${(activeThread || activeApiThread || pendingRecipient) ? "hidden md:flex" : "flex"}`}>
           <div className="p-4 border-b border-white/10">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-serif text-lg text-amber-100">Messages</h2>
@@ -318,12 +382,58 @@ export default function Messages() {
         </div>
 
         {/* Conversation panel */}
-        <div className={`flex-1 flex flex-col ${(activeThread || activeApiThread) ? "flex" : "hidden md:flex"}`}>
-          {!activeThread && !activeApiThread ? (
+        <div className={`flex-1 flex flex-col ${(activeThread || activeApiThread || pendingRecipient) ? "flex" : "hidden md:flex"}`}>
+          {!activeThread && !activeApiThread && !pendingRecipient ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
               <MessageCircle size={32} className="text-stone-700" />
               <p className="text-stone-500 text-sm">Select a conversation or start one from an artist's profile.</p>
             </div>
+          ) : pendingRecipient ? (
+            <>
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
+                <button
+                  onClick={() => { setPendingRecipient(null); navigate("/messages"); }}
+                  className="md:hidden text-stone-500 hover:text-amber-300 transition-colors"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <img
+                  src={pendingRecipient.avatar ?? `https://picsum.photos/seed/${pendingRecipient.id}/60/60`}
+                  alt={pendingRecipient.name}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+                <p className="text-sm font-medium text-amber-100">{pendingRecipient.name}</p>
+              </div>
+
+              {/* Empty state */}
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 p-8 text-center">
+                <MessageCircle size={28} className="text-stone-700" />
+                <p className="text-stone-500 text-sm">Send a message to start the conversation.</p>
+              </div>
+
+              {/* Compose */}
+              <div className="px-4 py-3 border-t border-white/10">
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Write a message…"
+                    value={newMsg}
+                    onChange={(e) => setNewMsg(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handlePendingSend(); } }}
+                    className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => void handlePendingSend()}
+                    disabled={!newMsg.trim()}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+                  >
+                    <Send size={15} />
+                  </button>
+                </div>
+              </div>
+            </>
           ) : activeApiThread ? (
             <>
               {/* Header */}
