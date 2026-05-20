@@ -1225,6 +1225,24 @@ export default function Feed() {
     setMusicUnlocked(true);
   }, []);
 
+  // Unlock video audio on first user interaction — scroll, touch, or tap.
+  // Browsers block all audio until a gesture; this mirrors how TikTok/Reels
+  // work: sound kicks in the moment you start scrolling, no button needed.
+  // The music layer stays muted (musicMuted=true); only original video audio plays.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const unlock = () => unlockMusic();
+    el.addEventListener("touchstart", unlock, { once: true, passive: true });
+    el.addEventListener("pointerdown", unlock, { once: true, passive: true });
+    el.addEventListener("scroll", unlock, { once: true, passive: true });
+    return () => {
+      el.removeEventListener("touchstart", unlock);
+      el.removeEventListener("pointerdown", unlock);
+      el.removeEventListener("scroll", unlock);
+    };
+  }, [unlockMusic]);
+
   const handleToggleMusic = useCallback(() => {
     if (!musicUnlocked) {
       unlockMusic();
