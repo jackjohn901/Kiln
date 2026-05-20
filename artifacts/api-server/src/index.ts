@@ -5,6 +5,7 @@ import { setupWebSocket } from "./lib/websocket";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
 import { seedDatabase } from "./lib/seed";
+import { backfillProcessingWindow } from "./lib/backfillProcessingWindow";
 import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
 import { startStoryExpiry } from "./lib/storyExpiry";
 import { startDropCountdownScheduler } from "./lib/dropCountdown";
@@ -49,6 +50,7 @@ if (Number.isNaN(port) || port <= 0) {
 (async () => {
   await initStripe();
   await seedDatabase();
+  backfillProcessingWindow().catch((err) => logger.error({ err }, "backfillProcessingWindow error"));
   startScheduledPostsPublisher();
   startStoryExpiry();
   startDropCountdownScheduler();
