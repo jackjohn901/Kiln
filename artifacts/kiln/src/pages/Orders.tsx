@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2 } from "lucide-react";
+import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Nav from "@/components/Nav";
 
 interface Order {
@@ -15,6 +15,7 @@ interface Order {
   trackingNumber: string | null;
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
+  manualPayout: boolean;
   createdAt: string;
 }
 
@@ -43,6 +44,51 @@ function formatPrice(n: number) {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function ManualReceiptSection({ order }: { order: Order }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 border-t border-white/6 pt-2">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1 text-[11px] text-amber-400/80 hover:text-amber-300 transition-colors"
+      >
+        {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+        {open ? "Hide receipt" : "View receipt"}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/6 p-3 text-[11px]">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-200 font-semibold mb-0.5">Manual fulfillment in progress</p>
+                <p className="text-stone-400 leading-relaxed">
+                  This artist processes payments directly. Your order has been recorded and the artist
+                  has been notified. Expect a reply within{" "}
+                  <span className="text-amber-300 font-medium">2–5 business days</span> with payment
+                  instructions and shipping details.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/6 bg-stone-900/60 p-3 text-[11px]">
+            <div className="flex items-center gap-1.5 mb-2">
+              <ShoppingBag size={11} className="text-amber-400" />
+              <span className="text-stone-300 font-medium">Order summary</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-stone-300 flex-1 pr-3">{order.title}</span>
+              <span className="text-amber-300 font-medium tabular-nums shrink-0">
+                {formatPrice(order.amount)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Orders() {
@@ -153,6 +199,7 @@ export default function Orders() {
                     )}
                   </div>
                 </div>
+                {order.manualPayout && <ManualReceiptSection order={order} />}
               </div>
             );
           })}

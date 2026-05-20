@@ -12,6 +12,7 @@ type VerifiedSession = {
   amountTotal: number | null;
   listingIds: string[];
   listingQtys: number[];
+  manualPayout: boolean;
 };
 
 /**
@@ -61,7 +62,9 @@ async function verifyStripeSession(
       : [];
     const listingQtys = listingIds.map((_, i) => (Number.isFinite(rawQtys[i]) && rawQtys[i] > 0 ? rawQtys[i] : 1));
 
-    return { amountTotal: session.amount_total, listingIds, listingQtys };
+    const manualPayout = meta.manualPayout === "true";
+
+    return { amountTotal: session.amount_total, listingIds, listingQtys, manualPayout };
   } catch (err) {
     logger.error({ err, stripeSessionId }, "Stripe session verification error");
     return null;
@@ -324,6 +327,7 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         notes: orderIds.length === 0 ? dedupeKey : null,
         processingWindowDays: stampedWindow,
         processingWindowLabel: sellerLabel,
+        manualPayout: verified.manualPayout,
       });
       orderIds.push(orderId);
       sellerIdSet.add(listing.artistId);

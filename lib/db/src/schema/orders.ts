@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, varchar, boolean } from "drizzle-orm/pg-core";
 
 export const ordersTable = pgTable("orders", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -17,6 +17,7 @@ export const ordersTable = pgTable("orders", {
   notes: text("notes"),
   processingWindowDays: integer("processing_window_days"),
   processingWindowLabel: text("processing_window_label"),
+  manualPayout: boolean("manual_payout").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
