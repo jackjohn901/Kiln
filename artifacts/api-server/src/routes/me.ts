@@ -216,7 +216,7 @@ router.post("/me/orders", async (req, res): Promise<void> => {
           amount: listing.price * qty,
           currency: "USD",
           status: "confirmed",
-          notes: orderIds.length === 0 ? dedupeKey : null,
+          notes: dedupeKey,
         });
         orderIds.push(orderId);
       }
@@ -377,8 +377,8 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         amount: listing.price * qty,
         currency: "USD",
         status: "confirmed",
-        // Only the first order row carries the deduplication key.
-        notes: orderIds.length === 0 ? dedupeKey : null,
+        // All order rows in a session share the deduplication key so they can be grouped.
+        notes: dedupeKey,
         processingWindowDays: stampedWindow,
         processingWindowLabel: sellerLabel,
         manualPayout: verified.manualPayout,

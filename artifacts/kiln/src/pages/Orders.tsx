@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
+import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Nav from "@/components/Nav";
 
 interface Order {
@@ -16,6 +16,7 @@ interface Order {
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
   manualPayout: boolean;
+  notes: string | null;
   createdAt: string;
 }
 
@@ -51,8 +52,9 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function ManualReceiptSection({ order }: { order: Order }) {
+function ManualReceiptSection({ orders }: { orders: Order[] }) {
   const [open, setOpen] = useState(false);
+  const combinedTotal = orders.reduce((sum, o) => sum + o.amount, 0);
   return (
     <div className="mt-2 border-t border-white/6 pt-2" onClick={e => e.preventDefault()}>
       <button
@@ -61,6 +63,9 @@ function ManualReceiptSection({ order }: { order: Order }) {
       >
         {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
         {open ? "Hide receipt" : "View receipt"}
+        {orders.length > 1 && (
+          <span className="ml-1 text-stone-500">({orders.length} items)</span>
+        )}
       </button>
       {open && (
         <div className="mt-2 space-y-2">
@@ -83,17 +88,57 @@ function ManualReceiptSection({ order }: { order: Order }) {
               <ShoppingBag size={11} className="text-amber-400" />
               <span className="text-stone-300 font-medium">Order summary</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-stone-300 flex-1 pr-3">{order.title}</span>
-              <span className="text-amber-300 font-medium tabular-nums shrink-0">
-                {formatPrice(order.amount)}
-              </span>
+            <div className="space-y-1.5">
+              {orders.map(order => (
+                <div key={order.id} className="flex items-center justify-between">
+                  <span className="text-stone-300 flex-1 pr-3">{order.title}</span>
+                  <span className="text-amber-300 font-medium tabular-nums shrink-0">
+                    {formatPrice(order.amount)}
+                  </span>
+                </div>
+              ))}
+              {orders.length > 1 && (
+                <div className="flex items-center justify-between border-t border-white/8 pt-1.5 mt-1.5">
+                  <span className="text-stone-400 font-medium">Total</span>
+                  <span className="text-amber-300 font-semibold tabular-nums">
+                    {formatPrice(combinedTotal)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+interface OrderGroup {
+  key: string;
+  orders: Order[];
+  isGroup: boolean;
+}
+
+function groupOrders(orders: Order[]): OrderGroup[] {
+  const groups: OrderGroup[] = [];
+  const sessionMap = new Map<string, Order[]>();
+
+  for (const order of orders) {
+    if (order.manualPayout && order.notes && order.notes.startsWith("stripe:")) {
+      const existing = sessionMap.get(order.notes);
+      if (existing) {
+        existing.push(order);
+      } else {
+        const group: Order[] = [order];
+        sessionMap.set(order.notes, group);
+        groups.push({ key: order.notes, orders: group, isGroup: true });
+      }
+    } else {
+      groups.push({ key: order.id, orders: [order], isGroup: false });
+    }
+  }
+
+  return groups;
 }
 
 export default function Orders() {
@@ -150,6 +195,8 @@ export default function Orders() {
     return true;
   });
 
+  const grouped = groupOrders(filtered);
+
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
@@ -174,7 +221,7 @@ export default function Orders() {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && grouped.length === 0 && (
           <div className="py-16 text-center">
             <ShoppingBag size={32} className="mx-auto mb-3 text-stone-700" />
             <p className="text-stone-500 text-sm">No orders yet.</p>
@@ -187,18 +234,22 @@ export default function Orders() {
         )}
 
         <div className="flex flex-col gap-3">
-          {filtered.map(order => {
-            const typeConf = TYPE_CONFIG[order.type] ?? TYPE_CONFIG.inquiry!;
-            const statusConf = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.pending!;
+          {grouped.map(({ key, orders: groupOrders, isGroup }) => {
+            const primary = groupOrders[0];
+            const typeConf = TYPE_CONFIG[primary.type] ?? TYPE_CONFIG.inquiry!;
+            const statusConf = STATUS_CONFIG[primary.status] ?? STATUS_CONFIG.pending!;
             const TypeIcon = typeConf.icon;
             const StatusIcon = statusConf.icon;
+            const combinedAmount = groupOrders.reduce((sum, o) => sum + o.amount, 0);
+            const isManualGroup = primary.manualPayout;
+
             return (
-              <Link key={order.id} href={`/orders/${order.id}`}>
+              <Link key={key} href={`/orders/${primary.id}`}>
               <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-4 hover:border-amber-500/20 hover:bg-stone-900/70 transition-colors cursor-pointer">
                 <div className="flex items-start gap-3">
                   <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
-                    {order.imageUrl ? (
-                      <img src={order.imageUrl} alt="" className="h-full w-full object-cover" />
+                    {primary.imageUrl ? (
+                      <img src={primary.imageUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <div className={`h-full w-full flex items-center justify-center rounded-xl ${typeConf.color}`}>
                         <TypeIcon size={20} />
@@ -208,8 +259,12 @@ export default function Orders() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-stone-100 leading-tight">{order.title}</p>
-                        <p className="text-xs text-stone-500 mt-0.5">{formatDate(order.createdAt)}</p>
+                        <p className="text-sm font-semibold text-stone-100 leading-tight">
+                          {isGroup && groupOrders.length > 1
+                            ? `${groupOrders.length} items from this checkout`
+                            : primary.title}
+                        </p>
+                        <p className="text-xs text-stone-500 mt-0.5">{formatDate(primary.createdAt)}</p>
                       </div>
                       <span className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium ${statusConf.color}`}>
                         <StatusIcon size={11} />
@@ -217,16 +272,16 @@ export default function Orders() {
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-amber-300">{formatPrice(order.amount)}</span>
+                      <span className="text-sm font-semibold text-amber-300">{formatPrice(combinedAmount)}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
                     </div>
-                    {!["delivered", "cancelled"].includes(order.status) && (
+                    {!["delivered", "cancelled"].includes(primary.status) && (
                       <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
                         <Clock size={10} className="text-amber-500/70 flex-shrink-0" />
                         Processing window:{" "}
                         {(() => {
-                          const label = order.processingWindowLabel ?? sellerWindows[order.sellerId]?.processingWindowLabel ?? null;
-                          const days = order.processingWindowDays ?? sellerWindows[order.sellerId]?.processingWindowDays ?? null;
+                          const label = primary.processingWindowLabel ?? sellerWindows[primary.sellerId]?.processingWindowLabel ?? null;
+                          const days = primary.processingWindowDays ?? sellerWindows[primary.sellerId]?.processingWindowDays ?? null;
                           if (label != null || days != null) {
                             return (
                               <span className="text-amber-400/80">
@@ -238,14 +293,14 @@ export default function Orders() {
                         })()}
                       </p>
                     )}
-                    {order.trackingNumber && (
+                    {primary.trackingNumber && (
                       <p className="mt-1.5 text-[11px] text-stone-600">
-                        Tracking: <span className="text-stone-400 font-mono">{order.trackingNumber}</span>
+                        Tracking: <span className="text-stone-400 font-mono">{primary.trackingNumber}</span>
                       </p>
                     )}
                   </div>
                 </div>
-                {order.manualPayout && <ManualReceiptSection order={order} />}
+                {isManualGroup && <ManualReceiptSection orders={groupOrders} />}
               </div>
               </Link>
             );
