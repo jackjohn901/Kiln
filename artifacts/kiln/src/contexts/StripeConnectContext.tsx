@@ -55,6 +55,19 @@ export function StripeConnectProvider({ children }: { children: ReactNode }) {
     void fetch_();
   }, [fetch_]);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const eventuallyDue = status?.requirementsEventuallyDue ?? 0;
+      const pastDue = status?.requirementsPastDue ?? 0;
+      if (eventuallyDue > 0 || pastDue > 0) {
+        void fetch_();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fetch_, status?.requirementsEventuallyDue, status?.requirementsPastDue]);
+
   const eventuallyDue = status?.requirementsEventuallyDue ?? 0;
   const pastDue = status?.requirementsPastDue ?? 0;
   const hasUrgent = pastDue > 0 || !!status?.disabledReason;
