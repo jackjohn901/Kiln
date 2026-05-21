@@ -36,6 +36,7 @@ interface EarningLine {
 interface EarningTotals {
   tips: number;
   subscriptions: number;
+  shopSales: number;
   total: number;
 }
 
@@ -141,7 +142,7 @@ export default function Earnings() {
   const { subscribe } = useWebSocket();
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
-  const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, total: 0 });
+  const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, total: 0 });
   const [loading, setLoading]     = useState(true);
   const [saleBanner, setSaleBanner] = useState<string | null>(null);
   const saleBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -318,9 +319,15 @@ export default function Earnings() {
     try {
       const r = await fetch("/api/me/earnings", { credentials: "include" });
       if (!r.ok) return;
-      const data = await r.json() as { earnings?: EarningLine[]; totals?: EarningTotals };
+      const data = await r.json() as { earnings?: EarningLine[]; totals?: { tips?: number; subscriptions?: number; sales?: number; shopSales?: number; total?: number } };
       setEarnings(data.earnings ?? []);
-      setTotals(data.totals ?? { tips: 0, subscriptions: 0, total: 0 });
+      const t = data.totals ?? {};
+      setTotals({
+        tips: t.tips ?? 0,
+        subscriptions: t.subscriptions ?? 0,
+        shopSales: t.shopSales ?? t.sales ?? 0,
+        total: t.total ?? 0,
+      });
     } catch { /* ignore */ }
   }, []);
 
@@ -499,9 +506,10 @@ export default function Earnings() {
         ) : (
           <>
             {/* Stats */}
-            <div className="mb-8 grid grid-cols-3 gap-3">
+            <div className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: "Total", value: formatPrice(totals.total), icon: TrendingUp, color: "text-amber-400" },
+                { label: "Shop Sales", value: formatPrice(totals.shopSales), icon: ShoppingBag, color: "text-sky-400" },
                 { label: "Tips", value: formatPrice(totals.tips), icon: DollarSign, color: "text-emerald-400" },
                 { label: "Subscriptions", value: formatPrice(totals.subscriptions), icon: Star, color: "text-purple-400" },
               ].map(stat => {
