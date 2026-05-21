@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -99,35 +98,70 @@ export default function NotificationSettingsScreen() {
 
   const [settings, setSettings] = useState<NotifSettings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSettingsRef = useRef<NotifSettings>(DEFAULTS);
+  const hasPendingSaveRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     apiGet<{ settings?: Partial<NotifSettings> }>("/api/me/settings")
       .then((data) => {
         if (data.settings) {
-          setSettings((prev) => ({ ...prev, ...data.settings }));
+          const merged = { ...DEFAULTS, ...data.settings };
+          setSettings(merged);
+          latestSettingsRef.current = merged;
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    return () => {
+      mountedRef.current = false;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+        if (hasPendingSaveRef.current) {
+          apiPatch("/api/me/settings", { settings: latestSettingsRef.current }).catch(() => {});
+          hasPendingSaveRef.current = false;
+        }
+      }
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleAutoSave = useCallback((nextSettings: NotifSettings) => {
+    latestSettingsRef.current = nextSettings;
+    hasPendingSaveRef.current = true;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      hasPendingSaveRef.current = false;
+      debounceRef.current = null;
+      try {
+        await apiPatch("/api/me/settings", { settings: latestSettingsRef.current });
+        if (!mountedRef.current) return;
+        setSaved(true);
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setSaved(false);
+        }, 1800);
+      } catch {
+      }
+    }, 400);
   }, []);
 
   const set = (key: keyof NotifSettings) => (value: boolean) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await apiPatch("/api/me/settings", { settings });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1800);
-    } catch {
-      Alert.alert("Error", "Could not save notification settings. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+    setSaved(false);
+    setSettings((prev) => {
+      const next = { ...prev, [key]: value };
+      scheduleAutoSave(next);
+      return next;
+    });
   };
 
   return (
@@ -146,7 +180,13 @@ export default function NotificationSettingsScreen() {
           <Feather name="chevron-left" size={24} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notifications</Text>
-        <View style={{ width: 34 }} />
+        <View style={styles.headerRight}>
+          {saved ? (
+            <Feather name="check" size={18} color={colors.primary} />
+          ) : (
+            <View style={{ width: 18 }} />
+          )}
+        </View>
       </View>
 
       {loading ? (
@@ -266,20 +306,6 @@ export default function NotificationSettingsScreen() {
               isLast
             />
           </View>
-
-          <Pressable
-            style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}
-            onPress={save}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
-              <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>
-                {saved ? "Saved!" : "Save preferences"}
-              </Text>
-            )}
-          </Pressable>
         </ScrollView>
       )}
     </View>
@@ -297,6 +323,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 34, alignItems: "flex-start" },
   headerTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
+  headerRight: { width: 34, alignItems: "flex-end" },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { padding: 16, gap: 8 },
   sectionHeader: {
@@ -323,12 +350,4 @@ const styles = StyleSheet.create({
   toggleText: { flex: 1, gap: 2 },
   toggleLabel: { fontFamily: "Inter_500Medium", fontSize: 14 },
   toggleDesc: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 16 },
-  saveBtn: {
-    borderRadius: 24,
-    paddingVertical: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15 },
 });
