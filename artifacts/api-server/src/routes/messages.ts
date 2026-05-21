@@ -120,6 +120,30 @@ router.get("/messages/thread-by-user/:userId", async (req, res): Promise<void> =
   }
 });
 
+// POST /messages/typing — broadcast a typing indicator to the other participant
+router.post("/messages/typing", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { threadId } = req.body as { threadId?: string };
+  if (!threadId) { res.status(400).json({ error: "threadId required" }); return; }
+
+  const userId = req.user.id;
+
+  try {
+    const [thread] = await db.select().from(messageThreadsTable).where(eq(messageThreadsTable.id, threadId));
+    if (!thread) { res.status(404).json({ error: "Thread not found" }); return; }
+    if (thread.participantA !== userId && thread.participantB !== userId) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+
+    const recipientId = thread.participantA === userId ? thread.participantB : thread.participantA;
+    broadcast(recipientId, { type: "typing", threadId, userId });
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err }, "typing indicator error");
+    res.status(500).json({ error: "Failed to send typing indicator" });
+  }
+});
+
 // POST /messages/send
 router.post("/messages/send", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

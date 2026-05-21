@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type MessageThread } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 
@@ -89,6 +90,7 @@ export default function Messages() {
   const params = useParams<{ participantId?: string }>();
   const { profile } = useProfile();
   const { threads, sendDirectMessage, markThreadRead } = useSocial();
+  const { subscribe } = useWebSocket();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [newMsg, setNewMsg] = useState("");
   const [search, setSearch] = useState("");
@@ -96,6 +98,9 @@ export default function Messages() {
   const [activeApiThreadId, setActiveApiThreadId] = useState<string | null>(null);
   const [apiMessages, setApiMessages] = useState<ApiMsg[]>([]);
   const [pendingRecipient, setPendingRecipient] = useState<PendingRecipient | null>(null);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const typingDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const activeThread = activeThreadId ? threads.find((t) => t.id === activeThreadId) : null;
@@ -151,6 +156,36 @@ export default function Messages() {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [activeApiThread, apiMessages.length]);
+
+  // Subscribe to typing events from the other participant
+  useEffect(() => {
+    if (!activeApiThreadId) return;
+    const unsub = subscribe("typing", (evt) => {
+      const e = evt as { threadId?: string; userId?: string };
+      if (e.threadId !== activeApiThreadId) return;
+      setOtherUserTyping(true);
+      if (typingDismissRef.current) clearTimeout(typingDismissRef.current);
+      typingDismissRef.current = setTimeout(() => setOtherUserTyping(false), 3000);
+    });
+    return () => {
+      unsub();
+      setOtherUserTyping(false);
+      if (typingDismissRef.current) clearTimeout(typingDismissRef.current);
+    };
+  }, [activeApiThreadId, subscribe]);
+
+  // Send a typing signal to the server (throttled to at most once per second)
+  const sendTypingSignal = useCallback((threadId: string) => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1000) return;
+    lastTypingSentRef.current = now;
+    void fetch("/api/messages/typing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ threadId }),
+    }).catch(() => {});
+  }, []);
 
   // Poll for new messages every 5 s when an API thread is active
   useEffect(() => {
@@ -498,6 +533,20 @@ export default function Messages() {
                     );
                   });
                 })()}
+                {otherUserTyping && (
+                  <div className="flex items-end gap-2">
+                    <img
+                      src={activeApiThread.otherUserAvatar ?? `https://picsum.photos/seed/${activeApiThread.otherUserId}/60/60`}
+                      alt={activeApiThread.otherUserName}
+                      className="h-7 w-7 rounded-full object-cover shrink-0"
+                    />
+                    <div className="bg-stone-800 rounded-2xl rounded-bl-sm px-4 py-2.5 flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:0ms]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:150ms]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:300ms]" />
+                    </div>
+                  </div>
+                )}
                 <div ref={bottomRef} />
               </div>
 
@@ -508,7 +557,7 @@ export default function Messages() {
                     type="text"
                     placeholder="Write a message…"
                     value={newMsg}
-                    onChange={(e) => setNewMsg(e.target.value)}
+                    onChange={(e) => { setNewMsg(e.target.value); if (e.target.value) sendTypingSignal(activeApiThread.id); }}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleApiSend(); } }}
                     className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
                   />
