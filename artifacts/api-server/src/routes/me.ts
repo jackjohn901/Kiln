@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable } from "@workspace/db";
+import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable, usersTable } from "@workspace/db";
 import { eq, inArray, and } from "drizzle-orm";
 import crypto from "crypto";
 import { logger } from "../lib/logger";
@@ -179,7 +179,15 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
       ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
       : { displayName: null, location: null };
 
-    res.json({ order, siblingOrders, buyerProfile });
+    const [buyerUserRow] = await db
+      .select({ email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id))
+      .limit(1);
+
+    const buyerEmail = buyerUserRow?.email ?? null;
+
+    res.json({ order, siblingOrders, buyerProfile, buyerEmail });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });

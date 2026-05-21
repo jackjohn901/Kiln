@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star,
+  Printer, Star, Mail,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 
@@ -156,6 +156,7 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
   const [buyerProfile, setBuyerProfile] = useState<BuyerProfile | null>(null);
+  const [buyerEmail, setBuyerEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -172,6 +173,7 @@ export default function OrderDetail() {
         const siblings: Order[] = data.siblingOrders ?? [];
         setSiblingOrders(siblings.length > 1 ? siblings : []);
         if (data.buyerProfile) setBuyerProfile(data.buyerProfile as BuyerProfile);
+        if (data.buyerEmail) setBuyerEmail(data.buyerEmail as string);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -383,6 +385,15 @@ export default function OrderDetail() {
             </p>
           </div>
         </div>
+
+        {buyerEmail && (
+          <div className="mb-4 flex items-center gap-2.5 rounded-2xl border border-white/8 bg-stone-900/50 px-4 py-3">
+            <Mail size={14} className="text-stone-500 shrink-0" />
+            <p className="text-xs text-stone-400">
+              Receipt emailed to <span className="text-stone-300 font-medium">{buyerEmail}</span>
+            </p>
+          </div>
+        )}
 
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
           {isCartOrder ? (
