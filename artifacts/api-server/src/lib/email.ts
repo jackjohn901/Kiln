@@ -111,6 +111,17 @@ export function newCommentEmail(commenterName: string, postCaption: string, post
   `);
 }
 
+export function newMentionEmail(mentionerName: string, snippet: string, postId: string): string {
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">You were mentioned</h1>
+    ${card(`
+      <p style="margin:0 0 8px;"><strong>${mentionerName}</strong> mentioned you in a comment:</p>
+      <p style="margin:0;color:#78716c;font-style:italic;">"${snippet.slice(0, 80)}…"</p>
+    `)}
+    ${btn(`${BASE_URL}/posts/${postId}`, "See the comment")}
+  `);
+}
+
 export function newPatronEmail(patronName: string, tierName: string): string {
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Patron! 🌟</h1>

@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable,
 } from "@workspace/db";
-import { sendEmail, newCommentEmail } from "../lib/email";
+import { sendEmail, newCommentEmail, newMentionEmail } from "../lib/email";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
@@ -309,6 +309,16 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
             text: `mentioned you: "${text.trim().substring(0, 50)}"`,
             link: `/post/${postId}`,
           });
+          // Email notification (fire-and-forget)
+          const mentionedUserId = mp.userId;
+          Promise.all([
+            db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, mentionedUserId)).limit(1),
+            db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, mentionedUserId)).limit(1),
+          ]).then(([[p], [s]]) => {
+            const emailSettings = s?.settings as Record<string, boolean> | null;
+            const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_mentions !== false;
+            if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: newMentionEmail(authorName, text.trim(), postId) }).catch(() => {});
+          }).catch(() => {});
         }
       } catch {
         // mention notifications are non-critical
