@@ -201,6 +201,21 @@ export default function CartCheckout() {
           setProcessingWindowLabel(typeof data.processingWindowLabel === "string" && data.processingWindowLabel.trim() ? data.processingWindowLabel.trim() : null);
           setCheckingOut(false);
         } else {
+          // Persist processing window to localStorage so CartSuccess can display it
+          // immediately after the Stripe redirect, before the /api/me/orders/bulk
+          // response comes back (same pattern as manual-payout orders).
+          try {
+            if (typeof data.processingWindowDays === "number") {
+              localStorage.setItem("kiln_processing_window", String(data.processingWindowDays));
+            } else {
+              localStorage.removeItem("kiln_processing_window");
+            }
+            if (typeof data.processingWindowLabel === "string" && data.processingWindowLabel.trim()) {
+              localStorage.setItem("kiln_processing_window_label", data.processingWindowLabel.trim());
+            } else {
+              localStorage.removeItem("kiln_processing_window_label");
+            }
+          } catch {}
           window.location.href = data.url;
         }
       } else {

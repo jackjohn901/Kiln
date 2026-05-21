@@ -43,12 +43,18 @@ export default function CartSuccess() {
     // Apply a cached hint immediately so the UI isn't blank while the API responds.
     // This is a best-effort early display only; the authoritative value comes from
     // the order record returned by /api/me/orders/bulk below.
+    // Both manual-payout and Connect orders now persist this before the Stripe redirect.
     try {
       const cached = localStorage.getItem("kiln_processing_window");
       if (cached !== null) {
         const days = parseInt(cached, 10);
         if (!isNaN(days)) setProcessingWindowDays(days);
         localStorage.removeItem("kiln_processing_window");
+      }
+      const cachedLabel = localStorage.getItem("kiln_processing_window_label");
+      if (cachedLabel !== null) {
+        setProcessingWindowLabel(cachedLabel);
+        localStorage.removeItem("kiln_processing_window_label");
       }
     } catch {}
 

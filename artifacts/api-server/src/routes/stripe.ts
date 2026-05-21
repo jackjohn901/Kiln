@@ -236,26 +236,27 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const manualPayout = listingIds.length > 0 && connectedAccountId === null;
 
+    // Fetch payment settings for all listing artists — needed for both:
+    //   (a) manual-payout method validation (manualPayout === true)
+    //   (b) processing window derivation for ALL checkout types (Connect and manual alike).
+    const listingArtistIds = [...new Set(
+      listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter((id): id is string => !!id),
+    )];
+    let artistPaymentSettingsRows: Array<{ userId: string; paymentSettings: unknown }> = [];
+    if (listingArtistIds.length > 0) {
+      artistPaymentSettingsRows = await db
+        .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+        .from(userSettingsTable)
+        .where(inArray(userSettingsTable.userId, listingArtistIds));
+    }
+
     // When the artist has no connected Stripe account, verify they have at least one
     // manual payment method configured before allowing checkout to proceed.
-    // Fetching payment settings here also lets us reuse the data for processingWindow
-    // without a second DB round-trip later.
-    let artistPaymentSettingsRows: Array<{ userId: string; paymentSettings: unknown }> = [];
     if (manualPayout) {
-      const artistIds = [...new Set(
-        listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter((id): id is string => !!id),
-      )];
-      if (artistIds.length > 0) {
-        artistPaymentSettingsRows = await db
-          .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
-          .from(userSettingsTable)
-          .where(inArray(userSettingsTable.userId, artistIds));
-      }
-
       // Check that every artist has at least one usable manual payment method.
       // An artist with no settings row at all also counts as having no payment method.
       const settingsMap = new Map(artistPaymentSettingsRows.map((row) => [row.userId, row.paymentSettings]));
-      const artistsWithoutMethod = artistIds.filter((id) => {
+      const artistsWithoutMethod = listingArtistIds.filter((id) => {
         const ps = settingsMap.get(id) as Record<string, unknown> | null | undefined;
         return !ps || !(
           (typeof ps.stripeLink === 'string' && ps.stripeLink.trim()) ||
@@ -330,23 +331,23 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    // For manual-payout orders, derive the processing window from the already-fetched
-    // payment settings rows (no second DB round-trip needed).
+    // Derive the processing window for all orders — take the maximum across all artists.
+    // Returned to the client so it can be cached in localStorage before the Stripe redirect
+    // and displayed immediately on the order confirmation page for both manual-payout and
+    // Connect orders.
     let processingWindowDays: number | null = null;
     let processingWindowLabel: string | null = null;
-    if (manualPayout) {
-      for (const row of artistPaymentSettingsRows) {
-        const ps = row.paymentSettings as Record<string, unknown> | null;
-        const w = ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null;
-        if (w !== null) {
-          processingWindowDays = processingWindowDays === null ? w : Math.max(processingWindowDays, w);
-        }
-        const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
-          ? ps.processingWindowLabel.trim()
-          : null;
-        if (label !== null) {
-          processingWindowLabel = label;
-        }
+    for (const row of artistPaymentSettingsRows) {
+      const ps = row.paymentSettings as Record<string, unknown> | null;
+      const w = ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null;
+      if (w !== null) {
+        processingWindowDays = processingWindowDays === null ? w : Math.max(processingWindowDays, w);
+      }
+      const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
+        ? ps.processingWindowLabel.trim()
+        : null;
+      if (label !== null) {
+        processingWindowLabel = label;
       }
     }
 
