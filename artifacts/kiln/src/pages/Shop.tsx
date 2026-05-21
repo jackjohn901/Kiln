@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { SlidersHorizontal, ShoppingCart, Plus, Check, Heart, Loader2, Truck } from "lucide-react";
@@ -110,6 +111,7 @@ function matchMedium(listing: ApiListing, filter: string): boolean {
 }
 
 export default function Shop() {
+  useEffect(() => { markFeatureVisited("shop"); }, []);
   const [medium, setMedium] = useState("All");
   const [sort, setSort] = useState("Default");
   const [showSold, setShowSold] = useState(false);

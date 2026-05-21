@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -267,6 +268,7 @@ function BidModal({ auction, onClose, onBidPlaced }: { auction: Auction; onClose
 }
 
 export default function Auctions() {
+  useEffect(() => { markFeatureVisited("auctions"); }, []);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X } from "lucide-react";
 import { useLocation } from "wouter";
 import Nav from "@/components/Nav";
@@ -163,6 +164,8 @@ export default function Workshops() {
   const [workshops, setWorkshops] = useState<ApiWorkshop[]>([]);
   const [loading, setLoading] = useState(true);
   const [medium, setMedium] = useState("All");
+
+  useEffect(() => { markFeatureVisited("workshops"); }, []);
 
   useEffect(() => {
     fetch("/api/workshops", { credentials: "include" })

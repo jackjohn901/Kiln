@@ -11,6 +11,8 @@ import {
 import ReportModal from "@/components/ReportModal";
 import BoardSavePicker from "@/components/BoardSavePicker";
 import { ParsedCaption } from "@/lib/parseCaption";
+import { getNextFeatureToSurface, markFeatureSurfaced, type DiscoveryFeature } from "@/lib/featureDiscovery";
+import FeatureDiscoveryCard from "@/components/FeatureDiscoveryCard";
 import { getTrackById } from "@/data/music";
 import { getCommunityBeats } from "@/lib/communityBeats";
 import { createBeatLooper } from "@/lib/beatSynth";
@@ -881,8 +883,20 @@ export default function Feed() {
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     try { return !!localStorage.getItem("kiln_welcome_dismissed"); } catch { return false; }
   });
+  const [discoveryFeature, setDiscoveryFeature] = useState<DiscoveryFeature | null>(null);
+  const [discoveryShown, setDiscoveryShown] = useState(false);
 
   const [justPublishedCount, setJustPublishedCount] = useState(0);
+
+  // Feature discovery: show a card after the 5th reel, once per session per feature
+  useEffect(() => {
+    if (discoveryShown || activeIndex < 4) return;
+    const feature = getNextFeatureToSurface();
+    if (!feature) return;
+    markFeatureSurfaced(feature.id);
+    setDiscoveryFeature(feature);
+    setDiscoveryShown(true);
+  }, [activeIndex, discoveryShown]);
 
   // Reload user posts on mount, when window regains focus, or immediately after posting
   useEffect(() => {
@@ -1424,6 +1438,16 @@ export default function Feed() {
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Feature discovery card */}
+      <AnimatePresence>
+        {discoveryFeature && (
+          <FeatureDiscoveryCard
+            feature={discoveryFeature}
+            onDismiss={() => setDiscoveryFeature(null)}
+          />
         )}
       </AnimatePresence>
 

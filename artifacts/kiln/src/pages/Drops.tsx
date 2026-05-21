@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { Zap, Clock, CheckCircle2, ChevronRight, Loader2, Plus } from "lucide-react";
 import { Link } from "wouter";
 import Nav from "@/components/Nav";
@@ -159,6 +160,8 @@ export default function Drops() {
   const [drops, setDrops] = useState<Drop[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "live" | "upcoming" | "sold">("all");
+
+  useEffect(() => { markFeatureVisited("drops"); }, []);
 
   useEffect(() => {
     fetch("/api/drops", { credentials: "include" })

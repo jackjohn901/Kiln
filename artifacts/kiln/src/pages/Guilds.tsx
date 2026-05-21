@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Users, ChevronRight, MessageCircle, ChevronLeft, CheckCircle2, Loader2 } from "lucide-react";
@@ -78,6 +79,8 @@ function GuildCard({ guild, onToggle }: { guild: Guild; onToggle: (id: string) =
 export default function Guilds() {
   const [guilds, setGuilds] = useState<Guild[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => { markFeatureVisited("guilds"); }, []);
 
   useEffect(() => {
     fetch("/api/guilds", { credentials: "include" })

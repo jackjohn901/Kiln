@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { useParams, Link, useLocation } from "wouter";
 import { ArrowLeft, CheckCircle, Clock, Image, DollarSign, Ruler, FileText, Flame, ChevronRight, Info } from "lucide-react";
 import { motion } from "framer-motion";
@@ -36,6 +37,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
 }
 
 export default function CommissionFlow() {
+  useEffect(() => { markFeatureVisited("commissions"); }, []);
   const { artistId } = useParams<{ artistId: string }>();
   const [, navigate] = useLocation();
   const { profile } = useProfile();
