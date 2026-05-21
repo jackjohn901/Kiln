@@ -95,6 +95,23 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   res.json({ listing: { ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() } });
 });
 
+// GET /artists/:artistId/shipping — public: buyer-facing shipping rates for an artist
+router.get("/artists/:artistId/shipping", async (req, res): Promise<void> => {
+  try {
+    const [row] = await db.select({ shippingSettings: userSettingsTable.shippingSettings })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, req.params.artistId));
+    const s = (row?.shippingSettings ?? {}) as Record<string, unknown>;
+    res.json({
+      offerFreeShipping: s.offerFreeShipping === true,
+      domesticRate: typeof s.domesticRate === "number" ? s.domesticRate : null,
+      internationalRate: typeof s.internationalRate === "number" ? s.internationalRate : null,
+      freeThreshold: typeof s.freeThreshold === "number" ? s.freeThreshold : null,
+      offerLocalPickup: s.offerLocalPickup === true,
+    });
+  } catch (err) { req.log.error({ err }, "getArtistShipping error"); res.status(500).json({ error: "Failed to load shipping" }); }
+});
+
 // DELETE /listings/:id
 router.delete("/listings/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

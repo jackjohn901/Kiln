@@ -7,8 +7,16 @@ import {
   Shield, Truck, Award, MapPin, ExternalLink, ChevronRight,
   Package, Ruler, Calendar, Palette, Star, MessageSquare,
   Bell, BellOff, DollarSign, X, Send, TrendingDown, Landmark,
-  QrCode, Download,
+  QrCode, Download, MapPinned,
 } from "lucide-react";
+
+interface ArtistShipping {
+  offerFreeShipping: boolean;
+  domesticRate: number | null;
+  internationalRate: number | null;
+  freeThreshold: number | null;
+  offerLocalPickup: boolean;
+}
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import Nav from "@/components/Nav";
 import { listings, formatPrice, type Listing } from "@/data/listings";
@@ -286,8 +294,19 @@ export default function ListingDetail() {
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [apiListing, setApiListing] = useState<import("@/data/listings").Listing | null>(null);
   const [listingLoading, setListingLoading] = useState(false);
+  const [artistShipping, setArtistShipping] = useState<ArtistShipping | null>(null);
 
   const staticListing = findListing(id ?? "");
+
+  useEffect(() => {
+    const artistId = staticListing?.artistId ?? apiListing?.artistId;
+    if (!artistId) return;
+    fetch(`/api/artists/${artistId}/shipping`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setArtistShipping(d); })
+      .catch(() => {});
+  }, [staticListing?.artistId, apiListing?.artistId]);
+
   useEffect(() => {
     if (staticListing || !id) return;
     setListingLoading(true);
@@ -664,10 +683,30 @@ export default function ListingDetail() {
             </div>
 
             {/* Price */}
-            <div className="flex items-baseline gap-3 mb-5">
-              <span className="font-serif text-4xl text-amber-200 font-medium">{formatPrice(listing.price)}</span>
-              {listing.price >= 5000 && (
-                <span className="text-xs text-stone-600">Payment plans available</span>
+            <div className="mb-5">
+              <div className="flex items-baseline gap-3 mb-1.5">
+                <span className="font-serif text-4xl text-amber-200 font-medium">{formatPrice(listing.price)}</span>
+                {listing.price >= 5000 && (
+                  <span className="text-xs text-stone-600">Payment plans available</span>
+                )}
+              </div>
+              {artistShipping && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {artistShipping.offerFreeShipping ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
+                      <Truck size={10} />Free shipping
+                    </span>
+                  ) : artistShipping.domesticRate != null && artistShipping.domesticRate > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-stone-900/60 px-2.5 py-1 text-[11px] text-stone-400">
+                      <Truck size={10} />Ships from ${artistShipping.domesticRate}
+                    </span>
+                  ) : null}
+                  {artistShipping.offerLocalPickup && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-400">
+                      <MapPinned size={10} />Local pickup available
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 

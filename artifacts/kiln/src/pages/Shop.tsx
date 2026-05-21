@@ -1,9 +1,43 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { SlidersHorizontal, ShoppingCart, Plus, Check, Heart, Loader2 } from "lucide-react";
+import { SlidersHorizontal, ShoppingCart, Plus, Check, Heart, Loader2, Truck } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
+
+interface ArtistShipping {
+  offerFreeShipping: boolean;
+  domesticRate: number | null;
+  internationalRate: number | null;
+  freeThreshold: number | null;
+  offerLocalPickup: boolean;
+}
+
+function ShippingBadge({ shipping }: { shipping: ArtistShipping | undefined }) {
+  if (!shipping) return null;
+  if (shipping.offerFreeShipping) {
+    return (
+      <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+        <Truck size={9} />Free shipping
+      </span>
+    );
+  }
+  if (shipping.domesticRate != null && shipping.domesticRate > 0) {
+    return (
+      <span className="flex items-center gap-1 text-[10px] text-stone-500">
+        <Truck size={9} />Ships from ${shipping.domesticRate}
+      </span>
+    );
+  }
+  if (shipping.offerLocalPickup) {
+    return (
+      <span className="flex items-center gap-1 text-[10px] text-sky-400">
+        <Truck size={9} />Local pickup available
+      </span>
+    );
+  }
+  return null;
+}
 
 const MEDIUMS = ["All", "Glass", "Metal", "Sculpture", "Fiber"];
 const SORTS = ["Default", "Price: Low to High", "Price: High to Low"];
@@ -83,6 +117,7 @@ export default function Shop() {
   const [listings, setListings] = useState<ApiListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [wishlisted, setWishlisted] = useState<Set<string>>(new Set());
+  const [shippingMap, setShippingMap] = useState<Record<string, ArtistShipping>>({});
   const { addItem, isInCart } = useCart();
 
   useEffect(() => {
@@ -90,8 +125,22 @@ export default function Shop() {
     fetch("/api/listings", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
-        setListings(data.listings ?? []);
-        setWishlisted(new Set(data.listings?.filter((l: ApiListing) => l.isWishlisted).map((l: ApiListing) => l.id) ?? []));
+        const loaded: ApiListing[] = data.listings ?? [];
+        setListings(loaded);
+        setWishlisted(new Set(loaded.filter((l) => l.isWishlisted).map((l) => l.id)));
+        const artistIds = [...new Set(loaded.map((l) => l.artistId))];
+        Promise.all(
+          artistIds.map(id =>
+            fetch(`/api/artists/${id}/shipping`)
+              .then(r => r.ok ? r.json() : null)
+              .then(s => s ? ({ id, s }) : null)
+              .catch(() => null)
+          )
+        ).then(results => {
+          const map: Record<string, ArtistShipping> = {};
+          for (const r of results) { if (r) map[r.id] = r.s; }
+          setShippingMap(map);
+        });
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -231,7 +280,12 @@ export default function Shop() {
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-base font-semibold text-foreground">{formatPrice(listing.price)}</span>
+                    <div>
+                      <span className="text-base font-semibold text-foreground">{formatPrice(listing.price)}</span>
+                      <div className="mt-0.5">
+                        <ShippingBadge shipping={shippingMap[listing.artistId]} />
+                      </div>
+                    </div>
                     {!listing.isSold ? (
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => addItem({ id: listing.id, title: listing.title, price: listing.price, imageUrl: listing.imageUrl ?? "", artistId: listing.artistId, available: true } as any)}
