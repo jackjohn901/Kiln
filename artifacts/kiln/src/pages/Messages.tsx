@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation, useParams } from "wouter";
-import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X, ImagePlus, Loader2 } from "lucide-react";
+import { Link, useLocation, useParams } from "wouter";
+import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X, ImagePlus, Loader2, ShoppingBag } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type MessageThread } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -213,6 +213,8 @@ export default function Messages() {
   const lastTypingSentRef = useRef<number>(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const [linkedOrderId, setLinkedOrderId] = useState<string | null>(null);
+
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -221,10 +223,15 @@ export default function Messages() {
   const activeApiThread = apiThreads.find(t => t.id === activeApiThreadId) ?? null;
 
   useEffect(() => {
-    if (!params.participantId) return;
+    if (!params.participantId) {
+      setLinkedOrderId(null);
+      return;
+    }
 
-    const prefill = new URLSearchParams(window.location.search).get("prefill");
+    const qs = new URLSearchParams(window.location.search);
+    const prefill = qs.get("prefill");
     if (prefill) setNewMsg(prefill);
+    setLinkedOrderId(qs.get("orderId"));
 
     const staticThread = threads.find((t) => t.participantId === params.participantId);
     if (staticThread) {
@@ -558,7 +565,7 @@ export default function Messages() {
             {apiThreads.map((t) => (
               <button
                 key={`api-${t.id}`}
-                onClick={() => void openApiThread(t.id)}
+                onClick={() => { setLinkedOrderId(null); void openApiThread(t.id); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/5 ${
                   activeApiThreadId === t.id ? "bg-amber-500/10 border-l-2 border-l-amber-500" : "hover:bg-white/[0.03]"
                 }`}
@@ -593,7 +600,7 @@ export default function Messages() {
                 key={thread.id}
                 thread={thread}
                 active={activeThreadId === thread.id}
-                onClick={() => { setActiveThreadId(thread.id); setActiveApiThreadId(null); }}
+                onClick={() => { setLinkedOrderId(null); setActiveThreadId(thread.id); setActiveApiThreadId(null); }}
               />
             ))}
           </div>
@@ -623,6 +630,17 @@ export default function Messages() {
                 />
                 <p className="text-sm font-medium text-amber-100">{pendingRecipient.name}</p>
               </div>
+              {linkedOrderId && (
+                <Link href={`/orders/${linkedOrderId}`}>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-500/20 bg-amber-500/8 hover:bg-amber-500/15 transition-colors cursor-pointer">
+                    <ShoppingBag size={12} className="text-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-300">
+                      Order <span className="font-mono font-medium">{"KLN-" + linkedOrderId.slice(0, 8).toUpperCase()}</span>
+                    </span>
+                    <span className="text-xs text-stone-500 ml-auto">View order →</span>
+                  </div>
+                </Link>
+              )}
 
               {/* Empty state */}
               <div className="flex-1 flex flex-col items-center justify-center gap-2 p-8 text-center">
@@ -662,6 +680,17 @@ export default function Messages() {
                 />
                 <p className="text-sm font-medium text-amber-100">{activeApiThread.otherUserName}</p>
               </div>
+              {linkedOrderId && (
+                <Link href={`/orders/${linkedOrderId}`}>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-500/20 bg-amber-500/8 hover:bg-amber-500/15 transition-colors cursor-pointer">
+                    <ShoppingBag size={12} className="text-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-300">
+                      Order <span className="font-mono font-medium">{"KLN-" + linkedOrderId.slice(0, 8).toUpperCase()}</span>
+                    </span>
+                    <span className="text-xs text-stone-500 ml-auto">View order →</span>
+                  </div>
+                </Link>
+              )}
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -760,6 +789,17 @@ export default function Messages() {
                   </button>
                 </div>
               </div>
+              {linkedOrderId && (
+                <Link href={`/orders/${linkedOrderId}`}>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-500/20 bg-amber-500/8 hover:bg-amber-500/15 transition-colors cursor-pointer">
+                    <ShoppingBag size={12} className="text-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-300">
+                      Order <span className="font-mono font-medium">{"KLN-" + linkedOrderId.slice(0, 8).toUpperCase()}</span>
+                    </span>
+                    <span className="text-xs text-stone-500 ml-auto">View order →</span>
+                  </div>
+                </Link>
+              )}
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
