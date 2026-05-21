@@ -295,7 +295,15 @@ export default function OrderDetailScreen() {
         <View style={styles.actions}>
           <Pressable
             style={[styles.actionBtn, styles.actionBtnOutline, { borderColor: colors.border }]}
-            onPress={() => router.push(`/chat/inbox` as any)}
+            onPress={() =>
+              router.push({
+                pathname: "/chat/user/[userId]" as any,
+                params: {
+                  userId: order.sellerId,
+                  prefill: `Re: ${order.title}`,
+                },
+              })
+            }
           >
             <Feather name="message-square" size={15} color={colors.foreground} />
             <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Message artist</Text>

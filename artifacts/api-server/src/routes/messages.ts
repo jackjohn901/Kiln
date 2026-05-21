@@ -89,6 +89,37 @@ router.get("/messages/threads/:threadId", async (req, res): Promise<void> => {
   }
 });
 
+// GET /messages/thread-by-user/:userId — find existing thread between current user and another user
+router.get("/messages/thread-by-user/:userId", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { userId } = req.params;
+  const me = req.user.id;
+
+  try {
+    const [thread] = await db.select().from(messageThreadsTable)
+      .where(or(
+        and(eq(messageThreadsTable.participantA, me), eq(messageThreadsTable.participantB, userId)),
+        and(eq(messageThreadsTable.participantA, userId), eq(messageThreadsTable.participantB, me)),
+      ));
+
+    const [otherProfile] = await db.select({
+      displayName: profilesTable.displayName,
+      avatarUrl: profilesTable.avatarUrl,
+      handle: profilesTable.handle,
+    }).from(profilesTable).where(eq(profilesTable.userId, userId));
+
+    res.json({
+      threadId: thread?.id ?? null,
+      otherUser: otherProfile
+        ? { displayName: otherProfile.displayName, avatarUrl: otherProfile.avatarUrl, handle: otherProfile.handle }
+        : null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "threadByUser error");
+    res.status(500).json({ error: "Failed to look up thread" });
+  }
+});
+
 // POST /messages/send
 router.post("/messages/send", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
