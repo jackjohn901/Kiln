@@ -21,6 +21,8 @@ function NotifIcon({ type }: { type: KilnNotification["type"] }) {
   if (type === "commission") return <div className={`${cls} bg-amber-500/20`}><Hammer size={13} className="text-amber-400" /></div>;
   if (type === "tip") return <div className={`${cls} bg-emerald-500/20`}><DollarSign size={13} className="text-emerald-400" /></div>;
   if (type === "workshop") return <div className={`${cls} bg-sky-500/20`}><Calendar size={13} className="text-sky-400" /></div>;
+  if (type === "workshop_booking") return <div className={`${cls} bg-sky-500/20`}><Calendar size={13} className="text-sky-400" /></div>;
+  if (type === "commission_payment") return <div className={`${cls} bg-emerald-500/20`}><DollarSign size={13} className="text-emerald-400" /></div>;
   return <div className={`${cls} bg-stone-700`}><Bell size={13} className="text-stone-400" /></div>;
 }
 

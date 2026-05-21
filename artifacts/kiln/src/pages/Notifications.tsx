@@ -1,21 +1,23 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: string; bg: string }> = {
-  follow:       { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },
-  like:         { icon: Heart,         color: "text-rose-400",   bg: "bg-rose-500/15" },
-  comment:      { icon: MessageCircle, color: "text-sky-400",    bg: "bg-sky-500/15" },
-  commission:   { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
-  tip:          { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-500/15" },
-  workshop:     { icon: BookOpen,      color: "text-purple-400", bg: "bg-purple-500/15" },
-  drop:         { icon: Zap,           color: "text-orange-400", bg: "bg-orange-500/15" },
-  subscription: { icon: Star,          color: "text-amber-300",  bg: "bg-amber-400/15" },
-  sale:         { icon: ShoppingBag,   color: "text-green-400",  bg: "bg-green-500/15" },
+  follow:              { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },
+  like:                { icon: Heart,         color: "text-rose-400",   bg: "bg-rose-500/15" },
+  comment:             { icon: MessageCircle, color: "text-sky-400",    bg: "bg-sky-500/15" },
+  commission:          { icon: Hammer,        color: "text-emerald-400",bg: "bg-emerald-500/15" },
+  tip:                 { icon: DollarSign,    color: "text-amber-400",  bg: "bg-amber-500/15" },
+  workshop:            { icon: BookOpen,      color: "text-purple-400", bg: "bg-purple-500/15" },
+  drop:                { icon: Zap,           color: "text-orange-400", bg: "bg-orange-500/15" },
+  subscription:        { icon: Star,          color: "text-amber-300",  bg: "bg-amber-400/15" },
+  sale:                { icon: ShoppingBag,   color: "text-green-400",  bg: "bg-green-500/15" },
+  workshop_booking:    { icon: Calendar,      color: "text-sky-400",    bg: "bg-sky-500/15" },
+  commission_payment:  { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
 };
 
 function timeAgo(iso: string): string {

@@ -15,7 +15,7 @@ export interface KilnComment {
 
 export interface KilnNotification {
   id: string;
-  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription" | "sale";
+  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription" | "sale" | "workshop_booking" | "commission_payment";
   fromId: string;
   fromName: string;
   fromAvatarUrl: string;
