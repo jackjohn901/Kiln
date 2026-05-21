@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable,
+  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable,
 } from "@workspace/db";
 import { sendEmail, newCommentEmail } from "../lib/email";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -267,10 +267,14 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
         broadcast(post.authorId, { type: "notification", userId: post.authorId, text: `${authorName} commented on your post`, link: `/post/${postId}` });
 
         // Email notification (fire-and-forget)
-        db.select({ contactEmail: profilesTable.contactEmail })
-          .from(profilesTable).where(eq(profilesTable.userId, post.authorId)).limit(1)
-          .then(([p]) => { if (p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }).catch(() => {}); })
-          .catch(() => {});
+        Promise.all([
+          db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, post.authorId)).limit(1),
+          db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, post.authorId)).limit(1),
+        ]).then(([[p], [s]]) => {
+          const emailSettings = s?.settings as Record<string, boolean> | null;
+          const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_comments !== false;
+          if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }).catch(() => {});
+        }).catch(() => {});
       }
     }
 
