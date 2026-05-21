@@ -1,20 +1,23 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Image } from "expo-image";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useColors } from "@/hooks/useColors";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch } from "@/lib/api";
 
 interface Sale {
   id: string;
@@ -95,17 +98,94 @@ const TYPE_ICON: Record<string, string> = {
   inquiry: "message-square",
 };
 
+interface StatusAction {
+  label: string;
+  newStatus: string;
+  icon: string;
+  variant: "primary" | "secondary" | "danger";
+  requiresTracking?: boolean;
+}
+
+function getStatusActions(status: string): StatusAction[] {
+  switch (status) {
+    case "inquiry":
+    case "pending":
+      return [
+        { label: "Accept & Start Processing", newStatus: "in_progress", icon: "check-circle", variant: "primary" },
+        { label: "Cancel Order", newStatus: "cancelled", icon: "x-circle", variant: "danger" },
+      ];
+    case "in_progress":
+      return [
+        { label: "Mark as Shipped", newStatus: "shipped", icon: "truck", variant: "primary", requiresTracking: true },
+        { label: "Cancel Order", newStatus: "cancelled", icon: "x-circle", variant: "danger" },
+      ];
+    case "shipped":
+      return [
+        { label: "Mark as Delivered", newStatus: "delivered", icon: "check-circle", variant: "primary" },
+      ];
+    default:
+      return [];
+  }
+}
+
 export default function SaleDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+
+  const [shippingModalVisible, setShippingModalVisible] = useState(false);
+  const [trackingInput, setTrackingInput] = useState("");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["me/sales", id],
     queryFn: () => apiGet<{ sale: Sale }>(`/api/me/sales/${encodeURIComponent(id!)}`),
     enabled: !!id,
   });
+
+  const { mutate: updateStatus, isPending: isUpdating } = useMutation({
+    mutationFn: (payload: { status: string; trackingNumber?: string }) =>
+      apiPatch<{ sale: Sale }>(`/api/me/sales/${encodeURIComponent(id!)}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me/sales", id] });
+      queryClient.invalidateQueries({ queryKey: ["me/sales"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert("Update failed", err.message ?? "Something went wrong. Please try again.");
+    },
+  });
+
+  function handleAction(action: StatusAction) {
+    if (action.newStatus === "cancelled") {
+      Alert.alert(
+        "Cancel Order",
+        "Are you sure you want to cancel this order? This cannot be undone.",
+        [
+          { text: "Keep Order", style: "cancel" },
+          {
+            text: "Cancel Order",
+            style: "destructive",
+            onPress: () => updateStatus({ status: "cancelled" }),
+          },
+        ],
+      );
+      return;
+    }
+
+    if (action.requiresTracking) {
+      setTrackingInput("");
+      setShippingModalVisible(true);
+      return;
+    }
+
+    updateStatus({ status: action.newStatus });
+  }
+
+  function handleConfirmShipped() {
+    setShippingModalVisible(false);
+    updateStatus({ status: "shipped", trackingNumber: trackingInput.trim() || undefined });
+  }
 
   if (isLoading) {
     return (
@@ -145,6 +225,7 @@ export default function SaleDetailScreen() {
     : sale.processingWindowDays === 1
       ? "1 business day"
       : `${sale.processingWindowDays} business days`;
+  const statusActions = getStatusActions(sale.status);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -166,7 +247,10 @@ export default function SaleDetailScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: insets.bottom + (statusActions.length > 0 ? 140 : 32),
+        }}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.orderId, { color: colors.primary }]}>{ordinalId(sale.id)}</Text>
@@ -293,6 +377,117 @@ export default function SaleDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {statusActions.length > 0 && (
+        <View
+          style={[
+            styles.actionBar,
+            {
+              paddingBottom: insets.bottom + 12,
+              borderTopColor: colors.border,
+              backgroundColor: colors.background,
+            },
+          ]}
+        >
+          {isUpdating ? (
+            <View style={styles.updatingRow}>
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={[styles.updatingText, { color: colors.mutedForeground }]}>
+                Updating…
+              </Text>
+            </View>
+          ) : (
+            statusActions.map((action) => {
+              const isPrimary = action.variant === "primary";
+              const isDanger = action.variant === "danger";
+              const bg = isPrimary
+                ? colors.primary
+                : isDanger
+                  ? "transparent"
+                  : colors.secondary;
+              const textColor = isPrimary
+                ? colors.primaryForeground
+                : isDanger
+                  ? "#f87171"
+                  : colors.foreground;
+              const borderColor = isDanger ? "#f87171" : "transparent";
+              return (
+                <Pressable
+                  key={action.newStatus}
+                  style={[
+                    styles.actionBtn,
+                    {
+                      backgroundColor: bg,
+                      borderColor,
+                      borderWidth: isDanger ? 1 : 0,
+                    },
+                  ]}
+                  onPress={() => handleAction(action)}
+                >
+                  <Feather name={action.icon as any} size={16} color={textColor} />
+                  <Text style={[styles.actionBtnText, { color: textColor }]}>{action.label}</Text>
+                </Pressable>
+              );
+            })
+          )}
+        </View>
+      )}
+
+      <Modal
+        visible={shippingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShippingModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShippingModalVisible(false)}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 },
+          ]}
+        >
+          <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.modalTitle, { color: colors.foreground }]}>Mark as Shipped</Text>
+          <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+            Add a tracking number for the buyer (optional).
+          </Text>
+          <TextInput
+            style={[
+              styles.trackingInput,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                color: colors.foreground,
+              },
+            ]}
+            placeholder="Tracking number (optional)"
+            placeholderTextColor={colors.mutedForeground}
+            value={trackingInput}
+            onChangeText={setTrackingInput}
+            autoCapitalize="characters"
+            returnKeyType="done"
+            onSubmitEditing={handleConfirmShipped}
+          />
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: colors.primary, marginTop: 4 }]}
+            onPress={handleConfirmShipped}
+          >
+            <Feather name="truck" size={16} color={colors.primaryForeground} />
+            <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
+              Confirm Shipped
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.cancelLink]}
+            onPress={() => setShippingModalVisible(false)}
+          >
+            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -369,4 +564,66 @@ const styles = StyleSheet.create({
   totalAmount: { fontFamily: "Inter_700Bold", fontSize: 16 },
   infoRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   infoText: { fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 },
+  actionBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  actionBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  updatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+  },
+  updatingText: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 10,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  modalTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  modalSubtitle: { fontFamily: "Inter_400Regular", fontSize: 13 },
+  trackingInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    marginTop: 4,
+  },
+  cancelLink: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  cancelLinkText: { fontFamily: "Inter_500Medium", fontSize: 14 },
 });
