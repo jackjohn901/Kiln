@@ -207,7 +207,7 @@ export default function Settings() {
   const notifDescClass = !contactEmail.trim()
     ? "text-amber-400"
     : activeEmailCount === 0
-    ? "text-stone-500"
+    ? "text-amber-400"
     : "text-emerald-400";
 
   const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string }[] = [
@@ -331,13 +331,21 @@ export default function Settings() {
                   </div>
                 );
               }
+              if (active === 0) {
+                return (
+                  <div className="flex items-start gap-2 py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-2">
+                    <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-300">All email types are off — turn on at least one below to receive alerts</p>
+                  </div>
+                );
+              }
               return (
                 <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-stone-800/60 border border-white/8 mb-2">
                   <Mail size={13} className="text-amber-400 shrink-0" />
                   <p className="text-xs text-stone-400">
                     Sending to <span className="text-stone-200 font-medium">{contactEmail.trim()}</span>
                     {" — "}
-                    <span className={active === 0 ? "text-stone-500" : "text-emerald-400"}>{active} of {total} types active</span>
+                    <span className="text-emerald-400">{active} of {total} types active</span>
                   </p>
                 </div>
               );
