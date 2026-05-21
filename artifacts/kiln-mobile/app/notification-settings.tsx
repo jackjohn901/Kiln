@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -99,6 +100,8 @@ export default function NotificationSettingsScreen() {
   const [settings, setSettings] = useState<NotifSettings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [notifEmail, setNotifEmail] = useState("");
+  const [emailSaved, setEmailSaved] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,13 +110,14 @@ export default function NotificationSettingsScreen() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    apiGet<{ settings?: Partial<NotifSettings> }>("/api/me/settings")
+    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null }>("/api/me/settings")
       .then((data) => {
         if (data.settings) {
           const merged = { ...DEFAULTS, ...data.settings };
           setSettings(merged);
           latestSettingsRef.current = merged;
         }
+        if (data.contactEmail) setNotifEmail(data.contactEmail);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -163,6 +167,21 @@ export default function NotificationSettingsScreen() {
       return next;
     });
   };
+
+  const emailSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const saveNotifEmail = useCallback((email: string) => {
+    apiPatch("/api/me/settings", { contactEmail: email })
+      .then(() => {
+        if (!mountedRef.current) return;
+        setEmailSaved(true);
+        if (emailSavedTimerRef.current) clearTimeout(emailSavedTimerRef.current);
+        emailSavedTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setEmailSaved(false);
+        }, 1800);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -303,8 +322,36 @@ export default function NotificationSettingsScreen() {
               value={settings.notif_email_outbid}
               onChange={set("notif_email_outbid")}
               colors={colors}
-              isLast
             />
+            <View style={[styles.emailInputRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+              <View style={styles.emailInputHeader}>
+                <Text style={[styles.toggleLabel, { color: colors.foreground }]}>Notification email address</Text>
+                {emailSaved && (
+                  <Text style={[styles.savedLabel, { color: colors.primary }]}>Saved ✓</Text>
+                )}
+              </View>
+              <Text style={[styles.toggleDesc, { color: colors.mutedForeground, marginBottom: 8 }]}>
+                Where we send email alerts. Never shown publicly.
+              </Text>
+              <TextInput
+                value={notifEmail}
+                onChangeText={setNotifEmail}
+                onBlur={() => saveNotifEmail(notifEmail)}
+                placeholder="you@example.com"
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                style={[
+                  styles.emailInput,
+                  {
+                    color: colors.foreground,
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            </View>
           </View>
         </ScrollView>
       )}
@@ -350,4 +397,23 @@ const styles = StyleSheet.create({
   toggleText: { flex: 1, gap: 2 },
   toggleLabel: { fontFamily: "Inter_500Medium", fontSize: 14 },
   toggleDesc: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 16 },
+  emailInputRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  emailInputHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  savedLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  emailInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+  },
 });
