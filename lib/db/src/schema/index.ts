@@ -67,3 +67,4 @@ export * from "./projects";
 export * from "./project_posts";
 export * from "./work_reservations";
 export * from "./studio-events";
+export * from "./press_releases";

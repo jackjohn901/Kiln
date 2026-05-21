@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import PressPage from "@/pages/PressPage";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -293,6 +294,7 @@ function Router() {
       <Route path="/mentorship" component={Mentorship} />
       <Route path="/artists/:artistId/patron" component={PatronTiers} />
       <Route path="/artists/:artistId/press-kit" component={PressKit} />
+      <Route path="/press" component={PressPage} />
       <Route path="/materials" component={Materials} />
       <Route path="/series" component={SeriesJournal} />
       <Route path="/series/:id" component={SeriesDetail} />
