@@ -252,6 +252,8 @@ router.post("/me/orders", async (req, res): Promise<void> => {
           amount: listing.price * qty,
           currency: "USD",
           status: "confirmed",
+          // INVARIANT: notes must always equal the dedupeKey so every row in a session
+          // can be grouped and deduplicated. Never omit this field on any insert path.
           notes: dedupeKey,
         });
         orderIds.push(orderId);
@@ -276,6 +278,8 @@ router.post("/me/orders", async (req, res): Promise<void> => {
       amount: amountUsd,
       currency: "USD",
       status: "confirmed",
+      // INVARIANT: notes must always equal the dedupeKey so every row in a session
+      // can be grouped and deduplicated. Never omit this field on any insert path.
       notes: dedupeKey,
     });
 
