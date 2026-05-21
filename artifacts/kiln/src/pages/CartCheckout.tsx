@@ -23,6 +23,13 @@ interface AddressForm {
   name: string; email: string; phone: string;
   address: string; city: string; state: string; zip: string; country: string;
 }
+
+interface ShippingRateInfo {
+  offerFreeShipping: boolean;
+  domesticRate: number | null;
+  internationalRate: number | null;
+  freeThreshold: number | null;
+}
 const EMPTY_ADDR: AddressForm = {
   name: "", email: "", phone: "", address: "", city: "", state: "", zip: "", country: "US",
 };
@@ -63,6 +70,21 @@ async function fetchArtistPayments(artistId: string): Promise<ArtistPayments> {
   return getDemoPayments(artistId);
 }
 
+async function fetchArtistShipping(artistId: string): Promise<ShippingRateInfo> {
+  try {
+    const res = await fetch(`/api/artists/${artistId}/shipping`);
+    if (res.ok) return await res.json() as ShippingRateInfo;
+  } catch { /* fall through */ }
+  return { offerFreeShipping: false, domesticRate: null, internationalRate: null, freeThreshold: null };
+}
+
+function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDomestic: boolean): number {
+  if (info.offerFreeShipping) return 0;
+  if (info.freeThreshold !== null && artistSubtotal >= info.freeThreshold) return 0;
+  const rate = isDomestic ? info.domesticRate : (info.internationalRate ?? info.domesticRate);
+  return rate ?? 0;
+}
+
 export default function CartCheckout() {
   const [, navigate] = useLocation();
   const { items, subtotal, itemCount, clearCart } = useCart();
@@ -81,10 +103,36 @@ export default function CartCheckout() {
   const [manualPayoutWarning, setManualPayoutWarning] = useState(false);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
+  const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
 
-  const shipping = subtotal > 500 ? 0 : 18;
+  const isDomestic = addr.country === "US";
+
+  // Build per-artist subtotals for shipping threshold calculation
+  const artistSubtotals = new Map<string, number>();
+  for (const { listing, quantity } of items) {
+    const aid = listing.artistId as string;
+    artistSubtotals.set(aid, (artistSubtotals.get(aid) ?? 0) + (listing.price as number) * quantity);
+  }
+
+  const shipping = Array.from(artistSubtotals.entries()).reduce((sum, [aid, artistSub]) => {
+    const info = shippingRates.get(aid);
+    if (!info) return sum;
+    return sum + calcArtistShipping(info, artistSub, isDomestic);
+  }, 0);
+
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
+
+  // Fetch shipping rates for each unique artist in the cart
+  useEffect(() => {
+    if (items.length === 0) return;
+    const artistIds = [...new Set(items.map(i => i.listing.artistId as string))];
+    Promise.all(artistIds.map(aid => fetchArtistShipping(aid).then(info => ({ aid, info }))))
+      .then(results => {
+        setShippingRates(new Map(results.map(r => [r.aid, r.info])));
+      })
+      .catch(() => {});
+  }, [items]);
 
   // Detect return from success (legacy path — real Stripe flow lands on /cart/success)
   useEffect(() => {
@@ -736,7 +784,11 @@ export default function CartCheckout() {
                   </div>
                   <div className="flex justify-between">
                     <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
-                    <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping}`}</span>
+                    {shippingRates.size === 0 && items.length > 0 ? (
+                      <span className="text-stone-600 italic">calculating…</span>
+                    ) : (
+                      <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                    )}
                   </div>
                   <div className="flex justify-between">
                     <span>Tax (est.)</span><span>${tax.toFixed(2)}</span>
