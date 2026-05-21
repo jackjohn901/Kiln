@@ -11,12 +11,13 @@ const SHIPPING_KEY = "kiln_shipping_v1";
 interface ShippingSettings {
   domesticRate: number;
   internationalRate: number;
+  perItemRate: number;
   freeThreshold: number;
   offerFreeShipping: boolean;
 }
 
 function defaultShipping(): ShippingSettings {
-  return { domesticRate: 18, internationalRate: 45, freeThreshold: 500, offerFreeShipping: false };
+  return { domesticRate: 18, internationalRate: 45, perItemRate: 0, freeThreshold: 500, offerFreeShipping: false };
 }
 
 function readShippingSettings(): ShippingSettings {
@@ -590,6 +591,20 @@ export default function Settings() {
                   </div>
 
                   <div>
+                    <label className="text-xs text-stone-500 mb-1 block">Per additional item</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={shipping.perItemRate}
+                        onChange={(e) => setShipping((s) => ({ ...s, perItemRate: Number(e.target.value) }))}
+                        className="w-full rounded-xl border border-white/10 bg-stone-800/60 pl-8 pr-4 py-2.5 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                    <p className="text-[10px] text-stone-700 mt-1">Added for each item beyond the first. Set to 0 to disable.</p>
+                  </div>
+
+                  <div>
                     <label className="text-xs text-stone-500 mb-1 block">International rate</label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 text-sm">$</span>
@@ -632,14 +647,18 @@ export default function Settings() {
                     const sampleLabel = avgListingPrice != null
                       ? `Based on your listings avg. $${avgListingPrice}`
                       : "Sample $45 order";
+                    const baseRate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
                     let cost: string;
+                    let multiItemCost: string | null = null;
                     if (shipping.offerFreeShipping) {
                       cost = "Free shipping";
                     } else if (shipping.freeThreshold > 0 && sampleTotal >= shipping.freeThreshold) {
                       cost = "Free shipping";
                     } else {
-                      const rate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
-                      cost = rate === 0 ? "Free shipping" : `$${rate.toFixed(2)}`;
+                      cost = baseRate === 0 ? "Free shipping" : `$${baseRate.toFixed(2)}`;
+                      if (shipping.perItemRate > 0 && cost !== "Free shipping") {
+                        multiItemCost = `$${(baseRate + shipping.perItemRate).toFixed(2)}`;
+                      }
                     }
                     const isFree = cost === "Free shipping";
                     return (
@@ -651,9 +670,18 @@ export default function Settings() {
                             <p className="text-[10px] text-stone-600 mt-0.5">{sampleLabel}</p>
                           </div>
                         </div>
-                        <span className={`text-sm font-semibold ${isFree ? "text-emerald-400" : "text-stone-200"}`}>
-                          {cost}
-                        </span>
+                        <div className="text-right">
+                          {multiItemCost ? (
+                            <>
+                              <p className="text-[10px] text-stone-500">1 item: <span className="text-stone-300 font-medium">{cost}</span></p>
+                              <p className="text-[10px] text-stone-500">2 items: <span className="text-stone-300 font-medium">{multiItemCost}</span></p>
+                            </>
+                          ) : (
+                            <span className={`text-sm font-semibold ${isFree ? "text-emerald-400" : "text-stone-200"}`}>
+                              {cost}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

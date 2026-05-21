@@ -22,6 +22,7 @@ interface ShippingSettings {
   offerFreeShipping: boolean;
   domesticRate: number;
   internationalRate: number;
+  perItemRate: number;
   freeThreshold: number;
   offerLocalPickup: boolean;
 }
@@ -30,6 +31,7 @@ const EMPTY_SHIPPING: ShippingSettings = {
   offerFreeShipping: false,
   domesticRate: 0,
   internationalRate: 0,
+  perItemRate: 0,
   freeThreshold: 0,
   offerLocalPickup: false,
 };
@@ -197,6 +199,13 @@ export default function ShippingSettingsScreen() {
                     colors={colors}
                   />
                   <RateField
+                    label="Per additional item"
+                    hint="Added for each item beyond the first. Set to 0 to disable."
+                    value={shipping.perItemRate}
+                    onChange={(v) => setShipping((s) => ({ ...s, perItemRate: v }))}
+                    colors={colors}
+                  />
+                  <RateField
                     label="International rate"
                     value={shipping.internationalRate}
                     onChange={(v) => setShipping((s) => ({ ...s, internationalRate: v }))}
@@ -246,14 +255,18 @@ export default function ShippingSettingsScreen() {
                   const sampleLabel = avgListingPrice != null
                     ? `Based on your listings avg. $${avgListingPrice}`
                     : "Sample $45 order";
+                  const baseRate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
                   let cost: string;
+                  let multiItemCost: string | null = null;
                   if (shipping.offerFreeShipping) {
                     cost = "Free shipping";
                   } else if (shipping.freeThreshold > 0 && sampleTotal >= shipping.freeThreshold) {
                     cost = "Free shipping";
                   } else {
-                    const rate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
-                    cost = rate === 0 ? "Free shipping" : `$${rate.toFixed(2)}`;
+                    cost = baseRate === 0 ? "Free shipping" : `$${baseRate.toFixed(2)}`;
+                    if (shipping.perItemRate > 0 && cost !== "Free shipping") {
+                      multiItemCost = `$${(baseRate + shipping.perItemRate).toFixed(2)}`;
+                    }
                   }
                   const isFree = cost === "Free shipping";
                   return (
@@ -271,9 +284,20 @@ export default function ShippingSettingsScreen() {
                           <Text style={[styles.previewRowSub, { color: colors.mutedForeground }]}>{sampleLabel}</Text>
                         </View>
                       </View>
-                      <Text style={[styles.previewCost, { color: isFree ? "#34D399" : colors.foreground }]}>
-                        {cost}
-                      </Text>
+                      {multiItemCost ? (
+                        <View style={{ alignItems: "flex-end", gap: 2 }}>
+                          <Text style={[styles.previewRowSub, { color: colors.mutedForeground }]}>
+                            1 item: <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium" }}>{cost}</Text>
+                          </Text>
+                          <Text style={[styles.previewRowSub, { color: colors.mutedForeground }]}>
+                            2 items: <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium" }}>{multiItemCost}</Text>
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.previewCost, { color: isFree ? "#34D399" : colors.foreground }]}>
+                          {cost}
+                        </Text>
+                      )}
                     </View>
                   );
                 })}
