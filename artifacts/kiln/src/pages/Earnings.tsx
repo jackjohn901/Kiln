@@ -143,6 +143,8 @@ export default function Earnings() {
   const [loading, setLoading]     = useState(true);
   const [saleBanner, setSaleBanner] = useState<string | null>(null);
   const saleBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [statsFlash, setStatsFlash] = useState(false);
+  const statsFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Payout state
   const [payouts, setPayouts]           = useState<PayoutRecord[]>([]);
@@ -352,7 +354,11 @@ export default function Earnings() {
     return subscribe("notification", (evt) => {
       const notifType = evt.notifType as string | undefined;
       if (notifType !== "sale" && notifType !== "tip" && notifType !== "subscription") return;
-      void fetchEarnings();
+      void fetchEarnings().then(() => {
+        if (statsFlashTimerRef.current) clearTimeout(statsFlashTimerRef.current);
+        setStatsFlash(true);
+        statsFlashTimerRef.current = setTimeout(() => setStatsFlash(false), 1000);
+      });
       void fetchSales();
       if (chargesEnabledRef.current) {
         void fetchBalance(true);
@@ -493,7 +499,15 @@ export default function Earnings() {
               ].map(stat => {
                 const Icon = stat.icon;
                 return (
-                  <div key={stat.label} className="rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+                  <div
+                    key={stat.label}
+                    className={[
+                      "rounded-2xl border bg-stone-900/50 p-4 transition-all duration-300",
+                      statsFlash
+                        ? "border-emerald-400/60 shadow-[0_0_12px_2px_rgba(52,211,153,0.25)] scale-[1.02]"
+                        : "border-white/8",
+                    ].join(" ")}
+                  >
                     <Icon size={16} className={`mb-2 ${stat.color}`} />
                     <p className="text-xs text-stone-500 mb-0.5">{stat.label}</p>
                     <p className="text-lg font-bold text-stone-100">{stat.value}</p>
