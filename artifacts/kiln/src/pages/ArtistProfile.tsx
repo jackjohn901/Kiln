@@ -12,6 +12,7 @@ import {
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
 import Nav from "@/components/Nav";
+import ShareModal from "@/components/ShareModal";
 import { getArtistById, artists, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { getListingsByArtist, formatPrice } from "@/data/listings";
@@ -322,6 +323,8 @@ export default function ArtistProfile() {
   const [showTip, setShowTip] = useState(false);
   const [selectedDrop, setSelectedDrop] = useState<Drop | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [visitDate, setVisitDate] = useState("");
@@ -561,17 +564,16 @@ export default function ArtistProfile() {
   const statusCfg = STATUS_CONFIG[commissionStatus];
 
   function handleShare() {
-    const url = window.location.href;
-    const name = artist!.name;
-    if (navigator.share) {
-      navigator.share({ title: name, text: `${name} on Kiln`, url }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(url).then(() => {
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 2000);
-      }).catch(() => {});
-    }
+    setShowShareModal(true);
   }
+
+  useEffect(() => {
+    if (!artist) return;
+    fetch(`/api/users/${artist.id}/featured-status`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { isFeatured?: boolean } | null) => { if (d) setIsFeatured(!!d.isFeatured); })
+      .catch(() => {});
+  }, [artist?.id]);
 
   // When viewing own profile, overlay any custom edits from ProfileContext on top of static artist data
   const displayName     = (isOwn && profile?.name)     ? profile.name     : artist.name;
@@ -760,8 +762,23 @@ export default function ArtistProfile() {
               <Flame size={11} className="text-amber-400" />
               <span className="text-xs font-bold text-amber-300">{score}</span>
             </div>
+            {isFeatured && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5">
+                <Award size={10} className="text-amber-400" />
+                <span className="text-[10px] font-bold text-amber-300">Featured on Kiln</span>
+              </span>
+            )}
           </div>
           <p className="text-sm text-stone-500">@{artist.id}</p>
+          {isFeatured && isOwn && (
+            <a
+              href={`/api/users/${artist.id}/featured-badge.svg`}
+              download="kiln-featured-badge.svg"
+              className="mt-1 inline-flex items-center gap-1 text-[11px] text-amber-500/70 hover:text-amber-400 transition-colors"
+            >
+              <Award size={10} /> Download your Featured Artist badge
+            </a>
+          )}
 
           {isOwn ? (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -1737,6 +1754,17 @@ export default function ArtistProfile() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Share profile modal */}
+      <ShareModal
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        mode="profile"
+        artistName={displayName}
+        medium={displayMedium}
+        location={displayLocation}
+        profileUrl={window.location.href}
+      />
 
       {/* Commission modal */}
       {showCommission && (

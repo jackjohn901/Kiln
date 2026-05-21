@@ -12,6 +12,7 @@ import glazeOracleRouter from "./glaze-oracle";
 import grantWriterRouter from "./grant-writer";
 import pressRouter from "./press";
 import pinterestRouter from "./pinterest";
+import featuredBadgeRouter from "./featured-badge";
 import authRouter from "./auth";
 import feedRouter from "./feed";
 import postsRouter from "./posts";
@@ -168,5 +169,6 @@ router.use(projectsRouter);
 router.use(studioEventsRouter);
 router.use(pressRouter);
 router.use(pinterestRouter);
+router.use(featuredBadgeRouter);
 
 export default router;

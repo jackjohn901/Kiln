@@ -4,7 +4,7 @@ import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock, Bell, Package,
+  ShoppingBag, Clock, Bell, Package, Share2,
 } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -22,6 +22,7 @@ const REFRESH_LABELS: Record<RefreshInterval, string> = {
   "manual": "Manual",
 };
 import Nav from "@/components/Nav";
+import ShareModal from "@/components/ShareModal";
 import { useProfile } from "@/contexts/ProfileContext";
 
 interface EarningLine {
@@ -146,6 +147,7 @@ export default function Earnings() {
   const [loading, setLoading]     = useState(true);
   const [saleBanner, setSaleBanner] = useState<string | null>(null);
   const saleBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSaleShare, setShowSaleShare] = useState(false);
   const [statsFlash, setStatsFlash] = useState(false);
   const statsFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -487,6 +489,12 @@ export default function Earnings() {
               <p className="text-sm font-medium text-emerald-300">New sale!</p>
               <p className="text-xs text-emerald-400/80 truncate">{saleBanner}</p>
             </div>
+            <button
+              onClick={() => setShowSaleShare(true)}
+              className="shrink-0 flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+            >
+              <Share2 size={11} /> Share
+            </button>
             <button
               onClick={() => {
                 setSaleBanner(null);
@@ -1268,6 +1276,17 @@ export default function Earnings() {
           </div>
         </div>
       )}
+
+      <ShareModal
+        open={showSaleShare}
+        onClose={() => setShowSaleShare(false)}
+        mode="sale"
+        artistName={profile?.name ?? ""}
+        medium={profile?.mediums?.[0]}
+        location={profile?.location ?? undefined}
+        profileUrl={`https://kilnfire.replit.app/kiln/`}
+        saleItem={saleBanner ?? undefined}
+      />
     </div>
   );
 }

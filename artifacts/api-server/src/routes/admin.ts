@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import {
   db, reportsTable, verificationApplicationsTable, profilesTable,
   postsTable, followsTable, likesTable, ordersTable,
-  commissionsTable, workshopsTable, workshopBookingsTable,
+  commissionsTable, workshopsTable, workshopBookingsTable, usersTable,
 } from "@workspace/db";
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
@@ -405,6 +405,25 @@ router.post("/admin/backfill-order-notes", async (req, res): Promise<void> => {
     req.log.error({ err }, "admin.backfillOrderNotes error");
     res.status(500).json({ error: "Failed to backfill order notes" });
   }
+});
+
+// PATCH /admin/users/:id/feature  — grant Featured on Kiln status
+router.patch("/admin/users/:id/feature", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const { featured } = req.body as { featured?: boolean };
+  const value = featured !== false;
+  await db.update(usersTable).set({ isFeatured: value }).where(eq(usersTable.id, req.params.id));
+  res.json({ ok: true, isFeatured: value });
+});
+
+// GET /admin/users/featured — list all featured users
+router.get("/admin/users/featured", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const rows = await db.select({ id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email })
+    .from(usersTable).where(eq(usersTable.isFeatured, true));
+  res.json({ users: rows });
 });
 
 export default router;
