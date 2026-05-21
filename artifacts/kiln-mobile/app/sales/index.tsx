@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
@@ -77,6 +78,13 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+interface EarningsTotals {
+  tips: number;
+  subscriptions: number;
+  sales: number;
+  total: number;
+}
+
 const TYPE_ICON: Record<string, string> = {
   drop: "zap",
   listing: "shopping-bag",
@@ -93,6 +101,8 @@ export default function SalesScreen() {
   const { isAuthenticated, isLoading: authLoading, login } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const [tab, setTab] = useState<TabValue>("all");
+  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   const params = useLocalSearchParams<{ highlight?: string }>();
   const highlightId = params.highlight;
@@ -102,6 +112,23 @@ export default function SalesScreen() {
     queryFn: () => apiGet<{ orders: Sale[] }>("/api/me/sales"),
     enabled: isAuthenticated,
   });
+
+  const { data: earningsData } = useQuery({
+    queryKey: ["me/earnings"],
+    queryFn: () => apiGet<{ totals: EarningsTotals }>("/api/me/earnings"),
+    enabled: isAuthenticated,
+  });
+
+  const totals = earningsData?.totals;
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["me/sales"] }),
+      queryClient.invalidateQueries({ queryKey: ["me/earnings"] }),
+    ]);
+    setRefreshing(false);
+  }
 
   const allSales: Sale[] = data?.orders ?? [];
 
@@ -171,18 +198,65 @@ export default function SalesScreen() {
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.center}>
-          <Feather name="dollar-sign" size={36} color={colors.mutedForeground} />
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            {tab === "all" ? "No sales yet." : `No ${tab} sales.`}
-          </Text>
-        </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         >
+          {totals && (
+            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.summaryTitle, { color: colors.foreground }]}>Earnings Summary</Text>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryItem}>
+                  <Feather name="heart" size={14} color="#f472b6" style={{ marginBottom: 4 }} />
+                  <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
+                    {formatPrice(totals.tips)}
+                  </Text>
+                  <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Tips</Text>
+                </View>
+                <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.summaryItem}>
+                  <Feather name="star" size={14} color="#a78bfa" style={{ marginBottom: 4 }} />
+                  <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
+                    {formatPrice(totals.subscriptions)}
+                  </Text>
+                  <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Patrons</Text>
+                </View>
+                <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.summaryItem}>
+                  <Feather name="shopping-bag" size={14} color="#34d399" style={{ marginBottom: 4 }} />
+                  <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
+                    {formatPrice(totals.sales)}
+                  </Text>
+                  <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Shop</Text>
+                </View>
+              </View>
+              <View style={[styles.summaryTotalRow, { borderTopColor: colors.border }]}>
+                <Text style={[styles.summaryTotalLabel, { color: colors.mutedForeground }]}>Total earnings</Text>
+                <Text style={[styles.summaryTotalAmount, { color: colors.primary }]}>
+                  {formatPrice(totals.total)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {filtered.length === 0 ? (
+            <View style={[styles.center, { paddingTop: 40 }]}>
+              <Feather name="dollar-sign" size={36} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                {tab === "all" ? "No sales yet." : `No ${tab} sales.`}
+              </Text>
+            </View>
+          ) : null}
+
           {filtered.map((sale) => {
             const statusColor = STATUS_COLOR[sale.status] ?? "#8A7E75";
             const statusLabel = STATUS_LABEL[sale.status] ?? "Pending";
@@ -338,4 +412,37 @@ const styles = StyleSheet.create({
   buyerText: { fontFamily: "Inter_400Regular", fontSize: 12 },
   cardDate: { fontFamily: "Inter_400Regular", fontSize: 11 },
   amount: { fontFamily: "Inter_700Bold", fontSize: 15, marginTop: 2 },
+  summaryCard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 14 },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 2,
+  },
+  summaryDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 40,
+    marginHorizontal: 4,
+  },
+  summaryAmount: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  summaryLabel: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  summaryTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+  },
+  summaryTotalLabel: { fontFamily: "Inter_500Medium", fontSize: 13 },
+  summaryTotalAmount: { fontFamily: "Inter_700Bold", fontSize: 16 },
 });
