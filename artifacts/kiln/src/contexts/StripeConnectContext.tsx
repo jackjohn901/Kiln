@@ -32,20 +32,21 @@ const StripeConnectContext = createContext<StripeConnectContextValue>({
   dismissBanner: () => undefined,
 });
 
-const SESSION_KEY = "stripe-banner-dismissed";
+const STORAGE_KEY_WARNING = "stripe-banner-dismissed-warning";
+const STORAGE_KEY_URGENT = "stripe-banner-dismissed-urgent";
+
+function readDismissedKeys(): Set<string> {
+  const keys = new Set<string>();
+  if (localStorage.getItem(STORAGE_KEY_WARNING) === "true") keys.add(STORAGE_KEY_WARNING);
+  if (localStorage.getItem(STORAGE_KEY_URGENT) === "true") keys.add(STORAGE_KEY_URGENT);
+  return keys;
+}
 
 export function StripeConnectProvider({ children }: { children: ReactNode }) {
   const { profile } = useProfile();
   const [status, setStatus] = useState<StripeConnectStatus | null>(null);
   const [loading, setLoading] = useState(false);
-  const [bannerDismissed, setBannerDismissed] = useState(
-    () => sessionStorage.getItem(SESSION_KEY) === "true"
-  );
-
-  const dismissBanner = useCallback(() => {
-    sessionStorage.setItem(SESSION_KEY, "true");
-    setBannerDismissed(true);
-  }, []);
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(readDismissedKeys);
 
   const fetch_ = useCallback(async () => {
     if (!profile) {
@@ -86,6 +87,20 @@ export function StripeConnectProvider({ children }: { children: ReactNode }) {
   const pastDue = status?.requirementsPastDue ?? 0;
   const hasUrgent = pastDue > 0 || !!status?.disabledReason;
   const hasWarning = !hasUrgent && eventuallyDue > 0;
+
+  const bannerKey = hasUrgent
+    ? STORAGE_KEY_URGENT
+    : hasWarning
+      ? STORAGE_KEY_WARNING
+      : null;
+
+  const bannerDismissed = bannerKey !== null && dismissedKeys.has(bannerKey);
+
+  const dismissBanner = useCallback(() => {
+    if (!bannerKey) return;
+    localStorage.setItem(bannerKey, "true");
+    setDismissedKeys(prev => new Set([...prev, bannerKey]));
+  }, [bannerKey]);
 
   return (
     <StripeConnectContext.Provider
