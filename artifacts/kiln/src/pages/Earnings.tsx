@@ -323,6 +323,19 @@ export default function Earnings() {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchStripeStatus = useCallback(async () => {
+    try {
+      const r = await fetch("/api/me/stripe/connect/status", { credentials: "include" });
+      if (!r.ok) return;
+      const data = await r.json() as StripeConnectStatus;
+      setStripeConnect(data);
+      if (data.chargesEnabled) {
+        chargesEnabledRef.current = true;
+        void fetchBalance(true);
+      }
+    } catch { /* ignore */ }
+  }, [fetchBalance]);
+
   useEffect(() => {
     fetchEarnings().finally(() => setLoading(false));
 
@@ -337,17 +350,34 @@ export default function Earnings() {
 
   useEffect(() => {
     return subscribe("notification", (evt) => {
-      if ((evt.notifType as string | undefined) !== "sale") return;
+      const notifType = evt.notifType as string | undefined;
+      if (notifType !== "sale" && notifType !== "tip" && notifType !== "subscription") return;
       void fetchEarnings();
       void fetchSales();
-      if (stripeConnect?.chargesEnabled) void fetchBalance(true);
-      const text = (evt.text as string | undefined) ?? "New sale!";
-      const label = text.replace(/^New sale:\s*/i, "").trim() || "New sale!";
-      setSaleBanner(label);
-      if (saleBannerTimerRef.current) clearTimeout(saleBannerTimerRef.current);
-      saleBannerTimerRef.current = setTimeout(() => setSaleBanner(null), 8000);
+      if (chargesEnabledRef.current) {
+        void fetchBalance(true);
+      } else if (notifType === "sale") {
+        void fetchStripeStatus();
+      }
+      if (notifType === "sale") {
+        const text = (evt.text as string | undefined) ?? "New sale!";
+        const label = text.replace(/^New sale:\s*/i, "").trim() || "New sale!";
+        setSaleBanner(label);
+        if (saleBannerTimerRef.current) clearTimeout(saleBannerTimerRef.current);
+        saleBannerTimerRef.current = setTimeout(() => setSaleBanner(null), 8000);
+      }
     });
-  }, [subscribe, fetchEarnings, fetchSales, fetchBalance, stripeConnect?.chargesEnabled]);
+  }, [subscribe, fetchEarnings, fetchSales, fetchBalance, fetchStripeStatus]);
+
+  useEffect(() => {
+    const POLL_MS = 60_000;
+    const timerId = setInterval(() => {
+      void fetchEarnings();
+      void fetchSales();
+      if (chargesEnabledRef.current) void fetchBalance(true);
+    }, POLL_MS);
+    return () => clearInterval(timerId);
+  }, [fetchEarnings, fetchSales, fetchBalance]);
 
   useEffect(() => {
     if (!profile?.id) return;
