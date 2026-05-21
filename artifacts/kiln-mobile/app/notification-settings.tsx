@@ -101,11 +101,15 @@ export default function NotificationSettingsScreen() {
   const [settings, setSettings] = useState<NotifSettings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [notifEmail, setNotifEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
+  const [emailError, setEmailError] = useState(false);
 
   const checkOpacity = useRef(new Animated.Value(0)).current;
   const checkScale = useRef(new Animated.Value(0.6)).current;
+  const errorOpacity = useRef(new Animated.Value(0)).current;
+  const errorScale = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
     if (saved) {
@@ -120,8 +124,23 @@ export default function NotificationSettingsScreen() {
     }
   }, [saved, checkOpacity, checkScale]);
 
+  useEffect(() => {
+    if (saveError) {
+      Animated.parallel([
+        Animated.timing(errorOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(errorScale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 12 }),
+      ]).start();
+    } else {
+      Animated.timing(errorOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        errorScale.setValue(0.6);
+      });
+    }
+  }, [saveError, errorOpacity, errorScale]);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSettingsRef = useRef<NotifSettings>(DEFAULTS);
   const hasPendingSaveRef = useRef(false);
   const mountedRef = useRef(true);
@@ -152,6 +171,12 @@ export default function NotificationSettingsScreen() {
       if (savedTimerRef.current) {
         clearTimeout(savedTimerRef.current);
       }
+      if (errorTimerRef.current) {
+        clearTimeout(errorTimerRef.current);
+      }
+      if (emailErrorTimerRef.current) {
+        clearTimeout(emailErrorTimerRef.current);
+      }
     };
   }, []);
 
@@ -166,12 +191,20 @@ export default function NotificationSettingsScreen() {
       try {
         await apiPatch("/api/me/settings", { settings: latestSettingsRef.current });
         if (!mountedRef.current) return;
+        setSaveError(false);
         setSaved(true);
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => {
           if (mountedRef.current) setSaved(false);
         }, 1800);
       } catch {
+        if (!mountedRef.current) return;
+        setSaved(false);
+        setSaveError(true);
+        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setSaveError(false);
+        }, 3000);
       }
     }, 400);
   }, []);
@@ -191,13 +224,22 @@ export default function NotificationSettingsScreen() {
     apiPatch("/api/me/settings", { contactEmail: email })
       .then(() => {
         if (!mountedRef.current) return;
+        setEmailError(false);
         setEmailSaved(true);
         if (emailSavedTimerRef.current) clearTimeout(emailSavedTimerRef.current);
         emailSavedTimerRef.current = setTimeout(() => {
           if (mountedRef.current) setEmailSaved(false);
         }, 1800);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setEmailSaved(false);
+        setEmailError(true);
+        if (emailErrorTimerRef.current) clearTimeout(emailErrorTimerRef.current);
+        emailErrorTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setEmailError(false);
+        }, 3000);
+      });
   }, []);
 
   return (
@@ -217,8 +259,12 @@ export default function NotificationSettingsScreen() {
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notifications</Text>
         <View style={styles.headerRight}>
-          <Animated.View style={{ opacity: checkOpacity, transform: [{ scale: checkScale }] }}>
+          <Animated.View style={{ opacity: checkOpacity, transform: [{ scale: checkScale }], position: "absolute", right: 0 }}>
             <Feather name="check" size={18} color={colors.primary} />
+          </Animated.View>
+          <Animated.View style={{ opacity: errorOpacity, transform: [{ scale: errorScale }], flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <Feather name="x" size={14} color="#ef4444" />
+            <Text style={[styles.errorLabel, { color: "#ef4444" }]}>Couldn't save</Text>
           </Animated.View>
         </View>
       </View>
@@ -341,9 +387,11 @@ export default function NotificationSettingsScreen() {
             <View style={[styles.emailInputRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
               <View style={styles.emailInputHeader}>
                 <Text style={[styles.toggleLabel, { color: colors.foreground }]}>Notification email address</Text>
-                {emailSaved && (
+                {emailError ? (
+                  <Text style={[styles.savedLabel, { color: "#ef4444" }]}>Couldn't save</Text>
+                ) : emailSaved ? (
                   <Text style={[styles.savedLabel, { color: colors.primary }]}>Saved ✓</Text>
-                )}
+                ) : null}
               </View>
               <Text style={[styles.toggleDesc, { color: colors.mutedForeground, marginBottom: 8 }]}>
                 Where we send email alerts. Never shown publicly.
@@ -385,7 +433,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 34, alignItems: "flex-start" },
   headerTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
-  headerRight: { width: 34, alignItems: "flex-end" },
+  headerRight: { width: 90, alignItems: "flex-end", justifyContent: "center" },
+  errorLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { padding: 16, gap: 8 },
   sectionHeader: {
