@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -103,6 +104,22 @@ export default function NotificationSettingsScreen() {
   const [notifEmail, setNotifEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
 
+  const checkOpacity = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    if (saved) {
+      Animated.parallel([
+        Animated.timing(checkOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 12 }),
+      ]).start();
+    } else {
+      Animated.timing(checkOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        checkScale.setValue(0.6);
+      });
+    }
+  }, [saved, checkOpacity, checkScale]);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSettingsRef = useRef<NotifSettings>(DEFAULTS);
@@ -200,11 +217,9 @@ export default function NotificationSettingsScreen() {
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notifications</Text>
         <View style={styles.headerRight}>
-          {saved ? (
+          <Animated.View style={{ opacity: checkOpacity, transform: [{ scale: checkScale }] }}>
             <Feather name="check" size={18} color={colors.primary} />
-          ) : (
-            <View style={{ width: 18 }} />
-          )}
+          </Animated.View>
         </View>
       </View>
 
