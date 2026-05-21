@@ -1,9 +1,32 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useLocation } from "wouter";
 import { ShoppingBag } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+
+function relativeLabel(since: Date): string {
+  const diffMs = Date.now() - since.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin === 1) return "1 min ago";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr === 1) return "1 hr ago";
+  return `${diffHr} hr ago`;
+}
+
+function RelativeTime({ since }: { since: Date }) {
+  const [label, setLabel] = useState(() => relativeLabel(since));
+
+  useEffect(() => {
+    const id = setInterval(() => setLabel(relativeLabel(since)), 30_000);
+    return () => clearInterval(id);
+  }, [since]);
+
+  return <span className="text-xs text-stone-500">{label}</span>;
+}
 
 export default function SaleNotificationListener() {
   const { subscribe } = useWebSocket();
@@ -17,6 +40,7 @@ export default function SaleNotificationListener() {
       const text = (evt.text as string | undefined) ?? "You have a new sale!";
       const link = (evt.link as string | undefined) ?? "/earnings";
       const fromName = (evt.fromName as string | undefined) ?? "A buyer";
+      const saleTime = new Date();
 
       toast({
         title: (
@@ -31,7 +55,7 @@ export default function SaleNotificationListener() {
               <span className="font-medium text-stone-200">{fromName}</span>{" "}
               {text.replace(/^New sale:\s*/i, "")}
             </span>
-            <span className="text-xs text-stone-500">just now</span>
+            <RelativeTime since={saleTime} />
           </span>
         ) as unknown as string,
         action: (
