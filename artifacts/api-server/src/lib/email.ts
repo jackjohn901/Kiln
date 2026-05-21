@@ -184,13 +184,73 @@ export function orderConfirmationEmail(customerEmail: string, orderId: string, a
   `);
 }
 
-export function workshopBookingEmail(workshopTitle: string, artistName: string, startDate: string): string {
+export interface WorkshopCalendarParams {
+  startDateISO?: string | null;
+  endDateISO?: string | null;
+  location?: string | null;
+  isOnline?: boolean;
+  workshopId?: string | null;
+  durationHours?: number | null;
+}
+
+function formatGCalDate(iso: string): string {
+  return iso.replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+function buildGoogleCalendarUrl(
+  title: string,
+  artistName: string,
+  params: WorkshopCalendarParams,
+): string {
+  const start = params.startDateISO ? new Date(params.startDateISO) : null;
+  const end = params.endDateISO
+    ? new Date(params.endDateISO)
+    : start
+      ? new Date(start.getTime() + (params.durationHours ?? 2) * 60 * 60 * 1000)
+      : null;
+
+  if (!start || !end) return "";
+
+  const location = params.isOnline ? "Online" : (params.location ?? "");
+  const details = `Workshop with ${artistName} on Kiln.`;
+
+  const qs = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title,
+    dates: `${formatGCalDate(start.toISOString())}/${formatGCalDate(end.toISOString())}`,
+    details,
+    ...(location ? { location } : {}),
+  });
+
+  return `https://calendar.google.com/calendar/render?${qs.toString()}`;
+}
+
+export function workshopBookingEmail(
+  workshopTitle: string,
+  artistName: string,
+  startDate: string,
+  calParams?: WorkshopCalendarParams,
+): string {
+  const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, artistName, calParams) : "";
+  const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
+
+  const calendarLinks = (gcalUrl || icsUrl) ? `
+    <div style="margin-top:16px;">
+      <p style="margin:0 0 10px;font-size:13px;color:#a8a29e;">Add this workshop to your calendar:</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${gcalUrl ? `<a href="${gcalUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:13px;font-weight:bold;">📅 Google Calendar</a>` : ""}
+        ${icsUrl ? `<a href="${icsUrl}" style="display:inline-block;background:#444039;color:#d6d3d1;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:13px;font-weight:bold;border:1px solid #57534e;">🍎 Apple Calendar (.ics)</a>` : ""}
+      </div>
+    </div>` : "";
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Workshop Booking Confirmed</h1>
     ${card(`
-      <p style="margin:0 0 8px;"><strong>${workshopTitle}</strong></p>
-      <p style="margin:0 0 8px;">with <strong style="color:#fcd34d;">${artistName}</strong></p>
-      <p style="margin:0;color:#78716c;">${startDate}</p>
+      <p style="margin:0 0 8px;"><strong>${escHtml(workshopTitle)}</strong></p>
+      <p style="margin:0 0 8px;">with <strong style="color:#fcd34d;">${escHtml(artistName)}</strong></p>
+      <p style="margin:0 0 4px;color:#78716c;">${startDate}</p>
+      ${calParams?.isOnline ? `<p style="margin:4px 0 0;font-size:12px;color:#4ade80;">🌐 Online workshop</p>` : calParams?.location ? `<p style="margin:4px 0 0;font-size:12px;color:#78716c;">📍 ${escHtml(calParams.location)}</p>` : ""}
+      ${calendarLinks}
     `)}
     ${btn(`${BASE_URL}/workshops`, "View Workshop")}
   `);

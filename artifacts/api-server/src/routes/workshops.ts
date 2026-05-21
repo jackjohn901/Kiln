@@ -89,6 +89,62 @@ router.delete("/workshops/:id/book", async (req, res): Promise<void> => {
   res.json({ success: true });
 });
 
+// GET /workshops/:id/calendar.ics — download ICS file for Apple Calendar and other clients
+router.get("/workshops/:id/calendar.ics", async (req, res): Promise<void> => {
+  try {
+    const [w] = await db.select().from(workshopsTable).where(eq(workshopsTable.id, req.params.id));
+    if (!w) { res.status(404).send("Not found"); return; }
+
+    const now = new Date();
+    const dtStamp = formatIcsDate(now);
+
+    const start = w.startDate ?? now;
+    const end = w.endDate ?? new Date(start.getTime() + (w.durationHours ?? 2) * 60 * 60 * 1000);
+    const dtStart = formatIcsDate(start);
+    const dtEnd = formatIcsDate(end);
+
+    const locationLine = w.isOnline ? "Online" : (w.location ?? "");
+    const description = [
+      `Workshop with ${w.artistName}`,
+      w.description ?? "",
+      w.isOnline ? "This is an online workshop." : "",
+    ].filter(Boolean).join("\\n");
+
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Kiln//Workshop Calendar//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:workshop-${w.id}@kilnfire.replit.app`,
+      `DTSTAMP:${dtStamp}`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      `SUMMARY:${escIcs(w.title)}`,
+      `DESCRIPTION:${escIcs(description)}`,
+      locationLine ? `LOCATION:${escIcs(locationLine)}` : null,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].filter(Boolean).join("\r\n");
+
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="workshop-${w.id}.ics"`);
+    res.send(ics);
+  } catch (err) {
+    req.log.error({ err }, "calendarIcs error");
+    res.status(500).send("Failed to generate calendar file");
+  }
+});
+
+function formatIcsDate(date: Date): string {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+function escIcs(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,");
+}
+
 // GET /me/workshops — my bookings
 router.get("/me/workshops", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

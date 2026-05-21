@@ -19,7 +19,7 @@ import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 import { broadcast } from '../lib/websocket';
 import { getDigitalProduct } from '../lib/digitalProducts';
-import { sendEmail, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, workshopBookingEmail, commissionPaymentEmail } from '../lib/email';
+import { sendEmail, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, workshopBookingEmail, commissionPaymentEmail, type WorkshopCalendarParams } from '../lib/email';
 
 const router: IRouter = Router();
 
@@ -691,7 +691,15 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 const startDateStr = w.startDate
                   ? w.startDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
                   : 'Date TBD';
-                const html = workshopBookingEmail(w.title, w.artistName, startDateStr);
+                const calParams: WorkshopCalendarParams = {
+                  startDateISO: w.startDate?.toISOString() ?? null,
+                  endDateISO: w.endDate?.toISOString() ?? null,
+                  location: w.location ?? null,
+                  isOnline: w.isOnline,
+                  workshopId: w.id,
+                  durationHours: w.durationHours,
+                };
+                const html = workshopBookingEmail(w.title, w.artistName, startDateStr, calParams);
                 await sendEmail({
                   to: studentEmail,
                   subject: `You're booked! "${w.title}" with ${w.artistName}`,
