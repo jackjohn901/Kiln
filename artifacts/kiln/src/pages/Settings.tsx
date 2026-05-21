@@ -401,7 +401,7 @@ export default function Settings() {
               <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
               <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />
             </div>
-            <div className="py-3">
+            <div className={`py-3${settings.notif_email_paused ? " opacity-40 pointer-events-none" : ""}`}>
               <p className="text-sm text-stone-200 mb-1">Notification email address</p>
               <p className="text-xs text-stone-600 mb-2">Where we send email alerts. Never shown publicly.</p>
               <div className="flex gap-2 items-center">
