@@ -258,6 +258,49 @@ router.get("/me/sales/:id", async (req, res): Promise<void> => {
   }
 });
 
+// PATCH /me/sales/:id — seller updates order status / tracking number
+router.patch("/me/sales/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [existing] = await db
+      .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, status: ordersTable.status })
+      .from(ordersTable)
+      .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.sellerId, req.user.id)))
+      .limit(1);
+
+    if (!existing) { res.status(404).json({ error: "Sale not found" }); return; }
+
+    const { status, trackingNumber } = req.body as { status?: string; trackingNumber?: string };
+
+    const ALLOWED_STATUSES = ["in_progress", "shipped", "delivered", "cancelled"];
+    if (status !== undefined && !ALLOWED_STATUSES.includes(status)) {
+      res.status(400).json({ error: `status must be one of: ${ALLOWED_STATUSES.join(", ")}` });
+      return;
+    }
+
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (status !== undefined) updates.status = status;
+    if (trackingNumber !== undefined) updates.trackingNumber = trackingNumber.trim() || null;
+
+    const [updated] = await db
+      .update(ordersTable)
+      .set(updates)
+      .where(eq(ordersTable.id, req.params.id))
+      .returning();
+
+    res.json({
+      sale: {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "me/sales/:id PATCH error");
+    res.status(500).json({ error: "Failed to update sale" });
+  }
+});
+
 // GET /me/orders — my orders (as buyer)
 router.get("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

@@ -3,7 +3,7 @@ import { Link, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  User, DollarSign,
+  User, DollarSign, Send,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 
@@ -66,11 +66,30 @@ function ordinalId(id: string) {
   return "KLN-" + id.slice(0, 8).toUpperCase();
 }
 
+async function patchSale(id: string, body: { status?: string; trackingNumber?: string }) {
+  const res = await fetch(`/api/me/sales/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error ?? "Failed to update sale");
+  }
+  return (await res.json()) as { sale: Sale };
+}
+
 export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [trackingInput, setTrackingInput] = useState("");
+  const [showTrackingInput, setShowTrackingInput] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -86,6 +105,47 @@ export default function SaleDetail() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleStatusUpdate(newStatus: string, trackingNumber?: string) {
+    if (!sale) return;
+    setUpdateError(null);
+    setUpdating(true);
+    const prevSale = sale;
+    setSale(s => s ? { ...s, status: newStatus, trackingNumber: trackingNumber ?? s.trackingNumber } : s);
+    try {
+      const body: { status: string; trackingNumber?: string } = { status: newStatus };
+      if (trackingNumber !== undefined) body.trackingNumber = trackingNumber;
+      const { sale: updated } = await patchSale(sale.id, body);
+      setSale(updated);
+      setShowTrackingInput(false);
+      setTrackingInput("");
+    } catch (err) {
+      setSale(prevSale);
+      setUpdateError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleTrackingUpdate() {
+    if (!sale) return;
+    setUpdateError(null);
+    setUpdating(true);
+    const prevSale = sale;
+    const newTracking = trackingInput.trim();
+    setSale(s => s ? { ...s, trackingNumber: newTracking || null } : s);
+    try {
+      const { sale: updated } = await patchSale(sale.id, { trackingNumber: newTracking });
+      setSale(updated);
+      setShowTrackingInput(false);
+      setTrackingInput("");
+    } catch (err) {
+      setSale(prevSale);
+      setUpdateError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setUpdating(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -132,6 +192,13 @@ export default function SaleDetail() {
         : `${sale.processingWindowDays} business days`
       : null;
   const windowText = deliveryEstimateText ? `Ships within ${deliveryEstimateText}` : null;
+
+  const isPhysical = ["listing", "drop"].includes(sale.type);
+  const canMarkInProgress = ["pending", "confirmed", "inquiry"].includes(sale.status);
+  const canMarkShipped = sale.status === "in_progress" && isPhysical;
+  const canMarkDelivered = sale.status === "shipped";
+  const canUpdateTracking = ["shipped", "in_progress"].includes(sale.status) && isPhysical;
+  const hasFulfillmentActions = canMarkInProgress || canMarkShipped || canMarkDelivered || canUpdateTracking;
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -193,6 +260,125 @@ export default function SaleDetail() {
             <p className="text-sm text-stone-300">{buyerLabel}</p>
           </div>
         </div>
+
+        {hasFulfillmentActions && (
+          <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Fulfillment</p>
+
+            {updateError && (
+              <div className="mb-3 flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2.5">
+                <AlertCircle size={13} className="text-rose-400 shrink-0" />
+                <p className="text-xs text-rose-300">{updateError}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {canMarkInProgress && (
+                <button
+                  onClick={() => handleStatusUpdate("in_progress")}
+                  disabled={updating}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-2.5 text-sm font-medium text-amber-300 hover:bg-amber-500/15 transition-colors disabled:opacity-50"
+                >
+                  {updating ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+                  Mark as In Progress
+                </button>
+              )}
+
+              {canMarkShipped && !showTrackingInput && (
+                <button
+                  onClick={() => setShowTrackingInput(true)}
+                  disabled={updating}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500/10 border border-blue-500/20 px-4 py-2.5 text-sm font-medium text-blue-300 hover:bg-blue-500/15 transition-colors disabled:opacity-50"
+                >
+                  <Truck size={14} />
+                  Mark as Shipped
+                </button>
+              )}
+
+              {canMarkShipped && showTrackingInput && (
+                <div className="rounded-xl bg-blue-500/8 border border-blue-500/15 p-3 space-y-2">
+                  <p className="text-xs text-stone-400">Add a tracking number (optional)</p>
+                  <input
+                    type="text"
+                    value={trackingInput}
+                    onChange={e => setTrackingInput(e.target.value)}
+                    placeholder="e.g. 1Z999AA10123456784"
+                    className="w-full rounded-lg bg-stone-800/80 border border-white/8 px-3 py-2 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-blue-500/40"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleStatusUpdate("shipped", trackingInput.trim() || undefined)}
+                      disabled={updating}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-500/15 border border-blue-500/25 px-3 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+                    >
+                      {updating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                      Confirm Shipped
+                    </button>
+                    <button
+                      onClick={() => { setShowTrackingInput(false); setTrackingInput(""); }}
+                      disabled={updating}
+                      className="px-3 py-2 rounded-lg border border-white/8 text-sm text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {canMarkDelivered && (
+                <button
+                  onClick={() => handleStatusUpdate("delivered")}
+                  disabled={updating}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/15 transition-colors disabled:opacity-50"
+                >
+                  {updating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Mark as Delivered
+                </button>
+              )}
+
+              {canUpdateTracking && !showTrackingInput && (
+                <button
+                  onClick={() => { setTrackingInput(sale.trackingNumber ?? ""); setShowTrackingInput(true); }}
+                  disabled={updating}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/8 px-4 py-2.5 text-sm text-stone-400 hover:text-stone-200 hover:border-white/15 transition-colors disabled:opacity-50"
+                >
+                  <Truck size={14} />
+                  {sale.trackingNumber ? "Update tracking number" : "Add tracking number"}
+                </button>
+              )}
+
+              {canUpdateTracking && showTrackingInput && !canMarkShipped && (
+                <div className="rounded-xl bg-stone-800/50 border border-white/8 p-3 space-y-2">
+                  <p className="text-xs text-stone-400">Tracking number</p>
+                  <input
+                    type="text"
+                    value={trackingInput}
+                    onChange={e => setTrackingInput(e.target.value)}
+                    placeholder="e.g. 1Z999AA10123456784"
+                    className="w-full rounded-lg bg-stone-900/80 border border-white/8 px-3 py-2 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/40"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleTrackingUpdate}
+                      disabled={updating}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-amber-500/12 border border-amber-500/20 px-3 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/18 transition-colors disabled:opacity-50"
+                    >
+                      {updating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                      Save Tracking
+                    </button>
+                    <button
+                      onClick={() => { setShowTrackingInput(false); setTrackingInput(""); }}
+                      disabled={updating}
+                      className="px-3 py-2 rounded-lg border border-white/8 text-sm text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Processing Window</p>
