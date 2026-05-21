@@ -286,6 +286,18 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={[styles.quickLinkItem, { borderBottomColor: colors.border }]}
+              onPress={() => router.push("/sales" as any)}
+            >
+              <View style={styles.quickLinkLeft}>
+                <Feather name="dollar-sign" size={16} color={colors.primary} />
+                <Text style={[styles.quickLinkLabel, { color: colors.foreground }]}>
+                  My Sales
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              style={[styles.quickLinkItem, { borderBottomColor: colors.border }]}
               onPress={() => router.push("/notification-settings" as any)}
             >
               <View style={styles.quickLinkLeft}>

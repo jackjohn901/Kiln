@@ -1,0 +1,341 @@
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { Image } from "expo-image";
+import { Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import { router, useLocalSearchParams } from "expo-router";
+import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/lib/auth";
+import { apiGet } from "@/lib/api";
+
+interface Sale {
+  id: string;
+  buyerId: string;
+  type: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  shippingAddress: string | null;
+  trackingNumber: string | null;
+  notes: string | null;
+  processingWindowDays: number | null;
+  processingWindowLabel: string | null;
+  manualPayout: boolean;
+  createdAt: string;
+  updatedAt: string;
+  buyerDisplayName: string | null;
+  buyerHandle: string | null;
+}
+
+function formatPrice(n: number, currency = "USD") {
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  pending: "#8A7E75",
+  inquiry: "#8A7E75",
+  in_progress: "#D87F31",
+  shipped: "#60a5fa",
+  delivered: "#34d399",
+  waitlisted: "#D87F31",
+  confirmed: "#34d399",
+  cancelled: "#f87171",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: "Pending",
+  inquiry: "Inquiry sent",
+  in_progress: "In Progress",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  waitlisted: "Waitlisted",
+  confirmed: "Confirmed",
+  cancelled: "Cancelled",
+};
+
+const TYPE_ICON: Record<string, string> = {
+  drop: "zap",
+  listing: "shopping-bag",
+  commission: "message-square",
+  workshop: "book-open",
+  inquiry: "message-square",
+};
+
+type TabValue = "all" | "active" | "completed";
+
+export default function SalesScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { isAuthenticated, isLoading: authLoading, login } = useAuth();
+  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const [tab, setTab] = useState<TabValue>("all");
+
+  const params = useLocalSearchParams<{ highlight?: string }>();
+  const highlightId = params.highlight;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["me/sales"],
+    queryFn: () => apiGet<{ orders: Sale[] }>("/api/me/sales"),
+    enabled: isAuthenticated,
+  });
+
+  const allSales: Sale[] = data?.orders ?? [];
+
+  const filtered = allSales.filter((s) => {
+    if (tab === "active")
+      return ["pending", "inquiry", "in_progress", "shipped", "confirmed", "waitlisted"].includes(s.status);
+    if (tab === "completed")
+      return ["delivered", "cancelled"].includes(s.status);
+    return true;
+  });
+
+  if (!isAuthenticated && !authLoading) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background, paddingTop: topPad }]}>
+        <Feather name="dollar-sign" size={40} color={colors.mutedForeground} />
+        <Text style={[styles.authTitle, { color: colors.foreground }]}>Your Sales</Text>
+        <Text style={[styles.authSub, { color: colors.mutedForeground }]}>
+          Sign in to view your sales history
+        </Text>
+        <Pressable style={[styles.authBtn, { backgroundColor: colors.primary }]} onPress={login}>
+          <Text style={[styles.authBtnText, { color: colors.primaryForeground }]}>Sign In</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: topPad + 12,
+            borderBottomColor: colors.border,
+            backgroundColor: colors.background,
+          },
+        ]}
+      >
+        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
+          <Feather name="chevron-left" size={22} color={colors.foreground} />
+        </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>My Sales</Text>
+        <View style={{ width: 30 }} />
+      </View>
+
+      <View
+        style={[styles.tabRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}
+      >
+        {(["all", "active", "completed"] as TabValue[]).map((t) => (
+          <Pressable key={t} style={styles.tabBtn} onPress={() => setTab(t)}>
+            <Text
+              style={[
+                styles.tabText,
+                { color: tab === t ? colors.primary : colors.mutedForeground },
+              ]}
+            >
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </Text>
+            {tab === t && (
+              <View style={[styles.tabUnderline, { backgroundColor: colors.primary }]} />
+            )}
+          </Pressable>
+        ))}
+      </View>
+
+      {isLoading || authLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : filtered.length === 0 ? (
+        <View style={styles.center}>
+          <Feather name="dollar-sign" size={36} color={colors.mutedForeground} />
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+            {tab === "all" ? "No sales yet." : `No ${tab} sales.`}
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {filtered.map((sale) => {
+            const statusColor = STATUS_COLOR[sale.status] ?? "#8A7E75";
+            const statusLabel = STATUS_LABEL[sale.status] ?? "Pending";
+            const typeIconName = (TYPE_ICON[sale.type] ?? "shopping-bag") as any;
+            const buyerName = sale.buyerDisplayName ?? sale.buyerHandle ?? "Unknown buyer";
+            const isHighlighted = highlightId === sale.id;
+
+            return (
+              <Pressable
+                key={sale.id}
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: isHighlighted ? colors.primary : colors.border,
+                  },
+                  isHighlighted && styles.cardHighlighted,
+                ]}
+                onPress={() => router.push(`/sales/${sale.id}` as any)}
+              >
+                {isHighlighted && (
+                  <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
+                    <Text style={[styles.newBadgeText, { color: colors.primaryForeground }]}>
+                      New
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.cardRow}>
+                  <View style={[styles.thumb, { backgroundColor: colors.secondary }]}>
+                    {sale.imageUrl ? (
+                      <Image
+                        source={{ uri: sale.imageUrl }}
+                        style={StyleSheet.absoluteFill}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <Feather name={typeIconName} size={18} color={colors.primary} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <View style={styles.titleRow}>
+                      <Text
+                        style={[styles.cardTitle, { color: colors.foreground }]}
+                        numberOfLines={1}
+                      >
+                        {sale.title}
+                      </Text>
+                      <Text style={[styles.statusBadge, { color: statusColor }]}>
+                        {statusLabel}
+                      </Text>
+                    </View>
+                    <View style={styles.buyerRow}>
+                      <Feather name="user" size={11} color={colors.mutedForeground} />
+                      <Text style={[styles.buyerText, { color: colors.mutedForeground }]}>
+                        {buyerName}
+                      </Text>
+                    </View>
+                    <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>
+                      {formatDate(sale.createdAt)}
+                    </Text>
+                    <Text style={[styles.amount, { color: colors.primary }]}>
+                      {formatPrice(sale.amount, sale.currency)}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 40,
+  },
+  authTitle: { fontFamily: "Inter_700Bold", fontSize: 20, marginTop: 8 },
+  authSub: { fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" },
+  authBtn: { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 32, marginTop: 4 },
+  authBtnText: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: { width: 30 },
+  headerTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  tabRow: {
+    flexDirection: "row",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    position: "relative",
+  },
+  tabText: { fontFamily: "Inter_500Medium", fontSize: 13 },
+  tabUnderline: {
+    position: "absolute",
+    bottom: 0,
+    left: "15%",
+    right: "15%",
+    height: 2,
+    borderRadius: 2,
+  },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 8 },
+  card: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+    marginBottom: 12,
+  },
+  cardHighlighted: {
+    borderWidth: 1.5,
+  },
+  newBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 8,
+  },
+  newBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  cardRow: { flexDirection: "row", gap: 12 },
+  thumb: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, flex: 1, lineHeight: 18 },
+  statusBadge: { fontFamily: "Inter_500Medium", fontSize: 11, flexShrink: 0 },
+  buyerRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  buyerText: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  cardDate: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  amount: { fontFamily: "Inter_700Bold", fontSize: 15, marginTop: 2 },
+});

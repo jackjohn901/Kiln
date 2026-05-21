@@ -4,16 +4,22 @@ import { useWebSocket, type SaleEvent } from "@/lib/useWebSocket";
 import { SaleBanner } from "@/components/SaleBanner";
 
 /**
- * Maps a web-style path from the sale notification payload to the closest
- * available mobile route. The API consistently sends `/earnings` for sale
- * events; there is no dedicated earnings tab yet so we fall back to the
- * profile tab — the best current approximation for artist earnings info.
+ * Maps a web-style path from the sale notification payload to the correct
+ * mobile route.
+ *
+ * Pattern matching:
+ *   /earnings/orders/:id  → /sales/:id  (deep-link to a specific sale)
+ *   /earnings             → /sales       (seller sales list)
+ *   /profile              → /(tabs)/profile
+ *   /notifications        → /(tabs)/notifications
  */
 function webLinkToMobileRoute(link: string): string {
-  if (link.startsWith("/earnings")) return "/(tabs)/profile";
+  const earningsOrderMatch = link.match(/^\/earnings\/orders\/([^/?#]+)/);
+  if (earningsOrderMatch) return `/sales/${earningsOrderMatch[1]}`;
+  if (link.startsWith("/earnings")) return "/sales";
   if (link.startsWith("/profile")) return "/(tabs)/profile";
   if (link.startsWith("/notifications")) return "/(tabs)/notifications";
-  return "/(tabs)/profile";
+  return "/sales";
 }
 
 export function SaleNotificationListener() {
