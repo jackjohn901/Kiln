@@ -148,8 +148,20 @@ router.post("/messages/typing", async (req, res): Promise<void> => {
 router.post("/messages/send", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { recipientId, text } = req.body;
-  if (!recipientId || !text?.trim()) { res.status(400).json({ error: "recipientId and text required" }); return; }
+  const { recipientId, text, attachmentUrl } = req.body as { recipientId?: string; text?: string; attachmentUrl?: string };
+  const trimmedText = text?.trim() ?? "";
+  if (!recipientId || (!trimmedText && !attachmentUrl)) {
+    res.status(400).json({ error: "recipientId and either text or attachmentUrl required" }); return;
+  }
+
+  // Validate attachmentUrl: must be a same-origin storage path — no external URLs,
+  // no javascript:/data: schemes, no arbitrary hosts.
+  if (attachmentUrl !== undefined && attachmentUrl !== null) {
+    const isValidStoragePath = typeof attachmentUrl === "string" && /^\/api\/storage\/objects\/[a-zA-Z0-9_\-/.]+$/.test(attachmentUrl);
+    if (!isValidStoragePath) {
+      res.status(400).json({ error: "Invalid attachmentUrl: must be a storage object path" }); return;
+    }
+  }
 
   const senderId = req.user.id;
   const user = req.user;
@@ -161,12 +173,14 @@ router.post("/messages/send", async (req, res): Promise<void> => {
         and(eq(messageThreadsTable.participantA, recipientId), eq(messageThreadsTable.participantB, senderId)),
       )).then((r) => r[0]);
 
+    const lastMsgPreview = trimmedText || "📎 Image";
+
     if (!thread) {
       const [created] = await db.insert(messageThreadsTable).values({
         id: crypto.randomUUID(),
         participantA: senderId,
         participantB: recipientId,
-        lastMessageText: text.trim(),
+        lastMessageText: lastMsgPreview,
       }).returning();
       thread = created;
     }
@@ -177,11 +191,12 @@ router.post("/messages/send", async (req, res): Promise<void> => {
       senderId,
       senderName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist",
       senderAvatarUrl: user.profileImageUrl ?? null,
-      text: text.trim(),
+      text: trimmedText,
+      attachmentUrl: attachmentUrl ?? null,
     }).returning();
 
     await db.update(messageThreadsTable)
-      .set({ lastMessageAt: new Date(), lastMessageText: text.trim() })
+      .set({ lastMessageAt: new Date(), lastMessageText: lastMsgPreview })
       .where(eq(messageThreadsTable.id, thread.id));
 
     broadcast(recipientId, { type: "message", threadId: thread.id, senderId, recipientId });

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
-import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X } from "lucide-react";
+import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X, ImagePlus, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type MessageThread } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -26,8 +26,15 @@ interface ApiMsg {
   senderName: string;
   senderAvatarUrl: string | null;
   text: string;
+  attachmentUrl: string | null;
   read: boolean;
   createdAt: string;
+}
+
+interface PendingAttachment {
+  file: File;
+  previewUrl: string;
+  objectPath: string | null;
 }
 
 function timeShort(iso: string): string {
@@ -83,6 +90,109 @@ interface PendingRecipient {
   avatar: string | null;
 }
 
+const STORAGE_PATH_RE = /^\/api\/storage\/objects\/[a-zA-Z0-9_\-/.]+$/;
+
+function AttachmentImage({ url }: { url: string }) {
+  const [errored, setErrored] = useState(false);
+
+  // Only render same-origin storage paths — reject javascript:, data:, external URLs, etc.
+  if (!STORAGE_PATH_RE.test(url)) return null;
+  if (errored) return null;
+
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block mt-1.5">
+      <img
+        src={url}
+        alt="Attachment"
+        className="max-w-[220px] max-h-[180px] rounded-xl object-cover border border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
+        onError={() => setErrored(true)}
+      />
+    </a>
+  );
+}
+
+function ComposeBar({
+  value,
+  onChange,
+  onSend,
+  onKeyDown,
+  onAttach,
+  attachment,
+  onRemoveAttachment,
+  isUploading,
+  disabled,
+  placeholder,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onAttach: () => void;
+  attachment: PendingAttachment | null;
+  onRemoveAttachment: () => void;
+  isUploading: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  autoFocus?: boolean;
+}) {
+  const canSend = !isUploading && (value.trim().length > 0 || (attachment !== null && attachment.objectPath !== null));
+  return (
+    <div className="space-y-2">
+      {attachment && (
+        <div className="relative inline-block">
+          <img
+            src={attachment.previewUrl}
+            alt="Attachment preview"
+            className="h-16 w-16 rounded-lg object-cover border border-white/20"
+          />
+          {isUploading && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+              <Loader2 size={14} className="animate-spin text-white" />
+            </div>
+          )}
+          {!isUploading && (
+            <button
+              onClick={onRemoveAttachment}
+              className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-stone-700 hover:bg-stone-600 text-stone-300"
+            >
+              <X size={9} />
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex gap-2 items-center">
+        <button
+          type="button"
+          onClick={onAttach}
+          disabled={isUploading}
+          title="Attach image"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-stone-800 text-stone-500 hover:text-amber-300 hover:border-amber-500/30 transition-colors disabled:opacity-40"
+        >
+          <ImagePlus size={16} />
+        </button>
+        <input
+          autoFocus={autoFocus}
+          type="text"
+          placeholder={placeholder ?? "Write a message…"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none disabled:opacity-50"
+        />
+        <button
+          onClick={onSend}
+          disabled={!canSend}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+        >
+          <Send size={15} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Messages() {
   const [location, navigate] = useLocation();
   const [composing, setComposing] = useState(false);
@@ -102,6 +212,10 @@ export default function Messages() {
   const typingDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeThread = activeThreadId ? threads.find((t) => t.id === activeThreadId) : null;
   const activeApiThread = apiThreads.find(t => t.id === activeApiThreadId) ?? null;
@@ -157,7 +271,6 @@ export default function Messages() {
     }
   }, [activeApiThread, apiMessages.length]);
 
-  // Subscribe to typing events from the other participant
   useEffect(() => {
     if (!activeApiThreadId) return;
     const unsub = subscribe("typing", (evt) => {
@@ -174,7 +287,6 @@ export default function Messages() {
     };
   }, [activeApiThreadId, subscribe]);
 
-  // Send a typing signal to the server (throttled to at most once per second)
   const sendTypingSignal = useCallback((threadId: string) => {
     const now = Date.now();
     if (now - lastTypingSentRef.current < 1000) return;
@@ -187,7 +299,6 @@ export default function Messages() {
     }).catch(() => {});
   }, []);
 
-  // Poll for new messages every 5 s when an API thread is active
   useEffect(() => {
     if (!activeApiThreadId) return;
     const interval = setInterval(async () => {
@@ -215,6 +326,57 @@ export default function Messages() {
 
   const filtered = threads.filter((t) => t.participantName.toLowerCase().includes(search.toLowerCase()));
 
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const previewUrl = URL.createObjectURL(file);
+    setPendingAttachment({ file, previewUrl, objectPath: null });
+    setIsUploading(true);
+
+    try {
+      const urlRes = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "image/jpeg" }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json() as { uploadURL: string; objectPath: string };
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+
+      await fetch("/api/storage/uploads/make-public", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+
+      setPendingAttachment({ file, previewUrl, objectPath });
+    } catch {
+      setPendingAttachment(null);
+      URL.revokeObjectURL(previewUrl);
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  function clearAttachment() {
+    if (pendingAttachment) URL.revokeObjectURL(pendingAttachment.previewUrl);
+    setPendingAttachment(null);
+  }
+
+  function getAttachmentServingUrl(objectPath: string): string {
+    return `/api/storage${objectPath}`;
+  }
+
   function handleSend() {
     if (!newMsg.trim() || !activeThread) return;
     sendDirectMessage(activeThread.participantId, activeThread.participantName, activeThread.participantAvatar, newMsg.trim());
@@ -234,22 +396,24 @@ export default function Messages() {
   }
 
   async function handleApiSend() {
-    if (!newMsg.trim() || !activeApiThread) return;
     const text = newMsg.trim();
+    const attachmentUrl = pendingAttachment?.objectPath ? getAttachmentServingUrl(pendingAttachment.objectPath) : undefined;
+    if ((!text && !attachmentUrl) || !activeApiThread) return;
     setNewMsg("");
+    clearAttachment();
     try {
       const r = await fetch("/api/messages/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId: activeApiThread.otherUserId, text }),
+        body: JSON.stringify({ recipientId: activeApiThread.otherUserId, text: text || undefined, attachmentUrl }),
       });
       if (r.ok) {
         const msg = await r.json() as ApiMsg;
         setApiMessages(prev => [...prev, msg]);
         setApiThreads(prev => prev.map(t =>
           t.id === activeApiThread.id
-            ? { ...t, lastMessageText: text, lastMessageAt: new Date().toISOString() }
+            ? { ...t, lastMessageText: text || "📎 Image", lastMessageAt: new Date().toISOString() }
             : t
         ));
       }
@@ -257,15 +421,17 @@ export default function Messages() {
   }
 
   async function handlePendingSend() {
-    if (!newMsg.trim() || !pendingRecipient) return;
     const text = newMsg.trim();
+    const attachmentUrl = pendingAttachment?.objectPath ? getAttachmentServingUrl(pendingAttachment.objectPath) : undefined;
+    if ((!text && !attachmentUrl) || !pendingRecipient) return;
     setNewMsg("");
+    clearAttachment();
     try {
       const r = await fetch("/api/messages/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId: pendingRecipient.id, text }),
+        body: JSON.stringify({ recipientId: pendingRecipient.id, text: text || undefined, attachmentUrl }),
       });
       if (r.ok) {
         const msg = await r.json() as ApiMsg;
@@ -308,6 +474,13 @@ export default function Messages() {
   return (
     <div className="min-h-screen bg-[#12100e] flex flex-col">
       <Nav />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void handleImageSelect(e)}
+      />
       <div className="flex-1 flex mx-auto w-full max-w-4xl" style={{ height: "calc(100vh - 56px)" }}>
         {/* Thread list */}
         <div className={`w-full md:w-72 shrink-0 border-r border-white/10 flex flex-col ${(activeThread || activeApiThread || pendingRecipient) ? "hidden md:flex" : "flex"}`}>
@@ -455,24 +628,17 @@ export default function Messages() {
 
               {/* Compose */}
               <div className="px-4 py-3 border-t border-white/10">
-                <div className="flex gap-2">
-                  <input
-                    autoFocus
-                    type="text"
-                    placeholder="Write a message…"
-                    value={newMsg}
-                    onChange={(e) => setNewMsg(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handlePendingSend(); } }}
-                    className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => void handlePendingSend()}
-                    disabled={!newMsg.trim()}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
-                  >
-                    <Send size={15} />
-                  </button>
-                </div>
+                <ComposeBar
+                  autoFocus
+                  value={newMsg}
+                  onChange={setNewMsg}
+                  onSend={() => void handlePendingSend()}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handlePendingSend(); } }}
+                  onAttach={() => fileInputRef.current?.click()}
+                  attachment={pendingAttachment}
+                  onRemoveAttachment={clearAttachment}
+                  isUploading={isUploading}
+                />
               </div>
             </>
           ) : activeApiThread ? (
@@ -520,7 +686,8 @@ export default function Messages() {
                               : "bg-stone-800 text-stone-200 rounded-bl-sm"
                           }`}>
                             {!isMe && <p className="text-[9px] text-stone-500 mb-0.5">{msg.senderName}</p>}
-                            {msg.text}
+                            {msg.text && <p>{msg.text}</p>}
+                            {msg.attachmentUrl && <AttachmentImage url={msg.attachmentUrl} />}
                             <p className={`text-[10px] mt-1 ${isMe ? "text-amber-400/60 text-right" : "text-stone-600"}`}>
                               {timeShort(msg.createdAt)}
                             </p>
@@ -552,23 +719,16 @@ export default function Messages() {
 
               {/* Compose */}
               <div className="px-4 py-3 border-t border-white/10">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Write a message…"
-                    value={newMsg}
-                    onChange={(e) => { setNewMsg(e.target.value); if (e.target.value) sendTypingSignal(activeApiThread.id); }}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleApiSend(); } }}
-                    className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => void handleApiSend()}
-                    disabled={!newMsg.trim()}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
-                  >
-                    <Send size={15} />
-                  </button>
-                </div>
+                <ComposeBar
+                  value={newMsg}
+                  onChange={(v) => { setNewMsg(v); if (v) sendTypingSignal(activeApiThread.id); }}
+                  onSend={() => void handleApiSend()}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleApiSend(); } }}
+                  onAttach={() => fileInputRef.current?.click()}
+                  attachment={pendingAttachment}
+                  onRemoveAttachment={clearAttachment}
+                  isUploading={isUploading}
+                />
               </div>
             </>
           ) : (

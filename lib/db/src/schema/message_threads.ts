@@ -15,7 +15,8 @@ export const messagesTable = pgTable("messages", {
   senderId: varchar("sender_id", { length: 255 }).notNull(),
   senderName: varchar("sender_name", { length: 255 }).notNull(),
   senderAvatarUrl: text("sender_avatar_url"),
-  text: text("text").notNull(),
+  text: text("text").notNull().default(""),
+  attachmentUrl: text("attachment_url"),
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
