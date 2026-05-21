@@ -131,3 +131,45 @@ id = "h9dPaBFwapyW9VGDlljwI"
 uri = "file://kilnfire-store-submission.zip"
 type = "unspecified"
 title = "KilnFire — App Store & Google Play Submission Package"
+
+[[outputs]]
+id = "i5TIr0VwaDsZTHIeFamuC"
+uri = "file://screenshots/screen-feed.jpg"
+type = "image"
+title = "1 — Feed (Home)"
+
+[[outputs]]
+id = "AhbftGRwVYMTkI5bySXLd"
+uri = "file://screenshots/screen-discover.jpg"
+type = "image"
+title = "2 — Discover Artists"
+
+[[outputs]]
+id = "LGk2y1_vwiEr32o5b0BCA"
+uri = "file://screenshots/screen-shop.jpg"
+type = "image"
+title = "3 — Shop / Marketplace"
+
+[[outputs]]
+id = "lgGTT6P2eXO0quxKMlIE5"
+uri = "file://screenshots/screen-profile.jpg"
+type = "image"
+title = "4 — Artist Profile"
+
+[[outputs]]
+id = "a5TuzAHRgGoKa_13tu4wy"
+uri = "file://screenshots/screen-workshops.jpg"
+type = "image"
+title = "5 — Workshops"
+
+[[outputs]]
+id = "LS-3LT8Dn50uok3KgRVDZ"
+uri = "file://screenshots/screen-guilds.jpg"
+type = "image"
+title = "6 — Craft Guilds"
+
+[[outputs]]
+id = "HvUE0EUyOotRCCBSHlDX3"
+uri = "file://screenshots/screen-auctions.jpg"
+type = "image"
+title = "7 — Auctions"
