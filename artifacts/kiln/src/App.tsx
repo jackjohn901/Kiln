@@ -132,6 +132,7 @@ import FoundingArtist from "@/pages/FoundingArtist";
 import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
 import SocialSync from "@/pages/SocialSync";
 import KilnOpening from "@/pages/KilnOpening";
+import AIMarketing from "@/pages/AIMarketing";
 import MaterialSources from "@/pages/MaterialSources";
 import ProcessPledge from "@/pages/ProcessPledge";
 import ListingCollaborators from "@/pages/ListingCollaborators";
@@ -374,6 +375,7 @@ function Router() {
       <Route path="/founding-artist" component={FoundingArtist} />
       <Route path="/social-sync" component={SocialSync} />
       <Route path="/kiln-opening" component={KilnOpening} />
+      <Route path="/ai-marketing" component={AIMarketing} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/help" component={Help} />
