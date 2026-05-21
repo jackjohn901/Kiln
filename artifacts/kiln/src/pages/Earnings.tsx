@@ -163,6 +163,12 @@ export default function Earnings() {
   const [salesLoading, setSalesLoading] = useState(true);
   const [showSales, setShowSales]       = useState(false);
 
+  // Sales filter state
+  const [salesSearch, setSalesSearch]   = useState("");
+  const [salesStatus, setSalesStatus]   = useState<string>("all");
+  const [salesSort, setSalesSort]       = useState<"newest" | "oldest">("newest");
+  const [salesDateRange, setSalesDateRange] = useState<"all" | "7d" | "30d" | "90d">("all");
+
   // Patron tier state
   const [myTiers, setMyTiers]           = useState<PatronTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
@@ -932,7 +938,17 @@ export default function Earnings() {
             <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40">
               <div className="flex w-full items-center justify-between px-4 py-3">
                 <button
-                  onClick={() => setShowSales(v => !v)}
+                  onClick={() => {
+                    setShowSales(v => {
+                      if (v) {
+                        setSalesSearch("");
+                        setSalesStatus("all");
+                        setSalesSort("newest");
+                        setSalesDateRange("all");
+                      }
+                      return !v;
+                    });
+                  }}
                   className="flex flex-1 items-center gap-2 text-left"
                 >
                   <ShoppingBag size={14} className="text-stone-400" />
@@ -949,20 +965,113 @@ export default function Earnings() {
                     <Clock size={10} />
                     Edit processing window
                   </Link>
-                  <button onClick={() => setShowSales(v => !v)} className="text-stone-600 hover:text-stone-400 transition-colors">
+                  <button
+                    onClick={() => {
+                      setShowSales(v => {
+                        if (v) {
+                          setSalesSearch("");
+                          setSalesStatus("all");
+                          setSalesSort("newest");
+                          setSalesDateRange("all");
+                        }
+                        return !v;
+                      });
+                    }}
+                    className="text-stone-600 hover:text-stone-400 transition-colors"
+                  >
                     {showSales ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 </div>
               </div>
 
               {showSales && (
-                <div className="border-t border-white/5 p-4 space-y-2">
+                <div className="border-t border-white/5 p-4 space-y-3">
+                  {/* Filter bar */}
+                  {!salesLoading && sales.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        value={salesSearch}
+                        onChange={e => setSalesSearch(e.target.value)}
+                        placeholder="Search by title or buyer…"
+                        className="w-full rounded-lg border border-white/10 bg-stone-800/60 px-3 py-1.5 text-xs text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={salesStatus}
+                          onChange={e => setSalesStatus(e.target.value)}
+                          className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none"
+                        >
+                          <option value="all">All statuses</option>
+                          <option value="pending">Pending</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="in_progress">In progress</option>
+                          <option value="shipped">Shipped</option>
+                          <option value="delivered">Delivered</option>
+                        </select>
+                        <select
+                          value={salesDateRange}
+                          onChange={e => setSalesDateRange(e.target.value as typeof salesDateRange)}
+                          className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none"
+                        >
+                          <option value="all">All time</option>
+                          <option value="7d">Last 7 days</option>
+                          <option value="30d">Last 30 days</option>
+                          <option value="90d">Last 90 days</option>
+                        </select>
+                        <select
+                          value={salesSort}
+                          onChange={e => setSalesSort(e.target.value as "newest" | "oldest")}
+                          className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none"
+                        >
+                          <option value="newest">Newest first</option>
+                          <option value="oldest">Oldest first</option>
+                        </select>
+                        {(salesSearch || salesStatus !== "all" || salesDateRange !== "all") && (
+                          <button
+                            onClick={() => { setSalesSearch(""); setSalesStatus("all"); setSalesSort("newest"); setSalesDateRange("all"); }}
+                            className="flex items-center gap-1 rounded-lg border border-white/8 px-2 py-1.5 text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
+                          >
+                            <X size={10} /> Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Sales list */}
+                  <div className="space-y-2">
                   {salesLoading ? (
                     <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-stone-600" /></div>
                   ) : sales.length === 0 ? (
                     <p className="text-xs text-stone-600 text-center py-4">No sales yet.</p>
-                  ) : (
-                    sales.map(sale => {
+                  ) : (() => {
+                    const needle = salesSearch.trim().toLowerCase();
+                    const nowMs = Date.now();
+                    const dateThresholdMs = salesDateRange === "7d" ? nowMs - 7 * 86400_000
+                      : salesDateRange === "30d" ? nowMs - 30 * 86400_000
+                      : salesDateRange === "90d" ? nowMs - 90 * 86400_000
+                      : null;
+                    const filtered = sales
+                      .filter(s => {
+                        if (salesStatus !== "all" && s.status !== salesStatus) return false;
+                        if (dateThresholdMs !== null && new Date(s.createdAt).getTime() < dateThresholdMs) return false;
+                        if (needle) {
+                          const titleMatch = s.title.toLowerCase().includes(needle);
+                          const buyerMatch = (s.buyerDisplayName ?? "").toLowerCase().includes(needle)
+                            || (s.buyerHandle ?? "").toLowerCase().includes(needle);
+                          if (!titleMatch && !buyerMatch) return false;
+                        }
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const ta = new Date(a.createdAt).getTime();
+                        const tb = new Date(b.createdAt).getTime();
+                        return salesSort === "newest" ? tb - ta : ta - tb;
+                      });
+                    if (filtered.length === 0) {
+                      return <p className="text-xs text-stone-600 text-center py-4">No sales match your filters.</p>;
+                    }
+                    return filtered.map(sale => {
                       const hasWindow = sale.processingWindowDays !== null || sale.processingWindowLabel !== null;
                       const windowText = sale.processingWindowLabel?.trim()
                         ? sale.processingWindowLabel
@@ -1050,8 +1159,9 @@ export default function Earnings() {
                           )}
                         </div>
                       );
-                    })
-                  )}
+                    });
+                  })()}
+                  </div>
                 </div>
               )}
             </div>
