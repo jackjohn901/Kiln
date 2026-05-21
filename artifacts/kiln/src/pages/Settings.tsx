@@ -116,6 +116,7 @@ export default function Settings() {
   const [contactEmail, setContactEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState(false);
+  const [settingsStatus, setSettingsStatus] = useState<"loading" | "loaded" | "error">("loading");
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -135,11 +136,13 @@ export default function Settings() {
     fetch("/api/me/settings", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null }> : null)
       .then(data => {
-        if (!data) return;
-        if (data.settings && Object.keys(data.settings).length > 0) {
-          setSettings(s => ({ ...s, ...data.settings }));
-          saveSettings({ ...defaultSettings(), ...data.settings });
+        if (!data) {
+          setSettingsStatus("error");
+          return;
         }
+        const merged = { ...defaultSettings(), ...(data.settings ?? {}) };
+        setSettings(merged);
+        saveSettings(merged);
         if (data.shippingSettings && Object.keys(data.shippingSettings).length > 0) {
           setShipping(s => ({ ...s, ...data.shippingSettings }));
           saveShippingSettings({ ...defaultShipping(), ...data.shippingSettings });
@@ -148,9 +151,12 @@ export default function Settings() {
           setPayments(s => ({ ...s, ...data.paymentSettings }));
           savePaymentSettings({ ...data.paymentSettings } as ArtistPayments);
         }
-        if (data.contactEmail) setContactEmail(data.contactEmail);
+        setContactEmail(data.contactEmail ?? "");
+        setSettingsStatus("loaded");
       })
-      .catch(() => { /* use localStorage cache */ });
+      .catch(() => {
+        setSettingsStatus("error");
+      });
   }, []);
 
   function syncToServer(s: KilnSettings) {
@@ -220,19 +226,23 @@ export default function Settings() {
     "notif_email_outbid",
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
-  const notifDesc = !contactEmail.trim()
+  const notifDesc = settingsStatus !== "loaded"
+    ? "—"
+    : !contactEmail.trim()
     ? "No email address set"
     : activeEmailCount === 0
     ? "Emails off · push only"
     : `${activeEmailCount} of ${EMAIL_KEYS.length} email types active`;
 
-  const notifDescClass = !contactEmail.trim()
+  const notifDescClass = settingsStatus !== "loaded"
+    ? "text-stone-600"
+    : !contactEmail.trim()
     ? "text-amber-400"
     : activeEmailCount === 0
     ? "text-amber-400"
     : "text-emerald-400";
 
-  const notifWarn = !!contactEmail.trim() && activeEmailCount === 0;
+  const notifWarn = settingsStatus === "loaded" && !!contactEmail.trim() && activeEmailCount === 0;
 
   const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string; warn?: boolean }[] = [
     { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass, warn: notifWarn },
