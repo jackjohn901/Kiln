@@ -91,7 +91,7 @@ export default function CreatorHome() {
   const QUICK_ACTIONS = [
     { href: "/create", icon: Plus, label: "New Post", color: "bg-amber-500 text-stone-950" },
     { href: "/scheduler", icon: PenLine, label: "Schedule", color: "bg-stone-800 text-stone-200 border border-white/10" },
-    { href: `/live/${artistId}`, icon: Radio, label: "Go Live", color: "bg-red-500/10 text-red-400 border border-red-500/20" },
+    { href: artistId ? `/live/${artistId}` : undefined, icon: Radio, label: "Go Live", color: "bg-red-500/10 text-red-400 border border-red-500/20" },
     { href: "/inventory", icon: Package, label: "Inventory", color: "bg-stone-800 text-stone-200 border border-white/10" },
     { href: "/grants", icon: Sparkles, label: "Grant Writer", color: "bg-stone-800 text-stone-200 border border-white/10" },
     { href: "/analytics", icon: BarChart2, label: "Analytics", color: "bg-stone-800 text-stone-200 border border-white/10" },
@@ -184,14 +184,15 @@ export default function CreatorHome() {
         <div className="mb-7">
           <p className="text-[10px] font-bold uppercase tracking-widest text-stone-600 mb-3">Quick actions</p>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {QUICK_ACTIONS.map(({ href, icon: Icon, label, color }) => (
-              <Link key={href} href={href}>
-                <button className={`w-full flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-xs font-medium transition-all hover:scale-105 ${color}`}>
+            {QUICK_ACTIONS.map(({ href, icon: Icon, label, color }) => {
+              const btn = (
+                <button className={`w-full flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-xs font-medium transition-all hover:scale-105 ${color} disabled:opacity-40 disabled:cursor-not-allowed`} disabled={!href}>
                   <Icon size={18} />
                   {label}
                 </button>
-              </Link>
-            ))}
+              );
+              return href ? <Link key={label} href={href}>{btn}</Link> : <div key={label}>{btn}</div>;
+            })}
           </div>
         </div>
 

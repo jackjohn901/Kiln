@@ -83,15 +83,16 @@ export default function LiveStudio() {
   const following = isFollowing(artistId ?? "");
 
   useEffect(() => {
-    if (!artist) return;
+    if (!artistId) return;
     const addMsg = () => {
       const [user, text] = CHAT_POOL[Math.floor(Math.random() * CHAT_POOL.length)];
       setChatMsgs((prev) => [...prev.slice(-60), { id: msgId.current++, user, text, ts: Date.now() }]);
     };
-    addMsg();
-    const interval = setInterval(addMsg, 1800 + Math.random() * 2400);
-    return () => clearInterval(interval);
-  }, [artist]);
+    // Delay first message so the page settles before chat starts
+    const initial = setTimeout(addMsg, 1200);
+    const interval = setInterval(addMsg, 3500 + Math.random() * 3000);
+    return () => { clearTimeout(initial); clearInterval(interval); };
+  }, [artistId]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -124,7 +125,21 @@ export default function LiveStudio() {
     setInput("");
   }
 
+  // Profile may still be loading — wait briefly before declaring "not found"
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 600);
+    return () => clearTimeout(t);
+  }, []);
+
   if (!artist) {
+    if (!ready) {
+      return (
+        <div className="min-h-screen bg-[#12100e] flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-[#12100e] flex items-center justify-center">
         <div className="text-center">
