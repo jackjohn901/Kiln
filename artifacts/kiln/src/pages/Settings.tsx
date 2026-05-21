@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, VolumeX, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2 } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -226,10 +226,13 @@ export default function Settings() {
     "notif_email_outbid",
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
+  const emailPaused = settings.notif_email_paused;
   const notifDesc = settingsStatus !== "loaded"
     ? "—"
     : !contactEmail.trim()
     ? "No email address set"
+    : emailPaused
+    ? `Emails globally paused · ${activeEmailCount} type${activeEmailCount === 1 ? "" : "s"} affected`
     : activeEmailCount === 0
     ? "Emails off · push only"
     : `${activeEmailCount} of ${EMAIL_KEYS.length} email types active`;
@@ -238,11 +241,13 @@ export default function Settings() {
     ? "text-stone-600"
     : !contactEmail.trim()
     ? "text-amber-400"
+    : emailPaused
+    ? "text-amber-400"
     : activeEmailCount === 0
     ? "text-amber-400"
     : "text-emerald-400";
 
-  const notifWarn = settingsStatus === "loaded" && !!contactEmail.trim() && activeEmailCount === 0;
+  const notifWarn = settingsStatus === "loaded" && !!contactEmail.trim() && (activeEmailCount === 0 || (emailPaused && activeEmailCount > 0));
 
   const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string; warn?: boolean }[] = [
     { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass, warn: notifWarn },
@@ -400,9 +405,11 @@ export default function Settings() {
               </button>
             </div>
             {settings.notif_email_paused && (
-              <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-red-500/10 border border-red-500/20 mb-1">
-                <VolumeX size={13} className="text-red-400 shrink-0" />
-                <p className="text-xs text-red-300">All email notifications are paused. Toggle individual settings below to resume specific ones when you unpause.</p>
+              <div className="flex items-start gap-2 py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-1">
+                <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-300">
+                  Emails are globally paused — no notifications will be sent even if individual types are enabled below. Flip the switch above to resume.
+                </p>
               </div>
             )}
             <div className={settings.notif_email_paused ? "opacity-40 pointer-events-none" : undefined}>
