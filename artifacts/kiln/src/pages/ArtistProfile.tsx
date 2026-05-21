@@ -7,7 +7,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2, Truck,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -26,6 +26,40 @@ import { getPosts } from "@/data/posts";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 import { getCommunityBeats, type CommunityBeat, LICENSE_LABELS, LICENSE_COLORS } from "@/lib/communityBeats";
 import { useMeta } from "@/hooks/useMeta";
+
+interface ArtistShipping {
+  offerFreeShipping: boolean;
+  domesticRate: number | null;
+  internationalRate: number | null;
+  freeThreshold: number | null;
+  offerLocalPickup: boolean;
+}
+
+function ShippingBadge({ shipping }: { shipping: ArtistShipping | null }) {
+  if (!shipping) return null;
+  if (shipping.offerFreeShipping) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+        <Truck size={12} />Free shipping
+      </span>
+    );
+  }
+  if (shipping.domesticRate != null && shipping.domesticRate > 0) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-stone-400">
+        <Truck size={12} />Ships from ${shipping.domesticRate}
+      </span>
+    );
+  }
+  if (shipping.offerLocalPickup) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-sky-400">
+        <Truck size={12} />Local pickup available
+      </span>
+    );
+  }
+  return null;
+}
 
 function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
   const seed = getArtistById(id) ?? seedArtists.find((a) => a.id === id);
@@ -295,6 +329,8 @@ export default function ArtistProfile() {
   const [visitNote, setVisitNote] = useState("");
   const [visitRequested, setVisitRequested] = useState(false);
 
+  const [shipping, setShipping] = useState<ArtistShipping | null>(null);
+
   const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
   const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
   const [dbPosts, setDbPosts] = useState<DbUserPost[]>([]);
@@ -342,6 +378,10 @@ export default function ArtistProfile() {
     fetch(`/api/artists/${id}/reservations`)
       .then((r) => r.ok ? r.json() : { reservations: [] })
       .then((data) => setHasReservations(data.reservations && data.reservations.length > 0))
+      .catch(() => {});
+    fetch(`/api/artists/${id}/shipping`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setShipping(data); })
       .catch(() => {});
   }, [id]);
 
@@ -991,6 +1031,11 @@ export default function ArtistProfile() {
           {/* Shop */}
           {tab === "shop" && (
             <div>
+              {shipping && (
+                <div className="mb-4">
+                  <ShippingBadge shipping={shipping} />
+                </div>
+              )}
               {listings.length === 0 ? (
                 <div className="py-16 text-center text-stone-600 text-sm">No works available in the shop.</div>
               ) : (
