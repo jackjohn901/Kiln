@@ -180,7 +180,7 @@ export function orderConfirmationEmail(customerEmail: string, orderId: string, a
       <p style="margin:0 0 8px;">Amount: <strong style="color:#fcd34d;">$${(amountTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></p>
       <p style="margin:0;color:#78716c;">The artist will reach out within 2–3 business days with shipping details.</p>
     `)}
-    ${btn(receiptUrl, "View your receipt")}
+    ${btn(receiptUrl, "View full receipt")}
   `);
 }
 
@@ -252,7 +252,7 @@ export function manualPayoutReceiptEmail(
         ? `<p style="margin:8px 0 0;color:#a8a29e;font-size:13px;">The artist typically processes orders within <strong style="color:#d6d3d1;">${processingWindowDays} business day${processingWindowDays === 1 ? '' : 's'}</strong>.</p>`
         : ''}
     `)}
-    ${btn(orderId ? `${BASE_URL}/orders/${orderId}` : `${BASE_URL}/orders`, "View your receipt")}
+    ${btn(orderId ? `${BASE_URL}/orders/${orderId}` : `${BASE_URL}/orders`, "View full receipt")}
   `);
 }
 

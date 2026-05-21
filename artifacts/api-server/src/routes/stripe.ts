@@ -28,6 +28,22 @@ const router: IRouter = Router();
 // lifetime (cleared on restart), which covers the typical retry window.
 const manualPayoutReceiptSent = new Set<string>();
 const manualPayoutArtistNotified = new Set<string>();
+
+async function waitForSessionOrder(sessionId: string, maxAttempts = 5, delayMs = 1200): Promise<string | null> {
+  const key = `stripe:${sessionId}`;
+  for (let i = 0; i < maxAttempts; i++) {
+    const row = await db
+      .select({ id: ordersTable.id })
+      .from(ordersTable)
+      .where(eq(ordersTable.notes, key))
+      .limit(1)
+      .then((rows) => rows[0] ?? null)
+      .catch(() => null);
+    if (row) return row.id;
+    if (i < maxAttempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return null;
+}
 const connectArtistNotified = new Set<string>();
 const connectBuyerReceiptSent = new Set<string>();
 const workshopArtistNotified = new Set<string>();
@@ -918,17 +934,10 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 artistName: listingArtistName(idx),
               }));
 
-              // Look up the DB order ID so the email can deep-link to the receipt.
-              // The order may not exist yet if the frontend confirm call races the webhook,
-              // so fall back gracefully to the orders list when not found.
-              const dedupeKey = `stripe:${session.id}`;
-              const orderRow = await db
-                .select({ id: ordersTable.id })
-                .from(ordersTable)
-                .where(eq(ordersTable.notes, dedupeKey))
-                .limit(1)
-                .then((rows) => rows[0] ?? null);
-              const receiptOrderId = orderRow?.id ?? null;
+              // Poll for the DB order ID so the email can deep-link to the receipt.
+              // Orders are written by the frontend after the Stripe redirect, so there is
+              // a small race; retry a few times before falling back to the orders list.
+              const receiptOrderId = await waitForSessionOrder(session.id);
 
               const html = manualPayoutReceiptEmail(
                 session.id,
@@ -1115,17 +1124,10 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   };
                 });
 
-                // Look up the DB order ID so the email can deep-link to the receipt.
-                // Fall back gracefully to the orders list if the order hasn't been
-                // created yet (frontend confirm call may race the webhook).
-                const connectDedupeKey = `stripe:${session.id}`;
-                const connectOrderRow = await db
-                  .select({ id: ordersTable.id })
-                  .from(ordersTable)
-                  .where(eq(ordersTable.notes, connectDedupeKey))
-                  .limit(1)
-                  .then((rows) => rows[0] ?? null);
-                const connectReceiptOrderId = connectOrderRow?.id ?? null;
+                // Poll for the DB order ID so the email can deep-link to the receipt.
+                // Orders are written by the frontend after the Stripe redirect, so there is
+                // a small race; retry a few times before falling back to the orders list.
+                const connectReceiptOrderId = await waitForSessionOrder(session.id);
 
                 const html = manualPayoutReceiptEmail(
                   session.id,

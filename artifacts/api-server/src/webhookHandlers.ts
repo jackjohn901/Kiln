@@ -7,6 +7,22 @@ import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
 
+async function waitForSessionOrder(sessionId: string, maxAttempts = 5, delayMs = 1200): Promise<string | null> {
+  const key = `stripe:${sessionId}`;
+  for (let i = 0; i < maxAttempts; i++) {
+    const row = await db
+      .select({ id: ordersTable.id })
+      .from(ordersTable)
+      .where(eq(ordersTable.notes, key))
+      .limit(1)
+      .then((rows) => rows[0] ?? null)
+      .catch(() => null);
+    if (row) return row.id;
+    if (i < maxAttempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return null;
+}
+
 async function activatePatronSubscription(tierId: string, userId: string): Promise<void> {
   const [tier] = await db.select().from(patronTiersTable).where(eq(patronTiersTable.id, tierId));
   if (!tier) return;
@@ -132,18 +148,10 @@ export class WebhookHandlers {
         const orderId = session.id.slice(-8).toUpperCase();
 
         if (session.mode === 'payment' && email) {
-          // Look up the DB order UUID so the email can deep-link to the receipt
+          // Poll for the DB order UUID so the email can deep-link to the receipt
           // page. Orders are created by the frontend after redirect, so there is a
-          // small race; fall back gracefully to the orders list when not yet found.
-          const dedupeKey = `stripe:${session.id}`;
-          const orderRow = await db
-            .select({ id: ordersTable.id })
-            .from(ordersTable)
-            .where(eq(ordersTable.notes, dedupeKey))
-            .limit(1)
-            .then((rows) => rows[0] ?? null)
-            .catch(() => null);
-          const receiptOrderId = orderRow?.id ?? null;
+          // small race; we retry a few times before falling back to the orders list.
+          const receiptOrderId = await waitForSessionOrder(session.id);
 
           sendEmail({
             to: email,
