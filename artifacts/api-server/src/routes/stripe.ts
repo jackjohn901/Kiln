@@ -19,7 +19,7 @@ import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 import { broadcast } from '../lib/websocket';
 import { getDigitalProduct } from '../lib/digitalProducts';
-import { sendEmail, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, commissionPaymentEmail } from '../lib/email';
+import { sendEmail, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, workshopBookingEmail, commissionPaymentEmail } from '../lib/email';
 
 const router: IRouter = Router();
 
@@ -31,6 +31,7 @@ const manualPayoutArtistNotified = new Set<string>();
 const connectArtistNotified = new Set<string>();
 const connectBuyerReceiptSent = new Set<string>();
 const workshopArtistNotified = new Set<string>();
+const workshopStudentConfirmationSent = new Set<string>();
 const commissionArtistNotified = new Set<string>();
 
 interface CartLineItem {
@@ -596,6 +597,30 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
           // Gating on bookingConfirmed ensures we don't notify when:
           //   - the workshop was full (seat not granted), or
           //   - the booking already existed (webhook replay after process restart).
+          if (bookingConfirmed && w) {
+            const studentName = session.customer_details?.name ?? '';
+            const studentEmail = session.customer_email ?? session.customer_details?.email ?? '';
+            const amountCents = session.amount_total ?? 0;
+
+            // Send confirmation email to the student.
+            if (studentEmail && !workshopStudentConfirmationSent.has(session.id)) {
+              workshopStudentConfirmationSent.add(session.id);
+              try {
+                const startDateStr = w.startDate
+                  ? w.startDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
+                  : 'Date TBD';
+                const html = workshopBookingEmail(w.title, w.artistName, startDateStr);
+                await sendEmail({
+                  to: studentEmail,
+                  subject: `You're booked! "${w.title}" with ${w.artistName}`,
+                  html,
+                });
+              } catch (studentEmailErr) {
+                logger.error({ err: studentEmailErr, sessionId: session.id }, 'Failed to send workshop booking student confirmation email');
+              }
+            }
+          }
+
           if (bookingConfirmed && w && !workshopArtistNotified.has(session.id)) {
             workshopArtistNotified.add(session.id);
             try {
