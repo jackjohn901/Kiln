@@ -232,8 +232,10 @@ export default function Settings() {
     ? "text-amber-400"
     : "text-emerald-400";
 
-  const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string }[] = [
-    { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass },
+  const notifWarn = !!contactEmail.trim() && activeEmailCount === 0;
+
+  const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string; warn?: boolean }[] = [
+    { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass, warn: notifWarn },
     { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you" },
     { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings" },
     { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly" },
@@ -294,14 +296,17 @@ export default function Settings() {
 
         {!section && (
           <div className="space-y-2">
-            {sections.map(({ key, icon: Icon, label, desc, descClass }) => (
+            {sections.map(({ key, icon: Icon, label, desc, descClass, warn }) => (
               <button
                 key={key}
                 onClick={() => setSection(key)}
-                className="w-full flex items-center gap-4 rounded-2xl border border-white/8 bg-stone-900/60 px-5 py-4 text-left hover:border-white/15 transition-colors"
+                className={`w-full flex items-center gap-4 rounded-2xl border bg-stone-900/60 px-5 py-4 text-left hover:border-white/15 transition-colors ${warn ? "border-l-2 border-l-amber-500/70 border-white/8" : "border-white/8"}`}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <Icon size={18} className="text-amber-400" />
+                  {warn && (
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-[#12100e]" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-stone-200">{label}</p>
