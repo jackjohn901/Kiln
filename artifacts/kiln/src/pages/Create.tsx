@@ -71,6 +71,7 @@ export default function Create() {
   const { upload, uploading, progress } = useUpload();
 
   const [step, setStep] = useState<Step>("upload");
+  const [postType, setPostType] = useState<"post" | "story">("post");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [bgFile, setBgFile] = useState<File | null>(null);
@@ -232,6 +233,29 @@ export default function Create() {
     try {
       let thumbnailUrl: string | undefined;
       let mediaUrl = previewUrl;
+
+      // ── Story publish path ──────────────────────────────────────────
+      if (postType === "story") {
+        if (file) {
+          try {
+            const result = await upload(file);
+            mediaUrl = result.servingUrl;
+          } catch {
+            if (file.type.startsWith("image/")) {
+              try { mediaUrl = await fileToDataUrl(file); } catch { /* keep previewUrl */ }
+            }
+          }
+        }
+        await fetch("/api/stories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ mediaUrl, mediaType, caption }),
+        }).catch(() => {});
+        setStep("done");
+        return;
+      }
+      // ────────────────────────────────────────────────────────────────
 
       if (file && mediaType === "video") {
         // Capture thumbnail while the blob URL is still valid
@@ -468,8 +492,25 @@ export default function Create() {
         {/* STEP 1: Upload */}
         {step === "upload" && (
           <div className="space-y-4">
-            {/* Technique selector */}
-            <div>
+            {/* Post type toggle */}
+            <div className="grid grid-cols-2 gap-2">
+              {(["post", "story"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setPostType(t)}
+                  className={`rounded-xl border py-3 text-sm font-medium transition-all ${
+                    postType === t
+                      ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
+                      : "border-white/8 bg-stone-900 text-stone-500 hover:text-stone-300"
+                  }`}
+                >
+                  {t === "post" ? "📸 Post" : "⏱ Story (24h)"}
+                </button>
+              ))}
+            </div>
+
+            {/* Technique selector — only for posts */}
+            {postType === "post" && <div>
               <p className="mb-2 text-xs font-medium text-stone-400">What process are you sharing?</p>
               <div className="flex flex-wrap gap-2">
                 {TECHNIQUES.map((t) => (
@@ -486,7 +527,7 @@ export default function Create() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {/* Drop zone */}
             <div
@@ -821,6 +862,7 @@ export default function Create() {
               )}
             </div>
 
+            {postType === "post" && <>
             {/* Process stage */}
             <div>
               <label className="mb-2 block text-xs font-medium text-stone-400">Process stage</label>
@@ -1098,6 +1140,7 @@ export default function Create() {
                 </div>
               )}
             </div>
+            </>}
 
             {/* Upload progress */}
             {uploading && (

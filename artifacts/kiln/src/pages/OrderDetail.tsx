@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer,
+  Printer, Star,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 
@@ -62,6 +62,79 @@ function formatTime(iso: string) {
 
 function ordinalId(id: string) {
   return "KLN-" + id.slice(0, 8).toUpperCase();
+}
+
+function ReviewForm({ order }: { order: Order }) {
+  const [rating, setRating] = useState(0);
+  const [hovered, setHovered] = useState(0);
+  const [body, setBody] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (rating < 1) return;
+    setSubmitting(true);
+    try {
+      await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetId: order.sellerId, targetType: "artist", rating, body }),
+      });
+      setSubmitted(true);
+    } catch { /* ignore */ }
+    setSubmitting(false);
+  }
+
+  if (submitted) {
+    return (
+      <div className="mt-4 mb-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 p-4 flex items-center gap-3">
+        <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-emerald-300">Review submitted</p>
+          <p className="text-xs text-stone-500 mt-0.5">Thank you — your feedback helps the community.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-4 mb-2 rounded-2xl border border-white/8 bg-stone-900/60 p-4 space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Leave a review</p>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n} type="button"
+            onClick={() => setRating(n)}
+            onMouseEnter={() => setHovered(n)}
+            onMouseLeave={() => setHovered(0)}
+            className="transition-transform hover:scale-110"
+          >
+            <Star
+              size={22}
+              className={n <= (hovered || rating) ? "text-amber-400 fill-amber-400" : "text-stone-700"}
+            />
+          </button>
+        ))}
+      </div>
+      <textarea
+        rows={3}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="How was the piece? Describe the quality, packaging, and communication…"
+        className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none resize-none"
+      />
+      <button
+        type="submit"
+        disabled={rating < 1 || submitting}
+        className="w-full rounded-full bg-amber-500 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+      >
+        {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
+        Submit review
+      </button>
+    </form>
+  );
 }
 
 function sessionReceiptId(notes: string | null): string {
@@ -449,6 +522,9 @@ export default function OrderDetail() {
             </div>
           </div>
         )}
+
+        {/* ── Review prompt — only for delivered orders ── */}
+        {order.status === "delivered" && <ReviewForm order={order} />}
 
         <div className="mt-6 space-y-3">
           <button
