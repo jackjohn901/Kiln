@@ -39,13 +39,15 @@ function timeAgo(iso: string): string {
 export default function Inbox() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { receivedInquiries: socialReceived, commissions: socialSent, acceptInquiry: socialAccept, declineInquiry: socialDecline, quoteInquiry } = useSocial();
+  const { receivedInquiries: socialReceived, commissions: socialSent, acceptInquiry: socialAccept, declineInquiry: socialDecline, quoteInquiry, markTypeRead } = useSocial();
   const [tab, setTab] = useState<"received" | "sent">("received");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [quotingId, setQuotingId] = useState<string | null>(null);
   const [quoteForm, setQuoteForm] = useState({ price: "", paymentSchedule: "", deliveryDate: "", terms: "" });
   const [apiReceived, setApiReceived] = useState<typeof socialReceived>([]);
   const [apiSent, setApiSent] = useState<typeof socialSent>([]);
+
+  useEffect(() => { markTypeRead("commission_payment"); }, [markTypeRead]);
 
   useEffect(() => {
     fetch("/api/me/commissions/received", { credentials: "include" })

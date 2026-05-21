@@ -3,6 +3,7 @@ import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X } from "lucide-react";
 import { useLocation } from "wouter";
 import Nav from "@/components/Nav";
+import { useSocial } from "@/contexts/SocialContext";
 
 interface ApiWorkshop {
   id: string;
@@ -164,8 +165,10 @@ export default function Workshops() {
   const [workshops, setWorkshops] = useState<ApiWorkshop[]>([]);
   const [loading, setLoading] = useState(true);
   const [medium, setMedium] = useState("All");
+  const { markTypeRead } = useSocial();
 
   useEffect(() => { markFeatureVisited("workshops"); }, []);
+  useEffect(() => { markTypeRead("workshop_booking"); }, [markTypeRead]);
 
   useEffect(() => {
     fetch("/api/workshops", { credentials: "include" })

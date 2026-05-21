@@ -12,7 +12,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
-  const { unreadCount, unreadMessageCount, receivedInquiries, isVerified } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -114,16 +114,25 @@ export default function Nav() {
           <div className="hidden items-center gap-1 md:flex">
             {links.map(({ href, label }) => {
               const active = href === "/" ? location === "/" : location.startsWith(href);
+              const badge =
+                href === "/workshops" && unreadWorkshopCount > 0
+                  ? unreadWorkshopCount
+                  : null;
               return (
                 <Link
                   key={href}
                   href={href}
                   data-testid={`nav-link-${label.toLowerCase()}`}
-                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                     active ? "bg-amber-500/20 text-amber-300" : "text-stone-400 hover:text-amber-200"
                   }`}
                 >
                   {label}
+                  {badge !== null && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-stone-950">
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -184,9 +193,9 @@ export default function Nav() {
               title="Commission Inbox"
             >
               <Inbox size={15} />
-              {pendingInquiries > 0 && (
+              {(pendingInquiries > 0 || unreadCommissionPaymentCount > 0) && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[9px] font-bold text-white">
-                  {pendingInquiries > 9 ? "9+" : pendingInquiries}
+                  {(pendingInquiries + unreadCommissionPaymentCount) > 9 ? "9+" : (pendingInquiries + unreadCommissionPaymentCount)}
                 </span>
               )}
             </Link>

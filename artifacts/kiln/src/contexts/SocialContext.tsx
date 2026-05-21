@@ -271,7 +271,10 @@ interface SocialContextType extends SocialState {
   addNotification: (n: Omit<KilnNotification, "id" | "read" | "createdAt">) => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  markTypeRead: (type: KilnNotification["type"]) => void;
   unreadCount: number;
+  unreadWorkshopCount: number;
+  unreadCommissionPaymentCount: number;
   setMyCommissionStatus: (status: CommissionStatus) => void;
   getArtistCommissionStatus: (artistId: string) => CommissionStatus;
   sendCommissionInquiry: (inquiry: Omit<CommissionInquiry, "id" | "status" | "createdAt">) => void;
@@ -575,6 +578,15 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     fetch("/api/notifications/read-all", { method: "POST", credentials: "include" }).catch(() => {});
   }, []);
 
+  const markTypeRead = useCallback((type: KilnNotification["type"]) => {
+    update((s) => ({
+      ...s,
+      notifications: s.notifications.map((n) =>
+        n.type === type && !n.read ? { ...n, read: true } : n
+      ),
+    }));
+  }, []);
+
   const setMyCommissionStatus = useCallback((status: CommissionStatus) => {
     update((s) => ({ ...s, myCommissionStatus: status }));
   }, []);
@@ -804,6 +816,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   );
 
   const unreadCount = state.notifications.filter((n) => !n.read).length;
+  const unreadWorkshopCount = state.notifications.filter((n) => !n.read && n.type === "workshop_booking").length;
+  const unreadCommissionPaymentCount = state.notifications.filter((n) => !n.read && n.type === "commission_payment").length;
   const unreadMessageCount = state.threads.reduce(
     (sum, t) => sum + t.messages.filter((m) => !m.read && m.senderId !== "__current_user__").length,
     0
@@ -822,7 +836,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         addNotification,
         markRead,
         markAllRead,
+        markTypeRead,
         unreadCount,
+        unreadWorkshopCount,
+        unreadCommissionPaymentCount,
         setMyCommissionStatus,
         getArtistCommissionStatus,
         sendCommissionInquiry,
