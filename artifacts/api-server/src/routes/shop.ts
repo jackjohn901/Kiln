@@ -269,6 +269,7 @@ router.get("/me/sales", async (req, res): Promise<void> => {
       updatedAt: ordersTable.updatedAt,
       buyerDisplayName: profilesTable.displayName,
       buyerHandle: profilesTable.handle,
+      buyerAvatarUrl: profilesTable.avatarUrl,
     })
     .from(ordersTable)
     .leftJoin(profilesTable, eq(ordersTable.buyerId, profilesTable.userId))

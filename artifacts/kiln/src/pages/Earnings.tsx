@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearch } from "wouter";
+import { Link, useSearch, useLocation } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock, Bell, User, Package,
+  ShoppingBag, Clock, Bell, Package,
 } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -95,6 +95,7 @@ interface SaleOrder {
   manualPayout: boolean;
   buyerDisplayName: string | null;
   buyerHandle: string | null;
+  buyerAvatarUrl: string | null;
 }
 
 const TYPE_CONFIG = {
@@ -136,6 +137,7 @@ function formatDate(iso: string) {
 export default function Earnings() {
   const { profile } = useProfile();
   const search = useSearch();
+  const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
@@ -972,19 +974,57 @@ export default function Earnings() {
                         : sale.buyerHandle
                           ? `@${sale.buyerHandle}`
                           : "Anonymous buyer";
+                      const buyerInitial = (sale.buyerDisplayName?.trim() || sale.buyerHandle || "?")[0].toUpperCase();
+                      const buyerHref = sale.buyerHandle
+                        ? `/artists/${sale.buyerHandle}`
+                        : sale.buyerId
+                          ? `/artists/${sale.buyerId}`
+                          : null;
                       const orderTypeLabel = sale.manualPayout ? "Manual" : "Connect";
                       return (
-                        <Link key={sale.id} href={`/sales/${sale.id}`} className="block rounded-xl border border-white/5 bg-stone-900/60 p-3 hover:border-amber-500/20 hover:bg-stone-900/80 transition-colors group">
+                        <div
+                          key={sale.id}
+                          role="link"
+                          tabIndex={0}
+                          onClick={() => navigate(`/sales/${sale.id}`)}
+                          onKeyDown={e => e.key === "Enter" && navigate(`/sales/${sale.id}`)}
+                          className="block rounded-xl border border-white/5 bg-stone-900/60 p-3 hover:border-amber-500/20 hover:bg-stone-900/80 transition-colors group cursor-pointer"
+                        >
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 mb-0.5">
+                              <div className="flex items-center gap-1.5 mb-1.5">
                                 <Package size={11} className="text-stone-500 flex-shrink-0" />
                                 <p className="text-sm font-medium text-stone-200 leading-tight truncate group-hover:text-amber-200 transition-colors">{sale.title}</p>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <User size={10} className="text-stone-600 flex-shrink-0" />
-                                <p className="text-[11px] text-stone-500 truncate">{buyerLabel}</p>
-                                <span className="text-stone-700">·</span>
+                                {buyerHref ? (
+                                  <Link
+                                    href={buyerHref}
+                                    onClick={e => e.stopPropagation()}
+                                    className="flex items-center gap-1.5 min-w-0 hover:opacity-80 transition-opacity"
+                                  >
+                                    {sale.buyerAvatarUrl ? (
+                                      <img
+                                        src={sale.buyerAvatarUrl}
+                                        alt={buyerLabel}
+                                        className="h-5 w-5 flex-shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                                      />
+                                    ) : (
+                                      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-stone-700 text-[9px] font-semibold text-stone-300 ring-1 ring-white/10">
+                                        {buyerInitial}
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-amber-400/80 truncate hover:text-amber-300 transition-colors">{buyerLabel}</span>
+                                  </Link>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-stone-700 text-[9px] font-semibold text-stone-300 ring-1 ring-white/10">
+                                      {buyerInitial}
+                                    </span>
+                                    <span className="text-[11px] text-stone-500 truncate">{buyerLabel}</span>
+                                  </div>
+                                )}
+                                <span className="text-stone-700 flex-shrink-0">·</span>
                                 <p className="text-[10px] text-stone-600 flex-shrink-0">{formatDate(sale.createdAt)}</p>
                               </div>
                             </div>
@@ -1008,7 +1048,7 @@ export default function Earnings() {
                               </span>
                             </div>
                           )}
-                        </Link>
+                        </div>
                       );
                     })
                   )}
