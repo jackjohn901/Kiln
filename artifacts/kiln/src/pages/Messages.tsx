@@ -387,10 +387,14 @@ export default function Messages() {
     setActiveApiThreadId(id);
     setActiveThreadId(null);
     try {
-      const r = await fetch(`/api/messages/threads/${id}`, { credentials: "include" });
+      const [r] = await Promise.all([
+        fetch(`/api/messages/threads/${id}`, { credentials: "include" }),
+        fetch(`/api/messages/threads/${id}/read`, { method: "POST", credentials: "include" }),
+      ]);
       if (r.ok) {
         const d = await r.json() as { messages?: ApiMsg[] };
         setApiMessages([...(d.messages ?? [])].reverse());
+        setApiThreads(prev => prev.map(t => t.id === id ? { ...t, unreadCount: 0 } : t));
       }
     } catch {}
   }
