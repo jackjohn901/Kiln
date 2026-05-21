@@ -9,6 +9,7 @@ import { backfillProcessingWindow } from "./lib/backfillProcessingWindow";
 import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
 import { startStoryExpiry } from "./lib/storyExpiry";
 import { startDropCountdownScheduler } from "./lib/dropCountdown";
+import { startWorkshopReminders } from "./lib/workshopReminders";
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -54,6 +55,7 @@ if (Number.isNaN(port) || port <= 0) {
   startScheduledPostsPublisher();
   startStoryExpiry();
   startDropCountdownScheduler();
+  startWorkshopReminders();
 
   const server = createServer(app);
   setupWebSocket(server);

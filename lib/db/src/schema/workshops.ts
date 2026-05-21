@@ -34,6 +34,7 @@ export const workshopBookingsTable = pgTable("workshop_bookings", {
   status: varchar("status", { length: 50 }).notNull().default("confirmed"),
   notes: text("notes"),
   paidAmount: integer("paid_amount"),
+  reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
