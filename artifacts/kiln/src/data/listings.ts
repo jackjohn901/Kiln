@@ -15,6 +15,7 @@ export interface Listing {
   originalArtistName?: string;
   originalListingId?: string;
   royaltyPercent?: number;
+  shipsTo?: string[];
 }
 
 export const listings: Listing[] = [

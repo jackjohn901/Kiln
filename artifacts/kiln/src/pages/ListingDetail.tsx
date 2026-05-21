@@ -324,6 +324,7 @@ export default function ListingDetail() {
             originalArtistName: d.originalArtistName ?? "",
             originalListingId: d.originalListingId ?? "",
             royaltyPercent: d.royaltyPercent ?? 10,
+            shipsTo: Array.isArray(d.shipsTo) ? d.shipsTo : [],
           });
         }
       })
@@ -708,16 +709,36 @@ export default function ListingDetail() {
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
                       <Truck size={10} />Free shipping
                     </span>
-                  ) : artistShipping.domesticRate != null && artistShipping.domesticRate > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-stone-900/60 px-2.5 py-1 text-[11px] text-stone-400">
-                      <Truck size={10} />Ships from ${artistShipping.domesticRate}
-                    </span>
-                  ) : null}
+                  ) : (
+                    <>
+                      {artistShipping.domesticRate != null && artistShipping.domesticRate > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-stone-900/60 px-2.5 py-1 text-[11px] text-stone-400">
+                          <Truck size={10} />US from ${artistShipping.domesticRate}
+                        </span>
+                      )}
+                      {artistShipping.internationalRate != null && artistShipping.internationalRate > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/8 px-2.5 py-1 text-[11px] text-sky-400">
+                          <Truck size={10} />International ${artistShipping.internationalRate}
+                        </span>
+                      )}
+                    </>
+                  )}
                   {artistShipping.offerLocalPickup && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-400">
                       <MapPinned size={10} />Local pickup available
                     </span>
                   )}
+                </div>
+              )}
+              {listing.shipsTo && listing.shipsTo.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <MapPin size={10} className="text-stone-600 shrink-0" />
+                  <span className="text-[10px] text-stone-600">Ships to:</span>
+                  {listing.shipsTo.map((region) => (
+                    <span key={region} className="rounded-full border border-white/8 bg-stone-900/50 px-2 py-0.5 text-[10px] text-stone-400">
+                      {region}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
