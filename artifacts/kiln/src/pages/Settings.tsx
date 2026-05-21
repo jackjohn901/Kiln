@@ -347,15 +347,17 @@ export default function Settings() {
                 <p className="text-xs text-red-300">All email notifications are paused. Toggle individual settings below to resume specific ones when you unpause.</p>
               </div>
             )}
-            <Toggle settingKey="notif_email_digest" label="Weekly digest" desc="Top posts, opportunities, and updates" />
-            <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
-            <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
-            <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
-            <Toggle settingKey="notif_email_new_booking" label="New workshop bookings" desc="Email when a student books a seat in your workshop" />
-            <Toggle settingKey="notif_email_commission_payment" label="Commission payments" desc="Email when a deposit or final payment lands on a commission" />
-            <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
-            <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
-            <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />
+            <div className={settings.notif_email_paused ? "opacity-40 pointer-events-none" : undefined}>
+              <Toggle settingKey="notif_email_digest" label="Weekly digest" desc="Top posts, opportunities, and updates" />
+              <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
+              <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
+              <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
+              <Toggle settingKey="notif_email_new_booking" label="New workshop bookings" desc="Email when a student books a seat in your workshop" />
+              <Toggle settingKey="notif_email_commission_payment" label="Commission payments" desc="Email when a deposit or final payment lands on a commission" />
+              <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
+              <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
+              <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />
+            </div>
             <div className="py-3">
               <p className="text-sm text-stone-200 mb-1">Notification email address</p>
               <p className="text-xs text-stone-600 mb-2">Where we send email alerts. Never shown publicly.</p>
