@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,10 +35,16 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   dismissed:  { label: "Dismissed",  color: "text-stone-500",  icon: XCircle },
 };
 
+interface BackfillResult {
+  dryRun: boolean;
+  backfilled: number;
+  orderIds: string[];
+}
+
 export default function AdminReports() {
   useMeta({ title: "Moderation Queue" });
   const { user } = useAuth();
-  const [section, setSection] = useState<"reports" | "verifications">("reports");
+  const [section, setSection] = useState<"reports" | "verifications" | "maintenance">("reports");
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("pending");
@@ -47,6 +53,46 @@ export default function AdminReports() {
   const [vFilter, setVFilter] = useState("pending");
   const [vLoading, setVLoading] = useState(false);
   const [vUpdating, setVUpdating] = useState<string | null>(null);
+
+  // Backfill state
+  const [backfillPreview, setBackfillPreview] = useState<BackfillResult | null>(null);
+  const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
+
+  async function runBackfill(dryRun: boolean) {
+    setBackfillLoading(true);
+    setBackfillError(null);
+    try {
+      const res = await fetch(`/api/admin/backfill-order-notes${dryRun ? "?dry_run=true" : ""}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setBackfillError(data?.error ?? "Request failed");
+        return;
+      }
+      const data = await res.json() as BackfillResult;
+      if (dryRun) {
+        setBackfillPreview(data);
+        setBackfillResult(null);
+      } else {
+        setBackfillResult(data);
+        setBackfillPreview(null);
+      }
+    } catch {
+      setBackfillError("Network error — please try again");
+    } finally {
+      setBackfillLoading(false);
+    }
+  }
+
+  function resetBackfill() {
+    setBackfillPreview(null);
+    setBackfillResult(null);
+    setBackfillError(null);
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -123,12 +169,15 @@ export default function AdminReports() {
         </div>
 
         {/* Section switcher */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button onClick={() => setSection("reports")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "reports" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <Flag size={13} /> Reports
           </button>
           <button onClick={() => setSection("verifications")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "verifications" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <BadgeCheck size={13} /> Verify Artists
+          </button>
+          <button onClick={() => { setSection("maintenance"); resetBackfill(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+            <Wrench size={13} /> Maintenance
           </button>
         </div>
 
@@ -329,6 +378,111 @@ export default function AdminReports() {
             ))}
           </div>
         </>)}
+
+        {/* Maintenance section */}
+        {section === "maintenance" && (
+          <div className="space-y-4">
+            {/* Backfill order grouping card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <RefreshCw size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-100">Backfill order grouping</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Stamps orphaned manual-payout order rows with the Stripe session key from the first item in the same checkout. Run a dry-run preview first to see how many orders would be affected, then confirm to apply.
+                  </p>
+                </div>
+              </div>
+
+              {/* Error */}
+              {backfillError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {backfillError}
+                </div>
+              )}
+
+              {/* Dry-run result */}
+              {backfillPreview && !backfillResult && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-3">
+                  <p className="text-xs text-amber-200">
+                    <span className="font-semibold">{backfillPreview.backfilled}</span>{" "}
+                    {backfillPreview.backfilled === 1 ? "order" : "orders"} would be updated.
+                  </p>
+                  {backfillPreview.backfilled > 0 && (
+                    <p className="text-[10px] font-mono text-stone-500 break-all">
+                      {backfillPreview.orderIds.slice(0, 8).join(", ")}
+                      {backfillPreview.orderIds.length > 8 ? ` …+${backfillPreview.orderIds.length - 8} more` : ""}
+                    </p>
+                  )}
+                  {backfillPreview.backfilled === 0 ? (
+                    <p className="text-xs text-stone-500">Nothing to backfill — all orders are already grouped.</p>
+                  ) : (
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => runBackfill(false)}
+                        disabled={backfillLoading}
+                        className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                      >
+                        <CheckCircle size={11} /> Confirm backfill
+                      </button>
+                      <button
+                        onClick={resetBackfill}
+                        disabled={backfillLoading}
+                        className="text-xs text-stone-600 hover:text-stone-400 transition-colors disabled:opacity-40"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Real-run result */}
+              {backfillResult && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 space-y-2">
+                  <p className="text-xs text-emerald-300 font-medium">
+                    Done — {backfillResult.backfilled} {backfillResult.backfilled === 1 ? "order" : "orders"} updated.
+                  </p>
+                  {backfillResult.backfilled > 0 && (
+                    <p className="text-[10px] font-mono text-stone-500 break-all">
+                      {backfillResult.orderIds.slice(0, 8).join(", ")}
+                      {backfillResult.orderIds.length > 8 ? ` …+${backfillResult.orderIds.length - 8} more` : ""}
+                    </p>
+                  )}
+                  <button
+                    onClick={resetBackfill}
+                    className="text-xs text-stone-600 hover:text-stone-400 transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
+
+              {/* Primary action — only show when no preview/result yet */}
+              {!backfillPreview && !backfillResult && (
+                <button
+                  onClick={() => runBackfill(true)}
+                  disabled={backfillLoading}
+                  className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >
+                  {backfillLoading ? (
+                    <RefreshCw size={13} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={13} />
+                  )}
+                  {backfillLoading ? "Checking…" : "Preview affected orders"}
+                </button>
+              )}
+
+              {/* Loading indicator when confirming */}
+              {backfillLoading && backfillPreview && (
+                <div className="flex items-center gap-2 text-xs text-stone-500">
+                  <RefreshCw size={12} className="animate-spin" /> Applying backfill…
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
