@@ -222,7 +222,28 @@ router.get("/me/sales/:id", async (req, res): Promise<void> => {
 
     if (rows.length === 0) { res.status(404).json({ error: "Sale not found" }); return; }
 
-    const sale = rows[0];
+    let sale = rows[0];
+
+    // If both processing window fields are NULL on the stamped order row, fall back to
+    // the seller's current payment settings so sellers see an estimate even when the
+    // order predates the backfill or the stamp was never written.
+    if (sale.processingWindowDays === null && sale.processingWindowLabel === null) {
+      const [settingsRow] = await db
+        .select({ paymentSettings: userSettingsTable.paymentSettings })
+        .from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, req.user.id))
+        .limit(1);
+      if (settingsRow) {
+        const ps = settingsRow.paymentSettings as Record<string, unknown> | null;
+        const liveDays = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+        const liveLabel = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+          ? (ps.processingWindowLabel as string).trim()
+          : null;
+        if (liveDays !== null || liveLabel !== null) {
+          sale = { ...sale, processingWindowDays: liveDays, processingWindowLabel: liveLabel };
+        }
+      }
+    }
 
     res.json({
       sale: {

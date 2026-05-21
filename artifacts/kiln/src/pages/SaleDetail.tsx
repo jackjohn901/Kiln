@@ -124,11 +124,14 @@ export default function SaleDetail() {
       : "Anonymous buyer";
 
   const hasWindow = sale.processingWindowDays !== null || sale.processingWindowLabel !== null;
-  const windowText = sale.processingWindowLabel?.trim()
+  const deliveryEstimateText = sale.processingWindowLabel?.trim()
     ? sale.processingWindowLabel
     : sale.processingWindowDays !== null
-      ? `${sale.processingWindowDays} day${sale.processingWindowDays === 1 ? "" : "s"}`
+      ? sale.processingWindowDays === 1
+        ? "1 business day"
+        : `${sale.processingWindowDays} business days`
       : null;
+  const windowText = deliveryEstimateText ? `Ships within ${deliveryEstimateText}` : null;
 
   return (
     <div className="min-h-screen bg-[#12100e]">

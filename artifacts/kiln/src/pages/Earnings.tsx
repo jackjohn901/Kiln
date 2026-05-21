@@ -1081,11 +1081,14 @@ export default function Earnings() {
                     }
                     return filtered.map(sale => {
                       const hasWindow = sale.processingWindowDays !== null || sale.processingWindowLabel !== null;
-                      const windowText = sale.processingWindowLabel?.trim()
+                      const deliveryEstimateText = sale.processingWindowLabel?.trim()
                         ? sale.processingWindowLabel
                         : sale.processingWindowDays !== null
-                          ? `${sale.processingWindowDays} day${sale.processingWindowDays === 1 ? "" : "s"}`
+                          ? sale.processingWindowDays === 1
+                            ? "1 business day"
+                            : `${sale.processingWindowDays} business days`
                           : null;
+                      const windowText = deliveryEstimateText ? `Ships within ${deliveryEstimateText}` : null;
                       const buyerLabel = sale.buyerDisplayName?.trim()
                         ? sale.buyerDisplayName
                         : sale.buyerHandle
@@ -1160,9 +1163,7 @@ export default function Earnings() {
                           {hasWindow && (
                             <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-amber-500/8 border border-amber-500/15">
                               <Clock size={11} className="text-amber-400/70 flex-shrink-0" />
-                              <span className="text-[11px] text-amber-300/80">
-                                Processing window: <span className="font-medium">{windowText}</span>
-                              </span>
+                              <span className="text-[11px] text-amber-300/80 font-medium">{windowText}</span>
                             </div>
                           )}
                         </div>
