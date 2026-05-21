@@ -98,6 +98,7 @@ export default function Create() {
   const [dropPrice, setDropPrice] = useState("");
   const [dropDate, setDropDate] = useState("");
   const [collabArtist, setCollabArtist] = useState("");
+  const [collaboratorId, setCollaboratorId] = useState("");
   const [isPatronOnly, setIsPatronOnly] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -112,6 +113,7 @@ export default function Create() {
   const [isReveal, setIsReveal] = useState(false);
   const [beforeFile, setBeforeFile] = useState<File | null>(null);
   const [beforePreview, setBeforePreview] = useState("");
+  const [collaboratorName, setCollaboratorName] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const additionalInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +210,8 @@ export default function Create() {
           technique: technique || null,
           tags,
           isPatronOnly,
+          collaboratorId: collaboratorId || null,
+          collaboratorName: collabArtist || null,
         }),
       });
     } catch {
@@ -316,6 +320,8 @@ export default function Create() {
           isPatronOnly,
           scheduledAt: scheduledAt || null,
           isDraft: scheduledAt ? true : false,
+          collaboratorId: collaboratorId || null,
+          collaboratorName: collabArtist || null,
         }),
       }).catch(() => {});
 

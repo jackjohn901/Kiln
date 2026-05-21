@@ -135,6 +135,9 @@ import ListingCollaborators from "@/pages/ListingCollaborators";
 import CreateProject from "@/pages/CreateProject";
 import ProjectDetail from "@/pages/ProjectDetail";
 import MyProjects from "@/pages/MyProjects";
+import ReserveList from "@/pages/ReserveList";
+import StudioOpenDays from "@/pages/StudioOpenDays";
+import CreateStudioEvent from "@/pages/CreateStudioEvent";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 import SaleNotificationListener from "@/components/SaleNotificationListener";
@@ -204,6 +207,7 @@ function TitleSetter() {
       ["/map", "Studio Map — Kiln"],
       ["/drops", "Drops — Kiln"],
       ["/listings", "Listing — Kiln"],
+      ["/studio-open-days", "Studio Open Days — Kiln"],
     ];
     const match = routes.find(([p]) =>
       p === location || (p !== "/" && location.startsWith(p + "/"))
@@ -351,6 +355,9 @@ function Router() {
       <Route path="/projects/create" component={CreateProject} />
       <Route path="/projects/mine" component={MyProjects} />
       <Route path="/projects/:id" component={ProjectDetail} />
+      <Route path="/artists/:id/reserve" component={ReserveList} />
+      <Route path="/studio-open-days" component={StudioOpenDays} />
+      <Route path="/create-studio-event" component={CreateStudioEvent} />
       <Route component={NotFound} />
       </Switch>
       <PushPrompt />

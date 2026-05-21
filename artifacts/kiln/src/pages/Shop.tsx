@@ -72,6 +72,7 @@ interface ApiListing {
   wishlistCount: number;
   tags: string[];
   sharedPlatforms?: string[];
+  isResale?: boolean;
 }
 
 const PLATFORM_BADGE: Record<string, { label: string; bg: string; text: string }> = {
@@ -253,6 +254,11 @@ export default function Shop() {
                         <span className="px-3 py-1 rounded-full bg-black/60 text-white/70 text-[10px] uppercase tracking-wider">Sold</span>
                       </div>
                     )}
+                    {listing.isResale && (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/90 text-stone-950 text-[9px] font-bold uppercase tracking-wider">
+                        Resale
+                      </div>
+                    )}
                   </Link>
                   <button onClick={() => toggleWishlist(listing.id)}
                     className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-colors hover:bg-black/70">
@@ -268,6 +274,7 @@ export default function Shop() {
                   </Link>
                   {listing.year && <p className="text-[11px] text-muted-foreground mb-1">{listing.year} · {(listing.medium ?? "").split(",")[0]}</p>}
                   {listing.dimensions && <p className="text-[10px] text-muted-foreground mb-1">{listing.dimensions}</p>}
+                  {listing.edition && <p className="text-[10px] text-amber-400/70 font-medium mb-1">Ed. {listing.edition}</p>}
                   {(listing.sharedPlatforms?.length ?? 0) > 0 && (
                     <div className="flex items-center gap-1 mb-2.5">
                       {listing.sharedPlatforms!.map((p) => {

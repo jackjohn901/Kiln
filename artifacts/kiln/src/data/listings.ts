@@ -8,6 +8,13 @@ export interface Listing {
   price: number;
   imageUrl: string | null;
   available: boolean;
+  edition?: string;
+  isResale?: boolean;
+  editionNumber?: string;
+  editionTotal?: string;
+  originalArtistName?: string;
+  originalListingId?: string;
+  royaltyPercent?: number;
 }
 
 export const listings: Listing[] = [

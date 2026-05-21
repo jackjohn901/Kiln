@@ -149,6 +149,7 @@ function userPostsToReels(): Reel[] {
       musicTrackId: ALL_REELS[0]?.musicTrackId ?? "track-ambient-1",
       available: false,
       patronOnly: post.patronOnly,
+      collabArtistName: (post as any).collaboratorName,
     }));
   } catch {
     return [];
@@ -566,7 +567,7 @@ function ReelCard({
         {reel.collabArtistName && (
           <div className="flex items-center gap-1.5">
             <Users size={10} className="text-amber-400/80" />
-            <span className="text-[10px] text-amber-300/90 font-medium">ft. {reel.collabArtistName}</span>
+            <span className="text-[10px] text-amber-300 font-bold">with {reel.collabArtistName}</span>
           </div>
         )}
 

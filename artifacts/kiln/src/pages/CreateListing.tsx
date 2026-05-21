@@ -34,6 +34,13 @@ export default function CreateListing() {
     tags: [] as string[],
     imageUrl: "",
   });
+  const [isResale, setIsResale] = useState(false);
+  const [originalArtistName, setOriginalArtistName] = useState("");
+  const [originalListingId, setOriginalListingId] = useState("");
+  const [royaltyPercent, setRoyaltyPercent] = useState("10");
+  const [editionNumber, setEditionNumber] = useState("");
+  const [editionTotal, setEditionTotal] = useState("");
+  const [isOneOfAKind, setIsOneOfAKind] = useState(true);
   const [tagInput, setTagInput] = useState("");
   const [imagePreview, setImagePreview] = useState("");
 
@@ -94,11 +101,26 @@ export default function CreateListing() {
           imageUrl = bgPreview || imagePreview;
         }
       }
+
+      const finalEdition = isOneOfAKind 
+        ? "One of a kind" 
+        : (editionNumber && editionTotal ? `${editionNumber}/${editionTotal}` : form.edition);
+
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...form, imageUrl, price: Number(form.price), year: form.year ? Number(form.year) : null }),
+        body: JSON.stringify({ 
+          ...form, 
+          imageUrl, 
+          edition: finalEdition,
+          price: Number(form.price), 
+          year: form.year ? Number(form.year) : null,
+          isResale,
+          originalArtistName,
+          originalListingId,
+          royaltyPercent: Number(royaltyPercent),
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
@@ -289,13 +311,99 @@ export default function CreateListing() {
 
           {/* Edition */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-stone-400">Edition (e.g. 1 of 3)</label>
-            <input
-              value={form.edition}
-              onChange={(e) => set("edition", e.target.value)}
-              placeholder="One of a kind"
-              className="w-full rounded-xl border border-white/10 bg-stone-900/60 px-4 py-2.5 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
-            />
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-stone-400">Edition</label>
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={isOneOfAKind}
+                  onChange={(e) => setIsOneOfAKind(e.target.checked)}
+                  className="rounded border-white/10 bg-stone-900 text-amber-500 focus:ring-amber-500/20 h-4 w-4"
+                />
+                <span className="text-xs text-stone-500 group-hover:text-stone-400 transition-colors">One of a kind</span>
+              </label>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="relative">
+                <input
+                  type="number"
+                  min="1"
+                  disabled={isOneOfAKind}
+                  value={isOneOfAKind ? "" : editionNumber}
+                  onChange={(e) => setEditionNumber(e.target.value)}
+                  placeholder={isOneOfAKind ? "1" : "Edition #"}
+                  className="w-full rounded-xl border border-white/10 bg-stone-900/60 px-4 py-2.5 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {!isOneOfAKind && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] uppercase tracking-wider text-stone-600 font-bold">Number</span>}
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="1"
+                  disabled={isOneOfAKind}
+                  value={isOneOfAKind ? "" : editionTotal}
+                  onChange={(e) => setEditionTotal(e.target.value)}
+                  placeholder={isOneOfAKind ? "1" : "Total"}
+                  className="w-full rounded-xl border border-white/10 bg-stone-900/60 px-4 py-2.5 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                {!isOneOfAKind && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] uppercase tracking-wider text-stone-600 font-bold">Total</span>}
+              </div>
+            </div>
+            {isOneOfAKind && (
+              <p className="mt-2 text-[10px] text-stone-500 italic">This piece will be listed as a unique, one-of-a-kind work.</p>
+            )}
+          </div>
+
+          {/* Resale */}
+          <div className="rounded-xl border border-white/5 bg-stone-900/40 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-stone-400">Resale Listing</label>
+                <p className="text-[10px] text-stone-500">Is this a resale of another artist's work?</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={isResale}
+                onChange={(e) => setIsResale(e.target.checked)}
+                className="rounded border-white/10 bg-stone-900 text-amber-500 focus:ring-amber-500/20 h-5 w-5"
+              />
+            </div>
+
+            {isResale && (
+              <div className="space-y-4 pt-2 border-t border-white/5">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-stone-500">Original Artist Name</label>
+                  <input
+                    value={originalArtistName}
+                    onChange={(e) => setOriginalArtistName(e.target.value)}
+                    placeholder="e.g. Dale Chihuly"
+                    className="w-full rounded-lg border border-white/10 bg-stone-900/60 px-3 py-2 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-stone-500">Original Listing ID (Optional)</label>
+                    <input
+                      value={originalListingId}
+                      onChange={(e) => setOriginalListingId(e.target.value)}
+                      placeholder="UUID"
+                      className="w-full rounded-lg border border-white/10 bg-stone-900/60 px-3 py-2 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-stone-500">Royalty Percent (%)</label>
+                    <input
+                      type="number"
+                      value={royaltyPercent}
+                      onChange={(e) => setRoyaltyPercent(e.target.value)}
+                      placeholder="10"
+                      className="w-full rounded-lg border border-white/10 bg-stone-900/60 px-3 py-2 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Ships From */}

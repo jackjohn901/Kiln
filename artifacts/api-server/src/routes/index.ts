@@ -79,6 +79,7 @@ import processPledgesRouter from "./process-pledges";
 import collaborationsRouter from "./collaborations";
 import firstAccessRouter from "./first-access";
 import projectsRouter from "./projects";
+import studioEventsRouter from "./studio-events";
 
 const router: IRouter = Router();
 
@@ -162,5 +163,6 @@ router.use(processPledgesRouter);
 router.use(collaborationsRouter);
 router.use(firstAccessRouter);
 router.use(projectsRouter);
+router.use(studioEventsRouter);
 
 export default router;

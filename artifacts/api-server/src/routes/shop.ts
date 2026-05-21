@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable } from "@workspace/db";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -49,7 +49,7 @@ router.get("/listings/:id", async (req, res): Promise<void> => {
 // POST /listings — create listing (authenticated)
 router.post("/listings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { title, description, medium, technique, dimensions, weight, year, edition, imageUrl, imageUrls, price, shipsFrom, shipsTo, tags } = req.body;
+  const { title, description, medium, technique, dimensions, weight, year, edition, imageUrl, imageUrls, price, shipsFrom, shipsTo, tags, isResale, originalArtistId, originalArtistName, originalListingId, royaltyPercent } = req.body;
   if (!title || !price) { res.status(400).json({ error: "title and price required" }); return; }
   try {
     const user = req.user;
@@ -58,6 +58,11 @@ router.post("/listings", async (req, res): Promise<void> => {
       id: crypto.randomUUID(), artistId: user.id, artistName: name, artistAvatarUrl: user.profileImageUrl ?? null,
       title, description, medium, technique, dimensions, weight, year: year ? Number(year) : null,
       edition, imageUrl, imageUrls: imageUrls ?? [], price: Number(price), shipsFrom, shipsTo: shipsTo ?? [], tags: tags ?? [],
+      isResale: !!isResale,
+      originalArtistId,
+      originalArtistName,
+      originalListingId,
+      royaltyPercent: royaltyPercent ? Number(royaltyPercent) : 10,
     }).returning();
 
     const caption = [title, description, technique ? `Technique: ${technique}` : null, medium ? `Medium: ${medium}` : null].filter(Boolean).join("\n");
@@ -276,6 +281,126 @@ router.get("/me/sales", async (req, res): Promise<void> => {
       updatedAt: o.updatedAt.toISOString(),
     })),
   });
+});
+
+// GET /artists/:artistId/reservations
+router.get("/artists/:artistId/reservations", async (req, res): Promise<void> => {
+  try {
+    const rows = await db.select().from(workReservationsTable)
+      .where(and(eq(workReservationsTable.artistId, req.params.artistId), eq(workReservationsTable.status, "open")))
+      .orderBy(desc(workReservationsTable.createdAt));
+
+    const viewerId = req.isAuthenticated() ? req.user.id : null;
+    let interestedIds = new Set<string>();
+    if (viewerId) {
+      const interests = await db.select({ reservationId: reservationInterestsTable.reservationId })
+        .from(reservationInterestsTable)
+        .where(eq(reservationInterestsTable.userId, viewerId));
+      interestedIds = new Set(interests.map(i => i.reservationId));
+    }
+
+    res.json({
+      reservations: rows.map(r => ({
+        ...r,
+        isInterested: interestedIds.has(r.id),
+        createdAt: r.createdAt.toISOString()
+      }))
+    });
+  } catch (err) {
+    req.log.error({ err }, "getReservations error");
+    res.status(500).json({ error: "Failed to load reservations" });
+  }
+});
+
+// POST /work-reservations — create (artist only)
+router.post("/work-reservations", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { title, description, imageUrl, expectedDate } = req.body;
+  if (!title || !expectedDate) { res.status(400).json({ error: "title and expectedDate are required" }); return; }
+
+  try {
+    const user = req.user;
+    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
+    const [reservation] = await db.insert(workReservationsTable).values({
+      artistId: user.id,
+      artistName: name,
+      title,
+      description,
+      imageUrl,
+      expectedDate,
+    }).returning();
+
+    res.status(201).json({
+      reservation: { ...reservation, createdAt: reservation.createdAt.toISOString() }
+    });
+  } catch (err) {
+    req.log.error({ err }, "createReservation error");
+    res.status(500).json({ error: "Failed to create reservation" });
+  }
+});
+
+// POST /work-reservations/:id/interest
+router.post("/work-reservations/:id/interest", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const reservationId = req.params.id;
+  const userId = req.user.id;
+  const userName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "Collector";
+
+  try {
+    const [existing] = await db.select().from(reservationInterestsTable)
+      .where(and(eq(reservationInterestsTable.reservationId, reservationId), eq(reservationInterestsTable.userId, userId)));
+
+    if (existing) {
+      res.json({ success: true, alreadyInterested: true });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.insert(reservationInterestsTable).values({
+        reservationId,
+        userId,
+        userName,
+      });
+      await tx.update(workReservationsTable)
+        .set({ interestCount: sql`${workReservationsTable.interestCount} + 1` })
+        .where(eq(workReservationsTable.id, reservationId));
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "expressInterest error");
+    res.status(500).json({ error: "Failed to express interest" });
+  }
+});
+
+// DELETE /work-reservations/:id/interest
+router.delete("/work-reservations/:id/interest", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const reservationId = req.params.id;
+  const userId = req.user.id;
+
+  try {
+    const [existing] = await db.select().from(reservationInterestsTable)
+      .where(and(eq(reservationInterestsTable.reservationId, reservationId), eq(reservationInterestsTable.userId, userId)));
+
+    if (!existing) {
+      res.json({ success: true, notInterested: true });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.delete(reservationInterestsTable)
+        .where(and(eq(reservationInterestsTable.reservationId, reservationId), eq(reservationInterestsTable.userId, userId)));
+      await tx.update(workReservationsTable)
+        .set({ interestCount: sql`GREATEST(${workReservationsTable.interestCount} - 1, 0)` })
+        .where(eq(workReservationsTable.id, reservationId));
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "removeInterest error");
+    res.status(500).json({ error: "Failed to remove interest" });
+  }
 });
 
 export default router;

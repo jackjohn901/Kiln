@@ -26,6 +26,8 @@ export const postsTable = pgTable("posts", {
   craftScore: integer("craft_score"),
   sharedPlatforms: text("shared_platforms").array().notNull().default([]),
   beforeImageUrl: text("before_image_url"),
+  collaboratorId: varchar("collaborator_id", { length: 255 }),
+  collaboratorName: varchar("collaborator_name", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

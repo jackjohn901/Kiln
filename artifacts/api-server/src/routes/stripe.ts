@@ -443,6 +443,71 @@ router.post('/stripe/gift-card-checkout', async (req, res): Promise<void> => {
   }
 });
 
+router.post('/stripe/payment-plan-checkout', async (req, res): Promise<void> => {
+  try {
+    const { listingId, installments } = req.body as {
+      listingId: string;
+      installments: number;
+    };
+
+    if (!listingId || ![2, 3].includes(installments)) {
+      res.status(400).json({ error: 'listingId and valid installments (2 or 3) required' });
+      return;
+    }
+
+    const [listing] = await db
+      .select()
+      .from(listingsTable)
+      .where(eq(listingsTable.id, listingId));
+
+    if (!listing) {
+      res.status(404).json({ error: 'Listing not found' });
+      return;
+    }
+
+    if (listing.price < 150) {
+      res.status(400).json({ error: 'Payment plans only available for listings >= $150' });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const installmentAmount = Math.ceil((listing.price * 100) / installments);
+
+    const baseUrl = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : `http://localhost:${process.env.PORT ?? 5000}`;
+    const basePath = process.env.BASE_PATH ?? '';
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: `${listing.title} — Installment 1 of ${installments}` },
+          unit_amount: installmentAmount,
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        listingId,
+        installments: String(installments),
+        planType: "installment",
+        platform: 'kiln',
+        ...(req.isAuthenticated() ? { userId: req.user.id } : {}),
+      },
+      success_url: `${baseUrl}${basePath}/cart/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${basePath}/listings/${listingId}`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Stripe payment plan checkout error');
+    const msg = err instanceof Error ? err.message : 'Checkout failed';
+    res.status(500).json({ error: msg });
+  }
+});
+
 router.get('/stripe/session/:sessionId', async (req, res): Promise<void> => {
   try {
     const stripe = await getUncachableStripeClient();

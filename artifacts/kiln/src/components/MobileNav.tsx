@@ -106,6 +106,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/collab", icon: Link2, label: "Collab Board" },
       { href: "/events", icon: CalendarDays, label: "Events" },
       { href: "/opportunities", icon: Briefcase, label: "Opportunities" },
+      { href: "/studio-open-days", icon: CalendarDays, label: "Studio Open Days" },
       { href: "/leaderboard", icon: Award, label: "Leaderboard" },
       { href: "/badges", icon: Trophy, label: "Badges" },
       { href: "/referrals", icon: UserCircle2, label: "Invite Artists" },

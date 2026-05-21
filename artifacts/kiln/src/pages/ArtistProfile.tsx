@@ -298,10 +298,12 @@ export default function ArtistProfile() {
   const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
   const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
   const [dbPosts, setDbPosts] = useState<DbUserPost[]>([]);
+  const [collabPosts, setCollabPosts] = useState<DbUserPost[]>([]);
   const [dbFollowing, setDbFollowing] = useState(false);
   const [dbFollowerCount, setDbFollowerCount] = useState(0);
   const [profileStreak, setProfileStreak] = useState<{ currentStreak: number; longestStreak: number } | null>(null);
   const [profileBadges, setProfileBadges] = useState<{ id: string; name: string; icon: string; rarity: string }[]>([]);
+  const [hasReservations, setHasReservations] = useState(false);
 
   const metaName = artist?.name ?? dbProfile?.displayName ?? undefined;
   const metaAvatar = artist?.images?.[0]?.url ?? dbProfile?.avatarUrl ?? undefined;
@@ -325,6 +327,10 @@ export default function ArtistProfile() {
       .then((r) => r.ok ? r.json() : { posts: [] })
       .then((data) => setDbPosts(data.posts ?? []))
       .catch(() => {});
+    fetch(`/api/users/${id}/collab-posts`)
+      .then((r) => r.ok ? r.json() : { posts: [] })
+      .then((data) => setCollabPosts(data.posts ?? []))
+      .catch(() => {});
     fetch(`/api/users/${id}/streak`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setProfileStreak(data); })
@@ -332,6 +338,10 @@ export default function ArtistProfile() {
     fetch(`/api/users/${id}/badges`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.badges) setProfileBadges(data.badges); })
+      .catch(() => {});
+    fetch(`/api/artists/${id}/reservations`)
+      .then((r) => r.ok ? r.json() : { reservations: [] })
+      .then((data) => setHasReservations(data.reservations && data.reservations.length > 0))
       .catch(() => {});
   }, [id]);
 
@@ -344,6 +354,8 @@ export default function ArtistProfile() {
       setDbFollowerCount(data.followerCount);
     }
   }
+
+  const allDbPosts = [...dbPosts, ...collabPosts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   if (!artist) {
     if (dbProfileLoading) {
@@ -428,11 +440,11 @@ export default function ArtistProfile() {
             )}
           </div>
 
-          {dbPosts.length > 0 ? (
+          {allDbPosts.length > 0 ? (
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Posts</h2>
               <div className="grid grid-cols-3 gap-2">
-                {dbPosts.map((p) => (
+                {allDbPosts.map((p) => (
                   <Link key={p.id} href={`/posts/db-${p.id}`}>
                     <div className="group relative aspect-square overflow-hidden rounded-xl bg-stone-800 cursor-pointer">
                       {p.thumbnailUrl ? (
@@ -440,6 +452,13 @@ export default function ArtistProfile() {
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">
                           <Flame size={24} className="text-stone-600" />
+                        </div>
+                      )}
+                      {/* Collab badge */}
+                      {(p as any).collaboratorName && (
+                        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-amber-500 px-1.5 py-0.5 shadow-lg border border-white/10">
+                          <Users size={10} className="text-stone-950" />
+                          <span className="text-[9px] font-bold text-stone-950">COLLAB</span>
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1193,6 +1212,13 @@ export default function ArtistProfile() {
                   >
                     <Crown size={14} /> Become a Patron
                   </Link>
+                  {hasReservations && (
+                    <Link href={`/artists/${id}/reserve`}
+                      className="flex items-center gap-2 rounded-full border border-stone-700 bg-stone-900/50 px-5 py-2 text-sm text-stone-300 hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+                    >
+                      Reserve upcoming work →
+                    </Link>
+                  )}
                 </div>
               )}
               {isOwn && (

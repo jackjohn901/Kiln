@@ -255,8 +255,8 @@ export default function ListingDetail() {
   const [offerSent, setOfferSent] = useState(false);
 
   const [showPlanModal, setShowPlanModal] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [planNote, setPlanNote] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
   const [planSent, setPlanSent] = useState(false);
 
   const [onWaitlist, setOnWaitlist] = useState(() =>
@@ -320,6 +320,10 @@ export default function ListingDetail() {
             medium: d.medium ?? "", dimensions: d.dimensions ?? "",
             price: d.price ?? 0, imageUrl: d.imageUrl ?? null,
             available: d.isAvailable ?? true,
+            isResale: d.isResale ?? false,
+            originalArtistName: d.originalArtistName ?? "",
+            originalListingId: d.originalListingId ?? "",
+            royaltyPercent: d.royaltyPercent ?? 10,
           });
         }
       })
@@ -373,28 +377,27 @@ export default function ListingDetail() {
     }, 1800);
   }
 
-  function handleSendPlan() {
+  async function handleSendPlan() {
     if (!listing || !selectedPlan) return;
-    const plan = PLAN_OPTIONS.find((p) => p.id === selectedPlan)!;
-    const artist = getArtistById(listing.artistId) ?? ALL_ARTISTS.find((a) => a.id === listing.artistId);
-    sendCommissionInquiry({
-      toArtistId: listing.artistId,
-      toArtistName: artist?.name ?? "Unknown Artist",
-      fromName: profile?.name ?? "Anonymous Collector",
-      fromEmail: "collector@kiln.app",
-      fromHandle: profile?.handle,
-      type: "custom",
-      description: `Payment plan request for "${listing.title}" (${formatPrice(listing.price)})\n\nRequested plan: ${plan.desc}${planNote ? `\n\n${planNote}` : ""}`,
-      budget: formatPrice(listing.price),
-      timeline: plan.schedule,
-    });
-    setPlanSent(true);
-    setTimeout(() => {
-      setShowPlanModal(false);
-      setPlanSent(false);
-      setSelectedPlan(null);
-      setPlanNote("");
-    }, 1800);
+    setPlanLoading(true);
+    try {
+      const res = await fetch("/api/stripe/payment-plan-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ listingId: listing.id, installments: selectedPlan }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setPlanLoading(false);
+        alert(data.error || "Failed to start checkout");
+      }
+    } catch (err) {
+      setPlanLoading(false);
+      alert("Failed to start checkout");
+    }
   }
 
   async function handleSubmitReview() {
@@ -570,6 +573,25 @@ export default function ListingDetail() {
             <h1 className="font-serif text-3xl text-amber-100 mb-1 leading-tight">{listing.title}</h1>
             <p className="text-stone-500 text-sm mb-3">{listing.medium}</p>
 
+            {/* Resale Banner */}
+            {(listing as any).isResale && (
+              <div className="mb-5 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20">
+                    <TrendingDown size={11} className="text-amber-400 rotate-180" />
+                  </div>
+                  <span className="text-xs font-semibold text-amber-200">Resale Work</span>
+                </div>
+                <p className="text-[11px] text-stone-400 mb-1.5">
+                  Originally by <span className="text-stone-200">{(listing as any).originalArtistName}</span>
+                </p>
+                <div className="flex items-center gap-1.5 text-[10px] text-stone-500 italic">
+                  <Landmark size={10} />
+                  <span>{(listing as any).royaltyPercent}% of this sale goes back to the original artist</span>
+                </div>
+              </div>
+            )}
+
             {/* Rating summary */}
             {reviews.length > 0 && (
               <div className="flex items-center gap-2 mb-4">
@@ -602,19 +624,9 @@ export default function ListingDetail() {
               <div>
                 <p className="text-[10px] text-stone-600 uppercase tracking-wide font-semibold mb-2">Edition</p>
                 <div className="flex flex-wrap gap-2">
-                  {["Original", "Artist Proof 1/3", "Artist Proof 2/3", "Artist Proof 3/3"].map((ed) => (
-                    <button
-                      key={ed}
-                      onClick={() => setSelectedEdition(ed)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                        selectedEdition === ed
-                          ? "border-amber-500 bg-amber-500/10 text-amber-300"
-                          : "border-white/10 text-stone-400 hover:border-white/20 hover:text-stone-300"
-                      }`}
-                    >
-                      {ed}
-                    </button>
-                  ))}
+                  <span className="px-3 py-1.5 rounded-lg border border-amber-500 bg-amber-500/10 text-amber-300 text-xs font-medium">
+                    {listing.edition ?? "One of a kind"}
+                  </span>
                 </div>
               </div>
               {listing.dimensions && (
@@ -686,7 +698,7 @@ export default function ListingDetail() {
             <div className="mb-5">
               <div className="flex items-baseline gap-3 mb-1.5">
                 <span className="font-serif text-4xl text-amber-200 font-medium">{formatPrice(listing.price)}</span>
-                {listing.price >= 5000 && (
+                {listing.price >= 15000 && (
                   <span className="text-xs text-stone-600">Payment plans available</span>
                 )}
               </div>
@@ -770,7 +782,7 @@ export default function ListingDetail() {
                   >
                     <TrendingDown size={14} /> Make an offer
                   </button>
-                  {listing.price >= 5000 && (
+                  {listing.price >= 15000 && (
                     <button
                       onClick={() => setShowPlanModal(true)}
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-full border border-stone-700 py-2.5 text-sm text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-all"
@@ -1133,49 +1145,44 @@ export default function ListingDetail() {
                 <>
                   <div className="flex items-center justify-between mb-5">
                     <div>
-                      <p className="font-serif text-lg text-amber-100">Request payment plan</p>
+                      <p className="font-serif text-lg text-amber-100">Pay in installments</p>
                       <p className="text-xs text-stone-600 mt-0.5">{listing.title} · {formatPrice(listing.price)}</p>
                     </div>
                     <button onClick={() => setShowPlanModal(false)} className="text-stone-600 hover:text-stone-300 transition-colors"><X size={18} /></button>
                   </div>
 
-                  <div className="space-y-2 mb-5">
-                    {PLAN_OPTIONS.map((plan) => (
+                  <div className="space-y-3 mb-5">
+                    {[2, 3].map((num) => (
                       <button
-                        key={plan.id}
-                        onClick={() => setSelectedPlan(plan.id)}
-                        className={`w-full text-left rounded-xl border px-4 py-3.5 transition-all ${
-                          selectedPlan === plan.id
+                        key={num}
+                        onClick={() => setSelectedPlan(num)}
+                        className={`w-full text-left rounded-xl border px-4 py-4 transition-all ${
+                          selectedPlan === num
                             ? "border-amber-500/50 bg-amber-500/10"
                             : "border-white/10 hover:border-white/20"
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <p className={`text-sm font-semibold ${selectedPlan === plan.id ? "text-amber-300" : "text-stone-200"}`}>{plan.label}</p>
-                          {selectedPlan === plan.id && <Check size={14} className="text-amber-400" />}
+                          <p className={`text-sm font-semibold ${selectedPlan === num ? "text-amber-300" : "text-stone-200"}`}>{num} installments</p>
+                          {selectedPlan === num && <Check size={14} className="text-amber-400" />}
                         </div>
-                        <p className="text-xs text-stone-500 mt-0.5">{plan.desc}</p>
-                        <p className="text-xs text-stone-600 mt-0.5">
-                          {plan.id === "half" && `${formatPrice(Math.round(listing.price / 2))} × 2`}
-                          {plan.id === "thirds" && `${formatPrice(Math.round(listing.price / 3))} × 3`}
-                          {plan.id === "quarters" && `${formatPrice(Math.round(listing.price / 4))} × 4`}
+                        <p className="text-xs text-stone-500 mt-1">
+                          {formatPrice(Math.ceil(listing.price / num))} per month
                         </p>
                       </button>
                     ))}
                   </div>
 
-                  <div className="mb-5">
-                    <label className="text-xs text-stone-500 uppercase tracking-wide mb-2 block">Message <span className="text-stone-700">(optional)</span></label>
-                    <textarea value={planNote} onChange={(e) => setPlanNote(e.target.value)}
-                      placeholder="Anything you'd like the artist to know…" rows={2}
-                      className="w-full rounded-xl border border-white/10 bg-stone-800 px-4 py-3 text-sm text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
-                  </div>
-
-                  <button onClick={handleSendPlan} disabled={!selectedPlan}
+                  <button onClick={handleSendPlan} disabled={!selectedPlan || planLoading}
                     className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                    <Send size={14} /> Send request
+                    {planLoading ? (
+                      <div className="h-4 w-4 rounded-full border-2 border-stone-900/30 border-t-stone-900 animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    {planLoading ? "Redirecting..." : "Start payment plan"}
                   </button>
-                  <p className="text-[10px] text-stone-700 text-center mt-3">Payment plans are arranged directly with the artist. All payments remain peer-to-peer.</p>
+                  <p className="text-[10px] text-stone-700 text-center mt-3">You will be redirected to Stripe to complete the first installment.</p>
                 </>
               )}
             </motion.div>

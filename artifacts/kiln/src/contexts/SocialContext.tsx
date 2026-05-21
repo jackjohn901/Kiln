@@ -464,6 +464,18 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {});
 
+    fetch("/api/me/subscriptions", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { subscriptions?: Array<{ artistId: string }> } | null) => {
+        if (!data?.subscriptions?.length) return;
+        const artistIds = data.subscriptions.map((s) => s.artistId);
+        update((s) => ({
+          ...s,
+          subscriptions: Array.from(new Set([...s.subscriptions, ...artistIds])),
+        }));
+      })
+      .catch(() => {});
+
     fetch("/api/notifications", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; read: boolean; createdAt: string }> } | null) => {

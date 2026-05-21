@@ -17,9 +17,10 @@ const router = Router();
 router.post("/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, isDraft } = req.body as {
+  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName } = req.body as {
     caption?: string; videoUrl?: string; thumbnailUrl?: string; technique?: string; medium?: string;
     tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; isDraft?: boolean;
+    collaboratorId?: string; collaboratorName?: string;
   };
   if (!caption) { res.status(400).json({ error: "caption required" }); return; }
 
@@ -43,6 +44,8 @@ router.post("/posts", async (req, res): Promise<void> => {
       isPatronOnly: isPatronOnly ?? false,
       isDraft: asDraft,
       scheduledAt: schedDate,
+      collaboratorId: collaboratorId ?? null,
+      collaboratorName: collaboratorName ?? null,
     }).returning();
 
     updateStreak(user.id).catch(() => {});
@@ -329,9 +332,10 @@ router.get("/me/drafts", async (req, res): Promise<void> => {
 // POST /me/drafts — save a new draft (or update existing via body.draftId)
 router.post("/me/drafts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, draftId } = req.body as {
+  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, draftId, collaboratorId, collaboratorName } = req.body as {
     caption?: string; videoUrl?: string; thumbnailUrl?: string; technique?: string; medium?: string;
     tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; draftId?: string;
+    collaboratorId?: string; collaboratorName?: string;
   };
   const user = req.user;
   const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
@@ -341,6 +345,7 @@ router.post("/me/drafts", async (req, res): Promise<void> => {
         caption: caption ?? "", videoUrl: videoUrl ?? null, thumbnailUrl: thumbnailUrl ?? null,
         technique: technique ?? null, medium: medium ?? null, tags: tags ?? [],
         isPatronOnly: isPatronOnly ?? false, scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        collaboratorId: collaboratorId ?? null, collaboratorName: collaboratorName ?? null,
       }).where(and(eq(postsTable.id, draftId), eq(postsTable.authorId, user.id))).returning();
       if (!updated) { res.status(404).json({ error: "Draft not found" }); return; }
       res.json({ draft: { ...updated, tags: updated.tags ?? [], createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), scheduledAt: updated.scheduledAt?.toISOString() ?? null } });
@@ -352,6 +357,7 @@ router.post("/me/drafts", async (req, res): Promise<void> => {
         technique: technique ?? null, medium: medium ?? null, tags: tags ?? [],
         isPatronOnly: isPatronOnly ?? false, isDraft: true,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        collaboratorId: collaboratorId ?? null, collaboratorName: collaboratorName ?? null,
       }).returning();
       res.status(201).json({ draft: { ...draft, tags: draft.tags ?? [], createdAt: draft.createdAt.toISOString(), updatedAt: draft.updatedAt.toISOString(), scheduledAt: draft.scheduledAt?.toISOString() ?? null } });
     }
@@ -404,6 +410,20 @@ router.get("/me/saves", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "getMySaves error");
     res.status(500).json({ error: "Failed to load saves" });
+  }
+});
+
+// GET /users/:userId/collab-posts — posts where this user is a collaborator
+router.get("/users/:userId/collab-posts", async (req, res): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const rows = await db.select().from(postsTable)
+      .where(and(eq(postsTable.collaboratorId, userId), eq(postsTable.isDraft, false)))
+      .orderBy(desc(postsTable.createdAt));
+    res.json({ posts: rows.map(p => ({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })) });
+  } catch (err) {
+    req.log.error({ err }, "getCollabPosts error");
+    res.status(500).json({ error: "Failed to load collaboration posts" });
   }
 });
 
