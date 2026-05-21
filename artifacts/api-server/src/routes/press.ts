@@ -181,12 +181,8 @@ async function runWeeklyRelease() {
     if (!generated.title || !generated.plaintextContent) return;
 
     const postedUrls: string[] = [];
-    const [devtoUrl, hashnodeUrl] = await Promise.all([
-      autoPostToDevTo(generated),
-      autoPostToHashnode(generated),
-    ]);
+    const devtoUrl = await autoPostToDevTo(generated);
     if (devtoUrl) postedUrls.push(`devto:${devtoUrl}`);
-    if (hashnodeUrl) postedUrls.push(`hashnode:${hashnodeUrl}`);
 
     await db.insert(pressReleasesTable).values({
       title: generated.title,
