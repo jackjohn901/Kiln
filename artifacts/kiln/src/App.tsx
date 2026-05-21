@@ -125,6 +125,8 @@ import Search from "@/pages/Search";
 import AdminReports from "@/pages/AdminReports";
 import PlatformAnalytics from "@/pages/PlatformAnalytics";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfService from "@/pages/TermsOfService";
+import Help from "@/pages/Help";
 import FoundingArtist from "@/pages/FoundingArtist";
 import AdminFoundingArtists from "@/pages/AdminFoundingArtists";
 import SocialSync from "@/pages/SocialSync";
@@ -154,6 +156,22 @@ function applyThemeFromSettings() {
   } catch {}
 }
 applyThemeFromSettings();
+
+const QUIZ_PREFS_KEY = "kiln_prefs_v1";
+
+function QuizGate() {
+  const [location, navigate] = useLocation();
+  useEffect(() => {
+    if (location !== "/") return;
+    try {
+      if (!localStorage.getItem(QUIZ_PREFS_KEY) && !sessionStorage.getItem("kiln_quiz_offered")) {
+        sessionStorage.setItem("kiln_quiz_offered", "1");
+        navigate("/quiz");
+      }
+    } catch {}
+  }, [location, navigate]);
+  return null;
+}
 
 function RefCapture() {
   useEffect(() => {
@@ -222,6 +240,7 @@ function Router() {
     <>
       <TitleSetter />
       <RefCapture />
+      <QuizGate />
       <Switch>
         <Route path="/" component={Feed} />
       <Route path="/discover" component={Discover} />
@@ -349,6 +368,8 @@ function Router() {
       <Route path="/social-sync" component={SocialSync} />
       <Route path="/kiln-opening" component={KilnOpening} />
       <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
+      <Route path="/help" component={Help} />
       <Route path="/material-sources" component={MaterialSources} />
       <Route path="/process-pledges" component={ProcessPledge} />
       <Route path="/listings/:id/collaborators" component={ListingCollaborators} />

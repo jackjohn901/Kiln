@@ -731,6 +731,30 @@ export default function Settings() {
             )}
 
             <div className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden">
+              <Link href="/help" className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-white/3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <BookOpen size={16} className="text-stone-400" />
+                  <span className="text-sm text-stone-300">Help Centre</span>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/terms" className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-white/3 transition-colors border-t border-white/5">
+                <div className="flex items-center gap-3">
+                  <Link2 size={16} className="text-stone-400" />
+                  <span className="text-sm text-stone-300">Terms of Service</span>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+              <Link href="/privacy" className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-white/3 transition-colors border-t border-white/5">
+                <div className="flex items-center gap-3">
+                  <Shield size={16} className="text-stone-400" />
+                  <span className="text-sm text-stone-300">Privacy Policy</span>
+                </div>
+                <ChevronRight size={14} className="text-stone-600" />
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden">
               <button
                 onClick={logout}
                 className="w-full flex items-center gap-3 px-5 py-4 hover:bg-white/3 transition-colors text-left"

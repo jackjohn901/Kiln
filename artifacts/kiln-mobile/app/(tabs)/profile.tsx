@@ -334,6 +334,29 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
+          {/* Explore */}
+          <View style={[styles.quickLinks, { borderColor: colors.border, marginTop: 16 }]}>
+            {[
+              { label: "Shop", icon: "shopping-bag", path: "/shop" },
+              { label: "Workshops", icon: "book-open", path: "/workshops" },
+              { label: "Guilds", icon: "users", path: "/guilds" },
+              { label: "Auctions", icon: "tag", path: "/auctions" },
+              { label: "Drops", icon: "zap", path: "/drops" },
+            ].map(({ label, icon, path }, idx, arr) => (
+              <Pressable
+                key={path}
+                style={[styles.quickLinkItem, idx < arr.length - 1 && { borderBottomColor: colors.border }]}
+                onPress={() => router.push(path as any)}
+              >
+                <View style={styles.quickLinkLeft}>
+                  <Feather name={icon as any} size={16} color={colors.primary} />
+                  <Text style={[styles.quickLinkLabel, { color: colors.foreground }]}>{label}</Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              </Pressable>
+            ))}
+          </View>
+
           {/* Tab switcher */}
           <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
             {(["posts", "saved"] as const).map((tab) => (
