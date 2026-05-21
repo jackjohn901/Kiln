@@ -105,6 +105,7 @@ export default function NotificationSettingsScreen() {
   const [notifEmail, setNotifEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailError, setEmailError] = useState(false);
+  const [emailValidationError, setEmailValidationError] = useState(false);
 
   const checkOpacity = useRef(new Animated.Value(0)).current;
   const checkScale = useRef(new Animated.Value(0.6)).current;
@@ -221,7 +222,13 @@ export default function NotificationSettingsScreen() {
   const emailSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saveNotifEmail = useCallback((email: string) => {
-    apiPatch("/api/me/settings", { contactEmail: email })
+    const trimmed = email.trim();
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailValidationError(true);
+      return;
+    }
+    setEmailValidationError(false);
+    apiPatch("/api/me/settings", { contactEmail: trimmed })
       .then(() => {
         if (!mountedRef.current) return;
         setEmailError(false);
@@ -398,7 +405,7 @@ export default function NotificationSettingsScreen() {
               </Text>
               <TextInput
                 value={notifEmail}
-                onChangeText={setNotifEmail}
+                onChangeText={(text) => { setNotifEmail(text); if (emailValidationError) setEmailValidationError(false); }}
                 onBlur={() => saveNotifEmail(notifEmail)}
                 placeholder="you@example.com"
                 placeholderTextColor={colors.mutedForeground}
@@ -410,10 +417,15 @@ export default function NotificationSettingsScreen() {
                   {
                     color: colors.foreground,
                     backgroundColor: colors.background,
-                    borderColor: colors.border,
+                    borderColor: emailValidationError ? "#ef4444" : colors.border,
                   },
                 ]}
               />
+              {emailValidationError && (
+                <Text style={[styles.toggleDesc, { color: "#ef4444", marginTop: 4 }]}>
+                  Please enter a valid email address.
+                </Text>
+              )}
             </View>
           </View>
         </ScrollView>

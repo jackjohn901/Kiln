@@ -115,6 +115,7 @@ export default function Settings() {
   const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
   const [contactEmail, setContactEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
+  const [emailValidationError, setEmailValidationError] = useState(false);
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -179,11 +180,17 @@ export default function Settings() {
   }
 
   function saveContactEmail(email: string) {
+    const trimmed = email.trim();
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailValidationError(true);
+      return;
+    }
+    setEmailValidationError(false);
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contactEmail: email }),
+      body: JSON.stringify({ contactEmail: trimmed }),
     })
       .then(() => { setEmailSaved(true); setTimeout(() => setEmailSaved(false), 2000); })
       .catch(() => {});
@@ -401,13 +408,16 @@ export default function Settings() {
                 <input
                   type="email"
                   value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
+                  onChange={(e) => { setContactEmail(e.target.value); if (emailValidationError) setEmailValidationError(false); }}
                   onBlur={(e) => saveContactEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="flex-1 min-w-0 rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                  className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${emailValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-amber-500/50"}`}
                 />
                 {emailSaved && <span className="text-xs text-emerald-400 shrink-0">Saved ✓</span>}
               </div>
+              {emailValidationError && (
+                <p className="text-xs text-red-400 mt-1.5">Please enter a valid email address.</p>
+              )}
             </div>
           </div>
         )}
