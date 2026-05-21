@@ -468,40 +468,37 @@ export default function OrderDetail() {
           )}
         </div>
 
-        {(isActive || hasDeliveryEstimate) && (
-          <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>
-            {hasDeliveryEstimate && (
-              <div className="flex items-start gap-2.5">
-                <Clock size={15} className={`shrink-0 mt-0.5 ${isActive ? "text-amber-400" : "text-stone-600"}`} />
-                <div>
-                  <p className={`text-sm font-semibold ${isActive ? "text-amber-300" : "text-stone-500"}`}>
-                    {shipsWithinText}
-                  </p>
-                  {isActive && (
-                    <p className="text-xs text-stone-600 mt-0.5">
-                      The artist will prepare your order within this time.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-            {!hasDeliveryEstimate && isActive && (
-              <div className="flex items-start gap-2.5">
-                <Clock size={15} className="text-stone-600 shrink-0 mt-0.5" />
-                <p className="text-sm text-stone-500">No delivery estimate provided.</p>
-              </div>
-            )}
-            {isActive && (
-              <div className="flex items-start gap-2.5">
-                <Package size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-stone-400">
-                  The artist will reach out within 2–3 business days with shipping details.
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>
+          {hasDeliveryEstimate ? (
+            <div className="flex items-start gap-2.5">
+              <Clock size={15} className={`shrink-0 mt-0.5 ${isActive ? "text-amber-400" : "text-stone-600"}`} />
+              <div>
+                <p className={`text-sm font-semibold ${isActive ? "text-amber-300" : "text-stone-500"}`}>
+                  {shipsWithinText}
                 </p>
+                {isActive && (
+                  <p className="text-xs text-stone-600 mt-0.5">
+                    The artist will prepare your order within this time.
+                  </p>
+                )}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          ) : (
+            <div className="flex items-start gap-2.5">
+              <Clock size={15} className="text-stone-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-stone-500">No processing window set.</p>
+            </div>
+          )}
+          {isActive && (
+            <div className="flex items-start gap-2.5">
+              <Package size={15} className="text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-stone-400">
+                The artist will reach out within 2–3 business days with shipping details.
+              </p>
+            </div>
+          )}
+        </div>
 
         {order.manualPayout && (
           <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/6 p-4">
