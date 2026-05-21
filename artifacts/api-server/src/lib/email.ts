@@ -349,6 +349,97 @@ export function commissionPaymentEmail(
   `);
 }
 
+export function welcomeEmail(firstName: string | null): string {
+  const name = firstName ? escHtml(firstName) : "there";
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Welcome to Kiln 🔥</h1>
+    <p style="color:#d6d3d1;">Hi ${name} — you're in. Kiln is the creator platform built exclusively for craft artists.</p>
+    ${card(`
+      <p style="margin:0 0 12px;color:#fcd34d;font-weight:bold;">Get started in 3 steps:</p>
+      <p style="margin:0 0 8px;">1. <strong>Set up your profile</strong> — add your discipline, location, and a short bio so collectors can find you.</p>
+      <p style="margin:0 0 8px;">2. <strong>Post your first process video</strong> — show how you make your work. This is your shop window.</p>
+      <p style="margin:0;">3. <strong>Add a listing</strong> — price a finished piece and connect it to your video.</p>
+    `)}
+    ${btn(`${BASE_URL}/`, "Set up your profile")}
+  `);
+}
+
+export function onboardingDay3Email(firstName: string | null): string {
+  const name = firstName ? escHtml(firstName) : "there";
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">One more thing, ${name}</h1>
+    <p style="color:#78716c;">Two revenue streams most artists on Kiln set up in their first week:</p>
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Workshop Booking</p>
+      <p style="margin:0;">Add a workshop and students can book and pay directly — no Calendly or separate payment link needed. Takes about 5 minutes to set up.</p>
+    `)}
+    ${btn(`${BASE_URL}/workshops/new`, "Add a workshop")}
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Patron Tiers</p>
+      <p style="margin:0;">Create a $5–$25/month supporter tier. Even 10 patrons covers your materials budget for the month.</p>
+    `)}
+    ${btn(`${BASE_URL}/settings`, "Set up patron tiers")}
+  `);
+}
+
+export function onboardingDay7Email(firstName: string | null): string {
+  const name = firstName ? escHtml(firstName) : "there";
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your first week on Kiln</h1>
+    <p style="color:#78716c;">Hi ${name} — here are three things worth knowing after your first week:</p>
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Guilds</p>
+      <p style="margin:0;">Join your technique guild (ceramics, glass, fiber, metal, wood) to connect with artists in your discipline, get critique, and find collaborators.</p>
+    `)}
+    ${btn(`${BASE_URL}/guilds`, "Find your guild")}
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">AI Grant Writer</p>
+      <p style="margin:0;">Kiln has a built-in AI grant writer that drafts applications for real craft residencies and grants. Try it with your artist statement.</p>
+    `)}
+    ${btn(`${BASE_URL}/grant-writer`, "Try the grant writer")}
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Opportunities Board</p>
+      <p style="margin:0;">Browse open residencies, grants, and fellowships curated for craft artists — updated weekly.</p>
+    `)}
+    ${btn(`${BASE_URL}/opportunities`, "Browse opportunities")}
+  `);
+}
+
+export function weeklyDigestEmail(stats: {
+  newArtistCount: number;
+  activeDropCount: number;
+  upcomingWorkshopCount: number;
+}): string {
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">This week on Kiln 🔥</h1>
+    <p style="color:#78716c;">What's happening in the craft community right now.</p>
+    ${card(`
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="text-align:center;min-width:80px;">
+          <div style="font-size:28px;font-weight:bold;color:#fcd34d;">${stats.newArtistCount}</div>
+          <div style="font-size:12px;color:#78716c;">new artists</div>
+        </div>
+        <div style="text-align:center;min-width:80px;">
+          <div style="font-size:28px;font-weight:bold;color:#fcd34d;">${stats.activeDropCount}</div>
+          <div style="font-size:12px;color:#78716c;">active drops</div>
+        </div>
+        <div style="text-align:center;min-width:80px;">
+          <div style="font-size:28px;font-weight:bold;color:#fcd34d;">${stats.upcomingWorkshopCount}</div>
+          <div style="font-size:12px;color:#78716c;">upcoming workshops</div>
+        </div>
+      </div>
+    `)}
+    ${btn(`${BASE_URL}/`, "See what's new")}
+    ${card(`
+      <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Discover this week</p>
+      <p style="margin:0 0 6px;">• Browse new process videos in the feed</p>
+      <p style="margin:0 0 6px;">• Check the Drops page for limited-edition releases</p>
+      <p style="margin:0;">• Find a workshop to book or a guild to join</p>
+    `)}
+    ${btn(`${BASE_URL}/discover`, "Discover artists")}
+  `);
+}
+
 function escHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")

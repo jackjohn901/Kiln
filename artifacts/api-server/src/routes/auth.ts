@@ -7,6 +7,7 @@ import {
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
+import { sendWelcomeIfNew } from "../lib/onboarding";
 import {
   clearSession,
   getOidcConfig,
@@ -168,6 +169,8 @@ router.get("/callback", async (req: Request, res: Response) => {
     claims as unknown as Record<string, unknown>,
   );
 
+  void sendWelcomeIfNew(dbUser);
+
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {
     user: {
@@ -237,6 +240,8 @@ router.post(
       const dbUser = await upsertUser(
         claims as unknown as Record<string, unknown>,
       );
+
+      void sendWelcomeIfNew(dbUser);
 
       const now = Math.floor(Date.now() / 1000);
       const sessionData: SessionData = {

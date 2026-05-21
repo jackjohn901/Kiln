@@ -6,6 +6,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./webhookHandlers";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { runOnboardingCron, runWeeklyDigest } from "./lib/onboarding";
 
 const app: Express = express();
 
@@ -55,5 +56,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
 app.use("/api", router);
+
+// ── Onboarding & digest crons ─────────────────────────────────────────────────
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+// Run onboarding check once a day (first run after 10s)
+setTimeout(() => {
+  void runOnboardingCron();
+  setInterval(() => void runOnboardingCron(), DAY_MS);
+}, 10_000);
+// Run weekly digest on Mondays (first run after 15s startup delay, then weekly)
+setTimeout(() => {
+  void runWeeklyDigest();
+  setInterval(() => void runWeeklyDigest(), WEEK_MS);
+}, 15_000);
 
 export default app;
