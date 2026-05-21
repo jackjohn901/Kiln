@@ -5,6 +5,7 @@ import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, S
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import CommissionInlineActions from "@/components/CommissionInlineActions";
 
 const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: string; bg: string }> = {
   follow:              { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },
@@ -49,6 +50,12 @@ function groupByDate(notifs: KilnNotification[]): Array<{ label: string; items: 
   return order.filter((l) => groups.has(l)).map((l) => ({ label: l, items: groups.get(l)! }));
 }
 
+function extractCommissionId(link?: string): string | undefined {
+  if (!link) return undefined;
+  const m = link.match(/\/commissions\/([a-f0-9-]{36})/);
+  return m?.[1];
+}
+
 export default function Notifications() {
   const { notifications, markRead, markAllRead } = useSocial();
   const { subscribe } = useWebSocket();
@@ -57,6 +64,7 @@ export default function Notifications() {
 
   const addLiveNotification = useCallback((evt: Record<string, unknown>) => {
     const n = evt as { text?: string; link?: string; fromId?: string; fromName?: string; fromAvatarUrl?: string; notifType?: string };
+    const link = n.link ?? undefined;
     setApiNotifications((prev) => [{
       id: `ws-${Date.now()}`,
       type: (n.notifType as KilnNotification["type"]) ?? "follow",
@@ -64,7 +72,8 @@ export default function Notifications() {
       fromName: n.fromName ?? "",
       fromAvatarUrl: n.fromAvatarUrl ?? "",
       text: n.text ?? "You have a new notification",
-      link: n.link ?? undefined,
+      link,
+      commissionId: extractCommissionId(link),
       read: false,
       createdAt: new Date().toISOString(),
     }, ...prev]);
@@ -80,17 +89,21 @@ export default function Notifications() {
       .then(r => r.ok ? r.json() : null)
       .then((data: { notifications?: Record<string, unknown>[] } | null) => {
         if (!Array.isArray(data?.notifications)) return;
-        setApiNotifications(data.notifications.map((n) => ({
-          id: `api-${n.id as string}`,
-          type: (n.type as KilnNotification["type"]) ?? "follow",
-          fromId: (n.fromId as string) ?? "",
-          fromName: (n.fromName as string) ?? "",
-          fromAvatarUrl: (n.fromAvatarUrl as string) ?? "",
-          text: (n.text as string) ?? "You have a new notification",
-          link: (n.link as string | undefined) ?? undefined,
-          read: (n.read as boolean) ?? false,
-          createdAt: n.createdAt as string,
-        })));
+        setApiNotifications(data.notifications.map((n) => {
+          const link = (n.link as string | undefined) ?? undefined;
+          return {
+            id: `api-${n.id as string}`,
+            type: (n.type as KilnNotification["type"]) ?? "follow",
+            fromId: (n.fromId as string) ?? "",
+            fromName: (n.fromName as string) ?? "",
+            fromAvatarUrl: (n.fromAvatarUrl as string) ?? "",
+            text: (n.text as string) ?? "You have a new notification",
+            link,
+            commissionId: extractCommissionId(link),
+            read: (n.read as boolean) ?? false,
+            createdAt: n.createdAt as string,
+          };
+        }));
       })
       .catch(() => {});
   }, []);
@@ -160,6 +173,8 @@ export default function Notifications() {
                   {items.map((n) => {
                     const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.follow;
                     const Icon = cfg.icon;
+                    const commissionId = n.commissionId ?? extractCommissionId(n.link);
+                    const isCommission = n.type === "commission" && !!commissionId;
                     return (
                       <motion.div
                         key={n.id}
@@ -182,22 +197,27 @@ export default function Notifications() {
                         </div>
 
                         {/* Content */}
-                        <div className="min-w-0 flex-1" onClick={() => {
-                          markRead(n.id);
-                          if (n.id.startsWith("api-")) {
-                            fetch(`/api/notifications/${n.id.slice(4)}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
-                          }
-                        }}>
-                          {n.link ? (
-                            <Link href={n.link} className="block">
-                              <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                              <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
-                            </Link>
-                          ) : (
-                            <>
-                              <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                              <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
-                            </>
+                        <div className="min-w-0 flex-1">
+                          <div onClick={() => {
+                            markRead(n.id);
+                            if (n.id.startsWith("api-")) {
+                              fetch(`/api/notifications/${n.id.slice(4)}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
+                            }
+                          }}>
+                            {n.link ? (
+                              <Link href={n.link} className="block">
+                                <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                                <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
+                              </Link>
+                            ) : (
+                              <>
+                                <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                                <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
+                              </>
+                            )}
+                          </div>
+                          {isCommission && (
+                            <CommissionInlineActions commissionId={commissionId} />
                           )}
                         </div>
 

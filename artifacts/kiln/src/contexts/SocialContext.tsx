@@ -21,6 +21,7 @@ export interface KilnNotification {
   fromAvatarUrl: string;
   text: string;
   link?: string;
+  commissionId?: string;
   read: boolean;
   createdAt: string;
 }
@@ -483,17 +484,22 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; read: boolean; createdAt: string }> } | null) => {
         if (!data?.notifications?.length) return;
-        const apiNotifs: KilnNotification[] = data.notifications.map((n) => ({
-          id: n.id,
-          type: n.type as KilnNotification["type"],
-          fromId: n.fromId,
-          fromName: n.fromName,
-          fromAvatarUrl: n.fromAvatarUrl ?? "",
-          text: n.text,
-          link: n.link ?? undefined,
-          read: n.read,
-          createdAt: n.createdAt,
-        }));
+        const apiNotifs: KilnNotification[] = data.notifications.map((n) => {
+          const link = n.link ?? undefined;
+          const commissionMatch = link?.match(/\/commissions\/([a-f0-9-]{36})/);
+          return {
+            id: n.id,
+            type: n.type as KilnNotification["type"],
+            fromId: n.fromId,
+            fromName: n.fromName,
+            fromAvatarUrl: n.fromAvatarUrl ?? "",
+            text: n.text,
+            link,
+            commissionId: commissionMatch?.[1],
+            read: n.read,
+            createdAt: n.createdAt,
+          };
+        });
         update((s) => {
           const apiIds = new Set(apiNotifs.map((n) => n.id));
           const localOnly = s.notifications.filter((n) => !apiIds.has(n.id));

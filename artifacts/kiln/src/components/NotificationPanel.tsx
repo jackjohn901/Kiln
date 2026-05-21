@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar } from "lucide-react";
 import { useSocial, KilnNotification } from "@/contexts/SocialContext";
 import { useLocation } from "wouter";
+import CommissionInlineActions from "@/components/CommissionInlineActions";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -90,20 +91,45 @@ export default function NotificationPanel({ onClose }: Props) {
             <p className="text-sm text-stone-500">No notifications yet</p>
           </div>
         ) : (
-          notifications.map((n) => (
-            <button
-              key={n.id}
-              onClick={() => handleNotifClick(n)}
-              className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-stone-800 transition-colors border-b border-stone-800/50 ${!n.read ? "bg-amber-500/5" : ""}`}
-            >
-              <NotifIcon type={n.type} />
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                <p className="text-xs text-stone-600 mt-0.5">{timeAgo(n.createdAt)}</p>
-              </div>
-              {!n.read && <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 mt-1" />}
-            </button>
-          ))
+          notifications.map((n) => {
+            const isCommission = n.type === "commission" && !!n.commissionId;
+            if (isCommission) {
+              return (
+                <div
+                  key={n.id}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-stone-800/50 ${!n.read ? "bg-amber-500/5" : ""}`}
+                >
+                  <NotifIcon type={n.type} />
+                  <div className="flex-1 min-w-0">
+                    <button
+                      className="w-full text-left"
+                      onClick={() => handleNotifClick(n)}
+                    >
+                      <p className={`text-xs leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                      <p className="text-xs text-stone-600 mt-0.5">{timeAgo(n.createdAt)}</p>
+                    </button>
+                    <CommissionInlineActions commissionId={n.commissionId!} />
+                  </div>
+                  {!n.read && <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 mt-1" />}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={n.id}
+                onClick={() => handleNotifClick(n)}
+                className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-stone-800 transition-colors border-b border-stone-800/50 ${!n.read ? "bg-amber-500/5" : ""}`}
+              >
+                <NotifIcon type={n.type} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                  <p className="text-xs text-stone-600 mt-0.5">{timeAgo(n.createdAt)}</p>
+                </div>
+                {!n.read && <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 mt-1" />}
+              </button>
+            );
+          })
         )}
       </div>
     </div>

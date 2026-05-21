@@ -21,7 +21,7 @@ router.post("/commissions", async (req, res): Promise<void> => {
       workType, description, budgetRange, timeline, dimensions,
       referenceUrls: referenceUrls ?? [], status: "pending",
     }).returning();
-    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions` });
+    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions/${commission.id}` });
     const [[artistUser], [artistSettings]] = await Promise.all([
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId)),
       db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, artistId)),
