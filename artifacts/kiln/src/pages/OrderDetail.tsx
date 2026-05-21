@@ -64,6 +64,14 @@ function ordinalId(id: string) {
   return "KLN-" + id.slice(0, 8).toUpperCase();
 }
 
+function sessionReceiptId(notes: string | null): string {
+  if (notes && notes.startsWith("stripe:")) {
+    const raw = notes.slice(7);
+    return "KLN-CART-" + raw.slice(-6).toUpperCase();
+  }
+  return "";
+}
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -178,7 +186,8 @@ export default function OrderDetail() {
 
     const statusLabel = esc(STATUS_CONFIG[order.status]?.label ?? order.status);
     const typeLabel = esc(TYPE_CONFIG[order.type]?.label ?? order.type);
-    const refNum = esc(ordinalId(order.id));
+    const refNum = esc(isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id));
+    const receiptTitle = isCartOrder ? "Cart Receipt" : "Order Receipt";
     const dateStr = esc(formatDate(order.createdAt));
 
     const html = `<!DOCTYPE html>
@@ -201,7 +210,7 @@ export default function OrderDetail() {
     </div>
     <div style="text-align:right;">
       <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">Order Receipt</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">${receiptTitle}</p>
     </div>
   </div>
 
@@ -267,8 +276,17 @@ export default function OrderDetail() {
         </div>
 
         <div className="mb-6">
-          <h1 className="font-serif text-2xl text-amber-100">Order Receipt</h1>
-          <p className="mt-1 font-mono text-sm text-amber-400/70">{ordinalId(order.id)}</p>
+          <h1 className="font-serif text-2xl text-amber-100">
+            {isCartOrder ? "Cart Receipt" : "Order Receipt"}
+          </h1>
+          <p className="mt-1 font-mono text-sm text-amber-400/70">
+            {isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id)}
+          </p>
+          {isCartOrder && (
+            <p className="mt-1 text-xs text-stone-500">
+              {siblingOrders.length} items · grouped checkout
+            </p>
+          )}
         </div>
 
         <div className={`mb-4 flex items-center gap-2.5 rounded-2xl border p-4 ${statusConf.bg}`}>
