@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -38,6 +38,11 @@ interface OrderGroup {
   key: string;
   orders: Order[];
   isGroup: boolean;
+}
+
+interface SellerProcessingWindow {
+  processingWindowDays: number | null;
+  processingWindowLabel: string | null;
 }
 
 function groupOrders(orders: Order[]): OrderGroup[] {
@@ -109,6 +114,8 @@ export default function OrdersScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const [tab, setTab] = useState<TabValue>("all");
 
+  const [sellerWindows, setSellerWindows] = useState<Record<string, SellerProcessingWindow>>({});
+
   const { data, isLoading } = useQuery({
     queryKey: ["me/orders"],
     queryFn: () => apiGet<{ orders: Order[] }>("/api/me/orders"),
@@ -116,6 +123,41 @@ export default function OrdersScreen() {
   });
 
   const allOrders: Order[] = data?.orders ?? [];
+
+  useEffect(() => {
+    if (allOrders.length === 0) return;
+    const missingSellerIds = [
+      ...new Set(
+        allOrders
+          .filter(o => o.processingWindowDays === null && o.processingWindowLabel === null && o.sellerId)
+          .map(o => o.sellerId)
+      ),
+    ];
+    if (missingSellerIds.length === 0) return;
+    Promise.allSettled(
+      missingSellerIds.map(sid =>
+        apiGet<{ processingWindow?: unknown; processingWindowLabel?: unknown }>(`/api/users/${sid}/payment-settings`)
+          .then(ps => ({
+            sellerId: sid,
+            processingWindowDays: typeof ps.processingWindow === "number" ? ps.processingWindow : null,
+            processingWindowLabel: typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+              ? (ps.processingWindowLabel as string).trim()
+              : null,
+          }))
+      )
+    ).then(results => {
+      const map: Record<string, SellerProcessingWindow> = {};
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          map[r.value.sellerId] = {
+            processingWindowDays: r.value.processingWindowDays,
+            processingWindowLabel: r.value.processingWindowLabel,
+          };
+        }
+      }
+      if (Object.keys(map).length > 0) setSellerWindows(map);
+    }).catch(() => {});
+  }, [allOrders]);
 
   const filtered = allOrders.filter((o) => {
     if (tab === "active") return ["pending", "inquiry", "in_progress", "shipped", "confirmed", "waitlisted"].includes(o.status);
@@ -184,6 +226,9 @@ export default function OrdersScreen() {
             const typeIconName = (TYPE_ICON[primary.type] ?? "shopping-bag") as any;
             const itemCount = groupOrders.length;
             const isMulti = isGroup && itemCount > 1;
+            const backfill = sellerWindows[primary.sellerId];
+            const windowLabel = primary.processingWindowLabel ?? backfill?.processingWindowLabel ?? null;
+            const windowDays = primary.processingWindowDays ?? backfill?.processingWindowDays ?? null;
 
             return (
               <Pressable
@@ -219,17 +264,17 @@ export default function OrdersScreen() {
                         </Text>
                       )}
                     </View>
-                    {(primary.processingWindowLabel || primary.processingWindowDays) ? (
+                    {(windowLabel || windowDays) ? (
                       <View style={styles.windowRow}>
                         <Feather name="clock" size={11} color={colors.primary} />
                         <Text style={[styles.windowText, { color: colors.mutedForeground }]}>
                           Processing:{" "}
                           <Text style={{ color: colors.primary }}>
-                            {primary.processingWindowLabel
-                              ? primary.processingWindowLabel
-                              : primary.processingWindowDays === 1
+                            {windowLabel
+                              ? windowLabel
+                              : windowDays === 1
                                 ? "1 business day"
-                                : `${primary.processingWindowDays} business days`}
+                                : `${windowDays} business days`}
                           </Text>
                         </Text>
                       </View>
