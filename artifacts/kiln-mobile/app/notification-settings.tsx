@@ -342,6 +342,14 @@ export default function NotificationSettingsScreen() {
 
           <SectionHeader label="EMAIL" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {!notifEmail.trim() && (
+              <View style={styles.emailWarning}>
+                <Feather name="alert-triangle" size={13} color="#f59e0b" style={styles.emailWarningIcon} />
+                <Text style={styles.emailWarningText}>
+                  No notification email set — add one below so you don't miss important alerts.
+                </Text>
+              </View>
+            )}
             <ToggleRow
               label="Weekly digest"
               desc="Top posts, opportunities, and updates"
@@ -491,5 +499,25 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     fontFamily: "Inter_400Regular",
     fontSize: 14,
+  },
+  emailWarning: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "rgba(245, 158, 11, 0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(245, 158, 11, 0.25)",
+  },
+  emailWarningIcon: {
+    marginTop: 1,
+  },
+  emailWarningText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#fbbf24",
   },
 });
