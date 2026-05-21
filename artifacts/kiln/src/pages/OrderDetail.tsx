@@ -145,11 +145,17 @@ function sessionReceiptId(notes: string | null): string {
   return "";
 }
 
+interface BuyerProfile {
+  displayName: string | null;
+  location: string | null;
+}
+
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [order, setOrder] = useState<Order | null>(null);
   const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
+  const [buyerProfile, setBuyerProfile] = useState<BuyerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -165,6 +171,7 @@ export default function OrderDetail() {
         setOrder(data.order as Order);
         const siblings: Order[] = data.siblingOrders ?? [];
         setSiblingOrders(siblings.length > 1 ? siblings : []);
+        if (data.buyerProfile) setBuyerProfile(data.buyerProfile as BuyerProfile);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -236,12 +243,17 @@ export default function OrderDetail() {
       </tr>
     `).join("");
 
-    const shippingRow = order.shippingAddress ? `
+    const buyerName = buyerProfile?.displayName ?? null;
+    const addressText = order.shippingAddress ?? buyerProfile?.location ?? null;
+
+    const buyerRow = (buyerName || addressText) ? `
       <div style="margin-top:24px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Ship to</p>
-        <p style="font-size:13px;color:#2c2621;white-space:pre-line;margin:0;">${esc(order.shippingAddress)}</p>
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Billed to</p>
+        ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
+        ${addressText ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(addressText)}</p>` : ""}
       </div>
     ` : "";
+
 
     const trackingRow = order.trackingNumber ? `
       <div style="margin-top:16px;">
@@ -319,7 +331,7 @@ export default function OrderDetail() {
     </div>
   </div>
 
-  ${shippingRow}${trackingRow}${notesRow}
+  ${buyerRow}${trackingRow}${notesRow}
 
   <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
     <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages</p>

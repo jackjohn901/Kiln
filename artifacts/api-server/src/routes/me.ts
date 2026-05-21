@@ -169,7 +169,17 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
         .where(and(eq(ordersTable.notes, order.notes), eq(ordersTable.buyerId, req.user.id)));
     }
 
-    res.json({ order, siblingOrders });
+    const [buyerProfileRow] = await db
+      .select({ displayName: profilesTable.displayName, location: profilesTable.location })
+      .from(profilesTable)
+      .where(eq(profilesTable.userId, req.user.id))
+      .limit(1);
+
+    const buyerProfile = buyerProfileRow
+      ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
+      : { displayName: null, location: null };
+
+    res.json({ order, siblingOrders, buyerProfile });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });
