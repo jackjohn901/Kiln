@@ -455,26 +455,59 @@ export default function Settings() {
                   value={payments.paypalMe}
                   onChange={(v) => setPayments((p) => ({ ...p, paypalMe: v }))}
                 />
-                <div>
-                  <label className="text-xs text-stone-500 mb-1 block">Delivery estimate</label>
-                  <input
-                    type="text"
-                    value={payments.processingWindowLabel ?? ""}
-                    onChange={(e) => setPayments((p) => ({ ...p, processingWindowLabel: e.target.value || undefined }))}
-                    placeholder="e.g. 2–3 weeks after firing"
-                    maxLength={80}
-                    className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
-                  />
-                  <p className="text-xs text-stone-600 mt-1">Buyers see this estimate at checkout. Leave blank to show the default "3–5 business days".</p>
-                  {payments.processingWindowLabel && payments.processingWindowLabel.trim() && (
-                    <div className="mt-3">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">Processing window (days)</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={payments.processingWindow ?? ""}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            setPayments((p) => ({ ...p, processingWindow: undefined }));
+                          } else {
+                            const n = Math.min(30, Math.max(1, parseInt(raw, 10)));
+                            if (Number.isFinite(n)) setPayments((p) => ({ ...p, processingWindow: n }));
+                          }
+                        }}
+                        placeholder="e.g. 7"
+                        className="w-28 rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                      />
+                      <span className="text-xs text-stone-500">business days (1–30)</span>
+                    </div>
+                    <p className="text-xs text-stone-600 mt-1">Numeric window used for order ETA calculations. Leave blank to use the default (3 days).</p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">Delivery estimate label</label>
+                    <input
+                      type="text"
+                      value={payments.processingWindowLabel ?? ""}
+                      onChange={(e) => setPayments((p) => ({ ...p, processingWindowLabel: e.target.value || undefined }))}
+                      placeholder="e.g. 2–3 weeks after firing"
+                      maxLength={80}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                    />
+                    <p className="text-xs text-stone-600 mt-1">Custom label shown to buyers at checkout. Leave blank to auto-generate from the day count above.</p>
+                  </div>
+
+                  {(payments.processingWindow != null || (payments.processingWindowLabel && payments.processingWindowLabel.trim())) && (
+                    <div>
                       <p className="text-xs text-stone-500 mb-1.5">Buyer preview</p>
                       <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 flex items-start gap-2.5">
                         <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
                         <div>
                           <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
                           <p className="text-xs text-amber-200/70">
-                            This artist manages payouts manually. Your order will be processed within {payments.processingWindowLabel.trim()}.
+                            This artist manages payouts manually. Your order will be processed within{" "}
+                            {payments.processingWindowLabel?.trim()
+                              ? payments.processingWindowLabel.trim()
+                              : payments.processingWindow != null
+                              ? `${payments.processingWindow} business day${payments.processingWindow === 1 ? "" : "s"}`
+                              : "3–5 business days"}.
                           </p>
                         </div>
                       </div>
