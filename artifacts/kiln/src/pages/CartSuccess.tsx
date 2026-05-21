@@ -281,30 +281,33 @@ export default function CartSuccess() {
         )}
 
         {/* Standard fulfillment info box */}
-        <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-stone-400 text-left space-y-2 mb-8">
+        <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-stone-400 text-left space-y-3 mb-8">
+          <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>
           {(processingWindowLabel !== null || processingWindowDays !== null) && (
-            <div className="flex items-center gap-2">
-              <Clock size={14} className="text-amber-400 shrink-0" />
-              <span>
-                Delivery estimate:{" "}
-                <span className="text-amber-300 font-medium">
+            <div className="flex items-start gap-2.5">
+              <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-300">
+                  Ships within{" "}
                   {processingWindowLabel
                     ? processingWindowLabel
                     : processingWindowDays === 1
                       ? "1 business day"
                       : `${processingWindowDays} business days`}
-                </span>
-                {" "}— the artist will prepare your order within this time.
-              </span>
+                </p>
+                <p className="text-xs text-stone-600 mt-0.5">
+                  The artist will prepare your order within this time.
+                </p>
+              </div>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <Package size={14} className="text-amber-400 shrink-0" />
-            <span>The artist will be notified and will reach out within 2–3 business days with shipping details.</span>
+          <div className="flex items-start gap-2.5">
+            <Package size={15} className="text-amber-400 shrink-0 mt-0.5" />
+            <p>The artist will be notified and will reach out within 2–3 business days with shipping details.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-            <span>Estimated delivery: 5–10 business days after shipment.</span>
+          <div className="flex items-start gap-2.5">
+            <CheckCircle size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+            <p>Estimated delivery: 5–10 business days after shipment.</p>
           </div>
         </div>
 
