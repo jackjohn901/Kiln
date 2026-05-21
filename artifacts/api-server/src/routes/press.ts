@@ -160,45 +160,6 @@ async function autoPostToHashnode(release: {
   }
 }
 
-async function autoPostToMedium(release: {
-  title: string;
-  summary: string;
-  htmlContent: string;
-  keywords: string;
-}): Promise<string | null> {
-  const token = process.env["MEDIUM_INTEGRATION_TOKEN"];
-  if (!token) return null;
-
-  try {
-    const meResp = await fetch("https://api.medium.com/v1/me", {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    if (!meResp.ok) return null;
-    const meData = (await meResp.json()) as { data?: { id?: string } };
-    const userId = meData.data?.id;
-    if (!userId) return null;
-
-    const content = `${release.htmlContent}<hr><p><em>Kiln is the creator platform built exclusively for craft artists. <a href="https://kilnfire.replit.app/kiln/">Learn more →</a></em></p>`;
-
-    const postResp = await fetch(`https://api.medium.com/v1/users/${userId}/posts`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: release.title,
-        contentFormat: "html",
-        content,
-        tags: release.keywords.split(",").slice(0, 5).map((k) => k.trim()),
-        canonicalUrl: "https://kilnfire.replit.app/kiln/press/index.html",
-        publishStatus: "public",
-      }),
-    });
-    if (!postResp.ok) return null;
-    const postData = (await postResp.json()) as { data?: { url?: string } };
-    return postData.data?.url ?? null;
-  } catch {
-    return null;
-  }
-}
 
 async function runWeeklyRelease() {
   try {
@@ -220,14 +181,12 @@ async function runWeeklyRelease() {
     if (!generated.title || !generated.plaintextContent) return;
 
     const postedUrls: string[] = [];
-    const [devtoUrl, hashnodeUrl, mediumUrl] = await Promise.all([
+    const [devtoUrl, hashnodeUrl] = await Promise.all([
       autoPostToDevTo(generated),
       autoPostToHashnode(generated),
-      autoPostToMedium(generated),
     ]);
     if (devtoUrl) postedUrls.push(`devto:${devtoUrl}`);
     if (hashnodeUrl) postedUrls.push(`hashnode:${hashnodeUrl}`);
-    if (mediumUrl) postedUrls.push(`medium:${mediumUrl}`);
 
     await db.insert(pressReleasesTable).values({
       title: generated.title,
