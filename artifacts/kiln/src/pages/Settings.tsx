@@ -111,9 +111,23 @@ export default function Settings() {
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
   const [shippingSaved, setShippingSaved] = useState(false);
+  const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
   const [contactEmail, setContactEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me/listings", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ listings: Array<{ price: number; status?: string }> }> : null)
+      .then(data => {
+        if (!data?.listings?.length) return;
+        const active = data.listings.filter(l => !l.status || l.status === "active" || l.status === "live");
+        const source = active.length > 0 ? active : data.listings;
+        const avg = Math.round(source.reduce((sum, l) => sum + l.price, 0) / source.length);
+        setAvgListingPrice(avg);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
@@ -614,7 +628,10 @@ export default function Settings() {
                       { label: "International buyer", flag: "🌍", type: "international" as const },
                     ] as const
                   ).map(({ label, flag, type }) => {
-                    const sampleTotal = 45;
+                    const sampleTotal = avgListingPrice ?? 45;
+                    const sampleLabel = avgListingPrice != null
+                      ? `Based on your listings avg. $${avgListingPrice}`
+                      : "Sample $45 order";
                     let cost: string;
                     if (shipping.offerFreeShipping) {
                       cost = "Free shipping";
@@ -631,7 +648,7 @@ export default function Settings() {
                           <span className="text-base leading-none">{flag}</span>
                           <div>
                             <p className="text-xs text-stone-300">{label}</p>
-                            <p className="text-[10px] text-stone-600 mt-0.5">Sample $45 order</p>
+                            <p className="text-[10px] text-stone-600 mt-0.5">{sampleLabel}</p>
                           </div>
                         </div>
                         <span className={`text-sm font-semibold ${isFree ? "text-emerald-400" : "text-stone-200"}`}>

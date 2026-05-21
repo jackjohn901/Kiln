@@ -80,6 +80,7 @@ export default function ShippingSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
 
   useEffect(() => {
     apiGet<{ shippingSettings?: Partial<ShippingSettings> }>("/api/me/settings")
@@ -90,6 +91,18 @@ export default function ShippingSettingsScreen() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    apiGet<{ listings: Array<{ price: number; status?: string }> }>("/api/me/listings")
+      .then((data) => {
+        if (!data?.listings?.length) return;
+        const active = data.listings.filter((l) => !l.status || l.status === "active" || l.status === "live");
+        const source = active.length > 0 ? active : data.listings;
+        const avg = Math.round(source.reduce((sum, l) => sum + l.price, 0) / source.length);
+        setAvgListingPrice(avg);
+      })
+      .catch(() => {});
   }, []);
 
   const saveShipping = async () => {
@@ -229,7 +242,10 @@ export default function ShippingSettingsScreen() {
                     { label: "International buyer", flag: "🌍", type: "international" as const },
                   ] as const
                 ).map(({ label, flag, type }, idx) => {
-                  const sampleTotal = 45;
+                  const sampleTotal = avgListingPrice ?? 45;
+                  const sampleLabel = avgListingPrice != null
+                    ? `Based on your listings avg. $${avgListingPrice}`
+                    : "Sample $45 order";
                   let cost: string;
                   if (shipping.offerFreeShipping) {
                     cost = "Free shipping";
@@ -252,7 +268,7 @@ export default function ShippingSettingsScreen() {
                         <Text style={styles.previewFlag}>{flag}</Text>
                         <View>
                           <Text style={[styles.previewRowLabel, { color: colors.foreground }]}>{label}</Text>
-                          <Text style={[styles.previewRowSub, { color: colors.mutedForeground }]}>Sample $45 order</Text>
+                          <Text style={[styles.previewRowSub, { color: colors.mutedForeground }]}>{sampleLabel}</Text>
                         </View>
                       </View>
                       <Text style={[styles.previewCost, { color: isFree ? "#34D399" : colors.foreground }]}>
