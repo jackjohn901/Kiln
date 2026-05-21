@@ -186,8 +186,32 @@ export default function Settings() {
     }).catch(() => { /* silent */ });
   }
 
-  const sections: { key: Section; icon: React.ElementType; label: string; desc: string }[] = [
-    { key: "notifications", icon: Bell, label: "Notifications", desc: "What alerts you get and how" },
+  const EMAIL_KEYS: (keyof KilnSettings)[] = [
+    "notif_email_digest",
+    "notif_email_follows",
+    "notif_email_comments",
+    "notif_email_new_sale",
+    "notif_email_new_booking",
+    "notif_email_commission_payment",
+    "notif_email_new_commission",
+    "notif_email_new_patron",
+    "notif_email_outbid",
+  ];
+  const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
+  const notifDesc = !contactEmail.trim()
+    ? "No email address set"
+    : activeEmailCount === 0
+    ? "Emails off · push only"
+    : `${activeEmailCount} of ${EMAIL_KEYS.length} email types active`;
+
+  const notifDescClass = !contactEmail.trim()
+    ? "text-amber-400"
+    : activeEmailCount === 0
+    ? "text-stone-500"
+    : "text-emerald-400";
+
+  const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string }[] = [
+    { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass },
     { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you" },
     { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings" },
     { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly" },
@@ -248,7 +272,7 @@ export default function Settings() {
 
         {!section && (
           <div className="space-y-2">
-            {sections.map(({ key, icon: Icon, label, desc }) => (
+            {sections.map(({ key, icon: Icon, label, desc, descClass }) => (
               <button
                 key={key}
                 onClick={() => setSection(key)}
@@ -259,7 +283,7 @@ export default function Settings() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-stone-200">{label}</p>
-                  <p className="text-xs text-stone-600 mt-0.5">{desc}</p>
+                  <p className={`text-xs mt-0.5 ${descClass ?? "text-stone-600"}`}>{desc}</p>
                 </div>
                 <ChevronRight size={16} className="text-stone-600" />
               </button>
@@ -297,19 +321,8 @@ export default function Settings() {
             <Toggle settingKey="notif_drops" label="Drop alerts" desc="New drops from artists you follow" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Email</p>
             {(() => {
-              const EMAIL_KEYS: (keyof KilnSettings)[] = [
-                "notif_email_digest",
-                "notif_email_follows",
-                "notif_email_comments",
-                "notif_email_new_sale",
-                "notif_email_new_booking",
-                "notif_email_commission_payment",
-                "notif_email_new_commission",
-                "notif_email_new_patron",
-                "notif_email_outbid",
-              ];
               const total = EMAIL_KEYS.length;
-              const active = EMAIL_KEYS.filter((k) => settings[k]).length;
+              const active = activeEmailCount;
               if (!contactEmail.trim()) {
                 return (
                   <div className="flex items-start gap-2 py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-2">
