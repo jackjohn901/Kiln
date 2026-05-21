@@ -11,6 +11,7 @@ import stripeConnectRouter from "./stripe-connect";
 import glazeOracleRouter from "./glaze-oracle";
 import grantWriterRouter from "./grant-writer";
 import pressRouter from "./press";
+import pinterestRouter from "./pinterest";
 import authRouter from "./auth";
 import feedRouter from "./feed";
 import postsRouter from "./posts";
@@ -166,5 +167,6 @@ router.use(firstAccessRouter);
 router.use(projectsRouter);
 router.use(studioEventsRouter);
 router.use(pressRouter);
+router.use(pinterestRouter);
 
 export default router;

@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { db } from "@workspace/db";
 import { pressReleasesTable } from "@workspace/db/schema";
 import { desc, eq } from "drizzle-orm";
+import { autoPostToPinterest } from "./pinterest";
 
 const router = Router();
 
@@ -196,14 +197,16 @@ async function runWeeklyRelease() {
     if (!generated.title || !generated.plaintextContent) return;
 
     const postedUrls: string[] = [];
-    const [devtoUrl, bskyUrl, mastodonUrl] = await Promise.all([
+    const [devtoUrl, bskyUrl, mastodonUrl, pinterestUrl] = await Promise.all([
       autoPostToDevTo(generated),
       autoPostToBluesky(generated),
       autoPostToMastodon(generated),
+      autoPostToPinterest(generated),
     ]);
     if (devtoUrl) postedUrls.push(`devto:${devtoUrl}`);
     if (bskyUrl) postedUrls.push(`bluesky:${bskyUrl}`);
     if (mastodonUrl) postedUrls.push(`mastodon:${mastodonUrl}`);
+    if (pinterestUrl) postedUrls.push(`pinterest:${pinterestUrl}`);
 
     await db.insert(pressReleasesTable).values({
       title: generated.title,
