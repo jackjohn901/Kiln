@@ -200,6 +200,7 @@ export default function Earnings() {
   });
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chargesEnabledRef = useRef(false);
+  const prevTotalsRef = useRef<EarningTotals | null>(null);
 
   const fetchBalance = useCallback(async (isBackground = false) => {
     if (isBackground) {
@@ -317,20 +318,24 @@ export default function Earnings() {
     finally { setDisconnectingStripe(false); }
   }
 
-  const fetchEarnings = useCallback(async () => {
+  const fetchEarnings = useCallback(async (): Promise<EarningTotals | undefined> => {
     try {
       const r = await fetch("/api/me/earnings", { credentials: "include" });
-      if (!r.ok) return;
+      if (!r.ok) return undefined;
       const data = await r.json() as { earnings?: EarningLine[]; totals?: { tips?: number; subscriptions?: number; sales?: number; shopSales?: number; total?: number } };
       setEarnings(data.earnings ?? []);
       const t = data.totals ?? {};
-      setTotals({
+      const newTotals: EarningTotals = {
         tips: t.tips ?? 0,
         subscriptions: t.subscriptions ?? 0,
         shopSales: t.shopSales ?? t.sales ?? 0,
         total: t.total ?? 0,
-      });
+      };
+      setTotals(newTotals);
+      prevTotalsRef.current = newTotals;
+      return newTotals;
     } catch { /* ignore */ }
+    return undefined;
   }, []);
 
   const fetchSales = useCallback(async () => {
@@ -396,8 +401,19 @@ export default function Earnings() {
 
   useEffect(() => {
     const POLL_MS = 60_000;
-    const timerId = setInterval(() => {
-      void fetchEarnings().then(triggerStatsFlash);
+    const timerId = setInterval(async () => {
+      const prev = prevTotalsRef.current;
+      const newTotals = await fetchEarnings();
+      if (
+        newTotals &&
+        prev &&
+        (newTotals.total !== prev.total ||
+          newTotals.tips !== prev.tips ||
+          newTotals.subscriptions !== prev.subscriptions ||
+          newTotals.shopSales !== prev.shopSales)
+      ) {
+        triggerStatsFlash();
+      }
       void fetchSales();
       if (chargesEnabledRef.current) void fetchBalance(true);
     }, POLL_MS);
