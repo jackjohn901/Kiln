@@ -318,11 +318,30 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       }).catch(() => {});
     }
 
+    let buyerDisplayName: string | null = null;
+    let buyerHandle: string | null = null;
+    let buyerAvatarUrl: string | null = null;
+    if (updated.buyerId) {
+      const [buyerProfile] = await db
+        .select({ displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
+        .from(profilesTable)
+        .where(eq(profilesTable.userId, updated.buyerId))
+        .limit(1);
+      if (buyerProfile) {
+        buyerDisplayName = buyerProfile.displayName ?? null;
+        buyerHandle = buyerProfile.handle ?? null;
+        buyerAvatarUrl = buyerProfile.avatarUrl ?? null;
+      }
+    }
+
     res.json({
       sale: {
         ...updated,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
+        buyerDisplayName,
+        buyerHandle,
+        buyerAvatarUrl,
       },
     });
   } catch (err) {

@@ -475,7 +475,14 @@ export default function SaleDetail() {
             <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Ship to</p>
             <div className="flex items-start gap-2">
               <MapPin size={14} className="text-stone-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-stone-400 whitespace-pre-line">{sale.shippingAddress}</p>
+              <div>
+                {(sale.buyerDisplayName?.trim() || sale.buyerHandle) && (
+                  <p className="text-sm font-medium text-stone-300 mb-0.5">
+                    {sale.buyerDisplayName?.trim() || `@${sale.buyerHandle}`}
+                  </p>
+                )}
+                <p className="text-sm text-stone-400 whitespace-pre-line">{sale.shippingAddress}</p>
+              </div>
             </div>
           </div>
         )}
