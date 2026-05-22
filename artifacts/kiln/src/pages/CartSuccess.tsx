@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer } from "lucide-react";
+import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer, Download } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 
@@ -189,12 +189,117 @@ export default function CartSuccess() {
 </body>
 </html>`;
 
+    openReceiptWindow(html, `Receipt_${refNum}`, false);
+  }
+
+  function handleDownloadPDF() {
+    function esc(text: string | null | undefined): string {
+      if (text == null) return "";
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    const refNum = esc(orderId);
+    const dateStr = esc(new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }));
+    const items = session?.lineItems ?? [];
+    const total = session?.amountTotal != null ? session.amountTotal / 100 : null;
+
+    const lineItemsHtml = items.map(item => `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.name)}${item.quantity > 1 ? `<span style="font-size:11px;color:#8a7e74;margin-left:6px;">× ${item.quantity}</span>` : ""}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">$${(item.amountTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join("");
+
+    const emailRow = session?.customerEmail ? `
+      <div style="margin-top:16px;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Receipt sent to</p>
+        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(session.customerEmail)}</p>
+      </div>
+    ` : "";
+
+    const totalRow = total != null ? `
+      <div style="display:flex;justify-content:flex-end;padding-top:12px;border-top:2px solid #2c2621;margin-top:4px;">
+        <div style="text-align:right;">
+          <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Total</p>
+          <p style="font-size:20px;font-weight:700;">$${total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+        </div>
+      </div>
+    ` : "";
+
+    const tableSection = lineItemsHtml ? `
+      <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+        <thead>
+          <tr>
+            <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
+            <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
+          </tr>
+        </thead>
+        <tbody>${lineItemsHtml}</tbody>
+      </table>
+      ${totalRow}
+    ` : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiln_Receipt_${refNum}.pdf</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fff; color: #2c2621; padding: 48px; max-width: 600px; margin: 0 auto; }
+    @media print { body { padding: 24px; } .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="background:#1e3a5f;color:#fff;padding:12px 20px;font-size:13px;text-align:center;margin:-48px -48px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    In the print dialog, set <strong>Destination → Save as PDF</strong>, then click <strong>Save</strong>.
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
+    <div>
+      <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
+    </div>
+    <div style="text-align:right;">
+      <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">Order Receipt</p>
+    </div>
+  </div>
+
+  <div style="margin-bottom:28px;">
+    <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Date</p>
+    <p style="font-size:13px;">${dateStr}</p>
+  </div>
+
+  ${tableSection}
+  ${emailRow}
+
+  <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
+    <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages</p>
+  </div>
+</body>
+</html>`;
+
+    openReceiptWindow(html, `Kiln_Receipt_${refNum}.pdf`, true);
+  }
+
+  function openReceiptWindow(html: string, title: string, autoPrint: boolean) {
     const win = window.open("", "_blank", "width=700,height=900");
     if (!win) return;
     win.document.write(html);
     win.document.close();
+    win.document.title = title;
     win.focus();
-    win.print();
+    if (autoPrint) {
+      setTimeout(() => win.print(), 300);
+    } else {
+      win.print();
+    }
   }
 
   if (loading) {
@@ -331,6 +436,13 @@ export default function CartSuccess() {
           >
             <Printer size={14} />
             Print receipt
+          </button>
+          <button
+            onClick={handleDownloadPDF}
+            className="flex items-center gap-2 rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors"
+          >
+            <Download size={14} />
+            Download PDF
           </button>
           <Link href="/shop">
             <button className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors">
