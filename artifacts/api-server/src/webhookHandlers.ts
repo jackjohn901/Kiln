@@ -1,5 +1,5 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { sendEmail, sendEmailWithRetry, orderConfirmationEmail, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
+import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable } from '@workspace/db';
@@ -153,11 +153,41 @@ export class WebhookHandlers {
           // small race; we retry a few times before falling back to the orders list.
           const receiptOrderId = await waitForSessionOrder(session.id);
 
+          // Fetch all order rows for this session to build itemised receipt email.
+          const sessionKey = `stripe:${session.id}`;
+          const sessionOrders = receiptOrderId
+            ? await db
+                .select({
+                  title: ordersTable.title,
+                  amount: ordersTable.amount,
+                  processingWindowDays: ordersTable.processingWindowDays,
+                  displayName: profilesTable.displayName,
+                })
+                .from(ordersTable)
+                .leftJoin(profilesTable, eq(ordersTable.sellerId, profilesTable.userId))
+                .where(eq(ordersTable.notes, sessionKey))
+                .catch(() => [])
+            : [];
+
+          const items: ManualPayoutReceiptItem[] = sessionOrders.length > 0
+            ? sessionOrders.map((o) => ({
+                title: o.title ?? 'Item',
+                quantity: 1,
+                priceCents: o.amount ?? undefined,
+                artistName: o.displayName ?? undefined,
+              }))
+            : [];
+
+          const processingWindowDays = sessionOrders.reduce<number | null>((max, o) => {
+            if (o.processingWindowDays == null) return max;
+            return max == null ? o.processingWindowDays : Math.max(max, o.processingWindowDays);
+          }, null);
+
           sendEmailWithRetry(
             {
               to: email,
               subject: `Your Kiln order #${orderId} is confirmed`,
-              html: orderConfirmationEmail(email, orderId, amount, receiptOrderId ?? undefined),
+              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined),
             },
             { contextId: session.id, label: 'order confirmation' },
           ).catch((err) => logger.error({ err, sessionId: session.id, to: email }, 'Unexpected error in sendEmailWithRetry for order confirmation'));
