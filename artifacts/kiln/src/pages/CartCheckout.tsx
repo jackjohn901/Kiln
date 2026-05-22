@@ -34,6 +34,24 @@ const EMPTY_ADDR: AddressForm = {
   name: "", email: "", phone: "", address: "", city: "", state: "", zip: "", country: "US",
 };
 
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  "united states": "US",
+  "usa": "US",
+  "us": "US",
+  "canada": "CA",
+  "united kingdom": "GB",
+  "uk": "GB",
+  "australia": "AU",
+  "germany": "DE",
+  "france": "FR",
+  "japan": "JP",
+};
+
+function normalizeCountryCode(raw: string): string {
+  const lower = raw.trim().toLowerCase();
+  return COUNTRY_NAME_TO_CODE[lower] ?? (raw.trim().length === 2 ? raw.trim().toUpperCase() : "US");
+}
+
 // Per-artist group in cart
 interface ArtistGroup {
   artistId: string;
@@ -122,6 +140,34 @@ export default function CartCheckout() {
 
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
+
+  // Pre-fill address from buyer's saved default shipping address
+  useEffect(() => {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ defaultShippingAddress?: { street?: string; city?: string; state?: string; zip?: string; country?: string } | null }> : null)
+      .then(data => {
+        const saved = data?.defaultShippingAddress;
+        if (!saved) return;
+        const street = typeof saved.street === "string" ? saved.street.trim() : "";
+        const city = typeof saved.city === "string" ? saved.city.trim() : "";
+        const state = typeof saved.state === "string" ? saved.state.trim() : "";
+        const zip = typeof saved.zip === "string" ? saved.zip.trim() : "";
+        const country = typeof saved.country === "string" && saved.country.trim()
+          ? normalizeCountryCode(saved.country)
+          : "US";
+        if (street || city || zip) {
+          setAddr(prev => ({
+            ...prev,
+            address: prev.address || street,
+            city: prev.city || city,
+            state: prev.state || state,
+            zip: prev.zip || zip,
+            country: prev.country === "US" ? country : prev.country,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch shipping rates for each unique artist in the cart
   useEffect(() => {

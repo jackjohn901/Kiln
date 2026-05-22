@@ -256,6 +256,33 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
   }
 });
 
+/**
+ * Look up the buyer's stored default shipping address and format it as a
+ * multi-line string suitable for stamping onto an order record.
+ * Returns null when no address is stored or the record is empty.
+ */
+async function getBuyerShippingAddress(buyerId: string): Promise<string | null> {
+  try {
+    const [row] = await db
+      .select({ defaultShippingAddress: userSettingsTable.defaultShippingAddress })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, buyerId))
+      .limit(1);
+    if (!row?.defaultShippingAddress) return null;
+    const addr = row.defaultShippingAddress as Record<string, unknown>;
+    const street = typeof addr.street === "string" ? addr.street.trim() : "";
+    const city = typeof addr.city === "string" ? addr.city.trim() : "";
+    const state = typeof addr.state === "string" ? addr.state.trim() : "";
+    const zip = typeof addr.zip === "string" ? addr.zip.trim() : "";
+    const country = typeof addr.country === "string" ? addr.country.trim() : "";
+    const line2 = [city, state, zip].filter(Boolean).join(", ");
+    const parts = [street, line2, country].filter(Boolean);
+    return parts.length > 0 ? parts.join("\n") : null;
+  } catch {
+    return null;
+  }
+}
+
 // POST /me/orders — create a single order after confirmed Stripe payment.
 // Used as a fallback when there is no pre-checkout item snapshot.
 // All commerce-critical fields (amount) are derived from the verified Stripe session.
@@ -289,6 +316,9 @@ router.post("/me/orders", async (req, res): Promise<void> => {
     if (existing.length > 0) {
       res.json({ orderId: existing[0].id, duplicate: true }); return;
     }
+
+    // Look up buyer's default shipping address once, reuse across all order rows.
+    const buyerShippingAddress = await getBuyerShippingAddress(userId);
 
     // If this session has listingIds in metadata, delegate to the bulk endpoint logic
     // instead of creating a generic single order.
@@ -332,6 +362,7 @@ router.post("/me/orders", async (req, res): Promise<void> => {
           amount: listing.price * qty,
           currency: "USD",
           status: "confirmed",
+          shippingAddress: buyerShippingAddress,
           // INVARIANT: notes must always equal the dedupeKey so every row in a session
           // can be grouped and deduplicated. Never omit this field on any insert path.
           notes: dedupeKey,
@@ -362,6 +393,7 @@ router.post("/me/orders", async (req, res): Promise<void> => {
       amount: amountUsd,
       currency: "USD",
       status: "confirmed",
+      shippingAddress: buyerShippingAddress,
       // INVARIANT: notes must always equal the dedupeKey so every row in a session
       // can be grouped and deduplicated. Never omit this field on any insert path.
       notes: dedupeKey,
@@ -467,6 +499,9 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
       processingWindowLabelMap.set(row.userId, label);
     }
 
+    // Look up buyer's default shipping address once, reuse across all order rows.
+    const buyerShippingAddress = await getBuyerShippingAddress(userId);
+
     const orderIds: string[] = [];
     const sellerIdSet = new Set<string>();
     // Track the processing window values actually stamped on each order row so the
@@ -501,6 +536,7 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         amount: listing.price * qty,
         currency: "USD",
         status: "confirmed",
+        shippingAddress: buyerShippingAddress,
         // All order rows in a session share the deduplication key so they can be grouped.
         notes: dedupeKey,
         processingWindowDays: stampedWindow,

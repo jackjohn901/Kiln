@@ -6,6 +6,23 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
+interface ShippingAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
+function isValidShippingAddress(v: unknown): v is ShippingAddress {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  const obj = v as Record<string, unknown>;
+  for (const key of ["street", "city", "state", "zip", "country"]) {
+    if (key in obj && obj[key] !== null && typeof obj[key] !== "string") return false;
+  }
+  return true;
+}
+
 // GET /me/settings
 router.get("/me/settings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -13,7 +30,17 @@ router.get("/me/settings", async (req, res): Promise<void> => {
     db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, req.user.id)),
     db.select({ contactEmail: profilesTable.contactEmail, phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, req.user.id)),
   ]);
-  if (!row) { res.json({ settings: {}, shippingSettings: {}, paymentSettings: {}, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null }); return; }
+  if (!row) {
+    res.json({
+      settings: {},
+      shippingSettings: {},
+      paymentSettings: {},
+      defaultShippingAddress: null,
+      contactEmail: profile?.contactEmail ?? null,
+      phoneNumber: profile?.phoneNumber ?? null,
+    });
+    return;
+  }
   res.json({ ...row, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null });
 });
 
@@ -21,7 +48,7 @@ router.get("/me/settings", async (req, res): Promise<void> => {
 router.patch("/me/settings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
-  const { settings, shippingSettings, paymentSettings, contactEmail, phoneNumber } = req.body;
+  const { settings, shippingSettings, paymentSettings, contactEmail, phoneNumber, defaultShippingAddress } = req.body;
 
   // Validate processingWindow if provided in paymentSettings
   if (paymentSettings !== undefined && paymentSettings !== null && typeof paymentSettings === "object") {
@@ -31,6 +58,14 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
         res.status(400).json({ error: "processingWindow must be an integer between 1 and 30" });
         return;
       }
+    }
+  }
+
+  // Validate defaultShippingAddress if provided
+  if (defaultShippingAddress !== undefined && defaultShippingAddress !== null) {
+    if (!isValidShippingAddress(defaultShippingAddress)) {
+      res.status(400).json({ error: "Invalid defaultShippingAddress format" });
+      return;
     }
   }
 
@@ -51,12 +86,16 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
       ...(settings !== undefined && { settings }),
       ...(shippingSettings !== undefined && { shippingSettings }),
       ...(paymentSettings !== undefined && { paymentSettings }),
+      ...(defaultShippingAddress !== undefined && { defaultShippingAddress: defaultShippingAddress ?? null }),
     }).where(eq(userSettingsTable.userId, userId)).returning();
     res.json(updated);
   } else {
     const [created] = await db.insert(userSettingsTable).values({
-      userId, settings: settings ?? {}, shippingSettings: shippingSettings ?? {},
+      userId,
+      settings: settings ?? {},
+      shippingSettings: shippingSettings ?? {},
       paymentSettings: paymentSettings ?? {},
+      defaultShippingAddress: defaultShippingAddress ?? null,
     }).returning();
     res.json(created);
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2 } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
@@ -103,7 +103,19 @@ function saveSettings(s: KilnSettings) {
   try { localStorage.setItem(SETTING_KEY, JSON.stringify(s)); } catch {}
 }
 
-type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping";
+interface DefaultShippingAddress {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+function defaultAddress(): DefaultShippingAddress {
+  return { street: "", city: "", state: "", zip: "", country: "" };
+}
+
+type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping" | "address";
 
 export default function Settings() {
   const { profile, logout } = useProfile();
@@ -112,7 +124,7 @@ export default function Settings() {
   const [section, setSection] = useState<Section | null>(() => {
     const params = new URLSearchParams(search);
     const s = params.get("section");
-    const valid: Section[] = ["notifications", "privacy", "display", "account", "payments", "shipping"];
+    const valid: Section[] = ["notifications", "privacy", "display", "account", "payments", "shipping", "address"];
     return (s && (valid as string[]).includes(s)) ? (s as Section) : null;
   });
   const [saved, setSaved] = useState(false);
@@ -127,6 +139,8 @@ export default function Settings() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneSaved, setPhoneSaved] = useState(false);
   const [phoneValidationError, setPhoneValidationError] = useState(false);
+  const [address, setAddress] = useState<DefaultShippingAddress>(defaultAddress);
+  const [addressSaved, setAddressSaved] = useState(false);
   const [settingsStatus, setSettingsStatus] = useState<"loading" | "loaded" | "error">("loading");
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -145,7 +159,7 @@ export default function Settings() {
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null }> : null)
       .then(data => {
         if (!data) {
           setSettingsStatus("error");
@@ -164,6 +178,9 @@ export default function Settings() {
         }
         setContactEmail(data.contactEmail ?? "");
         setPhoneNumber((data as Record<string, unknown>).phoneNumber as string ?? "");
+        if (data.defaultShippingAddress) {
+          setAddress({ ...defaultAddress(), ...data.defaultShippingAddress });
+        }
         setSettingsStatus("loaded");
       })
       .catch(() => {
@@ -278,10 +295,18 @@ export default function Settings() {
 
   const notifWarn = settingsStatus === "loaded" && !!contactEmail.trim() && (activeEmailCount === 0 || (emailPaused && activeEmailCount > 0));
 
+  const hasAddress = !!(address.street.trim() || address.city.trim());
+  const addressDesc = settingsStatus !== "loaded"
+    ? "—"
+    : hasAddress
+    ? [address.street.trim(), address.city.trim(), address.state.trim()].filter(Boolean).join(", ")
+    : "No default address saved";
+
   const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string; warn?: boolean }[] = [
     { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass, warn: notifWarn },
     { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you" },
     { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings" },
+    { key: "address", icon: MapPin, label: "Delivery Address", desc: addressDesc },
     { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly" },
     { key: "shipping", icon: Truck, label: "Shipping Rates", desc: "Your domestic and international rates" },
     { key: "account", icon: User, label: "Account", desc: "Profile, security, and data" },
@@ -296,6 +321,24 @@ export default function Settings() {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentSettings: next }),
+    }).catch(() => { /* silent */ });
+  }
+
+  function saveAddress(next: DefaultShippingAddress) {
+    const payload = {
+      street: next.street.trim(),
+      city: next.city.trim(),
+      state: next.state.trim(),
+      zip: next.zip.trim(),
+      country: next.country.trim(),
+    };
+    setAddress(next);
+    setAddressSaved(true);
+    setTimeout(() => setAddressSaved(false), 1800);
+    fetch("/api/me/settings", {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ defaultShippingAddress: payload }),
     }).catch(() => { /* silent */ });
   }
 
@@ -540,6 +583,106 @@ export default function Settings() {
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Videos</p>
             <Toggle settingKey="display_autoplay" label="Autoplay videos" desc="Process reels play automatically" />
             <Toggle settingKey="display_sound" label="Sound on by default" desc="Videos play with audio" />
+          </div>
+        )}
+
+        {section === "address" && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-1">How it works</p>
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  Save a default shipping address so it's automatically attached to your orders when you check out. Artists use this to ship your purchases directly to you.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-stone-500 mb-1 block">Street address</label>
+                  <input
+                    type="text"
+                    value={address.street}
+                    onChange={(e) => setAddress((a) => ({ ...a, street: e.target.value }))}
+                    placeholder="123 Main St, Apt 4B"
+                    maxLength={200}
+                    className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">City</label>
+                    <input
+                      type="text"
+                      value={address.city}
+                      onChange={(e) => setAddress((a) => ({ ...a, city: e.target.value }))}
+                      placeholder="Portland"
+                      maxLength={100}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">State / Province</label>
+                    <input
+                      type="text"
+                      value={address.state}
+                      onChange={(e) => setAddress((a) => ({ ...a, state: e.target.value }))}
+                      placeholder="OR"
+                      maxLength={100}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">ZIP / Postal code</label>
+                    <input
+                      type="text"
+                      value={address.zip}
+                      onChange={(e) => setAddress((a) => ({ ...a, zip: e.target.value }))}
+                      placeholder="97201"
+                      maxLength={20}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1 block">Country</label>
+                    <input
+                      type="text"
+                      value={address.country}
+                      onChange={(e) => setAddress((a) => ({ ...a, country: e.target.value }))}
+                      placeholder="United States"
+                      maxLength={100}
+                      className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-700 focus:border-amber-500/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {hasAddress && (
+                <div className="rounded-xl border border-white/8 bg-stone-800/40 px-4 py-3">
+                  <p className="text-xs text-stone-500 mb-1.5">Preview</p>
+                  <p className="text-sm text-stone-300 whitespace-pre-line">
+                    {[address.street.trim(), [address.city.trim(), address.state.trim(), address.zip.trim()].filter(Boolean).join(", "), address.country.trim()].filter(Boolean).join("\n")}
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={() => saveAddress(address)}
+                className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+              >
+                {addressSaved ? <><Check size={14} /> Saved!</> : "Save delivery address"}
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/8 bg-stone-900/40 px-5 py-4">
+              <p className="text-xs text-stone-600 leading-relaxed">
+                <span className="text-stone-400 font-medium">Privacy: </span>
+                Your shipping address is only shared with artists when you make a purchase — never shown publicly on your profile.
+              </p>
+            </div>
           </div>
         )}
 
