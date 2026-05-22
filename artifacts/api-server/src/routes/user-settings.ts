@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { userSettingsTable, profilesTable } from "@workspace/db";
+
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -10,17 +11,17 @@ router.get("/me/settings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [[row], [profile]] = await Promise.all([
     db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, req.user.id)),
-    db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, req.user.id)),
+    db.select({ contactEmail: profilesTable.contactEmail, phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, req.user.id)),
   ]);
-  if (!row) { res.json({ settings: {}, shippingSettings: {}, paymentSettings: {}, contactEmail: profile?.contactEmail ?? null }); return; }
-  res.json({ ...row, contactEmail: profile?.contactEmail ?? null });
+  if (!row) { res.json({ settings: {}, shippingSettings: {}, paymentSettings: {}, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null }); return; }
+  res.json({ ...row, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null });
 });
 
 // PATCH /me/settings
 router.patch("/me/settings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
-  const { settings, shippingSettings, paymentSettings, contactEmail } = req.body;
+  const { settings, shippingSettings, paymentSettings, contactEmail, phoneNumber } = req.body;
 
   // Validate processingWindow if provided in paymentSettings
   if (paymentSettings !== undefined && paymentSettings !== null && typeof paymentSettings === "object") {
@@ -33,10 +34,13 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     }
   }
 
-  // Persist contactEmail to profiles table if provided
-  if (typeof contactEmail === "string") {
+  // Persist contactEmail and phoneNumber to profiles table if provided
+  const profileUpdates: Record<string, string | null> = {};
+  if (typeof contactEmail === "string") profileUpdates.contactEmail = contactEmail.trim() || null;
+  if (typeof phoneNumber === "string") profileUpdates.phoneNumber = phoneNumber.trim() || null;
+  if (Object.keys(profileUpdates).length > 0) {
     await db.update(profilesTable)
-      .set({ contactEmail: contactEmail.trim() || null })
+      .set(profileUpdates)
       .where(eq(profilesTable.userId, userId))
       .catch(() => {});
   }

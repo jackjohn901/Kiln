@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable } from "@workspace/db";
+import { sendSmsIfOptedIn } from "../lib/sms";
 import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -288,6 +289,17 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       .set(updates)
       .where(eq(ordersTable.id, req.params.id))
       .returning();
+
+    // SMS the buyer when the seller marks as shipped
+    if (status === "shipped" && existing.status !== "shipped" && updated.buyerId) {
+      const tracking = updated.trackingNumber ? ` Tracking: ${updated.trackingNumber}.` : "";
+      Promise.all([
+        db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
+        db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, updated.buyerId)),
+      ]).then(([[s], [prof]]) => {
+        sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", s?.settings as Record<string, unknown> | null, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`);
+      }).catch(() => {});
+    }
 
     res.json({
       sale: {

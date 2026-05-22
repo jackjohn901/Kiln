@@ -46,6 +46,10 @@ interface KilnSettings {
   notif_email_new_commission: boolean;
   notif_email_new_patron: boolean;
   notif_email_outbid: boolean;
+  notif_sms_paused: boolean;
+  notif_sms_outbid: boolean;
+  notif_sms_drops: boolean;
+  notif_sms_shipped: boolean;
   privacy_profile_public: boolean;
   privacy_show_location: boolean;
   privacy_allow_messages: boolean;
@@ -81,6 +85,10 @@ function defaultSettings(): KilnSettings {
     notif_email_new_commission: true,
     notif_email_new_patron: true,
     notif_email_outbid: true,
+    notif_sms_paused: false,
+    notif_sms_outbid: true,
+    notif_sms_drops: true,
+    notif_sms_shipped: true,
     privacy_profile_public: true,
     privacy_show_location: true,
     privacy_allow_messages: true,
@@ -116,6 +124,9 @@ export default function Settings() {
   const [contactEmail, setContactEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneSaved, setPhoneSaved] = useState(false);
+  const [phoneValidationError, setPhoneValidationError] = useState(false);
   const [settingsStatus, setSettingsStatus] = useState<"loading" | "loaded" | "error">("loading");
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -152,6 +163,7 @@ export default function Settings() {
           savePaymentSettings({ ...data.paymentSettings } as ArtistPayments);
         }
         setContactEmail(data.contactEmail ?? "");
+        setPhoneNumber((data as Record<string, unknown>).phoneNumber as string ?? "");
         setSettingsStatus("loaded");
       })
       .catch(() => {
@@ -183,6 +195,23 @@ export default function Settings() {
       }
       return next;
     });
+  }
+
+  function savePhoneNumber(phone: string) {
+    const trimmed = phone.trim();
+    if (trimmed && !/^\+?[\d\s\-().]{7,20}$/.test(trimmed)) {
+      setPhoneValidationError(true);
+      return;
+    }
+    setPhoneValidationError(false);
+    fetch("/api/me/settings", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phoneNumber: trimmed }),
+    })
+      .then(() => { setPhoneSaved(true); setTimeout(() => setPhoneSaved(false), 2000); })
+      .catch(() => {});
   }
 
   function saveContactEmail(email: string) {
@@ -440,6 +469,57 @@ export default function Settings() {
               {emailValidationError && (
                 <p className="text-xs text-red-400 mt-1.5">Please enter a valid email address.</p>
               )}
+            </div>
+
+            {/* SMS Notifications */}
+            <div className="mt-2 rounded-2xl border border-white/8 bg-stone-900/40 p-4 space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Smartphone size={14} className="text-sky-400" />
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">SMS Notifications</p>
+                <span className="rounded-full bg-sky-500/15 border border-sky-500/25 px-2 py-0.5 text-[9px] font-medium text-sky-400">via Twilio</span>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed">Get text alerts for time-sensitive events — auction bids, drop openings, and shipped orders. Standard messaging rates apply.</p>
+
+              <div className="flex items-center justify-between py-2 border-b border-white/5">
+                <div>
+                  <p className="text-sm text-stone-200">Pause all SMS</p>
+                  <p className="text-xs text-stone-600 mt-0.5">Temporarily stop all texts</p>
+                </div>
+                <button
+                  onClick={() => toggle("notif_sms_paused")}
+                  className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${settings.notif_sms_paused ? "bg-red-500" : "bg-stone-700"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings.notif_sms_paused ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+
+              <div className={settings.notif_sms_paused ? "opacity-40 pointer-events-none" : undefined}>
+                <Toggle settingKey="notif_sms_outbid" label="Outbid alerts" desc="Text when someone outbids you in an auction" />
+                <Toggle settingKey="notif_sms_drops" label="Drop waitlist confirmations" desc="Text when you join a drop waitlist" />
+                <Toggle settingKey="notif_sms_shipped" label="Order shipped" desc="Text when a seller marks your order as shipped" />
+              </div>
+
+              <div className="pt-1">
+                <p className="text-sm text-stone-200 mb-1">Mobile number</p>
+                <p className="text-xs text-stone-600 mb-2">Include country code (e.g. +1 555 123 4567). Never shown publicly.</p>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => { setPhoneNumber(e.target.value); if (phoneValidationError) setPhoneValidationError(false); }}
+                    onBlur={(e) => savePhoneNumber(e.target.value)}
+                    placeholder="+1 555 123 4567"
+                    className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${phoneValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-sky-500/50"}`}
+                  />
+                  {phoneSaved && <span className="text-xs text-emerald-400 shrink-0">Saved ✓</span>}
+                </div>
+                {phoneValidationError && (
+                  <p className="text-xs text-red-400 mt-1.5">Please enter a valid phone number with country code.</p>
+                )}
+                {!phoneNumber.trim() && !settings.notif_sms_paused && (
+                  <p className="text-xs text-amber-500/70 mt-1.5">Add a phone number above to receive SMS alerts.</p>
+                )}
+              </div>
             </div>
           </div>
         )}

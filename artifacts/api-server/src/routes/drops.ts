@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { dropsTable, dropWaitlistsTable, notificationsTable } from "@workspace/db";
+import { dropsTable, dropWaitlistsTable, notificationsTable, userSettingsTable, profilesTable } from "@workspace/db";
+import { sendSmsIfOptedIn } from "../lib/sms";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -86,6 +87,13 @@ router.post("/drops/:id/waitlist", async (req, res): Promise<void> => {
   await db.insert(dropWaitlistsTable).values({ dropId, userId });
   const user = req.user; const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Someone";
   await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: drop.artistId, type: "drop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `joined the waitlist for your drop: ${drop.title}`, link: `/drops` });
+  // SMS confirmation to the buyer who joined
+  Promise.all([
+    db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, userId)),
+    db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, userId)),
+  ]).then(([[s], [prof]]) => {
+    sendSmsIfOptedIn(userId, prof?.phoneNumber, "notif_sms_drops", s?.settings as Record<string, unknown> | null, `Kiln: You're on the waitlist for "${drop.title}"! We'll text you when it drops. https://kilnfire.replit.app/kiln/drops/${drop.id}`);
+  }).catch(() => {});
   res.json({ onWaitlist: true });
 });
 

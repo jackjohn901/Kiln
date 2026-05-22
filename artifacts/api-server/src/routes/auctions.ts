@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { auctionsTable, auctionBidsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
+import { auctionsTable, auctionBidsTable, notificationsTable, usersTable, userSettingsTable, profilesTable } from "@workspace/db";
+import { sendSmsIfOptedIn } from "../lib/sms";
 import { eq, desc, and, gt } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
@@ -61,10 +62,12 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
     Promise.all([
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, prevBidderId)),
       db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
-    ]).then(([[prev], [s]]) => {
+      db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, prevBidderId)),
+    ]).then(([[prev], [s], [prof]]) => {
       const emailSettings = (s?.settings as Record<string, boolean> | null);
       const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_outbid !== false;
       if (wantsEmail && prev?.email) sendEmail({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }).catch(() => {});
+      sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilnfire.replit.app/kiln/auctions/${auction.id}`);
     }).catch(() => {});
   }
   broadcastAll({ type: "bid", auctionId: auction.id, currentBid: bidAmount, bidCount: auction.bidCount + 1, bidderName: name });
