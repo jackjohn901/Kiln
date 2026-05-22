@@ -315,4 +315,4 @@ export function getWorkshopsByMedium(medium: string): Workshop[] {
   return workshops.filter((w) => w.medium === medium);
 }
 
-export const workshopMediums = ["All", "Ceramics", "Glass", "Metal", "Fiber", "Wood", "Enamel"];
+export const workshopMediums = ["All", "Ceramics", "Glass", "Painting", "Resin", "Fiber", "Metal", "Wood", "Drawing", "Printmaking", "Photography", "Enamel", "Sculpture", "Mosaic", "Leather"];

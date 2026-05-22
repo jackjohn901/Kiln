@@ -19,7 +19,7 @@ const TRENDING_TECHNIQUES = [
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
-const MEDIUMS = ["All", "Glass", "Metal", "Ceramics", "Fiber", "Wood", "Enamel", "Sculpture", "Mixed"];
+const MEDIUMS = ["All", "Ceramics", "Glass", "Painting", "Resin", "Fiber", "Metal", "Wood", "Drawing", "Printmaking", "Photography", "Enamel", "Sculpture", "Mosaic", "Leather", "Mixed"];
 const STATUS_FILTERS = ["Any", "Open", "Waitlisted"] as const;
 
 const STATUS_UI: Record<CommissionStatus, { label: string; color: string; Icon: typeof CheckCircle }> = {
