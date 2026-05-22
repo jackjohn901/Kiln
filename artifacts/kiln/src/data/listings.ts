@@ -16,6 +16,9 @@ export interface Listing {
   originalListingId?: string;
   royaltyPercent?: number;
   shipsTo?: string[];
+  currency?: string;
+  bundleMinQty?: number | null;
+  bundleDiscountPct?: number | null;
 }
 
 export const listings: Listing[] = [

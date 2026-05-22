@@ -699,10 +699,21 @@ export default function ListingDetail() {
             <div className="mb-5">
               <div className="flex items-baseline gap-3 mb-1.5">
                 <span className="font-serif text-4xl text-amber-200 font-medium">{formatPrice(listing.price)}</span>
+                {(listing as any).currency && (listing as any).currency !== "USD" && (
+                  <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-400 uppercase">
+                    {(listing as any).currency}
+                  </span>
+                )}
                 {listing.price >= 15000 && (
                   <span className="text-xs text-stone-600">Payment plans available</span>
                 )}
               </div>
+              {(listing as any).bundleMinQty && (listing as any).bundleDiscountPct && (
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-400">
+                  <span>🎁</span>
+                  Buy {(listing as any).bundleMinQty}+ and save {(listing as any).bundleDiscountPct}%
+                </div>
+              )}
               {artistShipping && (
                 <div className="flex flex-wrap items-center gap-2">
                   {artistShipping.offerFreeShipping ? (

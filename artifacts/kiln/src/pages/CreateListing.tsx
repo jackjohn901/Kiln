@@ -62,6 +62,8 @@ export default function CreateListing() {
     tags: [] as string[],
     imageUrl: "",
   });
+  const [bundleMinQty, setBundleMinQty] = useState("");
+  const [bundleDiscountPct, setBundleDiscountPct] = useState("");
   const [isResale, setIsResale] = useState(false);
   const [originalArtistName, setOriginalArtistName] = useState("");
   const [originalListingId, setOriginalListingId] = useState("");
@@ -148,6 +150,8 @@ export default function CreateListing() {
           originalArtistName,
           originalListingId,
           royaltyPercent: Number(royaltyPercent),
+          bundleMinQty: bundleMinQty ? Number(bundleMinQty) : null,
+          bundleDiscountPct: bundleDiscountPct ? Number(bundleDiscountPct) : null,
         }),
       });
       if (!res.ok) {
@@ -443,6 +447,42 @@ export default function CreateListing() {
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Bundle Deal */}
+          <div className="rounded-xl border border-white/8 bg-stone-900/40 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-stone-400 mb-0.5">Bundle deal <span className="text-stone-600 text-xs font-normal">(optional)</span></p>
+              <p className="text-xs text-stone-600">Offer a discount when collectors buy multiple pieces.</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="mb-1 block text-xs text-stone-500">Min. quantity</label>
+                <input
+                  type="number"
+                  min="2"
+                  value={bundleMinQty}
+                  onChange={(e) => setBundleMinQty(e.target.value)}
+                  placeholder="e.g. 3"
+                  className="w-full rounded-lg border border-white/10 bg-stone-900/60 px-3 py-2 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="mb-1 block text-xs text-stone-500">Discount %</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={bundleDiscountPct}
+                  onChange={(e) => setBundleDiscountPct(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full rounded-lg border border-white/10 bg-stone-900/60 px-3 py-2 text-sm text-white placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+                />
+              </div>
+            </div>
+            {bundleMinQty && bundleDiscountPct && (
+              <p className="text-[11px] text-emerald-400">🎁 Buy {bundleMinQty}+ and save {bundleDiscountPct}%</p>
             )}
           </div>
 

@@ -558,18 +558,42 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {order.trackingNumber && (
-          <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Tracking</p>
-            <div className="flex items-center gap-2">
-              <Truck size={14} className="text-blue-400 shrink-0" />
-              <p className="text-sm text-stone-300">
-                Tracking number:{" "}
-                <span className="font-mono text-stone-100">{order.trackingNumber}</span>
-              </p>
+        {order.trackingNumber && (() => {
+          const tn = order.trackingNumber.replace(/\s/g, "");
+          const carrier = /^1Z/i.test(tn) ? "UPS"
+            : /^(94|93|92|94|95)\d{18,}/.test(tn) || /^\d{22}$/.test(tn) || /^[A-Z]{2}\d{9}US$/i.test(tn) ? "USPS"
+            : /^\d{12}$/.test(tn) || /^\d{15}$/.test(tn) || /^\d{20}$/.test(tn) ? "FedEx"
+            : /^JD\d{18}$/i.test(tn) || /^\d{10}$/.test(tn) ? "DHL"
+            : null;
+          const trackingUrl = carrier === "UPS" ? `https://www.ups.com/track?tracknum=${tn}`
+            : carrier === "USPS" ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${tn}`
+            : carrier === "FedEx" ? `https://www.fedex.com/fedextrack/?trknbr=${tn}`
+            : carrier === "DHL" ? `https://www.dhl.com/en/express/tracking.html?AWB=${tn}`
+            : null;
+          return (
+            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Tracking</p>
+              <div className="flex items-center gap-2">
+                <Truck size={14} className="text-blue-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {carrier && <p className="text-[10px] font-semibold text-stone-500 uppercase mb-0.5">{carrier}</p>}
+                  {trackingUrl ? (
+                    <a
+                      href={trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 break-all transition-colors"
+                    >
+                      {order.trackingNumber}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-sm text-stone-100 break-all">{order.trackingNumber}</span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {order.shippingAddress && (
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">

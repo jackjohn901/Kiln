@@ -17,6 +17,8 @@ export const listingsTable = pgTable("listings", {
   imageUrls: text("image_urls").array().default([]),
   price: integer("price").notNull(),
   currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  bundleMinQty: integer("bundle_min_qty"),
+  bundleDiscountPct: integer("bundle_discount_pct"),
   isSold: boolean("is_sold").notNull().default(false),
   isAvailable: boolean("is_available").notNull().default(true),
   shipsFrom: varchar("ships_from", { length: 100 }),

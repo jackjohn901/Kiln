@@ -1,0 +1,35 @@
+Content & Discovery
+
+Stories / Ephemeral posts — 24-hour behind-the-scenes moments are core to creator culture; the API already has a story expiry job but the feed UI doesn't fully surface them
+Live streaming — real-time studio demos, kiln openings, live Q&As; TikTok Live and Instagram Live drive enormous creator-audience bonding
+Art challenges / prompts — weekly hashtag challenges (#WheelThrowWednesday) that generate community content and virality
+Visual search — "find more like this piece" using image similarity, not just keywords
+Series / Collections — group related posts into a named series (e.g. "Spring Glaze Experiments")
+Collector & Buyer Side
+
+Collector profiles — buyers should have a public collection page showing what they own and love, not just artists having profiles
+Buyer reviews — verified purchase reviews on artist profiles are the #1 trust signal on Etsy/ArtStation
+Shipping carrier tracking — pull live tracking from USPS/FedEx/UPS automatically instead of copy-paste tracking numbers
+Price alerts — "notify me if this artist lists something under $200"
+Creator Monetization
+
+Referral / affiliate system — artists earn a cut when they bring in new collectors or fellow artists
+Digital downloads — printable patterns, stitch charts, glaze recipes — passive income beyond physical work
+Tip jar on posts — one-tap tipping directly from the feed card, not only from the earnings page
+Bundle deals — "buy 3 mugs, save 15%" — promotional tooling artists use constantly on Etsy
+Community & Social
+
+Collab posts — two artists co-credit a piece they made together
+Guild challenges — guild admins can post prompts; entries are tagged and surfaced in the guild feed
+Mentorship marketplace — currently a static reference page; should be bookable like workshops
+Events board — IRL gallery shows, craft fairs, studio open days — the kind of thing artists post in Facebook groups today
+Trust & Professional
+
+Artist verification badge — clear signal of established, active sellers
+Craft lineage / DNA tree — interactive who-taught-whom visual graph; unique to Kiln and no other platform has it — huge differentiation opportunity
+Portfolio mode — a clean, print-quality presentation layer for galleries and grant applications, separate from the social feed
+Operational
+
+Mobile push notifications — SMS is great for urgent events, but a native push channel (Expo notifications) for every in-app action would dramatically improve retention
+Multi-currency pricing — international collectors see prices in their currency
+Artist newsletter — send a monthly update directly to patrons and followers, like a Substack built into the platform

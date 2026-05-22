@@ -6,8 +6,9 @@ import {
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
   SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown, GitBranch,
-  Mic, MicOff,
+  Mic, MicOff, DollarSign, BadgeCheck,
 } from "lucide-react";
+import TipModal from "@/components/TipModal";
 import ReportModal from "@/components/ReportModal";
 import BoardSavePicker from "@/components/BoardSavePicker";
 import { ParsedCaption } from "@/lib/parseCaption";
@@ -313,7 +314,8 @@ function ReelCard({
   const [showBoardPicker, setShowBoardPicker] = useState(false);
   const [showAlgoMenu, setShowAlgoMenu] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
-  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed, isFollowing, followArtist, unfollowArtist } = useSocial();
+  const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed, isFollowing, followArtist, unfollowArtist, isVerified, sendTip } = useSocial();
+  const [showTip, setShowTip] = useState(false);
   const { profile: myProfile } = useProfile();
   const isPatronGated = reel.patronOnly && !isSubscribed(reel.artistId);
   const isOwnReel = !!myProfile && myProfile.id === reel.artistId;
@@ -563,8 +565,9 @@ function ReelCard({
         </div>
 
         <Link href={`/artists/${reel.artistId}`}>
-          <h2 className="font-serif text-[22px] font-bold leading-tight text-white drop-shadow-lg hover:text-amber-200 transition-colors">
+          <h2 className="font-serif text-[22px] font-bold leading-tight text-white drop-shadow-lg hover:text-amber-200 transition-colors inline-flex items-center gap-1.5">
             {reel.artistName}
+            {isVerified(reel.artistId) && <BadgeCheck size={16} className="text-blue-400 shrink-0 mt-0.5" />}
           </h2>
         </Link>
         {reel.collabArtistName && (
@@ -742,6 +745,14 @@ function ReelCard({
           </button>
         </Link>
 
+        {/* Tip */}
+        {!isOwnReel && (
+          <button onClick={() => setShowTip(true)} className="flex flex-col items-center gap-1">
+            <DollarSign size={22} className="text-white" />
+            <span className="text-[9px] font-bold text-white drop-shadow">Tip</span>
+          </button>
+        )}
+
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
 
@@ -826,6 +837,15 @@ function ReelCard({
           thumbnailUrl={reel.thumbnail}
           onClose={() => setShowBoardPicker(false)}
           onSaved={() => setShowBoardPicker(false)}
+        />
+      )}
+
+      {showTip && (
+        <TipModal
+          artistId={reel.artistId}
+          artistName={reel.artistName}
+          artistAvatarUrl={reel.avatarUrl ?? `https://picsum.photos/seed/${reel.artistId}/80/80`}
+          onClose={() => setShowTip(false)}
         />
       )}
     </div>
