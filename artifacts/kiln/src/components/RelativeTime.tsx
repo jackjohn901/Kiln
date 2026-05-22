@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-export function relativeLabel(since: Date): string {
-  const diffMs = Date.now() - since.getTime();
+export function relativeLabel(since: Date | string | number): string {
+  const date = since instanceof Date ? since : new Date(since);
+  const diffMs = Date.now() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   if (diffSec < 60) return "just now";
   const diffMin = Math.floor(diffSec / 60);
@@ -16,7 +17,7 @@ export function relativeLabel(since: Date): string {
 }
 
 interface RelativeTimeProps {
-  since: Date | string;
+  since: Date | string | number;
   className?: string;
   intervalMs?: number;
 }

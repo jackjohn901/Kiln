@@ -4,6 +4,7 @@ import { Inbox as InboxIcon, Check, X, Clock, ChevronRight, MessageCircle, Dolla
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 const TYPE_LABELS: Record<string, string> = {
   custom: "Custom Commission",
@@ -26,15 +27,6 @@ const STATUS_COLORS: Record<string, string> = {
   quoted: "text-sky-400 bg-sky-500/10 border-sky-500/20",
 };
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor(diff / 3600000);
-  const mins = Math.floor(diff / 60000);
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  return `${mins}m ago`;
-}
 
 export default function Inbox() {
   const [, navigate] = useLocation();
@@ -170,7 +162,7 @@ export default function Inbox() {
                       <span>·</span>
                       <span className="flex items-center gap-1"><DollarSign size={11} />{inquiry.budget}</span>
                       <span>·</span>
-                      <span>{timeAgo(inquiry.createdAt)}</span>
+                      <RelativeTime since={inquiry.createdAt} className="text-xs text-stone-500" />
                     </div>
                     <p className="mt-1.5 text-xs text-stone-400 line-clamp-2">{inquiry.description}</p>
                   </div>
@@ -323,7 +315,7 @@ export default function Inbox() {
                       </span>
                     </div>
                     <div className="text-xs text-stone-500 mb-2">
-                      {TYPE_LABELS[inquiry.type]} · {inquiry.budget} · {timeAgo(inquiry.createdAt)}
+                      {TYPE_LABELS[inquiry.type]} · {inquiry.budget} · <RelativeTime since={inquiry.createdAt} className="" />
                     </div>
                     <p className="text-xs text-stone-400 line-clamp-2">{inquiry.description}</p>
                   </div>

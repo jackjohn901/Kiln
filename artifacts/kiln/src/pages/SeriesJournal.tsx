@@ -2,14 +2,8 @@ import { Link } from "wouter";
 import { ChevronLeft, Eye, ChevronRight, Clock, CheckCircle, BookOpen, Play } from "lucide-react";
 import Nav from "@/components/Nav";
 import { ALL_SERIES, type ProcessSeries } from "@/data/processSeries";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days > 30) return new Date(iso).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-  if (days > 0) return `${days}d ago`;
-  return "today";
-}
 
 function SeriesCard({ series }: { series: ProcessSeries }) {
   const lastStep = series.steps[series.steps.length - 1];
@@ -82,7 +76,7 @@ function SeriesCard({ series }: { series: ProcessSeries }) {
               {completed && series.finalSalePrice && (
                 <span className="text-emerald-400 font-semibold">Sold: {series.finalSalePrice}</span>
               )}
-              <span className="flex items-center gap-1"><Clock size={9} /> Latest {timeAgo(lastStep.postedAt)}</span>
+              <span className="flex items-center gap-1"><Clock size={9} /> Latest <RelativeTime since={lastStep.postedAt} className="" /></span>
             </div>
           </div>
         </div>

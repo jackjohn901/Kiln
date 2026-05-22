@@ -5,6 +5,7 @@ import { ChevronLeft, Plus, Users, MapPin, Clock, Tag, X, Check, Flame, MessageC
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { ALL_CRAFTS } from "@/data/craftCategories";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 interface CollabPost {
   id: string;
@@ -119,14 +120,6 @@ function getCollabs(): CollabPost[] {
   }
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const d = Math.floor(diff / 86400000);
-  if (d === 0) return "Today";
-  if (d === 1) return "Yesterday";
-  if (d < 7) return `${d}d ago`;
-  return `${Math.floor(d / 7)}w ago`;
-}
 
 export default function CollabBoard() {
   const { profile } = useProfile();
@@ -273,7 +266,7 @@ export default function CollabBoard() {
                   <Link href={`/artists/${collab.authorId}`}>
                     <span className="text-sm font-semibold text-amber-100 hover:text-amber-300 transition-colors">{collab.authorName}</span>
                   </Link>
-                  <p className="text-xs text-stone-600">{timeAgo(collab.createdAt)}</p>
+                  <p className="text-xs text-stone-600"><RelativeTime since={collab.createdAt} className="" /></p>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-stone-600">
                   <MapPin size={10} /> {collab.remote ? "Remote ok" : collab.location}

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Package, Plus, Search, Tag, MapPin, Clock, MessageCircle, Heart, Filter, X, Star } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 type ListingType = "sell" | "trade" | "free" | "wanted";
 type Category = "clay" | "glass" | "fiber" | "metal" | "wood" | "pigment" | "tools" | "other";
@@ -105,12 +106,6 @@ const CATEGORIES: { value: Category | "all"; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-function timeAgo(ts: number) {
-  const d = Math.floor((Date.now() - ts) / 1000);
-  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
-  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
-  return `${Math.floor(d / 86400)}d ago`;
-}
 
 export default function MaterialExchange() {
   const [, navigate] = useLocation();
@@ -293,7 +288,7 @@ export default function MaterialExchange() {
                 <div className="flex items-center gap-3 text-[10px] text-stone-600">
                   <span className="flex items-center gap-1"><Package size={9} /> {l.quantity}</span>
                   <span className="flex items-center gap-1"><MapPin size={9} /> {l.location}</span>
-                  <span className="flex items-center gap-1"><Clock size={9} /> {timeAgo(l.postedAt)}</span>
+                  <span className="flex items-center gap-1"><Clock size={9} /> <RelativeTime since={l.postedAt} className="" /></span>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">

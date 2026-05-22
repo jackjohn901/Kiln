@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Bell, ChevronLeft, Heart, UserPlus, ShoppingBag, MessageCircle, Star, DollarSign, CheckCircle, Zap } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 const ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   like: { icon: Heart, color: "text-rose-400" },
@@ -15,17 +16,6 @@ const ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   drop: { icon: Zap, color: "text-amber-400" },
 };
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor(diff / 3600000);
-  const mins = Math.floor(diff / 60000);
-  if (days > 6) return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (mins > 0) return `${mins}m ago`;
-  return "just now";
-}
 
 type FilterType = "all" | "unread" | "likes" | "follows" | "sales" | "comments";
 
@@ -131,7 +121,7 @@ export default function NotificationsPage() {
                       <p className={`text-sm leading-snug ${!n.read ? "text-stone-200" : "text-stone-400"}`}>
                         {n.text}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-stone-600">{timeAgo(n.createdAt)}</p>
+                      <p className="mt-0.5 text-[11px] text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
                     </div>
 
                     {/* Unread dot */}

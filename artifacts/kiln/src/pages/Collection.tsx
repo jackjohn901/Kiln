@@ -4,6 +4,7 @@ import { Package, Zap, Clock, CheckCircle2, ShoppingBag } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { getLiveDrops, getUpcomingDrops, type Drop } from "@/data/drops";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 interface PurchasedItem {
   id: string;
@@ -52,10 +53,6 @@ const SEED_PURCHASED: PurchasedItem[] = [
 const TABS = ["Owned", "Waitlisted"] as const;
 type TabType = typeof TABS[number];
 
-function timeAgo(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
 
 export default function Collection() {
   const [tab, setTab] = useState<TabType>("Owned");
@@ -120,7 +117,7 @@ export default function Collection() {
                         {item.type === "drop" ? <Zap size={8} /> : <ShoppingBag size={8} />}
                         {item.type === "drop" ? "Drop" : "Shop"}
                       </span>
-                      <span className="text-xs text-stone-600">{timeAgo(item.acquiredAt)}</span>
+                      <RelativeTime since={item.acquiredAt} className="text-xs text-stone-600" />
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">

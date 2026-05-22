@@ -4,16 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
 import { getSeriesById } from "@/data/processSeries";
-
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor(diff / 3600000);
-  if (days > 30) return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  if (days > 0) return `${days} days ago`;
-  if (hours > 0) return `${hours}h ago`;
-  return "just now";
-}
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 export default function SeriesDetail() {
   const { id } = useParams<{ id: string }>();
@@ -166,7 +157,7 @@ export default function SeriesDetail() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         {isLatest && <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">Latest</span>}
-                        <span className="text-[10px] text-stone-600">{timeAgo(step.postedAt)}</span>
+                        <RelativeTime since={step.postedAt} className="text-[10px] text-stone-600" />
                       </div>
                       <h3 className={`text-sm font-semibold leading-snug ${isLatest ? "text-stone-100" : "text-stone-300"}`}>{step.title}</h3>
                       {!isOpen && <p className="mt-1 text-xs text-stone-500 line-clamp-1">{step.description}</p>}

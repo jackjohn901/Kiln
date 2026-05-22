@@ -4,6 +4,7 @@ import { ChevronLeft, MessageSquare, Star, Send, ThumbsUp, X, Plus, Info } from 
 import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 interface CritiquePost {
   id: string;
@@ -165,14 +166,6 @@ function avgRating(c: CritiquePost["critiques"][0]) {
   return ((c.technique + c.concept + c.finish + c.originality) / 4).toFixed(1);
 }
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor(diff / 3600000);
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  return "just now";
-}
 
 export default function CritiqueFeed() {
   const { profile } = useProfile();
@@ -275,7 +268,7 @@ export default function CritiqueFeed() {
                   onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${post.artistId}/80/80`; }} />
                 <div className="flex-1 min-w-0">
                   <Link href={`/artists/${post.artistId}`} className="text-sm font-semibold text-stone-200 hover:text-amber-300 transition-colors">{post.artistName}</Link>
-                  <p className="text-[11px] text-stone-600">{post.medium} · {timeAgo(post.postedAt)}</p>
+                  <p className="text-[11px] text-stone-600">{post.medium} · <RelativeTime since={post.postedAt} className="" /></p>
                 </div>
                 <span className="flex items-center gap-1 text-xs text-stone-500">
                   <MessageSquare size={11} /> {post.critiqueCount}
@@ -372,7 +365,7 @@ export default function CritiqueFeed() {
                               onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${c.id}/60/60`; }} />
                             <div>
                               <span className="text-xs font-semibold text-stone-200">{c.fromName}</span>
-                              <span className="ml-2 text-[11px] text-stone-600">{timeAgo(c.postedAt)}</span>
+                              <RelativeTime since={c.postedAt} className="ml-2 text-[11px] text-stone-600" />
                             </div>
                             <span className="ml-auto text-xs font-bold text-amber-300">{avgRating(c)} avg</span>
                           </div>

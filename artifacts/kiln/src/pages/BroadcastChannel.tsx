@@ -6,19 +6,13 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { Bell, BellOff, Send, ChevronLeft, Lock, Loader2, Radio } from "lucide-react";
 import { getArtistById } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 interface Broadcast {
   id: string; artistId: string; artistName: string; artistAvatarUrl: string | null;
   content: string; mediaUrl: string | null; isPatronOnly: boolean; reachCount: number; createdAt: string;
 }
 
-function timeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "Just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
 
 export default function BroadcastChannel() {
   const { artistId } = useParams<{ artistId: string }>();
@@ -122,7 +116,7 @@ export default function BroadcastChannel() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-stone-200">{artistName}</span>
                       {b.isPatronOnly && <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full"><Lock size={8} /> Patrons</span>}
-                      <span className="text-xs text-stone-600 ml-auto">{timeAgo(b.createdAt)}</span>
+                      <RelativeTime since={b.createdAt} className="text-xs text-stone-600 ml-auto" />
                     </div>
                     <p className="text-sm text-stone-300 leading-relaxed">{b.content}</p>
                     {b.mediaUrl && <img src={b.mediaUrl} alt="" className="mt-2 rounded-xl max-h-48 object-cover w-full" />}

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, MessageCircle, ChevronLeft, CheckCircle2, Heart, Share2, ExternalLink, BookOpen, Crown, Shield, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getGuildById, type GuildMember } from "@/data/guilds";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 const ROLE_BADGES: Record<GuildMember["role"], { label: string; icon: React.ElementType; color: string } | null> = {
   founder: { label: "Founder", icon: Crown, color: "text-amber-400" },
@@ -43,14 +44,6 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor(diff / 3600000);
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  return "just now";
-}
 
 const TECHNIQUE_EMOJI: Record<string, string> = {
   Ceramics: "🏺", Glasswork: "🔮", Woodwork: "🪵", Metalwork: "⚒️",
@@ -296,7 +289,7 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                         <Link href={`/artists/${post.artistId}`} className="text-sm font-semibold text-stone-200 hover:text-amber-300 transition-colors">
                           {post.artistName}
                         </Link>
-                        <p className="text-[11px] text-stone-600">{timeAgo(post.createdAt)}</p>
+                        <p className="text-[11px] text-stone-600"><RelativeTime since={post.createdAt} className="" /></p>
                       </div>
                     </div>
                     <img src={post.imageUrl} alt={post.caption} className="w-full aspect-video object-cover"

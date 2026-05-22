@@ -11,6 +11,7 @@ import { getArtistById, artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { useProfile } from "@/contexts/ProfileContext";
 import { motion as m } from "framer-motion";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -60,12 +61,6 @@ function fmt(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 export default function StudioDialogue() {
   const { profile } = useProfile();
@@ -196,7 +191,7 @@ export default function StudioDialogue() {
                 <div className="flex items-center gap-4 text-xs text-stone-600">
                   <span className="flex items-center gap-1"><Flame size={11} className="text-amber-500" /> {fmt(d.views)} views</span>
                   <span className="flex items-center gap-1"><MessageCircle size={11} /> {d.replies} replies</span>
-                  <span className="ml-auto">{timeAgo(d.createdAt)}</span>
+                  <RelativeTime since={d.createdAt} className="ml-auto text-xs text-stone-500" />
                 </div>
               </div>
             </motion.div>

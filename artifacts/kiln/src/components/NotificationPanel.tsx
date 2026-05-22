@@ -3,16 +3,8 @@ import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar }
 import { useSocial, KilnNotification } from "@/contexts/SocialContext";
 import { useLocation } from "wouter";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
 
 function NotifIcon({ type }: { type: KilnNotification["type"] }) {
   const cls = "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0";
@@ -106,7 +98,7 @@ export default function NotificationPanel({ onClose }: Props) {
                       onClick={() => handleNotifClick(n)}
                     >
                       <p className={`text-xs leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                      <p className="text-xs text-stone-600 mt-0.5">{timeAgo(n.createdAt)}</p>
+                      <p className="text-xs text-stone-600 mt-0.5"><RelativeTime since={n.createdAt} className="" /></p>
                     </button>
                     <CommissionInlineActions commissionId={n.commissionId!} />
                   </div>
@@ -124,7 +116,7 @@ export default function NotificationPanel({ onClose }: Props) {
                 <NotifIcon type={n.type} />
                 <div className="flex-1 min-w-0">
                   <p className={`text-xs leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                  <p className="text-xs text-stone-600 mt-0.5">{timeAgo(n.createdAt)}</p>
+                  <p className="text-xs text-stone-600 mt-0.5"><RelativeTime since={n.createdAt} className="" /></p>
                 </div>
                 {!n.read && <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 mt-1" />}
               </button>

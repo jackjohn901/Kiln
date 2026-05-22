@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Star, ThumbsUp, X, Send } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 interface ApiReview {
   id: string;
@@ -55,14 +56,6 @@ function Stars({ rating, size = 14, interactive = false, onRate }: {
   );
 }
 
-function timeAgo(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d === 0) return "Today";
-  if (d === 1) return "Yesterday";
-  if (d < 30) return `${d}d ago`;
-  if (d < 365) return `${Math.floor(d / 30)}mo ago`;
-  return `${Math.floor(d / 365)}yr ago`;
-}
 
 export default function ReviewsSection({ targetId, targetType, isVerifiedPurchaser = false }: Props) {
   const { profile } = useProfile();
@@ -213,7 +206,7 @@ export default function ReviewsSection({ targetId, targetType, isVerifiedPurchas
                 )}
                 <div>
                   <p className="text-xs font-semibold text-stone-200">{r.reviewerName}</p>
-                  <p className="text-[10px] text-stone-600">{timeAgo(r.createdAt)}</p>
+                  <p className="text-[10px] text-stone-600"><RelativeTime since={r.createdAt} className="" /></p>
                 </div>
               </div>
               <Stars rating={r.rating} size={12} />

@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
+import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
 const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: string; bg: string }> = {
   follow:              { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },
@@ -21,16 +22,6 @@ const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: 
   commission_payment:  { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
 };
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
 
 function groupByDate(notifs: KilnNotification[]): Array<{ label: string; items: KilnNotification[] }> {
   const groups = new Map<string, KilnNotification[]>();
@@ -207,12 +198,12 @@ export default function Notifications() {
                             {n.link ? (
                               <Link href={n.link} className="block">
                                 <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                                <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
+                                <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
                               </Link>
                             ) : (
                               <>
                                 <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                                <p className="mt-0.5 text-xs text-stone-600">{timeAgo(n.createdAt)}</p>
+                                <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
                               </>
                             )}
                           </div>
