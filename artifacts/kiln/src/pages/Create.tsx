@@ -106,6 +106,7 @@ export default function Create() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [captionSuggestions, setCaptionSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [crossPost, setCrossPost] = useState({ instagram: false, tiktok: false });
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
   const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
@@ -168,6 +169,26 @@ export default function Create() {
     setAdditionalFiles((p) => [...p, ...files]);
     setAdditionalPreviews((p) => [...p, ...previews]);
     e.target.value = "";
+  }
+
+  async function handleTranscribe() {
+    if (!file || mediaType !== "video") return;
+    setTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+      const res = await fetch("/api/ai/transcribe", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json() as { transcript?: string; error?: string };
+      if (data.transcript) setCaption(data.transcript);
+    } catch {
+      // silently fail — user still has manual caption
+    } finally {
+      setTranscribing(false);
+    }
   }
 
   async function handleSuggestCaptions() {
@@ -829,16 +850,29 @@ export default function Create() {
 
             {/* Caption */}
             <div>
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-1 flex items-center justify-between gap-2">
                 <label className="text-xs font-medium text-stone-400">Caption</label>
-                <button
-                  onClick={handleSuggestCaptions}
-                  disabled={loadingSuggestions || (!technique && !stage && tags.length === 0)}
-                  className="flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
-                >
-                  {loadingSuggestions ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                  Suggest captions
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {mediaType === "video" && file && (
+                    <button
+                      onClick={handleTranscribe}
+                      disabled={transcribing}
+                      className="flex items-center gap-1.5 rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-medium text-sky-300 hover:bg-sky-500/20 transition-colors disabled:opacity-40"
+                      title="Transcribe speech from your video"
+                    >
+                      {transcribing ? <Loader2 size={10} className="animate-spin" /> : <span>🎙</span>}
+                      {transcribing ? "Transcribing…" : "Transcribe speech"}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSuggestCaptions}
+                    disabled={loadingSuggestions || (!technique && !stage && tags.length === 0)}
+                    className="flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                  >
+                    {loadingSuggestions ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                    Suggest captions
+                  </button>
+                </div>
               </div>
               <textarea
                 rows={3}
