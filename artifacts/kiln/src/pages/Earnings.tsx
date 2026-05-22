@@ -170,7 +170,8 @@ export default function Earnings() {
   const [salesSearch, setSalesSearch]   = useState("");
   const [salesStatus, setSalesStatus]   = useState<string>("all");
   const [salesSort, setSalesSort]       = useState<"newest" | "oldest">("newest");
-  const [salesDateRange, setSalesDateRange] = useState<"all" | "7d" | "30d" | "90d">("all");
+  const [salesDateFrom, setSalesDateFrom] = useState("");
+  const [salesDateTo, setSalesDateTo]     = useState("");
 
   // Patron tier state
   const [myTiers, setMyTiers]           = useState<PatronTier[]>([]);
@@ -987,7 +988,8 @@ export default function Earnings() {
                         setSalesSearch("");
                         setSalesStatus("all");
                         setSalesSort("newest");
-                        setSalesDateRange("all");
+                        setSalesDateFrom("");
+                        setSalesDateTo("");
                       }
                       return !v;
                     });
@@ -1015,7 +1017,8 @@ export default function Earnings() {
                           setSalesSearch("");
                           setSalesStatus("all");
                           setSalesSort("newest");
-                          setSalesDateRange("all");
+                          setSalesDateFrom("");
+                          setSalesDateTo("");
                         }
                         return !v;
                       });
@@ -1053,16 +1056,6 @@ export default function Earnings() {
                           <option value="delivered">Delivered</option>
                         </select>
                         <select
-                          value={salesDateRange}
-                          onChange={e => setSalesDateRange(e.target.value as typeof salesDateRange)}
-                          className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none"
-                        >
-                          <option value="all">All time</option>
-                          <option value="7d">Last 7 days</option>
-                          <option value="30d">Last 30 days</option>
-                          <option value="90d">Last 90 days</option>
-                        </select>
-                        <select
                           value={salesSort}
                           onChange={e => setSalesSort(e.target.value as "newest" | "oldest")}
                           className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none"
@@ -1070,14 +1063,30 @@ export default function Earnings() {
                           <option value="newest">Newest first</option>
                           <option value="oldest">Oldest first</option>
                         </select>
-                        {(salesSearch || salesStatus !== "all" || salesDateRange !== "all") && (
+                        {(salesSearch || salesStatus !== "all" || salesDateFrom || salesDateTo) && (
                           <button
-                            onClick={() => { setSalesSearch(""); setSalesStatus("all"); setSalesSort("newest"); setSalesDateRange("all"); }}
+                            onClick={() => { setSalesSearch(""); setSalesStatus("all"); setSalesSort("newest"); setSalesDateFrom(""); setSalesDateTo(""); }}
                             className="flex items-center gap-1 rounded-lg border border-white/8 px-2 py-1.5 text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
                           >
                             <X size={10} /> Reset
                           </button>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] text-stone-500 shrink-0">From</label>
+                        <input
+                          type="date"
+                          value={salesDateFrom}
+                          onChange={e => setSalesDateFrom(e.target.value)}
+                          className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none [color-scheme:dark]"
+                        />
+                        <label className="text-[11px] text-stone-500 shrink-0">To</label>
+                        <input
+                          type="date"
+                          value={salesDateTo}
+                          onChange={e => setSalesDateTo(e.target.value)}
+                          className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none [color-scheme:dark]"
+                        />
                       </div>
                     </div>
                   )}
@@ -1089,15 +1098,14 @@ export default function Earnings() {
                     <p className="text-xs text-stone-600 text-center py-4">No sales yet.</p>
                   ) : (() => {
                     const needle = salesSearch.trim().toLowerCase();
-                    const nowMs = Date.now();
-                    const dateThresholdMs = salesDateRange === "7d" ? nowMs - 7 * 86400_000
-                      : salesDateRange === "30d" ? nowMs - 30 * 86400_000
-                      : salesDateRange === "90d" ? nowMs - 90 * 86400_000
-                      : null;
+                    const fromMs = salesDateFrom ? new Date(salesDateFrom).getTime() : null;
+                    const toMs = salesDateTo ? new Date(salesDateTo + "T23:59:59.999").getTime() : null;
                     const filtered = sales
                       .filter(s => {
                         if (salesStatus !== "all" && s.status !== salesStatus) return false;
-                        if (dateThresholdMs !== null && new Date(s.createdAt).getTime() < dateThresholdMs) return false;
+                        const saleMs = new Date(s.createdAt).getTime();
+                        if (fromMs !== null && saleMs < fromMs) return false;
+                        if (toMs !== null && saleMs > toMs) return false;
                         if (needle) {
                           const titleMatch = s.title.toLowerCase().includes(needle);
                           const buyerMatch = (s.buyerDisplayName ?? "").toLowerCase().includes(needle)
