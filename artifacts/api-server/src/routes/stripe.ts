@@ -1035,13 +1035,18 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                     ? `New sale: "${itemSummary[0]}" — $${amountDollars}`
                     : `New sale: ${itemSummary.length} items — $${amountDollars}`;
 
+                  // Poll for the order ID so the notification deep-links to the
+                  // exact sale detail screen instead of just the earnings list.
+                  const saleOrderId = await waitForSessionOrder(session.id);
+                  const saleLink = saleOrderId ? `/earnings/orders/${saleOrderId}` : '/earnings';
+
                   await db.insert(notificationsTable).values({
                     id: crypto.randomUUID(),
                     userId: artist.id,
                     type: 'sale',
                     fromName: buyerName || 'A buyer',
                     text: notifText,
-                    link: '/earnings',
+                    link: saleLink,
                     read: false,
                   });
 
@@ -1053,7 +1058,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                     notifType: 'sale',
                     fromName: buyerName || 'A buyer',
                     text: notifText,
-                    link: '/earnings',
+                    link: saleLink,
                   });
                 }
               }
@@ -1210,13 +1215,18 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   ? `New sale: "${itemSummary[0]}" — $${amountDollars}`
                   : `New sale: ${itemSummary.length} items — $${amountDollars}`;
 
+                // Poll for the order ID so the notification deep-links to the
+                // exact sale detail screen instead of just the earnings list.
+                const connectSaleOrderId = await waitForSessionOrder(session.id);
+                const connectSaleLink = connectSaleOrderId ? `/earnings/orders/${connectSaleOrderId}` : '/earnings';
+
                 await db.insert(notificationsTable).values({
                   id: crypto.randomUUID(),
                   userId: artist.id,
                   type: 'sale',
                   fromName: buyerName || 'A buyer',
                   text: notifText,
-                  link: '/earnings',
+                  link: connectSaleLink,
                   read: false,
                 });
 
@@ -1226,7 +1236,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   notifType: 'sale',
                   fromName: buyerName || 'A buyer',
                   text: notifText,
-                  link: '/earnings',
+                  link: connectSaleLink,
                 });
               }
             }
