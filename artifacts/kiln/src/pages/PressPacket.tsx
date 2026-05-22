@@ -6,6 +6,7 @@ import {
   Share2, ChevronLeft,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import SharePacketModal from "@/components/SharePacketModal";
 import { getArtistById, getAllImages } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 
@@ -56,6 +57,7 @@ export default function PressPacket() {
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     if (!artistId) return;
@@ -167,16 +169,16 @@ export default function PressPacket() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={handleCopyLink}
-                className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-stone-400 hover:text-stone-200 transition-colors"
-              >
-                {copiedLink ? <><Check size={12} className="text-emerald-400" /> Copied!</> : <><Share2 size={12} /> Copy link</>}
-              </button>
-              <button
                 onClick={handleCopyBio}
                 className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-stone-400 hover:text-stone-200 transition-colors"
               >
                 {copied ? <><Check size={12} className="text-emerald-400" /> Copied bio</> : <><Copy size={12} /> Copy bio</>}
+              </button>
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-300 hover:border-amber-400/60 hover:text-amber-200 transition-colors"
+              >
+                <Share2 size={14} /> Share
               </button>
               <button
                 onClick={handlePrint}
@@ -204,6 +206,16 @@ export default function PressPacket() {
       <div className="hidden print:block">
         <PressPacketDocument data={data} profileUrl={profileUrl} currentYear={currentYear} />
       </div>
+
+      {showShareModal && (
+        <SharePacketModal
+          artistId={profile.userId}
+          artistName={name}
+          bio={profile.bio}
+          packetUrl={profileUrl.replace("/artists/", "/artists/").replace(/\/?$/, "") + "/press-packet"}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
     </div>
   );
 }

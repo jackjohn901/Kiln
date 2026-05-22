@@ -12,6 +12,7 @@ import stripeConnectRouter from "./stripe-connect";
 import glazeOracleRouter from "./glaze-oracle";
 import grantWriterRouter from "./grant-writer";
 import pressRouter from "./press";
+import pressPacketShareRouter from "./press-packet-share";
 import pinterestRouter from "./pinterest";
 import featuredBadgeRouter from "./featured-badge";
 import authRouter from "./auth";
@@ -170,6 +171,7 @@ router.use(firstAccessRouter);
 router.use(projectsRouter);
 router.use(studioEventsRouter);
 router.use(pressRouter);
+router.use(pressPacketShareRouter);
 router.use(pinterestRouter);
 router.use(featuredBadgeRouter);
 
