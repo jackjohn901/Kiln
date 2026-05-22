@@ -66,6 +66,7 @@ export default function Nav() {
     { href: "/coa", label: "Certificates", icon: FileText },
     { href: "/badges", label: "Badges", icon: Medal },
     { href: "/referrals", label: "Invite Artists", icon: Share2 },
+    { href: "/ai-marketing", label: "AI Marketing", icon: Sparkles },
   ];
 
   useEffect(() => {
@@ -95,6 +96,7 @@ export default function Nav() {
         { href: "/analytics",      icon: BarChart2, label: "Analytics" },
         { href: "/badges",         icon: Medal,     label: "My Badges" },
         { href: "/referrals",      icon: Share2,    label: "Invite Artists" },
+        { href: "/ai-marketing",   icon: Sparkles,  label: "AI Marketing Hub" },
         { href: "/settings",       icon: Settings,  label: "Settings" },
       ]
     : [];

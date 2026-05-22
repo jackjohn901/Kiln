@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import PressPage from "@/pages/PressPage";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, useSearch } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import Landing from "@/pages/Landing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -163,15 +165,16 @@ const QUIZ_PREFS_KEY = "kiln_prefs_v1";
 
 function QuizGate() {
   const [location, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
   useEffect(() => {
-    if (location !== "/") return;
+    if (location !== "/" || !isAuthenticated) return;
     try {
       if (!localStorage.getItem(QUIZ_PREFS_KEY) && !sessionStorage.getItem("kiln_quiz_offered")) {
         sessionStorage.setItem("kiln_quiz_offered", "1");
         navigate("/quiz");
       }
     } catch {}
-  }, [location, navigate]);
+  }, [location, navigate, isAuthenticated]);
   return null;
 }
 
@@ -242,6 +245,15 @@ function TitleSetter() {
   return null;
 }
 
+function RootPage() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const search = useSearch();
+  const skip = new URLSearchParams(search).get("skipLanding") === "true";
+  if (isLoading) return null;
+  if (isAuthenticated || skip) return <Feed />;
+  return <Landing />;
+}
+
 function Router() {
   return (
     <>
@@ -249,7 +261,7 @@ function Router() {
       <RefCapture />
       <QuizGate />
       <Switch>
-        <Route path="/" component={Feed} />
+        <Route path="/" component={RootPage} />
       <Route path="/discover" component={Discover} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:id" component={ArtistProfile} />
