@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail,
+  Printer, Star, Mail, Link2, Check,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 
@@ -151,7 +151,7 @@ interface BuyerProfile {
 }
 
 export default function OrderDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
   const [order, setOrder] = useState<Order | null>(null);
   const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
@@ -159,10 +159,18 @@ export default function OrderDetail() {
   const [buyerEmail, setBuyerEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
-    fetch(`/api/me/orders/${encodeURIComponent(id)}`, { credentials: "include" })
+    const fetchUrl = sessionKey
+      ? `/api/me/orders/cart/${encodeURIComponent(sessionKey)}`
+      : id
+        ? `/api/me/orders/${encodeURIComponent(id)}`
+        : null;
+
+    if (!fetchUrl) return;
+
+    fetch(fetchUrl, { credentials: "include" })
       .then(r => {
         if (r.status === 404) { setNotFound(true); return null; }
         return r.ok ? r.json() : null;
@@ -177,7 +185,17 @@ export default function OrderDetail() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, sessionKey]);
+
+  const handleCopyLink = useCallback((rawNotes: string | null) => {
+    const key = rawNotes?.startsWith("stripe:") ? rawNotes.slice(7) : null;
+    if (!key) return;
+    const url = `${window.location.origin}/kiln/orders/cart/${key}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }).catch(() => {});
+  }, []);
 
   if (loading) {
     return (
@@ -370,17 +388,40 @@ export default function OrderDetail() {
         </div>
 
         <div className="mb-6">
-          <h1 className="font-serif text-2xl text-amber-100">
-            {isCartOrder ? "Cart Receipt" : "Order Receipt"}
-          </h1>
-          <p className="mt-1 font-mono text-sm text-amber-400/70">
-            {isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id)}
-          </p>
-          {isCartOrder && (
-            <p className="mt-1 text-xs text-stone-500">
-              {siblingOrders.length} items · grouped checkout
-            </p>
-          )}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-serif text-2xl text-amber-100">
+                {isCartOrder ? "Cart Receipt" : "Order Receipt"}
+              </h1>
+              <p className="mt-1 font-mono text-sm text-amber-400/70">
+                {isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id)}
+              </p>
+              {isCartOrder && (
+                <p className="mt-1 text-xs text-stone-500">
+                  {siblingOrders.length} items · grouped checkout
+                </p>
+              )}
+            </div>
+            {isCartOrder && (
+              <button
+                onClick={() => handleCopyLink(order.notes)}
+                title="Copy shareable link"
+                className="mt-1 flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-stone-400 hover:border-amber-500/40 hover:text-amber-300 transition-colors shrink-0"
+              >
+                {linkCopied ? (
+                  <>
+                    <Check size={12} className="text-emerald-400" />
+                    <span className="text-emerald-400">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 size={12} />
+                    Share
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className={`mb-4 flex items-center gap-2.5 rounded-2xl border p-4 ${statusConf.bg}`}>

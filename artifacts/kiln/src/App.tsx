@@ -294,6 +294,7 @@ function Router() {
       <Route path="/apply-verified" component={ApplyVerified} />
       <Route path="/edit-profile" component={EditProfile} />
       <Route path="/orders" component={Orders} />
+      <Route path="/orders/cart/:sessionKey" component={OrderDetail} />
       <Route path="/orders/:id" component={OrderDetail} />
       <Route path="/sales/:id" component={SaleDetail} />
       <Route path="/drafts" component={Drafts} />

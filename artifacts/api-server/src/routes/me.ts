@@ -105,6 +105,68 @@ router.get("/me/orders", async (req, res): Promise<void> => {
   }
 });
 
+// GET /me/orders/cart/:sessionKey — fetch a grouped cart receipt by Stripe session key.
+// Allows buyers to bookmark or share a stable URL for their multi-item cart purchase.
+// The sessionKey is the raw Stripe session ID (without the "stripe:" prefix stored in notes).
+// All sibling orders for that session are returned along with buyer details.
+router.get("/me/orders/cart/:sessionKey", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const orderColumns = {
+      id: ordersTable.id,
+      type: ordersTable.type,
+      refId: ordersTable.refId,
+      title: ordersTable.title,
+      description: ordersTable.description,
+      imageUrl: ordersTable.imageUrl,
+      amount: ordersTable.amount,
+      currency: ordersTable.currency,
+      status: ordersTable.status,
+      sellerId: ordersTable.sellerId,
+      shippingAddress: ordersTable.shippingAddress,
+      trackingNumber: ordersTable.trackingNumber,
+      notes: ordersTable.notes,
+      processingWindowDays: ordersTable.processingWindowDays,
+      processingWindowLabel: ordersTable.processingWindowLabel,
+      manualPayout: ordersTable.manualPayout,
+      createdAt: ordersTable.createdAt,
+      updatedAt: ordersTable.updatedAt,
+    } as const;
+
+    const dedupeKey = `stripe:${req.params.sessionKey}`;
+    const siblingOrders = await db.select(orderColumns).from(ordersTable)
+      .where(and(eq(ordersTable.notes, dedupeKey), eq(ordersTable.buyerId, req.user.id)));
+
+    if (siblingOrders.length === 0) { res.status(404).json({ error: "Cart receipt not found" }); return; }
+
+    // Use the first sibling as the "primary" order for top-level receipt fields.
+    const order = siblingOrders[0]!;
+
+    const [buyerProfileRow] = await db
+      .select({ displayName: profilesTable.displayName, location: profilesTable.location })
+      .from(profilesTable)
+      .where(eq(profilesTable.userId, req.user.id))
+      .limit(1);
+
+    const buyerProfile = buyerProfileRow
+      ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
+      : { displayName: null, location: null };
+
+    const [buyerUserRow] = await db
+      .select({ email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id))
+      .limit(1);
+
+    const buyerEmail = buyerUserRow?.email ?? null;
+
+    res.json({ order, siblingOrders, buyerProfile, buyerEmail });
+  } catch (err) {
+    logger.error({ err }, "me/orders/cart/:sessionKey GET error");
+    res.status(500).json({ error: "Failed to load cart receipt" });
+  }
+});
+
 // GET /me/orders/:id — fetch a single order for the current user.
 // When the order belongs to a multi-item Stripe session (notes starts with "stripe:"),
 // the response also includes all sibling orders from that same session as `siblingOrders`.
