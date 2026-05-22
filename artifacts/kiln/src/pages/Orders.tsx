@@ -247,15 +247,52 @@ export default function Orders() {
               <Link key={key} href={`/orders/${primary.id}`}>
               <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-4 hover:border-amber-500/20 hover:bg-stone-900/70 transition-colors cursor-pointer">
                 <div className="flex items-start gap-3">
-                  <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
-                    {primary.imageUrl ? (
-                      <img src={primary.imageUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className={`h-full w-full flex items-center justify-center rounded-xl ${typeConf.color}`}>
-                        <TypeIcon size={20} />
+                  {isGroup && groupOrders.length > 1 ? (() => {
+                    const thumbs = groupOrders
+                      .map(o => o.imageUrl)
+                      .filter((u): u is string => !!u)
+                      .slice(0, 3);
+                    if (thumbs.length >= 2) {
+                      return (
+                        <div className="relative h-14 w-14 flex-shrink-0">
+                          {thumbs.slice(0).reverse().map((url, i) => {
+                            const revIdx = thumbs.length - 1 - i;
+                            const offset = revIdx * 4;
+                            return (
+                              <img
+                                key={url}
+                                src={url}
+                                alt=""
+                                className="absolute h-12 w-12 rounded-xl object-cover border-2 border-stone-900"
+                                style={{ top: offset, left: offset, zIndex: revIdx + 1 }}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
+                        {primary.imageUrl ? (
+                          <img src={primary.imageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className={`h-full w-full flex items-center justify-center rounded-xl ${typeConf.color}`}>
+                            <TypeIcon size={20} />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })() : (
+                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-stone-800">
+                      {primary.imageUrl ? (
+                        <img src={primary.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className={`h-full w-full flex items-center justify-center rounded-xl ${typeConf.color}`}>
+                          <TypeIcon size={20} />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -278,7 +315,12 @@ export default function Orders() {
                           <span className="text-[10px] text-stone-500">{groupOrders.length} items</span>
                         )}
                       </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
+                      <span className="flex items-center gap-1">
+                        {isGroup && groupOrders.length > 1 && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full text-amber-300 bg-amber-500/15 font-medium">Cart</span>
+                        )}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
+                      </span>
                     </div>
                     {(() => {
                       const label = primary.processingWindowLabel ?? sellerWindows[primary.sellerId]?.processingWindowLabel ?? null;
