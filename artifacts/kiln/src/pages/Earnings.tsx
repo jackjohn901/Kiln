@@ -367,15 +367,17 @@ export default function Earnings() {
     fetchSales().finally(() => setSalesLoading(false));
   }, [fetchEarnings, fetchSales]);
 
+  const triggerStatsFlash = useCallback(() => {
+    if (statsFlashTimerRef.current) clearTimeout(statsFlashTimerRef.current);
+    setStatsFlash(true);
+    statsFlashTimerRef.current = setTimeout(() => setStatsFlash(false), 2000);
+  }, []);
+
   useEffect(() => {
     return subscribe("notification", (evt) => {
       const notifType = evt.notifType as string | undefined;
       if (notifType !== "sale" && notifType !== "tip" && notifType !== "subscription") return;
-      void fetchEarnings().then(() => {
-        if (statsFlashTimerRef.current) clearTimeout(statsFlashTimerRef.current);
-        setStatsFlash(true);
-        statsFlashTimerRef.current = setTimeout(() => setStatsFlash(false), 1000);
-      });
+      void fetchEarnings().then(triggerStatsFlash);
       void fetchSales();
       if (chargesEnabledRef.current) {
         void fetchBalance(true);
@@ -390,17 +392,17 @@ export default function Earnings() {
         saleBannerTimerRef.current = setTimeout(() => setSaleBanner(null), 8000);
       }
     });
-  }, [subscribe, fetchEarnings, fetchSales, fetchBalance, fetchStripeStatus]);
+  }, [subscribe, fetchEarnings, fetchSales, fetchBalance, fetchStripeStatus, triggerStatsFlash]);
 
   useEffect(() => {
     const POLL_MS = 60_000;
     const timerId = setInterval(() => {
-      void fetchEarnings();
+      void fetchEarnings().then(triggerStatsFlash);
       void fetchSales();
       if (chargesEnabledRef.current) void fetchBalance(true);
     }, POLL_MS);
     return () => clearInterval(timerId);
-  }, [fetchEarnings, fetchSales, fetchBalance]);
+  }, [fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -526,12 +528,21 @@ export default function Earnings() {
                   <div
                     key={stat.label}
                     className={[
-                      "rounded-2xl border bg-stone-900/50 p-4 transition-all duration-300",
+                      "relative rounded-2xl border bg-stone-900/50 p-4 transition-all duration-300",
                       statsFlash
                         ? "border-emerald-400/60 shadow-[0_0_12px_2px_rgba(52,211,153,0.25)] scale-[1.02]"
                         : "border-white/8",
                     ].join(" ")}
                   >
+                    {statsFlash && (
+                      <span className="absolute top-2 right-2 flex items-center gap-1">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                        </span>
+                        <span className="text-[9px] font-medium text-emerald-400 uppercase tracking-wide">Updated</span>
+                      </span>
+                    )}
                     <Icon size={16} className={`mb-2 ${stat.color}`} />
                     <p className="text-xs text-stone-500 mb-0.5">{stat.label}</p>
                     <p className="text-lg font-bold text-stone-100">{stat.value}</p>
