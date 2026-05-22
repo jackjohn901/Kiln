@@ -3,7 +3,7 @@ import { Link, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  User, DollarSign, Send,
+  DollarSign, Send,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 
@@ -27,6 +27,7 @@ interface Sale {
   updatedAt: string;
   buyerDisplayName: string | null;
   buyerHandle: string | null;
+  buyerAvatarUrl: string | null;
 }
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
@@ -182,6 +183,12 @@ export default function SaleDetail() {
     : sale.buyerHandle
       ? `@${sale.buyerHandle}`
       : "Anonymous buyer";
+  const buyerInitial = (sale.buyerDisplayName?.trim() || sale.buyerHandle || "?")[0].toUpperCase();
+  const buyerHref = sale.buyerHandle
+    ? `/artists/${sale.buyerHandle}`
+    : sale.buyerId
+      ? `/artists/${sale.buyerId}`
+      : null;
 
   const hasWindow = sale.processingWindowDays !== null || sale.processingWindowLabel !== null;
   const deliveryEstimateText = sale.processingWindowLabel?.trim()
@@ -255,9 +262,27 @@ export default function SaleDetail() {
 
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Buyer</p>
-          <div className="flex items-center gap-2">
-            <User size={14} className="text-stone-500 shrink-0" />
-            <p className="text-sm text-stone-300">{buyerLabel}</p>
+          <div className="flex items-center gap-3">
+            {sale.buyerAvatarUrl ? (
+              <img
+                src={sale.buyerAvatarUrl}
+                alt={buyerLabel}
+                className="h-8 w-8 flex-shrink-0 rounded-full object-cover ring-1 ring-white/10"
+              />
+            ) : (
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-stone-700 text-xs font-semibold text-stone-300 ring-1 ring-white/10">
+                {buyerInitial}
+              </span>
+            )}
+            {buyerHref ? (
+              <Link href={buyerHref}>
+                <span className="text-sm text-stone-300 hover:text-amber-300 transition-colors cursor-pointer">
+                  {buyerLabel}
+                </span>
+              </Link>
+            ) : (
+              <p className="text-sm text-stone-300">{buyerLabel}</p>
+            )}
           </div>
         </div>
 
