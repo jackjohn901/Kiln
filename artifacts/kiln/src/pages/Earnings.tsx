@@ -4,7 +4,7 @@ import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock, Bell, Package, Share2,
+  ShoppingBag, Clock, Bell, Package, Share2, MessageCircle,
 } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -1181,6 +1181,15 @@ export default function Earnings() {
                                 )}
                                 <span className="text-stone-700 flex-shrink-0">·</span>
                                 <p className="text-[10px] text-stone-600 flex-shrink-0">{formatDate(sale.createdAt)}</p>
+                                {sale.buyerId && (
+                                  <button
+                                    title="Message buyer"
+                                    onClick={e => { e.stopPropagation(); navigate(`/messages/${sale.buyerId}`); }}
+                                    className="ml-1 flex items-center justify-center rounded-full p-0.5 text-stone-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors flex-shrink-0"
+                                  >
+                                    <MessageCircle size={13} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0 space-y-1">

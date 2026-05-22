@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
@@ -83,6 +83,7 @@ async function patchSale(id: string, body: { status?: string; trackingNumber?: s
 
 export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -274,15 +275,26 @@ export default function SaleDetail() {
                 {buyerInitial}
               </span>
             )}
-            {buyerHref ? (
-              <Link href={buyerHref}>
-                <span className="text-sm text-stone-300 hover:text-amber-300 transition-colors cursor-pointer">
-                  {buyerLabel}
-                </span>
-              </Link>
-            ) : (
-              <p className="text-sm text-stone-300">{buyerLabel}</p>
-            )}
+            <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+              {buyerHref ? (
+                <Link href={buyerHref}>
+                  <span className="text-sm text-stone-300 hover:text-amber-300 transition-colors cursor-pointer">
+                    {buyerLabel}
+                  </span>
+                </Link>
+              ) : (
+                <p className="text-sm text-stone-300">{buyerLabel}</p>
+              )}
+              {sale.buyerId && (
+                <button
+                  onClick={() => navigate(`/messages/${sale.buyerId}`)}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/8 px-2.5 py-1.5 text-xs text-stone-400 hover:text-amber-300 hover:border-amber-500/30 hover:bg-amber-500/8 transition-colors flex-shrink-0"
+                >
+                  <MessageSquare size={12} />
+                  Message buyer
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
