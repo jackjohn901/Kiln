@@ -4,7 +4,7 @@ import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock, Bell, Package, Share2, MessageCircle,
+  ShoppingBag, Clock, Bell, Package, Share2, MessageCircle, Download,
 } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -172,6 +172,48 @@ export default function Earnings() {
   const [salesSort, setSalesSort]       = useState<"newest" | "oldest">("newest");
   const [salesDateFrom, setSalesDateFrom] = useState("");
   const [salesDateTo, setSalesDateTo]     = useState("");
+
+  const exportSalesCSV = useCallback(() => {
+    const needle = salesSearch.trim().toLowerCase();
+    const fromMs = salesDateFrom ? new Date(salesDateFrom).getTime() : null;
+    const toMs = salesDateTo ? new Date(salesDateTo + "T23:59:59.999").getTime() : null;
+    const filtered = sales
+      .filter(s => {
+        if (salesStatus !== "all" && s.status !== salesStatus) return false;
+        const saleMs = new Date(s.createdAt).getTime();
+        if (fromMs !== null && saleMs < fromMs) return false;
+        if (toMs !== null && saleMs > toMs) return false;
+        if (needle) {
+          const titleMatch = s.title.toLowerCase().includes(needle);
+          const buyerMatch = (s.buyerDisplayName ?? "").toLowerCase().includes(needle)
+            || (s.buyerHandle ?? "").toLowerCase().includes(needle);
+          if (!titleMatch && !buyerMatch) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const ta = new Date(a.createdAt).getTime();
+        const tb = new Date(b.createdAt).getTime();
+        return salesSort === "newest" ? tb - ta : ta - tb;
+      });
+
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const header = ["Date", "Title", "Buyer", "Status", "Amount"].join(",");
+    const rows = filtered.map(s => {
+      const date = new Date(s.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+      const buyer = s.buyerDisplayName?.trim() || (s.buyerHandle ? `@${s.buyerHandle}` : "Anonymous buyer");
+      const amount = s.amount.toFixed(2);
+      return [escape(date), escape(s.title), escape(buyer), escape(s.status), amount].join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sales.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sales, salesSearch, salesStatus, salesSort, salesDateFrom, salesDateTo]);
 
   // Patron tier state
   const [myTiers, setMyTiers]           = useState<PatronTier[]>([]);
@@ -1003,6 +1045,15 @@ export default function Earnings() {
                   )}
                 </button>
                 <div className="flex items-center gap-2">
+                  {sales.length > 0 && (
+                    <button
+                      onClick={exportSalesCSV}
+                      className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1 text-[11px] text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+                    >
+                      <Download size={10} />
+                      Export CSV
+                    </button>
+                  )}
                   <Link
                     href="/settings?section=payments"
                     className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1 text-[11px] text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors"
