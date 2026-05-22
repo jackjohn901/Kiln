@@ -34,9 +34,33 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootLayoutNav() {
+/**
+ * Global overlays that must survive tab and stack navigation.
+ *
+ * These components are rendered as siblings to the <Stack> navigator, not
+ * inside any screen, so they never unmount when the user switches tabs or
+ * pushes/pops a screen. This is intentional:
+ *
+ * - SaleNotificationListener: manages a WebSocket subscription and a queue of
+ *   incoming sale events. If it were mounted inside a tab screen it would
+ *   unmount on navigation, dropping the queue and any mid-display banner.
+ *   Keeping it here at root ensures banners continue to show and queue
+ *   correctly regardless of which screen the artist is on.
+ *
+ * - UpdateBanner: similar reasoning — OTA update state must persist across
+ *   the full session.
+ */
+function RootOverlays() {
   const updateState = useAppUpdates();
+  return (
+    <>
+      <UpdateBanner updateState={updateState} />
+      <SaleNotificationListener />
+    </>
+  );
+}
 
+function RootLayoutNav() {
   return (
     <View style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
@@ -44,8 +68,12 @@ function RootLayoutNav() {
         <Stack.Screen name="login" options={{ headerShown: false, presentation: "modal" }} />
         <Stack.Screen name="chat/[threadId]" options={{ headerShown: true, headerTitle: "", headerBackTitle: "Back" }} />
       </Stack>
-      <UpdateBanner updateState={updateState} />
-      <SaleNotificationListener />
+      {/*
+       * RootOverlays is intentionally rendered outside <Stack> so its
+       * component subtree — and the WebSocket connection + sale queue inside
+       * SaleNotificationListener — are never torn down by navigation events.
+       */}
+      <RootOverlays />
     </View>
   );
 }

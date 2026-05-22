@@ -41,21 +41,19 @@ export function SaleBanner({ sale, onDismiss, onView }: Props) {
     };
   }, [sale, translateY, onDismiss]);
 
-  if (!sale) return null;
-
-  const bodyText = sale.text.replace(/^New sale:\s*/i, "");
+  const bodyText = sale ? sale.text.replace(/^New sale:\s*/i, "") : "";
 
   return (
     <Animated.View
       style={[styles.banner, { transform: [{ translateY }] }]}
-      pointerEvents="box-none"
+      pointerEvents={sale ? "box-none" : "none"}
     >
       <Pressable onPress={onView} style={styles.inner}>
         <View style={styles.dot} />
         <View style={styles.textBlock}>
           <Text style={styles.title}>New Sale!</Text>
           <Text style={styles.body} numberOfLines={2}>
-            <Text style={styles.fromName}>{sale.fromName}</Text>
+            <Text style={styles.fromName}>{sale?.fromName ?? ""}</Text>
             {bodyText ? ` — ${bodyText}` : ""}
           </Text>
         </View>
