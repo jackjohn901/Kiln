@@ -127,7 +127,8 @@ interface ApiPost {
 interface EarningTotals {
   tips: number;
   subscriptions: number;
-  sales: number;
+  shopSales: number;
+  sales?: number;
   total: number;
 }
 
@@ -155,7 +156,17 @@ export default function Analytics() {
       .catch(() => {});
     fetch("/api/me/earnings", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.totals) setEarningTotals(data.totals); })
+      .then(data => {
+        if (data?.totals) {
+          const t = data.totals;
+          setEarningTotals({
+            tips: t.tips ?? 0,
+            subscriptions: t.subscriptions ?? 0,
+            shopSales: t.shopSales ?? t.sales ?? 0,
+            total: t.total ?? 0,
+          });
+        }
+      })
       .catch(() => {});
     fetch("/api/analytics/me", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
@@ -225,6 +236,56 @@ export default function Analytics() {
           <KpiCard label="Total views" value={(analyticsData?.totalViews ?? 0).toLocaleString()} sub="Across all posts" icon={Eye} color="bg-amber-500/10 text-amber-400" />
           <KpiCard label="Total likes" value={(analyticsData?.totalLikes ?? (apiPosts.length > 0 ? apiPosts.reduce((s, p) => s + p.likeCount, 0) : null))?.toLocaleString() ?? "—"} sub="Across all posts" icon={Star} color="bg-purple-500/10 text-purple-400" />
           <KpiCard label="Posts" value={String(analyticsData?.totalPosts ?? apiPosts.length)} sub="Published" icon={TrendingUp} color="bg-emerald-500/10 text-emerald-400" />
+        </div>
+
+        {/* Earnings breakdown */}
+        <div className="mb-5 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-stone-200">Earnings Breakdown</h2>
+              <p className="text-xs text-stone-500 mt-0.5">Total earned across all revenue streams</p>
+            </div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <DollarSign size={13} />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-stone-800/60 p-3 text-center">
+              <p className="text-xl font-bold text-emerald-400">
+                {earningTotals ? `$${earningTotals.shopSales.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+              </p>
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                <ShoppingBag size={9} className="text-stone-500" />
+                <p className="text-[10px] text-stone-500">Shop Sales</p>
+              </div>
+            </div>
+            <div className="rounded-xl bg-stone-800/60 p-3 text-center">
+              <p className="text-xl font-bold text-amber-400">
+                {earningTotals ? `$${earningTotals.tips.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+              </p>
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                <DollarSign size={9} className="text-stone-500" />
+                <p className="text-[10px] text-stone-500">Tips</p>
+              </div>
+            </div>
+            <div className="rounded-xl bg-stone-800/60 p-3 text-center">
+              <p className="text-xl font-bold text-sky-400">
+                {earningTotals ? `$${earningTotals.subscriptions.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+              </p>
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                <Users size={9} className="text-stone-500" />
+                <p className="text-[10px] text-stone-500">Subscriptions</p>
+              </div>
+            </div>
+          </div>
+          {earningTotals && (
+            <div className="mt-3 border-t border-white/5 pt-3 flex items-center justify-between">
+              <span className="text-xs text-stone-500">Total earned</span>
+              <span className="text-sm font-bold text-amber-100">
+                ${earningTotals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Post activity chart (real data) */}
