@@ -130,6 +130,26 @@ const btn = (href: string, label: string) =>
 const card = (content: string) =>
   `<div style="background:#292524;border-radius:12px;padding:20px;margin:16px 0;">${content}</div>`;
 
+export function shippingNotificationEmail(
+  orderTitle: string,
+  orderId: string,
+  trackingNumber?: string | null,
+): string {
+  const receiptUrl = `${BASE_URL}/orders/${orderId}`;
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your order has shipped! 📦</h1>
+    <p style="color:#78716c;margin-bottom:0;">Great news — the artist has marked your order as shipped.</p>
+    ${card(`
+      <p style="margin:0 0 8px;font-size:15px;"><strong>${escHtml(orderTitle)}</strong></p>
+      ${trackingNumber
+        ? `<p style="margin:0;color:#a8a29e;font-size:13px;">Tracking number: <strong style="color:#d6d3d1;">${escHtml(trackingNumber)}</strong></p>`
+        : `<p style="margin:0;color:#78716c;font-size:13px;">The artist will send you tracking details as soon as they're available.</p>`
+      }
+    `)}
+    ${btn(receiptUrl, "View receipt")}
+  `);
+}
+
 export function newFollowerEmail(followerName: string): string {
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Follower</h1>
