@@ -18,6 +18,7 @@ import { getCommunityBeats } from "@/lib/communityBeats";
 import { createBeatLooper } from "@/lib/beatSynth";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import Comments from "@/components/Comments";
 import NotificationPanel from "@/components/NotificationPanel";
 import Stories from "@/components/Stories";
@@ -910,9 +911,8 @@ export default function Feed() {
     };
   }, []);
 
-  // Fetch posts from users I follow when the Following tab is active
-  useEffect(() => {
-    if (feedTab !== "following") return;
+  // Fetch posts from users I follow — extracted so polling and WS can reuse it
+  const fetchFollowingFeed = useCallback(() => {
     const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
     fetch("/api/feed/following?limit=20", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -942,7 +942,28 @@ export default function Feed() {
         setFollowingApiReels(apiReels);
       })
       .catch(() => {});
-  }, [feedTab]);
+  }, []);
+
+  // Fetch on tab switch
+  useEffect(() => {
+    if (feedTab !== "following") return;
+    fetchFollowingFeed();
+  }, [feedTab, fetchFollowingFeed]);
+
+  // Poll every 60s while the Following tab is active
+  useEffect(() => {
+    if (feedTab !== "following") return;
+    const POLL_MS = 60_000;
+    const timerId = setInterval(fetchFollowingFeed, POLL_MS);
+    return () => clearInterval(timerId);
+  }, [feedTab, fetchFollowingFeed]);
+
+  // Refresh immediately on WebSocket new-post events while Following tab is active
+  const { subscribe: wsSubscribe } = useWebSocket();
+  useEffect(() => {
+    if (feedTab !== "following") return;
+    return wsSubscribe("new-post", fetchFollowingFeed);
+  }, [feedTab, wsSubscribe, fetchFollowingFeed]);
 
   // Fetch real posts from API and prepend to feed
   useEffect(() => {
