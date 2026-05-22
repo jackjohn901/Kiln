@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ShoppingBag, X } from "lucide-react";
 import { useLocation } from "wouter";
+import RelativeTime from "./RelativeTime";
 
 export interface SaleInfo {
   text: string;
@@ -13,27 +14,6 @@ interface Props {
   sale: SaleInfo;
   queueLength: number;
   onDismiss: () => void;
-}
-
-function relativeLabel(since: Date): string {
-  const diffMs = Date.now() - since.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return "just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin === 1) return "1 min ago";
-  if (diffMin < 60) return `${diffMin} min ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr === 1) return "1 hr ago";
-  return `${diffHr} hr ago`;
-}
-
-function RelativeTime({ since }: { since: Date }) {
-  const [label, setLabel] = useState(() => relativeLabel(since));
-  useEffect(() => {
-    const id = setInterval(() => setLabel(relativeLabel(since)), 30_000);
-    return () => clearInterval(id);
-  }, [since]);
-  return <span className="text-xs text-stone-500">{label}</span>;
 }
 
 const AUTO_DISMISS_MS = 6_000;

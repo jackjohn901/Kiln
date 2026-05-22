@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Gavel, Clock, TrendingUp, X, AlertCircle, CheckCircle, Trophy, ChevronDown, ChevronUp, CreditCard, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import RelativeTime from "@/components/RelativeTime";
 
 interface Bid {
   id: string;
@@ -250,10 +251,13 @@ function BidModal({ auction, onClose, onBidPlaced }: { auction: Auction; onClose
                 Bid history ({auction.bids.length})
               </button>
               {showHistory && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-1.5">
                   {auction.bids.slice(0, 5).map(bid => (
                     <div key={bid.id} className="flex items-center justify-between text-xs">
-                      <span className="text-stone-500">{bid.bidderName}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-stone-400">{bid.bidderName}</span>
+                        <RelativeTime since={bid.createdAt} className="text-[10px] text-stone-600" />
+                      </div>
                       <span className="text-amber-400 font-medium">{formatPrice(bid.amount)}</span>
                     </div>
                   ))}
