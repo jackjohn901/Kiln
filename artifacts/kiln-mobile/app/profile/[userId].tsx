@@ -183,20 +183,39 @@ export default function PublicProfileScreen() {
         </View>
 
         {isAuthenticated && (
-          <Pressable
-            style={[
-              styles.followBtn,
-              {
-                backgroundColor: isFollowing ? "transparent" : colors.primary,
-                borderColor: isFollowing ? colors.border : colors.primary,
-              },
-            ]}
-            onPress={handleFollow}
-          >
-            <Text style={[styles.followBtnText, { color: isFollowing ? colors.mutedForeground : colors.primaryForeground }]}>
-              {isFollowing ? "Following" : "Follow"}
-            </Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[
+                styles.followBtn,
+                {
+                  backgroundColor: isFollowing ? "transparent" : colors.primary,
+                  borderColor: isFollowing ? colors.border : colors.primary,
+                  flex: 1,
+                },
+              ]}
+              onPress={handleFollow}
+            >
+              <Text style={[styles.followBtnText, { color: isFollowing ? colors.mutedForeground : colors.primaryForeground }]}>
+                {isFollowing ? "Following" : "Follow"}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.followBtn,
+                {
+                  backgroundColor: "transparent",
+                  borderColor: colors.border,
+                  flex: 1,
+                  flexDirection: "row",
+                  gap: 6,
+                },
+              ]}
+              onPress={() => router.push(`/chat/user/${userId}` as any)}
+            >
+              <Feather name="message-circle" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.followBtnText, { color: colors.mutedForeground }]}>Message</Text>
+            </Pressable>
+          </View>
         )}
       </View>
 
@@ -268,9 +287,10 @@ const styles = StyleSheet.create({
   mediumTagText: { fontFamily: "Inter_500Medium", fontSize: 12 },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   locationText: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  actionRow: { flexDirection: "row", gap: 8, marginTop: 4 },
   followBtn: {
     borderWidth: 1, borderRadius: 10, paddingVertical: 10,
-    alignItems: "center", marginTop: 4,
+    alignItems: "center", justifyContent: "center",
   },
   followBtnText: { fontFamily: "Inter_700Bold", fontSize: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
