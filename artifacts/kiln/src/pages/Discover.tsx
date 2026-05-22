@@ -78,6 +78,43 @@ export default function Discover() {
     return () => { clearTimeout(t); controller.abort(); };
   }, [query]);
 
+  interface AiListing {
+    id: string; title: string; description: string | null;
+    imageUrl: string | null; price: string | null; medium: string | null;
+  }
+  const [aiListings, setAiListings] = useState<AiListing[]>([]);
+  const [aiInterpretation, setAiInterpretation] = useState("");
+  const [aiSearching, setAiSearching] = useState(false);
+
+  const isNaturalLanguage = (q: string) =>
+    q.trim().split(/\s+/).length >= 3 ||
+    /\$|\bunder\b|\bover\b|\bcheap\b|\baffordable\b|\bprice\b|\bbudget\b/i.test(q);
+
+  useEffect(() => {
+    if (!isNaturalLanguage(query)) { setAiListings([]); setAiInterpretation(""); return; }
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      setAiSearching(true);
+      try {
+        const res = await fetch("/api/ai/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({ query: query.trim() }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { listings?: AiListing[]; interpretation?: string };
+          setAiListings(data.listings ?? []);
+          setAiInterpretation(data.interpretation ?? "");
+        }
+      } catch {
+      } finally {
+        setAiSearching(false);
+      }
+    }, 600);
+    return () => { clearTimeout(t); controller.abort(); };
+  }, [query]);
+
   const handleCommunityFollow = (userId: string) => {
     const nowFollowing = !communityFollowing.has(userId);
     setCommunityFollowing((prev) => {
@@ -481,6 +518,47 @@ export default function Discover() {
               ))}
             </div>
           </div>
+
+          {/* AI semantic search results */}
+          {isNaturalLanguage(query) && (aiSearching || aiListings.length > 0) && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={13} className="text-amber-400" />
+                <h2 className="text-sm font-semibold text-stone-300">
+                  {aiSearching ? "Searching…" : `Shop results — ${aiInterpretation}`}
+                </h2>
+                {!aiSearching && aiListings.length > 0 && (
+                  <span className="rounded-full bg-stone-800 border border-stone-700 px-2 py-0.5 text-[9px] text-stone-500">{aiListings.length} listing{aiListings.length !== 1 ? "s" : ""}</span>
+                )}
+              </div>
+              {aiSearching ? (
+                <div className="flex items-center gap-2 text-xs text-stone-500 py-2">
+                  <div className="h-3 w-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+                  Understanding your search…
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {aiListings.map((listing) => (
+                    <button
+                      key={listing.id}
+                      onClick={() => navigate(`/shop/${listing.id}`)}
+                      className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden text-left hover:border-amber-500/20 transition-colors"
+                    >
+                      {listing.imageUrl ? (
+                        <img src={listing.imageUrl} alt={listing.title} className="w-full aspect-square object-cover" />
+                      ) : (
+                        <div className="w-full aspect-square bg-stone-800 flex items-center justify-center text-stone-600 text-2xl">🏺</div>
+                      )}
+                      <div className="p-2.5">
+                        <p className="text-xs font-medium text-stone-200 line-clamp-1">{listing.title}</p>
+                        <p className="text-[10px] text-stone-500 mt-0.5">{listing.medium ?? ""}{listing.price ? ` · $${listing.price}` : ""}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* API / platform search results */}
           {query.trim().length >= 2 && apiSearchResults.length > 0 && (

@@ -106,6 +106,8 @@ export default function Create() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [captionSuggestions, setCaptionSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [hashtagSuggestions, setHashtagSuggestions] = useState<string[]>([]);
+  const [loadingHashtags, setLoadingHashtags] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [crossPost, setCrossPost] = useState({ instagram: false, tiktok: false });
   const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
@@ -188,6 +190,25 @@ export default function Create() {
       // silently fail — user still has manual caption
     } finally {
       setTranscribing(false);
+    }
+  }
+
+  async function handleSuggestHashtags() {
+    if (!technique && !caption && tags.length === 0) return;
+    setLoadingHashtags(true);
+    setHashtagSuggestions([]);
+    try {
+      const res = await fetch("/api/ai/hashtags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ technique, caption, tags, medium: undefined }),
+      });
+      const data = await res.json() as { hashtags?: string[] };
+      setHashtagSuggestions(data.hashtags ?? []);
+    } catch {
+      setHashtagSuggestions([]);
+    } finally {
+      setLoadingHashtags(false);
     }
   }
 
@@ -1094,7 +1115,17 @@ export default function Create() {
 
             {/* Tags */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-400">Tags</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-medium text-stone-400">Tags</label>
+                <button
+                  onClick={handleSuggestHashtags}
+                  disabled={loadingHashtags || (!technique && !caption && tags.length === 0)}
+                  className="flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >
+                  {loadingHashtags ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                  Suggest hashtags
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {tags.map((t) => (
                   <span key={t} className="flex items-center gap-1 rounded-full bg-stone-800 px-2.5 py-1 text-xs text-stone-300">
@@ -1105,6 +1136,19 @@ export default function Create() {
                   </span>
                 ))}
               </div>
+              {hashtagSuggestions.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {hashtagSuggestions.filter((h) => !tags.includes(h)).map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => { addTag(h); setHashtagSuggestions((p) => p.filter((x) => x !== h)); }}
+                      className="flex items-center gap-1 rounded-full border border-dashed border-amber-500/30 bg-amber-500/8 px-2.5 py-1 text-[10px] text-amber-400 hover:bg-amber-500/15 transition-colors"
+                    >
+                      <span className="text-amber-600">+</span> #{h}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="text"

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon } from "lucide-react";
+import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon, Sparkles } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
 import BgRemoveToggle from "@/components/BgRemoveToggle";
@@ -18,6 +18,34 @@ export default function CreateListing() {
   const search = useSearch();
   const { upload, uploading } = useUpload();
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const [generatingDesc, setGeneratingDesc] = useState(false);
+
+  async function handleGenerateDescription() {
+    if (!form.title) return;
+    setGeneratingDesc(true);
+    try {
+      const res = await fetch("/api/ai/listing-writer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: form.title,
+          medium: form.medium,
+          technique: form.technique,
+          dimensions: form.dimensions,
+          year: form.year,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { description?: string };
+        if (data.description) set("description", data.description);
+      }
+    } catch {
+    } finally {
+      setGeneratingDesc(false);
+    }
+  }
 
   const [form, setForm] = useState({
     title: "",
@@ -229,7 +257,19 @@ export default function CreateListing() {
 
           {/* Description */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-stone-400">Description</label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium text-stone-400">Description</label>
+              <button
+                type="button"
+                onClick={handleGenerateDescription}
+                disabled={generatingDesc || !form.title}
+                title={!form.title ? "Add a title first" : "Generate description with AI"}
+                className="flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+              >
+                {generatingDesc ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                {generatingDesc ? "Writing…" : "Write with AI"}
+              </button>
+            </div>
             <textarea
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
