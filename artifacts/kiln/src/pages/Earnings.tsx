@@ -34,10 +34,18 @@ interface EarningLine {
   date: string;
 }
 
+interface SalesByType {
+  listings: number;
+  drops: number;
+  commissions: number;
+  workshops: number;
+}
+
 interface EarningTotals {
   tips: number;
   subscriptions: number;
   shopSales: number;
+  salesByType: SalesByType;
   total: number;
 }
 
@@ -143,7 +151,8 @@ export default function Earnings() {
   const { subscribe } = useWebSocket();
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
-  const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, total: 0 });
+  const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, salesByType: { listings: 0, drops: 0, commissions: 0, workshops: 0 }, total: 0 });
+  const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
   const [loading, setLoading]     = useState(true);
   const [saleBanner, setSaleBanner] = useState<string | null>(null);
   const saleBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -365,13 +374,14 @@ export default function Earnings() {
     try {
       const r = await fetch("/api/me/earnings", { credentials: "include" });
       if (!r.ok) return undefined;
-      const data = await r.json() as { earnings?: EarningLine[]; totals?: { tips?: number; subscriptions?: number; sales?: number; shopSales?: number; total?: number } };
+      const data = await r.json() as { earnings?: EarningLine[]; totals?: { tips?: number; subscriptions?: number; sales?: number; shopSales?: number; salesByType?: SalesByType; total?: number } };
       setEarnings(data.earnings ?? []);
       const t = data.totals ?? {};
       const newTotals: EarningTotals = {
         tips: t.tips ?? 0,
         subscriptions: t.subscriptions ?? 0,
         shopSales: t.shopSales ?? t.sales ?? 0,
+        salesByType: t.salesByType ?? { listings: 0, drops: 0, commissions: 0, workshops: 0 },
         total: t.total ?? 0,
       };
       setTotals(newTotals);
@@ -575,19 +585,21 @@ export default function Earnings() {
         ) : (
           <>
             {/* Stats */}
-            <div className="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Total", value: formatPrice(totals.total), icon: TrendingUp, color: "text-amber-400" },
-                { label: "Shop Sales", value: formatPrice(totals.shopSales), icon: ShoppingBag, color: "text-sky-400" },
-                { label: "Tips", value: formatPrice(totals.tips), icon: DollarSign, color: "text-emerald-400" },
-                { label: "Subscriptions", value: formatPrice(totals.subscriptions), icon: Star, color: "text-purple-400" },
+                { label: "Total", value: formatPrice(totals.total), icon: TrendingUp, color: "text-amber-400", clickable: false },
+                { label: "Shop Sales", value: formatPrice(totals.shopSales), icon: ShoppingBag, color: "text-sky-400", clickable: true },
+                { label: "Tips", value: formatPrice(totals.tips), icon: DollarSign, color: "text-emerald-400", clickable: false },
+                { label: "Subscriptions", value: formatPrice(totals.subscriptions), icon: Star, color: "text-purple-400", clickable: false },
               ].map(stat => {
                 const Icon = stat.icon;
                 return (
                   <div
                     key={stat.label}
+                    onClick={stat.clickable ? () => setSalesBreakdownOpen(o => !o) : undefined}
                     className={[
                       "relative rounded-2xl border bg-stone-900/50 p-4 transition-all duration-300",
+                      stat.clickable ? "cursor-pointer hover:border-sky-500/30 hover:bg-stone-900/70 select-none" : "",
                       statsFlash
                         ? "border-emerald-400/60 shadow-[0_0_12px_2px_rgba(52,211,153,0.25)] scale-[1.02]"
                         : "border-white/8",
@@ -602,6 +614,13 @@ export default function Earnings() {
                         <span className="text-[9px] font-medium text-emerald-400 uppercase tracking-wide">Updated</span>
                       </span>
                     )}
+                    {stat.clickable && (
+                      <span className="absolute top-2 right-2">
+                        {salesBreakdownOpen
+                          ? <ChevronUp size={12} className="text-stone-600" />
+                          : <ChevronDown size={12} className="text-stone-600" />}
+                      </span>
+                    )}
                     <Icon size={16} className={`mb-2 ${stat.color}`} />
                     <p className="text-xs text-stone-500 mb-0.5">{stat.label}</p>
                     <p className="text-lg font-bold text-stone-100">{stat.value}</p>
@@ -609,6 +628,36 @@ export default function Earnings() {
                 );
               })}
             </div>
+
+            {/* Shop Sales breakdown */}
+            {salesBreakdownOpen && (
+              <div className="mb-6 rounded-2xl border border-sky-500/15 bg-stone-900/40 p-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                <p className="text-xs uppercase tracking-wider text-stone-600 mb-3">Shop Sales by channel</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "Listings", value: totals.salesByType.listings, icon: ShoppingBag, color: "text-sky-400", bg: "bg-sky-500/10" },
+                    { label: "Drops", value: totals.salesByType.drops, icon: Zap, color: "text-orange-400", bg: "bg-orange-500/10" },
+                    { label: "Commissions", value: totals.salesByType.commissions, icon: MessageSquare, color: "text-blue-400", bg: "bg-blue-500/10" },
+                    { label: "Workshops", value: totals.salesByType.workshops, icon: BarChart2, color: "text-violet-400", bg: "bg-violet-500/10" },
+                  ].map(row => {
+                    const Icon = row.icon;
+                    const pct = totals.shopSales > 0 ? Math.round((row.value / totals.shopSales) * 100) : 0;
+                    return (
+                      <div key={row.label} className="rounded-xl border border-white/5 bg-stone-900/50 p-3">
+                        <div className={`inline-flex h-7 w-7 items-center justify-center rounded-lg mb-2 ${row.bg}`}>
+                          <Icon size={13} className={row.color} />
+                        </div>
+                        <p className="text-[11px] text-stone-500 mb-0.5">{row.label}</p>
+                        <p className="text-sm font-bold text-stone-100">{formatPrice(row.value)}</p>
+                        {totals.shopSales > 0 && (
+                          <p className="text-[10px] text-stone-600 mt-0.5">{pct}% of shop</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Recent transactions */}
             {earnings.length === 0 ? (

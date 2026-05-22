@@ -138,13 +138,26 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   const tipTotal = tips.reduce((s, t) => s + t.amountCents / 100, 0);
   const subTotal = subs.reduce((s, sub) => s + sub.amount / 100, 0);
   const saleTotal = sales.reduce((s, o) => s + o.amount / 100, 0);
+
+  const salesByType = sales.reduce<{ listings: number; drops: number; commissions: number; workshops: number }>(
+    (acc, o) => {
+      const amount = o.amount / 100;
+      if (o.type === "drop") acc.drops += amount;
+      else if (o.type === "commission") acc.commissions += amount;
+      else if (o.type === "workshop") acc.workshops += amount;
+      else acc.listings += amount;
+      return acc;
+    },
+    { listings: 0, drops: 0, commissions: 0, workshops: 0 },
+  );
+
   type EarningType = "tip" | "subscription" | "listing" | "drop" | "commission" | "workshop";
   const earnings = [
     ...tips.map(t => ({ id: t.id, type: "tip" as EarningType, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "via Kiln", amount: t.amountCents / 100, date: t.createdAt.toISOString() })),
     ...subs.map(s => ({ id: s.id, type: "subscription" as EarningType, label: "Patron subscription", sublabel: s.subscriberName ?? "Patron", amount: s.amount / 100, date: s.startedAt.toISOString() })),
     ...sales.map(o => ({ id: o.id, type: (["listing","drop","commission","workshop"].includes(o.type) ? o.type : "listing") as EarningType, label: o.title, sublabel: "Sale", amount: o.amount / 100, date: o.createdAt.toISOString() })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  res.json({ earnings, totals: { tips: tipTotal, subscriptions: subTotal, sales: saleTotal, total: tipTotal + subTotal + saleTotal } });
+  res.json({ earnings, totals: { tips: tipTotal, subscriptions: subTotal, sales: saleTotal, salesByType, total: tipTotal + subTotal + saleTotal } });
 });
 
 export default router;
