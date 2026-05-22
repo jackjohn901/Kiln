@@ -5,6 +5,7 @@ import { Users, MessageCircle, ChevronLeft, CheckCircle2, Heart, Share2, Externa
 import Nav from "@/components/Nav";
 import { getGuildById, type GuildMember } from "@/data/guilds";
 import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
+import { Composer, PostCard, type CommunityPost } from "@/pages/Community";
 
 const ROLE_BADGES: Record<GuildMember["role"], { label: string; icon: React.ElementType; color: string } | null> = {
   founder: { label: "Founder", icon: Crown, color: "text-amber-400" },
@@ -12,7 +13,7 @@ const ROLE_BADGES: Record<GuildMember["role"], { label: string; icon: React.Elem
   member: null,
 };
 
-type Tab = "feed" | "members" | "events" | "resources";
+type Tab = "feed" | "discussions" | "members" | "events" | "resources";
 
 interface ApiMember { userId: string; role: string; joinedAt: string; }
 interface ApiMemberWithProfile extends ApiMember {
@@ -71,8 +72,21 @@ export default function GuildDetail() {
   const [apiGuild, setApiGuild] = useState<ApiGuild | null>(null);
   const [apiMembers, setApiMembers] = useState<ApiMemberWithProfile[]>([]);
   const [apiEvents, setApiEvents] = useState<{ title: string; date: string; location: string; description: string }[]>([]);
+  const [discussionPosts, setDiscussionPosts] = useState<CommunityPost[]>([]);
+  const [discussionsLoaded, setDiscussionsLoaded] = useState(false);
 
   const staticGuild = getGuildById(id ?? "");
+
+  // Load guild discussions when tab is first opened
+  useEffect(() => {
+    if (tab !== "discussions" || discussionsLoaded || !id) return;
+    const guildId = staticGuild?.id ?? apiGuild?.id ?? id;
+    setDiscussionsLoaded(true);
+    fetch(`/api/community/guilds/${guildId}`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.posts) setDiscussionPosts(data.posts); })
+      .catch(() => {});
+  }, [tab, discussionsLoaded, id, staticGuild, apiGuild]);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -186,7 +200,11 @@ export default function GuildDetail() {
           <GuildTabs tab={tab} setTab={setTab} likedPosts={likedPosts} setLikedPosts={setLikedPosts}
             posts={staticGuild.posts} members={staticGuild.members.map(m => ({ userId: m.artistId, role: m.role, joinedAt: new Date().toISOString(), displayName: m.name, avatarUrl: m.avatarUrl, medium: m.medium, location: m.location }))}
             events={staticGuild.events} resources={staticGuild.resources} rules={staticGuild.rules}
-            memberCount={staticGuild.memberCount} />
+            memberCount={staticGuild.memberCount}
+            guildId={staticGuild.id}
+            discussionPosts={discussionPosts}
+            onDiscussionPosted={(p) => setDiscussionPosts((prev) => [p, ...prev])}
+            onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))} />
           <div className="h-20" />
         </div>
       </div>
@@ -235,7 +253,11 @@ export default function GuildDetail() {
 
         <GuildTabs tab={tab} setTab={setTab} likedPosts={likedPosts} setLikedPosts={setLikedPosts}
           posts={[]} members={apiMembers} events={apiEvents} resources={[]} rules={DEFAULT_RULES}
-          memberCount={guild.memberCount} />
+          memberCount={guild.memberCount}
+          guildId={guild.id}
+          discussionPosts={discussionPosts}
+          onDiscussionPosted={(p) => setDiscussionPosts((prev) => [p, ...prev])}
+          onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))} />
 
         <div className="h-20" />
       </div>
@@ -254,16 +276,28 @@ interface GuildTabsProps {
   resources: { title: string; description: string; type: string; url?: string }[];
   rules: string[];
   memberCount: number;
+  guildId: string;
+  discussionPosts: CommunityPost[];
+  onDiscussionPosted: (p: CommunityPost) => void;
+  onDiscussionDelete: (id: string) => void;
 }
 
-function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, events, resources, rules, memberCount }: GuildTabsProps) {
+const TAB_LABELS: Record<Tab, string> = {
+  feed: "Feed",
+  discussions: "Discussions",
+  members: "Members",
+  events: "Events",
+  resources: "Resources",
+};
+
+function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, events, resources, rules, memberCount, guildId, discussionPosts, onDiscussionPosted, onDiscussionDelete }: GuildTabsProps) {
   return (
     <>
-      <div className="mb-6 flex border-b border-white/10 gap-1">
-        {(["feed", "members", "events", "resources"] as Tab[]).map((t) => (
+      <div className="mb-6 flex border-b border-white/10 gap-1 overflow-x-auto scrollbar-none">
+        {(["feed", "discussions", "members", "events", "resources"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${tab === t ? "border-amber-400 text-amber-300" : "border-transparent text-stone-500 hover:text-stone-300"}`}>
-            {t}
+            className={`shrink-0 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${tab === t ? "border-amber-400 text-amber-300" : "border-transparent text-stone-500 hover:text-stone-300"}`}>
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -323,6 +357,33 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                 </div>
               </div>
             )}
+          </motion.div>
+        )}
+
+        {tab === "discussions" && (
+          <motion.div key="discussions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <div className="flex flex-col gap-4">
+              <Composer
+                placeholder="Start a discussion, ask a question, or share a tip…"
+                guildId={guildId}
+                onPosted={onDiscussionPosted}
+              />
+              {discussionPosts.length === 0 ? (
+                <div className="py-16 text-center">
+                  <p className="text-stone-600 mb-2">No discussions yet.</p>
+                  <p className="text-xs text-stone-700">Be the first to start a conversation in this guild.</p>
+                </div>
+              ) : (
+                discussionPosts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    onLike={() => {}}
+                    onDelete={onDiscussionDelete}
+                  />
+                ))
+              )}
+            </div>
           </motion.div>
         )}
 

@@ -21,6 +21,7 @@ import Setup from "@/pages/Setup";
 import Create from "@/pages/Create";
 import Discover from "@/pages/Discover";
 import Gallery from "@/pages/Gallery";
+import Community from "@/pages/Community";
 import Analytics from "@/pages/Analytics";
 import Workshops from "@/pages/Workshops";
 import Inbox from "@/pages/Inbox";
@@ -200,6 +201,7 @@ function TitleSetter() {
       ["/", "Kiln — Craft Creator Platform", "Watch craft artists share their process. Buy ceramics, glass, weaving, metalwork, and woodwork directly from makers. Book workshops and support artists you love."],
       ["/discover", "Discover Artists — Kiln", "Find craft artists by technique, location, and style. Ceramicists, glassblowers, weavers, metalworkers, woodworkers, and more on Kiln."],
       ["/gallery", "Gallery — Kiln", "Browse works by craft artists. Ceramics, glass, weaving, metalwork, and woodwork in a visual image gallery."],
+      ["/community", "Community — Kiln", "Join the Kiln craft community. Share thoughts, ask questions, and connect with other artists and makers."],
       ["/artists", "Browse Craft Artists — Kiln", "Browse all craft artists on Kiln. Filter by technique, location, and commission availability. Find the maker behind the work."],
       ["/shop", "Shop Original Handmade Works — Kiln", "Buy original handmade art directly from craft artists. Ceramics, glass, woven textiles, metalwork, woodwork, and more. No middlemen."],
       ["/workshops", "Book Craft Workshops — Kiln", "Book in-person and online craft workshops. Pottery, glassblowing, weaving, blacksmithing, and more classes taught by working artists."],
@@ -267,6 +269,7 @@ function Router() {
         <Route path="/" component={RootPage} />
       <Route path="/discover" component={Discover} />
       <Route path="/gallery" component={Gallery} />
+      <Route path="/community" component={Community} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:id" component={ArtistProfile} />
       <Route path="/artists/:id/followers" component={FollowerList} />

@@ -37,6 +37,7 @@ export default function Nav() {
     { href: "/", label: "Home" },
     { href: "/discover", label: "Discover" },
     { href: "/gallery", label: "Gallery" },
+    { href: "/community", label: "Community" },
     { href: "/drops", label: "Drops" },
     { href: "/workshops", label: "Workshops" },
     { href: "/techniques", label: "Techniques" },
