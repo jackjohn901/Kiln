@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -39,6 +39,11 @@ interface Order {
 interface OrderDetailResponse {
   order: Order;
   siblingOrders?: Order[];
+}
+
+interface SellerProcessingWindow {
+  processingWindowDays: number | null;
+  processingWindowLabel: string | null;
 }
 
 function formatPrice(n: number) {
@@ -93,11 +98,33 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
+  const [sellerWindow, setSellerWindow] = useState<SellerProcessingWindow | null>(null);
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["me/orders", id],
     queryFn: () => apiGet<OrderDetailResponse>(`/api/me/orders/${encodeURIComponent(id!)}`),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    const order = data?.order;
+    if (!order) return;
+    if (order.processingWindowDays !== null || order.processingWindowLabel !== null) return;
+    if (!order.sellerId) return;
+    apiGet<{ processingWindow?: unknown; processingWindowLabel?: unknown }>(
+      `/api/users/${order.sellerId}/payment-settings`
+    )
+      .then(ps => {
+        setSellerWindow({
+          processingWindowDays: typeof ps.processingWindow === "number" ? ps.processingWindow : null,
+          processingWindowLabel:
+            typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+              ? (ps.processingWindowLabel as string).trim()
+              : null,
+        });
+      })
+      .catch(() => {});
+  }, [data?.order]);
 
   if (isLoading) {
     return (
@@ -127,12 +154,14 @@ export default function OrderDetailScreen() {
   const statusLabel = STATUS_LABEL[order.status] ?? "Pending";
   const typeIconName = (TYPE_ICON[order.type] ?? "shopping-bag") as any;
   const isActive = !["delivered", "cancelled"].includes(order.status);
-  const hasDeliveryEstimate = order.processingWindowLabel !== null || order.processingWindowDays !== null;
-  const deliveryEstimateText = order.processingWindowLabel
-    ? order.processingWindowLabel
-    : order.processingWindowDays === 1
+  const windowLabel = order.processingWindowLabel ?? sellerWindow?.processingWindowLabel ?? null;
+  const windowDays = order.processingWindowDays ?? sellerWindow?.processingWindowDays ?? null;
+  const hasDeliveryEstimate = windowLabel !== null || windowDays !== null;
+  const deliveryEstimateText = windowLabel
+    ? windowLabel
+    : windowDays === 1
       ? "1 business day"
-      : `${order.processingWindowDays} business days`;
+      : `${windowDays} business days`;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
