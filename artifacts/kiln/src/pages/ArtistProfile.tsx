@@ -1285,6 +1285,11 @@ export default function ArtistProfile() {
               )}
               {isOwn && (
                 <div className="flex gap-3 flex-wrap">
+                  <Link href={`/artists/${artist.id}/press-packet`}
+                    className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-5 py-2 text-sm font-semibold text-amber-300 hover:border-amber-400/50 hover:text-amber-200 transition-colors"
+                  >
+                    <Share2 size={14} /> Press Packet
+                  </Link>
                   <Link href={`/artists/${artist.id}/press-kit`}
                     className="flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-stone-400 hover:text-stone-200 hover:border-white/20 transition-colors"
                   >

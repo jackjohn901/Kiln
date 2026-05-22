@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   followsTable, profilesTable, notificationsTable, postsTable, userSettingsTable,
+  listingsTable, workshopsTable, patronTiersTable,
 } from "@workspace/db";
 import { eq, and, sql, or, ilike, inArray, desc, isNull, lte } from "drizzle-orm";
 import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
@@ -350,6 +351,60 @@ router.get("/me/followers", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "getMyFollowers error");
     res.status(500).json({ error: "Failed to load followers" });
+  }
+});
+
+// GET /users/:userId/press-packet — public, aggregated press packet data
+router.get("/users/:userId/press-packet", async (req, res): Promise<void> => {
+  const { userId } = req.params;
+  try {
+    const [profile] = await db.select(publicProfileFields).from(profilesTable).where(eq(profilesTable.userId, userId));
+    if (!profile) { res.status(404).json({ error: "Artist not found" }); return; }
+
+    const [followerCountRow, postCountRow, listingCountRow, workshopCountRow] = await Promise.all([
+      db.select({ count: sql<number>`count(*)::int` }).from(followsTable).where(eq(followsTable.followingId, userId)),
+      db.select({ count: sql<number>`count(*)::int` }).from(postsTable).where(and(eq(postsTable.authorId, userId), eq(postsTable.isDraft, false), or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)))),
+      db.select({ count: sql<number>`count(*)::int` }).from(listingsTable).where(and(eq(listingsTable.artistId, userId), eq(listingsTable.isAvailable, true), eq(listingsTable.isSold, false))),
+      db.select({ count: sql<number>`count(*)::int` }).from(workshopsTable).where(eq(workshopsTable.artistId, userId)),
+    ]);
+
+    const recentPosts = await db.select({
+      id: postsTable.id,
+      thumbnailUrl: postsTable.thumbnailUrl,
+      videoUrl: postsTable.videoUrl,
+      caption: postsTable.caption,
+      likeCount: postsTable.likeCount,
+      viewCount: postsTable.viewCount,
+      createdAt: postsTable.createdAt,
+    }).from(postsTable)
+      .where(and(eq(postsTable.authorId, userId), eq(postsTable.isDraft, false), or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`))))
+      .orderBy(desc(postsTable.createdAt))
+      .limit(9);
+
+    const patronTiers = await db.select({
+      id: patronTiersTable.id,
+      name: patronTiersTable.name,
+      price: patronTiersTable.price,
+      description: patronTiersTable.description,
+      perks: patronTiersTable.perks,
+    }).from(patronTiersTable)
+      .where(and(eq(patronTiersTable.artistId, userId), eq(patronTiersTable.isActive, true)))
+      .orderBy(patronTiersTable.sortOrder);
+
+    res.json({
+      profile: { ...profile, createdAt: profile.createdAt.toISOString() },
+      stats: {
+        followerCount: followerCountRow[0]?.count ?? 0,
+        postCount: postCountRow[0]?.count ?? 0,
+        listingCount: listingCountRow[0]?.count ?? 0,
+        workshopCount: workshopCountRow[0]?.count ?? 0,
+      },
+      recentPosts: recentPosts.map(p => ({ ...p, createdAt: p.createdAt.toISOString() })),
+      patronTiers,
+    });
+  } catch (err) {
+    req.log.error({ err }, "getPressPacket error");
+    res.status(500).json({ error: "Failed to load press packet" });
   }
 });
 

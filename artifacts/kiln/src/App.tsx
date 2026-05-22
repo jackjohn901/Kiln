@@ -56,6 +56,7 @@ import CritiqueFeed from "@/pages/CritiqueFeed";
 import Mentorship from "@/pages/Mentorship";
 import PatronTiers from "@/pages/PatronTiers";
 import PressKit from "@/pages/PressKit";
+import PressPacket from "@/pages/PressPacket";
 import Materials from "@/pages/Materials";
 import GlazeLibrary from "@/pages/GlazeLibrary";
 import SeriesJournal from "@/pages/SeriesJournal";
@@ -307,6 +308,7 @@ function Router() {
       <Route path="/mentorship" component={Mentorship} />
       <Route path="/artists/:artistId/patron" component={PatronTiers} />
       <Route path="/artists/:artistId/press-kit" component={PressKit} />
+      <Route path="/artists/:artistId/press-packet" component={PressPacket} />
       <Route path="/press" component={PressPage} />
       <Route path="/materials" component={Materials} />
       <Route path="/series" component={SeriesJournal} />
