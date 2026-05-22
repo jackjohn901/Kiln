@@ -19,7 +19,7 @@ import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 import { broadcast } from '../lib/websocket';
 import { getDigitalProduct } from '../lib/digitalProducts';
-import { sendEmail, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, workshopBookingEmail, commissionPaymentEmail, type WorkshopCalendarParams } from '../lib/email';
+import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, workshopBookingEmail, commissionPaymentEmail, type WorkshopCalendarParams } from '../lib/email';
 
 const router: IRouter = Router();
 
@@ -956,13 +956,12 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 receiptOrderId,
               );
 
-              await sendEmail({
-                to: buyerEmail,
-                subject: 'Your Kiln order is confirmed',
-                html,
-              });
+              await sendEmailWithRetry(
+                { to: buyerEmail, subject: 'Your Kiln order is confirmed', html },
+                { contextId: session.id, label: 'manual-payout receipt' },
+              );
             } catch (emailErr) {
-              logger.error({ err: emailErr, sessionId: session.id }, 'Failed to send manual-payout receipt email');
+              logger.error({ err: emailErr, sessionId: session.id, to: buyerEmail }, 'Failed to send manual-payout receipt email');
             }
           }
 
@@ -1151,13 +1150,12 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   connectReceiptOrderId,
                 );
 
-                await sendEmail({
-                  to: connectBuyerEmail,
-                  subject: 'Your Kiln order is confirmed',
-                  html,
-                });
+                await sendEmailWithRetry(
+                  { to: connectBuyerEmail, subject: 'Your Kiln order is confirmed', html },
+                  { contextId: session.id, label: 'connect receipt' },
+                );
               } catch (receiptErr) {
-                logger.error({ err: receiptErr, sessionId: session.id }, 'Failed to send Stripe Connect buyer receipt email');
+                logger.error({ err: receiptErr, sessionId: session.id, to: connectBuyerEmail }, 'Failed to send Stripe Connect buyer receipt email');
               }
             }
 

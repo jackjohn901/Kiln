@@ -1,5 +1,5 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { sendEmail, orderConfirmationEmail, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
+import { sendEmail, sendEmailWithRetry, orderConfirmationEmail, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable } from '@workspace/db';
@@ -153,11 +153,14 @@ export class WebhookHandlers {
           // small race; we retry a few times before falling back to the orders list.
           const receiptOrderId = await waitForSessionOrder(session.id);
 
-          sendEmail({
-            to: email,
-            subject: `Your Kiln order #${orderId} is confirmed`,
-            html: orderConfirmationEmail(email, orderId, amount, receiptOrderId ?? undefined),
-          }).catch(() => {});
+          sendEmailWithRetry(
+            {
+              to: email,
+              subject: `Your Kiln order #${orderId} is confirmed`,
+              html: orderConfirmationEmail(email, orderId, amount, receiptOrderId ?? undefined),
+            },
+            { contextId: session.id, label: 'order confirmation' },
+          ).catch((err) => logger.error({ err, sessionId: session.id, to: email }, 'Unexpected error in sendEmailWithRetry for order confirmation'));
         }
 
         if (session.mode === 'subscription' && meta.platform === 'kiln' && meta.tierId && meta.userId) {

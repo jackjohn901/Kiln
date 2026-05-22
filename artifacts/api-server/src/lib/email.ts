@@ -35,6 +35,44 @@ export interface EmailPayload {
   from?: string;
 }
 
+export interface EmailRetryContext {
+  /** Arbitrary identifier for log correlation (e.g. Stripe session ID). */
+  contextId?: string;
+  /** Human-readable label for the log (e.g. "order confirmation"). */
+  label?: string;
+}
+
+/**
+ * Sends an email with up to two automatic retries on transient failure.
+ * Delays: 1 s before retry 1, 2 s before retry 2.
+ * Logs a structured warning on each failed attempt and an error when all
+ * attempts are exhausted so failures are always diagnosable.
+ */
+export async function sendEmailWithRetry(
+  payload: EmailPayload,
+  ctx?: EmailRetryContext,
+  maxAttempts = 3,
+): Promise<boolean> {
+  const delays = [1_000, 2_000];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const ok = await sendEmail(payload);
+    if (ok) return true;
+    if (attempt < maxAttempts) {
+      const delayMs = delays[attempt - 1] ?? 2_000;
+      logger.warn(
+        { to: payload.to, subject: payload.subject, attempt, contextId: ctx?.contextId, label: ctx?.label },
+        `Email send attempt ${attempt} failed — retrying in ${delayMs}ms`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  logger.error(
+    { to: payload.to, subject: payload.subject, attempts: maxAttempts, contextId: ctx?.contextId, label: ctx?.label },
+    "Email send failed after all retry attempts — buyer may not receive receipt",
+  );
+  return false;
+}
+
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   const apiKey = await getResendApiKey();
 
