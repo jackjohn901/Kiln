@@ -572,6 +572,47 @@ const SEED_PATRON_TIERS = [
   },
 ];
 
+export interface SeedStatus {
+  markerPresent: boolean;
+  seedUserCount: number;
+  seedPostCount: number;
+  markerUserId: string;
+}
+
+export async function getSeedStatus(): Promise<SeedStatus> {
+  const [marker] = await db.select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.id, SEED_MARKER_ID));
+
+  const seedUserIds = SEED_USERS.map((u) => u.id);
+  const existingUsers = await db.select({ id: usersTable.id })
+    .from(usersTable)
+    .where(sql`${usersTable.id} = ANY(${seedUserIds})`);
+
+  const seedPostIds = SEED_POSTS.map((p) => (p as { id: string }).id);
+  const existingPosts = await db.select({ id: postsTable.id })
+    .from(postsTable)
+    .where(sql`${postsTable.id} = ANY(${seedPostIds})`);
+
+  return {
+    markerPresent: !!marker,
+    seedUserCount: existingUsers.length,
+    seedPostCount: existingPosts.length,
+    markerUserId: SEED_MARKER_ID,
+  };
+}
+
+export async function forceSeedDatabase(): Promise<{ users: number; posts: number; listings: number; guilds: number }> {
+  await db.delete(usersTable).where(eq(usersTable.id, SEED_MARKER_ID));
+  await seedDatabase();
+  return {
+    users: SEED_USERS.length - 1,
+    posts: SEED_POSTS.length,
+    listings: SEED_LISTINGS.length,
+    guilds: SEED_GUILDS.length,
+  };
+}
+
 export async function seedDatabase(): Promise<void> {
   try {
     const [existing] = await db.select({ id: usersTable.id })

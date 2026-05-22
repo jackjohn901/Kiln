@@ -3,9 +3,12 @@ import {
   db, reportsTable, verificationApplicationsTable, profilesTable,
   postsTable, followsTable, likesTable, ordersTable,
   commissionsTable, workshopsTable, workshopBookingsTable, usersTable,
+  notificationsTable,
 } from "@workspace/db";
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { getSeedStatus, forceSeedDatabase } from "../lib/seed";
+import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
@@ -404,6 +407,63 @@ router.post("/admin/backfill-order-notes", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.backfillOrderNotes error");
     res.status(500).json({ error: "Failed to backfill order notes" });
+  }
+});
+
+// POST /admin/reseed — re-run database seed (dry-run preview or force)
+router.post("/admin/reseed", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const dryRun = req.query["dry_run"] === "true";
+
+  try {
+    if (dryRun) {
+      const status = await getSeedStatus();
+      res.json({ dryRun: true, ...status });
+      return;
+    }
+
+    const result = await forceSeedDatabase();
+    req.log.info({ result }, "admin.reseed: forced reseed completed");
+    res.json({ dryRun: false, ...result });
+  } catch (err) {
+    req.log.error({ err }, "admin.reseed error");
+    res.status(500).json({ error: "Reseed failed" });
+  }
+});
+
+// POST /admin/test-notification — send a test notification to the calling admin
+router.post("/admin/test-notification", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const dryRun = req.query["dry_run"] === "true";
+
+  const preview = {
+    type: "system",
+    text: "Test notification — the notification pipeline is working correctly.",
+    link: "/kiln/notifications",
+  };
+
+  if (dryRun) {
+    res.json({ dryRun: true, preview });
+    return;
+  }
+
+  try {
+    await db.insert(notificationsTable).values({
+      id: randomUUID(),
+      userId: req.user.id,
+      type: preview.type,
+      text: preview.text,
+      link: preview.link,
+      read: false,
+    });
+    res.json({ dryRun: false, sent: true });
+  } catch (err) {
+    req.log.error({ err }, "admin.testNotification error");
+    res.status(500).json({ error: "Failed to send test notification" });
   }
 });
 

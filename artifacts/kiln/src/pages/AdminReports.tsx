@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,6 +41,26 @@ interface BackfillResult {
   orderIds: string[];
 }
 
+interface SeedPreview {
+  markerPresent: boolean;
+  seedUserCount: number;
+  seedPostCount: number;
+  markerUserId: string;
+}
+
+interface SeedResult {
+  users: number;
+  posts: number;
+  listings: number;
+  guilds: number;
+}
+
+interface NotifPreview {
+  type: string;
+  text: string;
+  link: string;
+}
+
 export default function AdminReports() {
   useMeta({ title: "Moderation Queue" });
   const { user } = useAuth();
@@ -59,6 +79,18 @@ export default function AdminReports() {
   const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillError, setBackfillError] = useState<string | null>(null);
+
+  // Reseed state
+  const [seedPreview, setSeedPreview] = useState<SeedPreview | null>(null);
+  const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
+
+  // Test notification state
+  const [notifPreview, setNotifPreview] = useState<NotifPreview | null>(null);
+  const [notifSent, setNotifSent] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
 
   async function runBackfill(dryRun: boolean) {
     setBackfillLoading(true);
@@ -92,6 +124,75 @@ export default function AdminReports() {
     setBackfillPreview(null);
     setBackfillResult(null);
     setBackfillError(null);
+  }
+
+  async function runReseed(dryRun: boolean) {
+    setSeedLoading(true);
+    setSeedError(null);
+    try {
+      const res = await fetch(`/api/admin/reseed${dryRun ? "?dry_run=true" : ""}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setSeedError(data?.error ?? "Request failed");
+        return;
+      }
+      if (dryRun) {
+        const data = await res.json() as SeedPreview & { dryRun: boolean };
+        setSeedPreview(data);
+        setSeedResult(null);
+      } else {
+        const data = await res.json() as SeedResult & { dryRun: boolean };
+        setSeedResult(data);
+        setSeedPreview(null);
+      }
+    } catch {
+      setSeedError("Network error — please try again");
+    } finally {
+      setSeedLoading(false);
+    }
+  }
+
+  function resetSeed() {
+    setSeedPreview(null);
+    setSeedResult(null);
+    setSeedError(null);
+  }
+
+  async function runTestNotification(dryRun: boolean) {
+    setNotifLoading(true);
+    setNotifError(null);
+    try {
+      const res = await fetch(`/api/admin/test-notification${dryRun ? "?dry_run=true" : ""}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setNotifError(data?.error ?? "Request failed");
+        return;
+      }
+      if (dryRun) {
+        const data = await res.json() as { dryRun: boolean; preview: NotifPreview };
+        setNotifPreview(data.preview);
+        setNotifSent(false);
+      } else {
+        setNotifSent(true);
+        setNotifPreview(null);
+      }
+    } catch {
+      setNotifError("Network error — please try again");
+    } finally {
+      setNotifLoading(false);
+    }
+  }
+
+  function resetNotif() {
+    setNotifPreview(null);
+    setNotifSent(false);
+    setNotifError(null);
   }
 
   useEffect(() => {
@@ -176,7 +277,7 @@ export default function AdminReports() {
           <button onClick={() => setSection("verifications")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "verifications" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <BadgeCheck size={13} /> Verify Artists
           </button>
-          <button onClick={() => { setSection("maintenance"); resetBackfill(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+          <button onClick={() => { setSection("maintenance"); resetBackfill(); resetSeed(); resetNotif(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <Wrench size={13} /> Maintenance
           </button>
         </div>
@@ -478,6 +579,167 @@ export default function AdminReports() {
               {backfillLoading && backfillPreview && (
                 <div className="flex items-center gap-2 text-xs text-stone-500">
                   <RefreshCw size={12} className="animate-spin" /> Applying backfill…
+                </div>
+              )}
+            </div>
+
+            {/* Re-run seed data card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <Database size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-100">Re-run seed data</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Re-applies the canonical seed artists, posts, listings, guilds, and patron tiers. Safe to run after a DB reset — existing records are updated in-place, not duplicated. Preview first to check the current seed state.
+                  </p>
+                </div>
+              </div>
+
+              {seedError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {seedError}
+                </div>
+              )}
+
+              {seedPreview && !seedResult && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-amber-200 font-medium">Current seed state:</p>
+                    <p className="text-[11px] text-stone-400">
+                      Marker <span className="font-mono text-stone-500">{seedPreview.markerUserId}</span>{" "}
+                      <span className={seedPreview.markerPresent ? "text-emerald-400" : "text-rose-400"}>
+                        {seedPreview.markerPresent ? "✓ present" : "✗ missing"}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-stone-400">
+                      {seedPreview.seedUserCount} seed users · {seedPreview.seedPostCount} seed posts found in DB
+                    </p>
+                  </div>
+                  <p className="text-xs text-stone-500">
+                    Confirming will delete the marker and re-run the full seed (all tables use upsert, so no data is lost).
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => runReseed(false)}
+                      disabled={seedLoading}
+                      className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                    >
+                      <CheckCircle size={11} /> Confirm reseed
+                    </button>
+                    <button
+                      onClick={resetSeed}
+                      disabled={seedLoading}
+                      className="text-xs text-stone-600 hover:text-stone-400 transition-colors disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {seedResult && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 space-y-2">
+                  <p className="text-xs text-emerald-300 font-medium">Done — seed data applied.</p>
+                  <p className="text-[11px] text-stone-500">
+                    {seedResult.users} artists · {seedResult.posts} posts · {seedResult.listings} listings · {seedResult.guilds} guilds
+                  </p>
+                  <button onClick={resetSeed} className="text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                    Reset
+                  </button>
+                </div>
+              )}
+
+              {!seedPreview && !seedResult && (
+                <button
+                  onClick={() => runReseed(true)}
+                  disabled={seedLoading}
+                  className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >
+                  {seedLoading ? <RefreshCw size={13} className="animate-spin" /> : <Database size={13} />}
+                  {seedLoading ? "Checking…" : "Preview seed state"}
+                </button>
+              )}
+
+              {seedLoading && seedPreview && (
+                <div className="flex items-center gap-2 text-xs text-stone-500">
+                  <RefreshCw size={12} className="animate-spin" /> Running seed…
+                </div>
+              )}
+            </div>
+
+            {/* Test notification card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <Bell size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-100">Send test notification</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Inserts a test notification into your own feed to verify the notification pipeline is working end-to-end. Preview the notification content before sending.
+                  </p>
+                </div>
+              </div>
+
+              {notifError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {notifError}
+                </div>
+              )}
+
+              {notifPreview && !notifSent && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-amber-200 font-medium">Notification preview:</p>
+                    <p className="text-[11px] text-stone-300">"{notifPreview.text}"</p>
+                    <p className="text-[10px] font-mono text-stone-600">type: {notifPreview.type} · link: {notifPreview.link}</p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => runTestNotification(false)}
+                      disabled={notifLoading}
+                      className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                    >
+                      <CheckCircle size={11} /> Send notification
+                    </button>
+                    <button
+                      onClick={resetNotif}
+                      disabled={notifLoading}
+                      className="text-xs text-stone-600 hover:text-stone-400 transition-colors disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {notifSent && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 space-y-2">
+                  <p className="text-xs text-emerald-300 font-medium">
+                    Sent — check your{" "}
+                    <a href="/kiln/notifications" className="underline hover:text-emerald-200 transition-colors">
+                      notifications
+                    </a>{" "}
+                    to confirm it arrived.
+                  </p>
+                  <button onClick={resetNotif} className="text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                    Reset
+                  </button>
+                </div>
+              )}
+
+              {!notifPreview && !notifSent && (
+                <button
+                  onClick={() => runTestNotification(true)}
+                  disabled={notifLoading}
+                  className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >
+                  {notifLoading ? <RefreshCw size={13} className="animate-spin" /> : <Bell size={13} />}
+                  {notifLoading ? "Preparing…" : "Preview test notification"}
+                </button>
+              )}
+
+              {notifLoading && notifPreview && (
+                <div className="flex items-center gap-2 text-xs text-stone-500">
+                  <RefreshCw size={12} className="animate-spin" /> Sending…
                 </div>
               )}
             </div>
