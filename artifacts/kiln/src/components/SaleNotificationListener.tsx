@@ -1,80 +1,45 @@
-import { useEffect, useCallback, useState } from "react";
-import { useLocation } from "wouter";
-import { ShoppingBag } from "lucide-react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { toast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-
-function relativeLabel(since: Date): string {
-  const diffMs = Date.now() - since.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return "just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin === 1) return "1 min ago";
-  if (diffMin < 60) return `${diffMin} min ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr === 1) return "1 hr ago";
-  return `${diffHr} hr ago`;
-}
-
-function RelativeTime({ since }: { since: Date }) {
-  const [label, setLabel] = useState(() => relativeLabel(since));
-
-  useEffect(() => {
-    const id = setInterval(() => setLabel(relativeLabel(since)), 30_000);
-    return () => clearInterval(id);
-  }, [since]);
-
-  return <span className="text-xs text-stone-500">{label}</span>;
-}
+import SaleBanner, { type SaleInfo } from "./SaleBanner";
 
 export default function SaleNotificationListener() {
   const { subscribe } = useWebSocket();
-  const [, navigate] = useLocation();
+  const [queue, setQueue] = useState<SaleInfo[]>([]);
+  const queueRef = useRef<SaleInfo[]>([]);
 
-  const handleNotification = useCallback(
-    (evt: Record<string, unknown>) => {
-      const notifType = evt.notifType as string | undefined;
-      if (notifType !== "sale") return;
+  const handleNotification = useCallback((evt: Record<string, unknown>) => {
+    const notifType = evt.notifType as string | undefined;
+    if (notifType !== "sale") return;
 
-      const text = (evt.text as string | undefined) ?? "You have a new sale!";
-      const link = (evt.link as string | undefined) ?? "/earnings";
-      const fromName = (evt.fromName as string | undefined) ?? "A buyer";
-      const saleTime = new Date();
+    const text = (evt.text as string | undefined) ?? "You have a new sale!";
+    const link = (evt.link as string | undefined) ?? "/earnings";
+    const fromName = (evt.fromName as string | undefined) ?? "A buyer";
 
-      toast({
-        title: (
-          <span className="flex items-center gap-2">
-            <ShoppingBag size={15} className="text-green-400 shrink-0" />
-            <span className="text-green-300 font-semibold">New Sale!</span>
-          </span>
-        ) as unknown as string,
-        description: (
-          <span className="flex flex-col gap-0.5">
-            <span className="text-stone-300">
-              <span className="font-medium text-stone-200">{fromName}</span>{" "}
-              {text.replace(/^New sale:\s*/i, "")}
-            </span>
-            <RelativeTime since={saleTime} />
-          </span>
-        ) as unknown as string,
-        action: (
-          <ToastAction
-            altText="View earnings"
-            onClick={() => navigate(link)}
-            className="border-green-500/40 text-green-300 hover:bg-green-500/10"
-          >
-            View
-          </ToastAction>
-        ),
-      });
-    },
-    [navigate],
-  );
+    const sale: SaleInfo = { text, link, fromName, arrivedAt: new Date() };
+
+    queueRef.current = [...queueRef.current, sale];
+    setQueue([...queueRef.current]);
+  }, []);
 
   useEffect(() => {
     return subscribe("notification", handleNotification);
   }, [subscribe, handleNotification]);
 
-  return null;
+  const dismiss = useCallback(() => {
+    queueRef.current = queueRef.current.slice(1);
+    setQueue([...queueRef.current]);
+  }, []);
+
+  if (queue.length === 0) return null;
+
+  const [current, ...rest] = queue;
+
+  return (
+    <SaleBanner
+      key={current.arrivedAt.getTime()}
+      sale={current}
+      queueLength={rest.length}
+      onDismiss={dismiss}
+    />
+  );
 }
