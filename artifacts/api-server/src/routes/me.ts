@@ -277,6 +277,10 @@ router.post("/me/orders", async (req, res): Promise<void> => {
         orderIds.push(orderId);
       }
 
+      if (orderIds.length === 0) {
+        res.status(422).json({ error: "No valid listings found for this session." }); return;
+      }
+
       res.json({ orderId: orderIds[0] ?? null, orderIds });
       return;
     }
