@@ -300,7 +300,7 @@ export default function OrderDetailScreen() {
                 pathname: "/chat/user/[userId]" as any,
                 params: {
                   userId: order.sellerId,
-                  prefill: `Re: ${order.title}`,
+                  orderRef: order.title,
                 },
               })
             }
