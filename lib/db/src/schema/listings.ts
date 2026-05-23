@@ -32,6 +32,8 @@ export const listingsTable = pgTable("listings", {
   originalListingId: varchar("original_listing_id", { length: 36 }),
   royaltyPercent: integer("royalty_percent").notNull().default(10),
   sharedPlatforms: text("shared_platforms").array().notNull().default([]),
+  isPinned: boolean("is_pinned").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

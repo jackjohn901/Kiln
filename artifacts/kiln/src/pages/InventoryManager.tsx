@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Package, Plus, Edit2, Check, X, Eye, EyeOff,
-  DollarSign, Image, Trash2, Loader2,
+  Image, Trash2, Loader2, Star, GripVertical,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -22,6 +22,8 @@ interface ApiListing {
   imageUrl: string | null;
   technique: string | null;
   description: string | null;
+  isPinned: boolean;
+  sortOrder: number;
 }
 
 interface NewListingForm {
@@ -48,6 +50,9 @@ export default function InventoryManager() {
   const [saved, setSaved] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
@@ -73,6 +78,29 @@ export default function InventoryManager() {
       });
       if (r.ok) {
         setApiListings(prev => prev.map(l => l.id === id ? { ...l, isAvailable: !current } : l));
+        setSaved(id);
+        setTimeout(() => setSaved(null), 1500);
+      }
+    } catch {}
+  }
+
+  async function togglePinned(id: string, current: boolean) {
+    setSaved(null);
+    try {
+      const r = await fetch(`/api/listings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ isPinned: !current }),
+      });
+      if (r.ok) {
+        setApiListings(prev => {
+          const updated = prev.map(l => l.id === id ? { ...l, isPinned: !current } : l);
+          return [...updated].sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+            return a.sortOrder - b.sortOrder;
+          });
+        });
         setSaved(id);
         setTimeout(() => setSaved(null), 1500);
       }
@@ -143,9 +171,51 @@ export default function InventoryManager() {
     } catch {}
   }
 
+  function handleDragStart(index: number) {
+    dragIndexRef.current = index;
+  }
+
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    setDragOverIndex(index);
+  }
+
+  async function handleDrop(dropIndex: number) {
+    const dragIndex = dragIndexRef.current;
+    if (dragIndex === null || dragIndex === dropIndex) {
+      dragIndexRef.current = null;
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...apiListings];
+    const [dragged] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, dragged);
+
+    const withOrder = reordered.map((l, i) => ({ ...l, sortOrder: i }));
+    setApiListings(withOrder);
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+
+    try {
+      await fetch("/api/me/listings/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ order: withOrder.map(l => ({ id: l.id, sortOrder: l.sortOrder })) }),
+      });
+    } catch {}
+  }
+
+  function handleDragEnd() {
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+  }
+
   const totalValue = displayed.filter(l => l.isAvailable && !l.isSold).reduce((s, l) => s + l.price, 0);
   const soldCount = displayed.filter(l => l.isSold || !l.isAvailable).length;
   const availCount = displayed.filter(l => l.isAvailable && !l.isSold).length;
+  const pinnedCount = apiListings.filter(l => l.isPinned).length;
 
 
   return (
@@ -172,7 +242,7 @@ export default function InventoryManager() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-4 gap-3 mb-5">
           <div className="rounded-xl border border-white/8 bg-stone-900/40 p-3 text-center">
             <p className="text-lg font-bold text-emerald-400">{availCount}</p>
             <p className="text-xs text-stone-600">Available</p>
@@ -182,8 +252,12 @@ export default function InventoryManager() {
             <p className="text-xs text-stone-600">Sold</p>
           </div>
           <div className="rounded-xl border border-white/8 bg-stone-900/40 p-3 text-center">
+            <p className="text-lg font-bold text-amber-300">{pinnedCount}</p>
+            <p className="text-xs text-stone-600">Pinned</p>
+          </div>
+          <div className="rounded-xl border border-white/8 bg-stone-900/40 p-3 text-center">
             <p className="text-lg font-bold text-amber-300">${totalValue.toLocaleString()}</p>
-            <p className="text-xs text-stone-600">Available value</p>
+            <p className="text-xs text-stone-600">Value</p>
           </div>
         </div>
 
@@ -202,6 +276,12 @@ export default function InventoryManager() {
           ))}
         </div>
 
+        {filter === "all" && !loading && apiListings.length > 1 && (
+          <p className="text-[10px] text-stone-600 mb-3 flex items-center gap-1">
+            <GripVertical size={10} /> Drag rows to reorder · <Star size={9} className="text-amber-500" /> pins appear first on your shop
+          </p>
+        )}
+
         {/* Listings */}
         {loading && (
           <div className="flex items-center justify-center py-16 gap-3 text-stone-600">
@@ -211,10 +291,11 @@ export default function InventoryManager() {
         )}
         <div className="space-y-2">
           <AnimatePresence>
-            {!loading && displayed.map((listing) => {
+            {!loading && displayed.map((listing, index) => {
               const isEditing = editingId === listing.id;
               const isListed = listing.isAvailable && !listing.isSold;
               const justSaved = saved === listing.id;
+              const isDragOver = dragOverIndex === index;
 
               return (
                 <motion.div
@@ -223,9 +304,27 @@ export default function InventoryManager() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className={`rounded-2xl border ${isListed ? "border-white/8 bg-stone-900/60" : "border-white/5 bg-stone-900/30"} overflow-hidden`}
+                  draggable={filter === "all" && !isEditing}
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={() => handleDrop(index)}
+                  onDragEnd={handleDragEnd}
+                  className={`rounded-2xl border overflow-hidden transition-all cursor-default ${
+                    isDragOver
+                      ? "border-amber-500/40 bg-stone-800/80 scale-[1.01]"
+                      : isListed
+                        ? "border-white/8 bg-stone-900/60"
+                        : "border-white/5 bg-stone-900/30"
+                  } ${listing.isPinned ? "ring-1 ring-amber-500/20" : ""}`}
                 >
                   <div className="flex gap-3 p-4">
+                    {/* Drag handle */}
+                    {filter === "all" && !isEditing && (
+                      <div className="flex items-center self-stretch pr-0.5 cursor-grab active:cursor-grabbing text-stone-700 hover:text-stone-500 transition-colors shrink-0">
+                        <GripVertical size={14} />
+                      </div>
+                    )}
+
                     {/* Thumbnail */}
                     <div className={`h-16 w-16 shrink-0 rounded-xl overflow-hidden ${listing.imageUrl ? "" : "bg-stone-800 flex items-center justify-center"}`}>
                       {listing.imageUrl ? (
@@ -259,7 +358,10 @@ export default function InventoryManager() {
                       ) : (
                         <>
                           <div className="flex items-start justify-between gap-2">
-                            <p className={`text-sm font-medium line-clamp-1 ${isListed ? "text-stone-200" : "text-stone-500"}`}>{listing.title}</p>
+                            <p className={`text-sm font-medium line-clamp-1 ${isListed ? "text-stone-200" : "text-stone-500"}`}>
+                              {listing.isPinned && <Star size={10} className="inline text-amber-400 mr-1 -mt-0.5" fill="currentColor" />}
+                              {listing.title}
+                            </p>
                             {!isListed && <span className="shrink-0 rounded-full bg-stone-800 px-2 py-0.5 text-[9px] text-stone-500 font-semibold uppercase tracking-wide">{listing.isSold ? "Sold" : "Hidden"}</span>}
                           </div>
                           <p className="text-xs text-stone-600 mt-0.5">{(listing.medium ?? "—").split(",")[0]} · {listing.year ?? "—"} · {listing.dimensions ?? "—"}</p>
@@ -292,12 +394,25 @@ export default function InventoryManager() {
                             {isListed ? <Eye size={9} /> : <EyeOff size={9} />}
                             {isListed ? "Listed" : "Hidden"}
                           </button>
-                          <button onClick={() => startEdit(listing)} className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
-                            <Edit2 size={12} className="text-stone-500" />
-                          </button>
-                          <button onClick={() => deleteNew(listing.id)} className="p-1.5 rounded-full hover:bg-red-500/10 transition-colors">
-                            <Trash2 size={12} className="text-stone-700 hover:text-red-400" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => togglePinned(listing.id, listing.isPinned)}
+                              title={listing.isPinned ? "Unpin listing" : "Pin to top of shop"}
+                              className={`p-1.5 rounded-full transition-colors ${
+                                listing.isPinned
+                                  ? "text-amber-400 hover:text-amber-300"
+                                  : "text-stone-600 hover:text-amber-500"
+                              }`}
+                            >
+                              <Star size={12} fill={listing.isPinned ? "currentColor" : "none"} />
+                            </button>
+                            <button onClick={() => startEdit(listing)} className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
+                              <Edit2 size={12} className="text-stone-500" />
+                            </button>
+                            <button onClick={() => deleteNew(listing.id)} className="p-1.5 rounded-full hover:bg-red-500/10 transition-colors">
+                              <Trash2 size={12} className="text-stone-700 hover:text-red-400" />
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>

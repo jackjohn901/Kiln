@@ -333,6 +333,7 @@ export default function ArtistProfile() {
   const [visitRequested, setVisitRequested] = useState(false);
 
   const [shipping, setShipping] = useState<ArtistShipping | null>(null);
+  const [apiListings, setApiListings] = useState<{ id: string; title: string; medium: string | null; price: number; imageUrl: string | null; isPinned: boolean; sortOrder: number }[] | null>(null);
 
   const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
   const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
@@ -385,6 +386,10 @@ export default function ArtistProfile() {
     fetch(`/api/artists/${id}/shipping`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setShipping(data); })
+      .catch(() => {});
+    fetch(`/api/listings?artistId=${encodeURIComponent(id ?? "")}&available=true&limit=100`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
       .catch(() => {});
   }, [id]);
 
@@ -1053,25 +1058,57 @@ export default function ArtistProfile() {
                   <ShippingBadge shipping={shipping} />
                 </div>
               )}
-              {listings.length === 0 ? (
-                <div className="py-16 text-center text-stone-600 text-sm">No works available in the shop.</div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {listings.map((l) => (
-                    <div key={l.id} className="group overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
-                      <div className="aspect-square overflow-hidden">
-                        <img src={l.imageUrl ?? undefined} alt={l.title}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+              {(() => {
+                const shopListings = apiListings ?? listings;
+                const hasPinned = shopListings.some(l => (l as { isPinned?: boolean }).isPinned);
+                if (shopListings.length === 0) {
+                  return <div className="py-16 text-center text-stone-600 text-sm">No works available in the shop.</div>;
+                }
+                return (
+                  <>
+                    {hasPinned && (
+                      <div className="mb-4">
+                        <p className="text-[10px] text-stone-600 mb-3 flex items-center gap-1">
+                          <Star size={9} className="text-amber-500" fill="currentColor" /> Featured works
+                        </p>
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 mb-6">
+                          {shopListings.filter(l => (l as { isPinned?: boolean }).isPinned).map((l) => (
+                            <Link key={l.id} href={`/listings/${l.id}`} className="group overflow-hidden rounded-xl border border-amber-500/20 bg-stone-900/60 ring-1 ring-amber-500/10">
+                              <div className="aspect-square overflow-hidden">
+                                <img src={l.imageUrl ?? undefined} alt={l.title}
+                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                              </div>
+                              <div className="p-3">
+                                <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
+                                <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
+                                <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                        {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).length > 0 && (
+                          <p className="text-[10px] text-stone-600 mb-3">All works</p>
+                        )}
                       </div>
-                      <div className="p-3">
-                        <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
-                        <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
-                        <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
-                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).map((l) => (
+                        <Link key={l.id} href={`/listings/${l.id}`} className="group overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
+                          <div className="aspect-square overflow-hidden">
+                            <img src={l.imageUrl ?? undefined} alt={l.title}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          </div>
+                          <div className="p-3">
+                            <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
+                            <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
+                            <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </>
+                );
+              })()}
             </div>
           )}
 

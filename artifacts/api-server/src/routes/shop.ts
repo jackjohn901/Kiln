@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
 import { sendEmailWithRetry, shippingNotificationEmail } from "../lib/email";
-import { eq, and, desc, ilike, or, sql } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
 import { grantFirstAccessToTopSavers } from "./first-access";
@@ -21,7 +21,7 @@ router.get("/listings", async (req, res): Promise<void> => {
     if (available !== "false") conditions.push(eq(listingsTable.isSold, false));
     if (artistId) conditions.push(eq(listingsTable.artistId, artistId));
     if (conditions.length) query = query.where(and(...(conditions as [any, ...any[]])));
-    const rows = await query.orderBy(desc(listingsTable.createdAt)).limit(Number(limit)).offset(Number(offset));
+    const rows = await query.orderBy(desc(listingsTable.isPinned), asc(listingsTable.sortOrder), desc(listingsTable.createdAt)).limit(Number(limit)).offset(Number(offset));
     const viewerId = req.isAuthenticated() ? req.user.id : null;
     let wishlisted = new Set<string>();
     if (viewerId) {
@@ -88,10 +88,11 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, req.params.id));
   if (!listing || listing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { title, price, isAvailable, isSold, medium, dimensions, description, bundleMinQty, bundleDiscountPct } = req.body as {
+  const { title, price, isAvailable, isSold, medium, dimensions, description, bundleMinQty, bundleDiscountPct, isPinned, sortOrder } = req.body as {
     title?: string; price?: number; isAvailable?: boolean; isSold?: boolean;
     medium?: string; dimensions?: string; description?: string;
     bundleMinQty?: number | null; bundleDiscountPct?: number | null;
+    isPinned?: boolean; sortOrder?: number;
   };
   const updates: Partial<typeof listing> = { updatedAt: new Date() };
   if (title !== undefined) updates.title = title;
@@ -103,6 +104,8 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (description !== undefined) updates.description = description;
   if (bundleMinQty !== undefined) updates.bundleMinQty = bundleMinQty ? Number(bundleMinQty) : null;
   if (bundleDiscountPct !== undefined) updates.bundleDiscountPct = bundleDiscountPct ? Number(bundleDiscountPct) : null;
+  if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);
+  if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
   const [updated] = await db.update(listingsTable).set(updates).where(eq(listingsTable.id, req.params.id)).returning();
   res.json({ listing: { ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() } });
 });
@@ -191,8 +194,26 @@ router.get("/me/wishlist", async (req, res): Promise<void> => {
 // GET /me/listings — my listings
 router.get("/me/listings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const rows = await db.select().from(listingsTable).where(eq(listingsTable.artistId, req.user.id)).orderBy(desc(listingsTable.createdAt));
+  const rows = await db.select().from(listingsTable).where(eq(listingsTable.artistId, req.user.id)).orderBy(desc(listingsTable.isPinned), asc(listingsTable.sortOrder), desc(listingsTable.createdAt));
   res.json({ listings: rows.map(l => ({ ...l, createdAt: l.createdAt.toISOString(), updatedAt: l.updatedAt.toISOString() })) });
+});
+
+// PATCH /me/listings/reorder — bulk update sort order for listings
+router.patch("/me/listings/reorder", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { order } = req.body as { order?: Array<{ id: string; sortOrder: number }> };
+  if (!Array.isArray(order) || order.length === 0) { res.status(400).json({ error: "order array required" }); return; }
+  try {
+    const ids = order.map(o => o.id);
+    const owned = await db.select({ id: listingsTable.id }).from(listingsTable)
+      .where(and(eq(listingsTable.artistId, req.user.id), inArray(listingsTable.id, ids)));
+    const ownedSet = new Set(owned.map(o => o.id));
+    const updates = order.filter(o => ownedSet.has(o.id));
+    await Promise.all(updates.map(({ id, sortOrder }) =>
+      db.update(listingsTable).set({ sortOrder, updatedAt: new Date() }).where(eq(listingsTable.id, id))
+    ));
+    res.json({ success: true });
+  } catch (err) { req.log.error({ err }, "reorderListings error"); res.status(500).json({ error: "Failed to reorder listings" }); }
 });
 
 // GET /me/sales/:id — single sale detail for the current seller
