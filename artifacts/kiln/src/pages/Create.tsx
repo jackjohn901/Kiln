@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
-  Upload, Video, ImageIcon, ChevronRight, ChevronLeft,
+  Upload, Video, ImageIcon, ChevronRight, ChevronLeft, ShoppingBag,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
   Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark, Images,
 } from "lucide-react";
@@ -323,7 +323,8 @@ export default function Create() {
           const result = await upload(imgFile);
           mediaUrl = result.servingUrl;
         } catch {
-          try { mediaUrl = await fileToDataUrl(imgFile); } catch { /* keep previewUrl */ }
+          // Fall back to IndexedDB blob storage (idb: URLs persist and can be resolved in feed)
+          try { mediaUrl = await storeBlob(imgFile); } catch { /* keep previewUrl */ }
         }
       }
 
@@ -540,6 +541,23 @@ export default function Create() {
         {/* STEP 1: Upload */}
         {step === "upload" && (
           <div className="space-y-4">
+            {/* Shop listing shortcut */}
+            <button
+              onClick={() => navigate("/create-listing")}
+              className="w-full flex items-center justify-between rounded-2xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-left hover:bg-amber-500/14 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 shrink-0">
+                  <ShoppingBag size={16} className="text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-200">Selling a piece?</p>
+                  <p className="text-xs text-stone-500">List it in the shop with price, shipping &amp; photos</p>
+                </div>
+              </div>
+              <ChevronRight size={15} className="text-stone-600 shrink-0" />
+            </button>
+
             {/* Post type toggle */}
             <div className="grid grid-cols-2 gap-2">
               {(["post", "story"] as const).map((t) => (

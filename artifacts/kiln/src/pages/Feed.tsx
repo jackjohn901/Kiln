@@ -864,7 +864,7 @@ export default function Feed() {
   const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
   const [apiPostOffset, setApiPostOffset] = useState(20);
   const [hasMoreApiPosts, setHasMoreApiPosts] = useState(true);
-  const [musicMuted, setMusicMuted] = useState(true);
+  const [musicMuted, setMusicMuted] = useState(false);
   const [videoAudioOn, setVideoAudioOn] = useState(true);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
   const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");
@@ -1284,7 +1284,7 @@ export default function Feed() {
   // Unlock video audio on first user interaction — scroll, touch, or tap.
   // Browsers block all audio until a gesture; this mirrors how TikTok/Reels
   // work: sound kicks in the moment you start scrolling, no button needed.
-  // The music layer stays muted (musicMuted=true); only original video audio plays.
+  // Music plays as soon as the user unlocks audio with their first interaction.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
