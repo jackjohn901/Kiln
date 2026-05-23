@@ -121,6 +121,7 @@ function ComposeBar({
   attachment,
   onRemoveAttachment,
   isUploading,
+  attachError,
   disabled,
   placeholder,
   autoFocus,
@@ -133,6 +134,7 @@ function ComposeBar({
   attachment: PendingAttachment | null;
   onRemoveAttachment: () => void;
   isUploading: boolean;
+  attachError?: string | null;
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
@@ -162,13 +164,20 @@ function ComposeBar({
           )}
         </div>
       )}
+      {attachError && (
+        <p className="text-xs text-red-400 pl-1">{attachError}</p>
+      )}
       <div className="flex gap-2 items-center">
         <button
           type="button"
           onClick={onAttach}
           disabled={isUploading}
           title="Attach image"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-stone-800 text-stone-500 hover:text-amber-300 hover:border-amber-500/30 transition-colors disabled:opacity-40"
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-stone-800 transition-colors disabled:opacity-40 ${
+            attachError
+              ? "border-red-500/50 text-red-400 hover:text-red-300 hover:border-red-400/60"
+              : "border-white/10 text-stone-500 hover:text-amber-300 hover:border-amber-500/30"
+          }`}
         >
           <ImagePlus size={16} />
         </button>
@@ -218,6 +227,7 @@ export default function Messages() {
 
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeThread = activeThreadId ? threads.find((t) => t.id === activeThreadId) : null;
@@ -387,6 +397,17 @@ export default function Messages() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (!file.type.startsWith("image/")) {
+      setAttachError("Only image files can be attached.");
+      return;
+    }
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      setAttachError("Image must be 10 MB or smaller.");
+      return;
+    }
+    setAttachError(null);
 
     const previewUrl = URL.createObjectURL(file);
     setPendingAttachment({ file, previewUrl, objectPath: null });
@@ -716,10 +737,11 @@ export default function Messages() {
                   onChange={setNewMsg}
                   onSend={() => void handlePendingSend()}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handlePendingSend(); } }}
-                  onAttach={() => fileInputRef.current?.click()}
+                  onAttach={() => { setAttachError(null); fileInputRef.current?.click(); }}
                   attachment={pendingAttachment}
                   onRemoveAttachment={clearAttachment}
                   isUploading={isUploading}
+                  attachError={attachError}
                 />
               </div>
             </>
@@ -817,10 +839,11 @@ export default function Messages() {
                   onChange={(v) => { setNewMsg(v); if (v) sendTypingSignal(activeApiThread.id); }}
                   onSend={() => void handleApiSend()}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleApiSend(); } }}
-                  onAttach={() => fileInputRef.current?.click()}
+                  onAttach={() => { setAttachError(null); fileInputRef.current?.click(); }}
                   attachment={pendingAttachment}
                   onRemoveAttachment={clearAttachment}
                   isUploading={isUploading}
+                  attachError={attachError}
                 />
               </div>
             </>
@@ -898,10 +921,11 @@ export default function Messages() {
                   onChange={setNewMsg}
                   onSend={handleSend}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  onAttach={() => fileInputRef.current?.click()}
+                  onAttach={() => { setAttachError(null); fileInputRef.current?.click(); }}
                   attachment={pendingAttachment}
                   onRemoveAttachment={clearAttachment}
                   isUploading={isUploading}
+                  attachError={attachError}
                 />
               </div>
             </>
