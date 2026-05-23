@@ -296,6 +296,13 @@ export default function OrderDetail() {
       </div>
     ` : "";
 
+    const emailRow = buyerEmail ? `
+      <div style="margin-top:16px;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Receipt emailed to</p>
+        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(buyerEmail)}</p>
+      </div>
+    ` : "";
+
     const statusLabel = esc(STATUS_CONFIG[order.status]?.label ?? order.status);
     const typeLabel = esc(TYPE_CONFIG[order.type]?.label ?? order.type);
     const refNum = esc(isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id));
@@ -358,7 +365,7 @@ export default function OrderDetail() {
     </div>
   </div>
 
-  ${buyerRow}${processingWindowRow}${trackingRow}${notesRow}
+  ${buyerRow}${processingWindowRow}${trackingRow}${notesRow}${emailRow}
 
   <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
     <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages</p>
