@@ -388,12 +388,43 @@ router.get("/me/sales", async (req, res): Promise<void> => {
     .leftJoin(profilesTable, eq(ordersTable.buyerId, profilesTable.userId))
     .where(eq(ordersTable.sellerId, req.user.id))
     .orderBy(desc(ordersTable.createdAt));
+
+  // For rows where both processing window fields are NULL, fall back to the
+  // seller's current payment settings — same logic as the detail endpoint.
+  const needsFallback = rows.some(r => r.processingWindowDays === null && r.processingWindowLabel === null);
+  let liveDays: number | null = null;
+  let liveLabel: string | null = null;
+  if (needsFallback) {
+    const [settingsRow] = await db
+      .select({ paymentSettings: userSettingsTable.paymentSettings })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, req.user.id))
+      .limit(1);
+    if (settingsRow) {
+      const ps = settingsRow.paymentSettings as Record<string, unknown> | null;
+      liveDays = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+      liveLabel = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+        ? (ps.processingWindowLabel as string).trim()
+        : null;
+    }
+  }
+
   res.json({
-    orders: rows.map(o => ({
-      ...o,
-      createdAt: o.createdAt.toISOString(),
-      updatedAt: o.updatedAt.toISOString(),
-    })),
+    orders: rows.map(o => {
+      let processingWindowDays = o.processingWindowDays;
+      let processingWindowLabel = o.processingWindowLabel;
+      if (processingWindowDays === null && processingWindowLabel === null && (liveDays !== null || liveLabel !== null)) {
+        processingWindowDays = liveDays;
+        processingWindowLabel = liveLabel;
+      }
+      return {
+        ...o,
+        processingWindowDays,
+        processingWindowLabel,
+        createdAt: o.createdAt.toISOString(),
+        updatedAt: o.updatedAt.toISOString(),
+      };
+    }),
   });
 });
 
