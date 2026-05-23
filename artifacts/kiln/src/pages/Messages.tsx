@@ -434,9 +434,12 @@ export default function Messages() {
   }
 
   function handleSend() {
-    if (!newMsg.trim() || !activeThread) return;
-    sendDirectMessage(activeThread.participantId, activeThread.participantName, activeThread.participantAvatar, newMsg.trim());
+    const text = newMsg.trim();
+    const attachmentUrl = pendingAttachment?.objectPath ? getAttachmentServingUrl(pendingAttachment.objectPath) : undefined;
+    if ((!text && !attachmentUrl) || !activeThread) return;
+    sendDirectMessage(activeThread.participantId, activeThread.participantName, activeThread.participantAvatar, text, attachmentUrl);
     setNewMsg("");
+    clearAttachment();
   }
 
   async function openApiThread(id: string) {
@@ -869,6 +872,7 @@ export default function Messages() {
                           : "bg-stone-800 text-stone-200 rounded-bl-sm"
                       }`}>
                         {msg.text}
+                        {msg.attachmentUrl && <AttachmentImage url={msg.attachmentUrl} />}
                         <p className={`text-[10px] mt-1 ${isMe ? "text-amber-400/60 text-right" : "text-stone-600"}`}>
                           {timeShort(msg.createdAt)}
                         </p>
@@ -881,23 +885,16 @@ export default function Messages() {
 
               {/* Compose */}
               <div className="px-4 py-3 border-t border-white/10">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Write a message…"
-                    value={newMsg}
-                    onChange={(e) => setNewMsg(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={!newMsg.trim()}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
-                  >
-                    <Send size={15} />
-                  </button>
-                </div>
+                <ComposeBar
+                  value={newMsg}
+                  onChange={setNewMsg}
+                  onSend={handleSend}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  onAttach={() => fileInputRef.current?.click()}
+                  attachment={pendingAttachment}
+                  onRemoveAttachment={clearAttachment}
+                  isUploading={isUploading}
+                />
               </div>
             </>
           )}

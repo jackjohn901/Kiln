@@ -77,6 +77,7 @@ export interface DirectMessage {
   senderName: string;
   senderAvatar: string;
   text: string;
+  attachmentUrl?: string;
   createdAt: string;
   read: boolean;
 }
@@ -292,7 +293,7 @@ interface SocialContextType extends SocialState {
   unsubscribe: (artistId: string) => void;
   isSubscribed: (artistId: string) => boolean;
   isVerified: (artistId: string) => boolean;
-  sendDirectMessage: (toId: string, toName: string, toAvatar: string, text: string) => void;
+  sendDirectMessage: (toId: string, toName: string, toAvatar: string, text: string, attachmentUrl?: string) => void;
   getThread: (participantId: string) => MessageThread | undefined;
   unreadMessageCount: number;
   markThreadRead: (threadId: string) => void;
@@ -750,13 +751,14 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const isVerified = useCallback((artistId: string) => state.verifiedArtists.includes(artistId), [state.verifiedArtists]);
 
-  const sendDirectMessage = useCallback((toId: string, toName: string, toAvatar: string, text: string) => {
+  const sendDirectMessage = useCallback((toId: string, toName: string, toAvatar: string, text: string, attachmentUrl?: string) => {
     const msg: DirectMessage = {
       id: genId(),
       senderId: "__current_user__",
       senderName: "You",
       senderAvatar: "",
       text,
+      attachmentUrl,
       createdAt: new Date().toISOString(),
       read: true,
     };
