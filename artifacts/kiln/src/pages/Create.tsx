@@ -634,6 +634,7 @@ export default function Create() {
                 onBgReset={() => { setBgPreview(""); setBgFile(null); }}
                 onWatermark={(url, f) => { setWmPreview(url); setWmFile(f); }}
                 onTiltShift={(url, f) => { setTsPreview(url); setTsFile(f); }}
+                onAnimate={(url, f) => { setFile(f); setMediaType("video"); setPreviewUrl(url); setBgFile(null); setBgPreview(""); setCropFile(null); setCropPreview(""); setWmFile(null); setWmPreview(""); setTsFile(null); setTsPreview(""); }}
               />
             ) : (
               <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">

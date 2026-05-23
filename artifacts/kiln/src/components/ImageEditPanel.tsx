@@ -4,8 +4,9 @@ import CropTool from "@/components/CropTool";
 import BgRemoveToggle from "@/components/BgRemoveToggle";
 import WatermarkTool from "@/components/WatermarkTool";
 import TiltShiftTool from "@/components/TiltShiftTool";
+import AnimateTool from "@/components/AnimateTool";
 
-type Tab = "adjust" | "crop" | "bg" | "mark" | "tilt";
+type Tab = "adjust" | "crop" | "bg" | "mark" | "tilt" | "animate";
 
 interface Props {
   previewUrl: string;
@@ -16,14 +17,16 @@ interface Props {
   onBgReset:     () => void;
   onWatermark?:  (url: string, file: File) => void;
   onTiltShift?:  (url: string, file: File) => void;
+  onAnimate?:    (videoUrl: string, file: File) => void;
 }
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "adjust", label: "Adjust" },
-  { id: "crop",   label: "Crop"   },
-  { id: "bg",     label: "BG"     },
-  { id: "mark",   label: "Mark"   },
-  { id: "tilt",   label: "Tilt"   },
+  { id: "adjust",  label: "Adjust"   },
+  { id: "crop",    label: "Crop"     },
+  { id: "bg",      label: "BG"       },
+  { id: "mark",    label: "Mark"     },
+  { id: "tilt",    label: "Tilt"     },
+  { id: "animate", label: "✦ Animate" },
 ];
 
 export default function ImageEditPanel({
@@ -35,6 +38,7 @@ export default function ImageEditPanel({
   onBgReset,
   onWatermark,
   onTiltShift,
+  onAnimate,
 }: Props) {
   const [tab,      setTab]      = useState<Tab>("adjust");
   const [showCrop, setShowCrop] = useState(false);
@@ -97,6 +101,19 @@ export default function ImageEditPanel({
       {tab === "tilt" && !onTiltShift && (
         <p className="rounded-xl border border-white/8 bg-stone-900/40 p-4 text-center text-sm text-stone-500">
           Tilt-shift not available here
+        </p>
+      )}
+
+      {tab === "animate" && onAnimate && (
+        <AnimateTool
+          previewUrl={previewUrl}
+          sourceFile={sourceFile}
+          onApply={(url, file) => { onAnimate(url, file); setTab("adjust"); }}
+        />
+      )}
+      {tab === "animate" && !onAnimate && (
+        <p className="rounded-xl border border-white/8 bg-stone-900/40 p-4 text-center text-sm text-stone-500">
+          Animation not available here
         </p>
       )}
     </div>
