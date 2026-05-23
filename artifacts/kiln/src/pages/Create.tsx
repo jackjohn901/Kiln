@@ -300,7 +300,7 @@ export default function Create() {
           credentials: "include",
           body: JSON.stringify({ mediaUrl, mediaType, caption }),
         }).catch(() => {});
-        setStep("done");
+        navigate("/");
         return;
       }
       // ────────────────────────────────────────────────────────────────
@@ -413,7 +413,7 @@ export default function Create() {
       }
 
       recordPost();
-      setStep("done");
+      navigate("/");
     } finally {
       setPublishing(false);
     }
