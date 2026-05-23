@@ -222,6 +222,10 @@ export default function Messages() {
   const activeThread = activeThreadId ? threads.find((t) => t.id === activeThreadId) : null;
   const activeApiThread = apiThreads.find(t => t.id === activeApiThreadId) ?? null;
 
+  // Keep a ref so WS handlers always see the latest value without needing re-subscription
+  const activeApiThreadIdRef = useRef<string | null>(null);
+  useEffect(() => { activeApiThreadIdRef.current = activeApiThreadId; }, [activeApiThreadId]);
+
   useEffect(() => {
     if (!params.participantId) {
       setLinkedOrderId(null);
@@ -277,6 +281,51 @@ export default function Messages() {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [activeApiThread, apiMessages.length]);
+
+  // Refresh thread list helper
+  const refreshThreads = useCallback(async () => {
+    try {
+      const r = await fetch("/api/messages/threads", { credentials: "include" });
+      if (r.ok) {
+        const d = await r.json() as { threads?: ApiThread[] };
+        if (Array.isArray(d?.threads)) setApiThreads(d.threads);
+      }
+    } catch {}
+  }, []);
+
+  // Subscribe to incoming message WS events to keep thread list + open thread in sync
+  useEffect(() => {
+    const unsub = subscribe("message", (evt) => {
+      const e = evt as { threadId?: string; senderId?: string };
+      const { threadId } = e;
+      if (!threadId) return;
+
+      const openThreadId = activeApiThreadIdRef.current;
+
+      if (threadId === openThreadId) {
+        // Message arrived in the currently open thread — fetch latest messages and mark read
+        Promise.all([
+          fetch(`/api/messages/threads/${threadId}`, { credentials: "include" }),
+          fetch(`/api/messages/threads/${threadId}/read`, { method: "POST", credentials: "include" }),
+        ])
+          .then(([r]) => (r.ok ? r.json() : null))
+          .then((d: { messages?: ApiMsg[] } | null) => {
+            if (Array.isArray(d?.messages)) {
+              setApiMessages([...d.messages].reverse());
+            }
+            // Zero out unread count for this thread in the sidebar
+            setApiThreads(prev =>
+              prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t)
+            );
+          })
+          .catch(() => {});
+      } else {
+        // Message arrived in a different thread — refresh thread list so badge updates
+        void refreshThreads();
+      }
+    });
+    return unsub;
+  }, [subscribe, refreshThreads]);
 
   useEffect(() => {
     if (!activeApiThreadId) return;
