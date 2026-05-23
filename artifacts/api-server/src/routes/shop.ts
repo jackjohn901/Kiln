@@ -121,6 +121,7 @@ router.get("/artists/:artistId/shipping", async (req, res): Promise<void> => {
       offerFreeShipping: s.offerFreeShipping === true,
       domesticRate: typeof s.domesticRate === "number" ? s.domesticRate : null,
       internationalRate: typeof s.internationalRate === "number" ? s.internationalRate : null,
+      perItemRate: typeof s.perItemRate === "number" ? s.perItemRate : null,
       freeThreshold: typeof s.freeThreshold === "number" ? s.freeThreshold : null,
       offerLocalPickup: s.offerLocalPickup === true,
     });

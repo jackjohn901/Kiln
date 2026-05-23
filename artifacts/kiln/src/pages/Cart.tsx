@@ -1,18 +1,70 @@
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
 
+interface ShippingRateInfo {
+  offerFreeShipping: boolean;
+  domesticRate: number | null;
+  internationalRate: number | null;
+  perItemRate: number | null;
+  freeThreshold: number | null;
+}
+
+async function fetchArtistShipping(artistId: string): Promise<ShippingRateInfo> {
+  try {
+    const res = await fetch(`/api/artists/${artistId}/shipping`);
+    if (res.ok) return await res.json() as ShippingRateInfo;
+  } catch { /* fall through */ }
+  return { offerFreeShipping: false, domesticRate: null, internationalRate: null, perItemRate: null, freeThreshold: null };
+}
+
+function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, totalQty: number): number {
+  if (info.offerFreeShipping) return 0;
+  if (info.freeThreshold !== null && artistSubtotal >= info.freeThreshold) return 0;
+  const rate = info.domesticRate;
+  if (rate === null) return 0;
+  const additionalItems = Math.max(0, totalQty - 1);
+  const perItem = (info.perItemRate ?? 0) * additionalItems;
+  return rate + perItem;
+}
+
 export default function Cart() {
   const { items, itemCount, subtotal, removeItem, updateQty, clearCart } = useCart();
   const [bundleApplied, setBundleApplied] = useState(false);
+  const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    const artistIds = [...new Set(items.map(i => i.listing.artistId as string))];
+    Promise.all(artistIds.map(aid => fetchArtistShipping(aid).then(info => ({ aid, info }))))
+      .then(results => setShippingRates(new Map(results.map(r => [r.aid, r.info]))))
+      .catch(() => {});
+  }, [items]);
 
   const bundleDiscount = bundleApplied ? Math.round(subtotal * 0.10) : 0;
-  const shipping = (subtotal - bundleDiscount) > 500 ? 0 : subtotal > 0 ? 18 : 0;
-  const total = subtotal - bundleDiscount + shipping;
+
+  // Build per-artist subtotals and item quantities for shipping calculation
+  const artistSubtotals = new Map<string, number>();
+  const artistItemQtys = new Map<string, number>();
+  for (const { listing, quantity } of items) {
+    const aid = listing.artistId as string;
+    artistSubtotals.set(aid, (artistSubtotals.get(aid) ?? 0) + (listing.price as number) * quantity);
+    artistItemQtys.set(aid, (artistItemQtys.get(aid) ?? 0) + quantity);
+  }
+
+  const shipping = shippingRates.size > 0
+    ? Array.from(artistSubtotals.entries()).reduce((sum, [aid, artistSub]) => {
+        const info = shippingRates.get(aid);
+        if (!info) return sum;
+        return sum + calcArtistShipping(info, artistSub - (bundleApplied ? Math.round(artistSub * 0.10) : 0), artistItemQtys.get(aid) ?? 1);
+      }, 0)
+    : subtotal > 0 ? null : 0; // null = loading, show placeholder
+
+  const total = subtotal - bundleDiscount + (shipping ?? 0);
 
   const artistGroups = items.reduce<Record<string, typeof items>>((acc, item) => {
     const id = item.listing.artistId;
@@ -163,14 +215,13 @@ export default function Cart() {
                   <Truck size={12} /> Shipping
                 </span>
                 <span className={shipping === 0 ? "text-emerald-400" : ""}>
-                  {shipping === 0 ? (subtotal > 0 ? "Free" : "—") : `$${shipping}`}
+                  {shipping === null
+                    ? <span className="text-stone-600">Calculating…</span>
+                    : shipping === 0
+                      ? (subtotal > 0 ? "Free" : "—")
+                      : `$${shipping.toLocaleString()}`}
                 </span>
               </div>
-              {subtotal > 0 && (subtotal - bundleDiscount) <= 500 && !bundleApplied && (
-                <p className="text-xs text-stone-600">
-                  Add ${(500 - subtotal).toLocaleString()} more for free shipping
-                </p>
-              )}
               <div className="border-t border-white/8 pt-3 flex justify-between text-base font-bold text-amber-100">
                 <span>Total</span>
                 <span>${total.toLocaleString()}</span>

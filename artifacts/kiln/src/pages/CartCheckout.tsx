@@ -28,6 +28,7 @@ interface ShippingRateInfo {
   offerFreeShipping: boolean;
   domesticRate: number | null;
   internationalRate: number | null;
+  perItemRate: number | null;
   freeThreshold: number | null;
 }
 const EMPTY_ADDR: AddressForm = {
@@ -93,14 +94,17 @@ async function fetchArtistShipping(artistId: string): Promise<ShippingRateInfo> 
     const res = await fetch(`/api/artists/${artistId}/shipping`);
     if (res.ok) return await res.json() as ShippingRateInfo;
   } catch { /* fall through */ }
-  return { offerFreeShipping: false, domesticRate: null, internationalRate: null, freeThreshold: null };
+  return { offerFreeShipping: false, domesticRate: null, internationalRate: null, perItemRate: null, freeThreshold: null };
 }
 
-function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDomestic: boolean): number {
+function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDomestic: boolean, totalQty: number): number {
   if (info.offerFreeShipping) return 0;
   if (info.freeThreshold !== null && artistSubtotal >= info.freeThreshold) return 0;
   const rate = isDomestic ? info.domesticRate : (info.internationalRate ?? info.domesticRate);
-  return rate ?? 0;
+  if (rate === null) return 0;
+  const additionalItems = Math.max(0, totalQty - 1);
+  const perItem = (info.perItemRate ?? 0) * additionalItems;
+  return rate + perItem;
 }
 
 export default function CartCheckout() {
@@ -126,17 +130,19 @@ export default function CartCheckout() {
 
   const isDomestic = addr.country === "US";
 
-  // Build per-artist subtotals for shipping threshold calculation
+  // Build per-artist subtotals and item quantities for shipping calculation
   const artistSubtotals = new Map<string, number>();
+  const artistItemQtys = new Map<string, number>();
   for (const { listing, quantity } of items) {
     const aid = listing.artistId as string;
     artistSubtotals.set(aid, (artistSubtotals.get(aid) ?? 0) + (listing.price as number) * quantity);
+    artistItemQtys.set(aid, (artistItemQtys.get(aid) ?? 0) + quantity);
   }
 
   const shipping = Array.from(artistSubtotals.entries()).reduce((sum, [aid, artistSub]) => {
     const info = shippingRates.get(aid);
     if (!info) return sum;
-    return sum + calcArtistShipping(info, artistSub, isDomestic);
+    return sum + calcArtistShipping(info, artistSub, isDomestic, artistItemQtys.get(aid) ?? 1);
   }, 0);
 
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
