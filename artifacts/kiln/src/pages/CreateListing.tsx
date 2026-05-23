@@ -3,7 +3,8 @@ import { useLocation, useSearch } from "wouter";
 import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon, Sparkles } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
-import BgRemoveToggle from "@/components/BgRemoveToggle";
+import ImageEditPanel from "@/components/ImageEditPanel";
+import type { FilterSettings } from "@/components/ImageEditor";
 
 const MEDIUMS = [
   "Blown Glass", "Cast Glass", "Fused Glass", "Flameworked Glass",
@@ -84,8 +85,12 @@ export default function CreateListing() {
     }
   }, [search]);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropPreview, setCropPreview] = useState("");
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [bgPreview, setBgPreview] = useState("");
+  const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
+  const [filterCss, setFilterCss] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
@@ -111,8 +116,9 @@ export default function CreateListing() {
     if (!f) return;
     setImageFile(f);
     setImagePreview(URL.createObjectURL(f));
-    setBgFile(null);
-    setBgPreview("");
+    setBgFile(null); setBgPreview("");
+    setCropFile(null); setCropPreview("");
+    setFilterSettings(null); setFilterCss("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -122,13 +128,13 @@ export default function CreateListing() {
     setSubmitting(true);
     try {
       let imageUrl = form.imageUrl;
-      const fileToUpload = bgFile ?? imageFile;
+      const fileToUpload = bgFile ?? cropFile ?? imageFile;
       if (fileToUpload) {
         try {
           const r = await upload(fileToUpload);
           imageUrl = r.servingUrl;
         } catch {
-          imageUrl = bgPreview || imagePreview;
+          imageUrl = bgPreview || cropPreview || imagePreview;
         }
       }
 
@@ -221,19 +227,32 @@ export default function CreateListing() {
             {imagePreview ? (
               <div className="space-y-3">
                 <div className="relative w-full aspect-square overflow-hidden rounded-xl border border-white/10 bg-stone-900">
-                  <img src={bgPreview || imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                  <img
+                    src={bgPreview || cropPreview || imagePreview}
+                    alt="Preview"
+                    className="h-full w-full object-cover"
+                    style={{ filter: filterCss || undefined }}
+                  />
                   <button
                     type="button"
-                    onClick={() => { setImagePreview(""); setImageFile(null); setBgFile(null); setBgPreview(""); }}
+                    onClick={() => {
+                      setImagePreview(""); setImageFile(null);
+                      setBgFile(null); setBgPreview("");
+                      setCropFile(null); setCropPreview("");
+                      setFilterSettings(null); setFilterCss("");
+                    }}
                     className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
                   >
                     <X size={14} />
                   </button>
                 </div>
-                <BgRemoveToggle
-                  sourceFile={imageFile}
-                  onResult={(url, file) => { setBgPreview(url); setBgFile(file); }}
-                  onReset={() => { setBgPreview(""); setBgFile(null); }}
+                <ImageEditPanel
+                  previewUrl={bgPreview || cropPreview || imagePreview}
+                  sourceFile={cropFile ?? imageFile}
+                  onFilterChange={(s, css) => { setFilterSettings(s); setFilterCss(css); }}
+                  onCrop={(url, f) => { setCropPreview(url); setCropFile(f); setBgFile(null); setBgPreview(""); }}
+                  onBgResult={(url, f) => { setBgPreview(url); setBgFile(f); }}
+                  onBgReset={() => { setBgPreview(""); setBgFile(null); }}
                 />
               </div>
             ) : (

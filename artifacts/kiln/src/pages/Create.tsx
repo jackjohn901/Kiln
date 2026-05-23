@@ -6,8 +6,8 @@ import {
   Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark, Images,
 } from "lucide-react";
 import Nav from "@/components/Nav";
-import ImageEditor, { type FilterSettings } from "@/components/ImageEditor";
-import BgRemoveToggle from "@/components/BgRemoveToggle";
+import { type FilterSettings } from "@/components/ImageEditor";
+import ImageEditPanel from "@/components/ImageEditPanel";
 import MusicPicker from "@/components/MusicPicker";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -76,6 +76,8 @@ export default function Create() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [bgPreview, setBgPreview] = useState("");
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropPreview, setCropPreview] = useState("");
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
   const [filterCss, setFilterCss] = useState("");
@@ -311,8 +313,8 @@ export default function Create() {
         }
       } else if (file) {
         // Images: prefer bg-removed file if available, then try server upload
-        const imgFile = bgFile ?? file;
-        if (bgPreview) mediaUrl = bgPreview;
+        const imgFile = bgFile ?? cropFile ?? file;
+        if (bgPreview || cropPreview) mediaUrl = bgPreview || cropPreview;
         try {
           const result = await upload(imgFile);
           mediaUrl = result.servingUrl;
@@ -619,23 +621,18 @@ export default function Create() {
         {step === "edit" && previewUrl && (
           <div className="space-y-4">
             {mediaType === "image" ? (
-              <ImageEditor
-                previewUrl={bgPreview || previewUrl}
-                onChange={(s, css) => { setFilterSettings(s); setFilterCss(css); }}
+              <ImageEditPanel
+                previewUrl={bgPreview || cropPreview || previewUrl}
+                sourceFile={cropFile ?? file}
+                onFilterChange={(s, css) => { setFilterSettings(s); setFilterCss(css); }}
+                onCrop={(url, f) => { setCropPreview(url); setCropFile(f); setBgFile(null); setBgPreview(""); }}
+                onBgResult={(url, f) => { setBgPreview(url); setBgFile(f); }}
+                onBgReset={() => { setBgPreview(""); setBgFile(null); }}
               />
             ) : (
               <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
                 <video src={previewUrl} controls className="h-full w-full" />
               </div>
-            )}
-
-            {/* Background removal — images only */}
-            {mediaType === "image" && (
-              <BgRemoveToggle
-                sourceFile={file}
-                onResult={(url, f) => { setBgPreview(url); setBgFile(f); }}
-                onReset={() => { setBgPreview(""); setBgFile(null); }}
-              />
             )}
 
             {/* Music picker toggle */}
