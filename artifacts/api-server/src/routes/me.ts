@@ -442,14 +442,33 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, processingWindowDays: ordersTable.processingWindowDays, processingWindowLabel: ordersTable.processingWindowLabel })
         .from(ordersTable)
         .where(eq(ordersTable.notes, dedupeKey));
-      const sellerIds = [...new Set(allExisting.map((o) => o.sellerId).filter(Boolean))];
+      const sellerIds = [...new Set(allExisting.map((o) => o.sellerId).filter(Boolean))] as string[];
       // Surface the most conservative processing window from the persisted order rows.
       const existingWindows = allExisting
         .map((o) => o.processingWindowDays)
         .filter((w): w is number => typeof w === "number");
       const maxProcessingWindowDays = existingWindows.length > 0 ? Math.max(...existingWindows) : null;
       const existingLabel = allExisting.map((o) => o.processingWindowLabel).find((l): l is string => typeof l === "string") ?? null;
-      res.json({ orderIds: [existing[0].id], duplicate: true, sellerIds, processingWindowDays: maxProcessingWindowDays, processingWindowLabel: existingLabel }); return;
+
+      // Fetch seller display names so the buyer can see per-artist processing windows.
+      const existingSellerProfiles = sellerIds.length > 0
+        ? await db
+            .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
+            .from(profilesTable)
+            .where(inArray(profilesTable.userId, sellerIds))
+        : [];
+      const existingSellerNameMap = new Map(existingSellerProfiles.map((p) => [p.userId, p.displayName ?? p.userId]));
+      // Deduplicate: one entry per seller, using the window from any order row for that seller.
+      const seenSellerIds = new Set<string>();
+      const existingPerSellerWindows = allExisting
+        .filter((o): o is typeof o & { sellerId: string } => typeof o.sellerId === "string" && !seenSellerIds.has(o.sellerId) && !!(seenSellerIds.add(o.sellerId) || true))
+        .map((o) => ({
+          sellerName: existingSellerNameMap.get(o.sellerId) ?? o.sellerId,
+          days: o.processingWindowDays ?? null,
+          label: o.processingWindowLabel ?? null,
+        }));
+
+      res.json({ orderIds: [existing[0].id], duplicate: true, sellerIds, processingWindowDays: maxProcessingWindowDays, processingWindowLabel: existingLabel, perSellerWindows: existingPerSellerWindows }); return;
     }
 
     // Look up listing data from the DB — authoritative source for seller, price, and title.
@@ -481,12 +500,20 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
 
     // Fetch processing window for each seller (used to stamp the order record).
     const sellerIdsForListings = [...new Set(listings.map((l) => l.artistId))];
-    const paymentSettingsRows = sellerIdsForListings.length > 0
-      ? await db
-          .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
-          .from(userSettingsTable)
-          .where(inArray(userSettingsTable.userId, sellerIdsForListings))
-      : [];
+    const [paymentSettingsRows, sellerProfileRows] = await Promise.all([
+      sellerIdsForListings.length > 0
+        ? db
+            .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+            .from(userSettingsTable)
+            .where(inArray(userSettingsTable.userId, sellerIdsForListings))
+        : Promise.resolve([]),
+      sellerIdsForListings.length > 0
+        ? db
+            .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
+            .from(profilesTable)
+            .where(inArray(profilesTable.userId, sellerIdsForListings))
+        : Promise.resolve([]),
+    ]);
     const processingWindowMap = new Map<string, number | null>();
     const processingWindowLabelMap = new Map<string, string | null>();
     for (const row of paymentSettingsRows) {
@@ -498,6 +525,7 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
         : null;
       processingWindowLabelMap.set(row.userId, label);
     }
+    const sellerNameMap = new Map(sellerProfileRows.map((p) => [p.userId, p.displayName ?? p.userId]));
 
     // Look up buyer's default shipping address once, reuse across all order rows.
     const buyerShippingAddress = await getBuyerShippingAddress(userId);
@@ -557,7 +585,14 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
     // with what the buyer would see if they fetched their order history.
     const maxProcessingWindowDays = stampedWindows.length > 0 ? Math.max(...stampedWindows) : null;
 
-    res.json({ orderIds, sellerIds: [...sellerIdSet], processingWindowDays: maxProcessingWindowDays, processingWindowLabel: stampedLabel });
+    // Build per-seller breakdown so multi-seller carts can show individual processing times.
+    const perSellerWindows = [...sellerIdSet].map((sellerId) => ({
+      sellerName: sellerNameMap.get(sellerId) ?? sellerId,
+      days: processingWindowMap.get(sellerId) ?? null,
+      label: processingWindowLabelMap.get(sellerId) ?? null,
+    }));
+
+    res.json({ orderIds, sellerIds: [...sellerIdSet], processingWindowDays: maxProcessingWindowDays, processingWindowLabel: stampedLabel, perSellerWindows });
   } catch (err) {
     logger.error({ err }, "me/orders/bulk error");
     res.status(500).json({ error: "Failed to create orders" });

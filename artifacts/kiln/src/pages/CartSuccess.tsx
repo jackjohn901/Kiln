@@ -27,6 +27,7 @@ export default function CartSuccess() {
   const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
+  const [perSellerWindows, setPerSellerWindows] = useState<{ sellerName: string; days: number | null; label: string | null }[]>([]);
   const orderCreated = useRef(false);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export default function CartSuccess() {
             body: JSON.stringify({ stripeSessionId: sessionId }),
           });
           if (res.ok) {
-            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[]; processingWindowDays?: number | null; processingWindowLabel?: string | null };
+            const d = await res.json() as { orderIds?: string[]; sellerIds?: string[]; processingWindowDays?: number | null; processingWindowLabel?: string | null; perSellerWindows?: { sellerName: string; days: number | null; label: string | null }[] };
             if (d.orderIds?.[0]) {
               setOrderId("KLN-" + d.orderIds[0].slice(0, 8).toUpperCase());
               setReceiptOrderId(d.orderIds[0]);
@@ -89,6 +90,9 @@ export default function CartSuccess() {
             }
             if (typeof d.processingWindowLabel === "string" && d.processingWindowLabel.trim()) {
               setProcessingWindowLabel(d.processingWindowLabel.trim());
+            }
+            if (Array.isArray(d.perSellerWindows) && d.perSellerWindows.length > 0) {
+              setPerSellerWindows(d.perSellerWindows);
             }
           }
           // Clean up any stale pre-checkout data from localStorage.
@@ -388,7 +392,32 @@ export default function CartSuccess() {
         {/* Standard fulfillment info box */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-5 text-sm text-stone-400 text-left space-y-3 mb-8">
           <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>
-          {(processingWindowLabel !== null || processingWindowDays !== null) && (
+          {perSellerWindows.length > 1 ? (
+            /* Multi-seller: show per-artist processing windows */
+            <div className="flex items-start gap-2.5">
+              <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-300 mb-2">Processing time by artist</p>
+                <ul className="space-y-1.5">
+                  {perSellerWindows.map((w, i) => (
+                    <li key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-stone-300 font-medium">{w.sellerName}</span>
+                      <span className="text-stone-400 tabular-nums">
+                        {w.label
+                          ? w.label
+                          : w.days === null
+                            ? "Not specified"
+                            : w.days === 1
+                              ? "1 business day"
+                              : `${w.days} business days`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : (processingWindowLabel !== null || processingWindowDays !== null) ? (
+            /* Single seller: show the existing single-value display */
             <div className="flex items-start gap-2.5">
               <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
               <div>
@@ -405,7 +434,7 @@ export default function CartSuccess() {
                 </p>
               </div>
             </div>
-          )}
+          ) : null}
           <div className="flex items-start gap-2.5">
             <Package size={15} className="text-amber-400 shrink-0 mt-0.5" />
             <p>The artist will be notified and will reach out within 2–3 business days with shipping details.</p>
