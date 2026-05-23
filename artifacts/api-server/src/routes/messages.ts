@@ -205,6 +205,7 @@ router.post("/messages/send", async (req, res): Promise<void> => {
         participantA: senderId,
         participantB: recipientId,
         lastMessageText: lastMsgPreview,
+        lastMessageAttachmentUrl: attachmentUrl ?? null,
       }).returning();
       thread = created;
     }
@@ -220,7 +221,7 @@ router.post("/messages/send", async (req, res): Promise<void> => {
     }).returning();
 
     await db.update(messageThreadsTable)
-      .set({ lastMessageAt: new Date(), lastMessageText: lastMsgPreview })
+      .set({ lastMessageAt: new Date(), lastMessageText: lastMsgPreview, lastMessageAttachmentUrl: attachmentUrl ?? null })
       .where(eq(messageThreadsTable.id, thread.id));
 
     broadcast(recipientId, { type: "message", threadId: thread.id, senderId, recipientId });

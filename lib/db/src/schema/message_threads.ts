@@ -6,6 +6,7 @@ export const messageThreadsTable = pgTable("message_threads", {
   participantB: varchar("participant_b", { length: 255 }).notNull(),
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
   lastMessageText: text("last_message_text"),
+  lastMessageAttachmentUrl: text("last_message_attachment_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

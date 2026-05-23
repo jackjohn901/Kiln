@@ -17,6 +17,7 @@ interface ApiThread {
   otherUserAvatar: string | null;
   lastMessageAt: string;
   lastMessageText: string | null;
+  lastMessageAttachmentUrl: string | null;
   unreadCount: number;
 }
 interface ApiMsg {
@@ -476,7 +477,7 @@ export default function Messages() {
         setApiMessages(prev => [...prev, msg]);
         setApiThreads(prev => prev.map(t =>
           t.id === activeApiThread.id
-            ? { ...t, lastMessageText: text || "📎 Image", lastMessageAt: new Date().toISOString() }
+            ? { ...t, lastMessageText: text || "📎 Image", lastMessageAttachmentUrl: attachmentUrl ?? null, lastMessageAt: new Date().toISOString() }
             : t
         ));
       }
@@ -641,9 +642,16 @@ export default function Messages() {
                     </span>
                     <span className="text-[10px] text-stone-600 shrink-0 ml-2">{timeShort(t.lastMessageAt)}</span>
                   </div>
-                  <p className={`text-xs truncate ${t.unreadCount > 0 ? "text-stone-400" : "text-stone-600"}`}>
-                    {t.lastMessageText ?? "No messages yet"}
-                  </p>
+                  <div className={`flex items-center gap-1.5 text-xs truncate ${t.unreadCount > 0 ? "text-stone-400" : "text-stone-600"}`}>
+                    {t.lastMessageAttachmentUrl && (
+                      <img
+                        src={t.lastMessageAttachmentUrl}
+                        alt="attachment"
+                        className="h-5 w-5 rounded object-cover shrink-0 border border-white/10"
+                      />
+                    )}
+                    <span className="truncate">{t.lastMessageText ?? "No messages yet"}</span>
+                  </div>
                 </div>
               </button>
             ))}
