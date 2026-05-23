@@ -6,6 +6,7 @@ import {
   Printer, Star, Mail, Link2, Check, Download,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 
 interface Order {
   id: string;
@@ -228,12 +229,8 @@ export default function OrderDetail() {
   const TypeIcon = typeConf.icon;
 
   const hasDeliveryEstimate = order.processingWindowLabel !== null || order.processingWindowDays !== null;
-  const deliveryEstimateText = order.processingWindowLabel
-    ? order.processingWindowLabel
-    : order.processingWindowDays === 1
-      ? "1 business day"
-      : `${order.processingWindowDays} business days`;
-  const shipsWithinText = `Ships within ${deliveryEstimateText}`;
+  const deliveryEstimateText = formatProcessingWindowLabel(order.processingWindowDays, order.processingWindowLabel) ?? "";
+  const shipsWithinText = `Ships ${deliveryEstimateText}`;
 
   const isActive = !["delivered", "cancelled"].includes(order.status);
 

@@ -38,6 +38,21 @@ export function hasAnyPaymentMethod(p: ArtistPayments) {
   return !!(p.stripeLink || p.venmo || p.cashapp || p.paypalMe);
 }
 
+/**
+ * Derives a buyer-friendly delivery estimate label from a numeric day count.
+ * Returns the custom label unchanged if provided, otherwise generates
+ * "within 1 business day" / "within N business days" from the day count.
+ * Returns null when neither value is set.
+ */
+export function formatProcessingWindowLabel(
+  days: number | null | undefined,
+  label: string | null | undefined,
+): string | null {
+  if (label && label.trim()) return label.trim();
+  if (days == null) return null;
+  return days === 1 ? "within 1 business day" : `within ${days} business days`;
+}
+
 // Build a Venmo payment URL with pre-filled amount and note
 export function venmoUrl(handle: string, amount: number, note: string) {
   const h = handle.startsWith("@") ? handle.slice(1) : handle;

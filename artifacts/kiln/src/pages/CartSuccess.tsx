@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer, Download } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
+import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 
 interface LineItem {
   name: string;
@@ -422,12 +423,8 @@ export default function CartSuccess() {
               <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-amber-300">
-                  Ships within{" "}
-                  {processingWindowLabel
-                    ? processingWindowLabel
-                    : processingWindowDays === 1
-                      ? "1 business day"
-                      : `${processingWindowDays} business days`}
+                  Ships{" "}
+                  {formatProcessingWindowLabel(processingWindowDays, processingWindowLabel) ?? `within ${processingWindowDays} business days`}
                 </p>
                 <p className="text-xs text-stone-600 mt-0.5">
                   The artist will prepare your order within this time.
