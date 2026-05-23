@@ -2,25 +2,137 @@ import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
-import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable } from '@workspace/db';
-import { eq, and, sql } from 'drizzle-orm';
+import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable } from '@workspace/db';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
 
-async function waitForSessionOrder(sessionId: string, maxAttempts = 5, delayMs = 1200): Promise<string | null> {
-  const key = `stripe:${sessionId}`;
-  for (let i = 0; i < maxAttempts; i++) {
-    const row = await db
-      .select({ id: ordersTable.id })
-      .from(ordersTable)
-      .where(eq(ordersTable.notes, key))
-      .limit(1)
-      .then((rows) => rows[0] ?? null)
-      .catch(() => null);
-    if (row) return row.id;
-    if (i < maxAttempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
+/**
+ * Create order rows for a listing checkout session, inline in the webhook handler.
+ * This ensures orders exist before the receipt email is sent, eliminating the race
+ * between the webhook and the buyer's browser redirect.
+ *
+ * Idempotent: if orders already exist for this session (created by the browser or a
+ * previous webhook delivery), the existing rows are returned unchanged.
+ *
+ * Returns created/existing order rows, or [] if creation is skipped
+ * (userId absent, no matching listings, or amount mismatch).
+ */
+async function createOrdersForSession(params: {
+  sessionId: string;
+  amountTotal: number | null;
+  userId: string;
+  listingIds: string[];
+  listingQtys: number[];
+  manualPayout: boolean;
+}): Promise<{ orderId: string; sellerId: string }[]> {
+  const { sessionId, amountTotal, userId, listingIds, listingQtys, manualPayout } = params;
+  if (listingIds.length === 0) return [];
+
+  const dedupeKey = `stripe:${sessionId}`;
+
+  const existing = await db
+    .select({ id: ordersTable.id, sellerId: ordersTable.sellerId })
+    .from(ordersTable)
+    .where(eq(ordersTable.notes, dedupeKey));
+  if (existing.length > 0) {
+    return existing.map((r) => ({ orderId: r.id, sellerId: r.sellerId ?? '' }));
   }
-  return null;
+
+  const listings = await db
+    .select({
+      id: listingsTable.id,
+      title: listingsTable.title,
+      artistId: listingsTable.artistId,
+      price: listingsTable.price,
+      imageUrl: listingsTable.imageUrl,
+    })
+    .from(listingsTable)
+    .where(inArray(listingsTable.id, listingIds));
+
+  const listingMap = new Map(listings.map((l) => [l.id, l]));
+
+  let expectedCents = 0;
+  for (let i = 0; i < listingIds.length; i++) {
+    const listing = listingMap.get(listingIds[i]);
+    if (listing) expectedCents += Math.round(listing.price * 100) * (listingQtys[i] ?? 1);
+  }
+  const paidCents = amountTotal ?? 0;
+  if (Math.abs(expectedCents - paidCents) > 100) {
+    logger.warn({ sessionId, expectedCents, paidCents }, 'Webhook order creation skipped: amount mismatch');
+    return [];
+  }
+
+  const sellerIds = [...new Set(listings.map((l) => l.artistId))];
+  const [paymentSettingsRows, buyerShippingRows] = await Promise.all([
+    sellerIds.length > 0
+      ? db
+          .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+          .from(userSettingsTable)
+          .where(inArray(userSettingsTable.userId, sellerIds))
+      : Promise.resolve([]),
+    db
+      .select({ defaultShippingAddress: userSettingsTable.defaultShippingAddress })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1),
+  ]);
+
+  const processingWindowMap = new Map<string, number | null>();
+  const processingWindowLabelMap = new Map<string, string | null>();
+  for (const row of paymentSettingsRows) {
+    const ps = row.paymentSettings as Record<string, unknown> | null;
+    processingWindowMap.set(row.userId, ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null);
+    const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
+      ? ps.processingWindowLabel.trim() : null;
+    processingWindowLabelMap.set(row.userId, label);
+  }
+
+  let buyerShippingAddress: string | null = null;
+  const addrRow = buyerShippingRows[0];
+  if (addrRow?.defaultShippingAddress) {
+    const addr = addrRow.defaultShippingAddress as Record<string, unknown>;
+    const street = typeof addr.street === 'string' ? addr.street.trim() : '';
+    const city = typeof addr.city === 'string' ? addr.city.trim() : '';
+    const state = typeof addr.state === 'string' ? addr.state.trim() : '';
+    const zip = typeof addr.zip === 'string' ? addr.zip.trim() : '';
+    const country = typeof addr.country === 'string' ? addr.country.trim() : '';
+    const line2 = [city, state, zip].filter(Boolean).join(', ');
+    const parts = [street, line2, country].filter(Boolean);
+    buyerShippingAddress = parts.length > 0 ? parts.join('\n') : null;
+  }
+
+  const result: { orderId: string; sellerId: string }[] = [];
+  for (let i = 0; i < listingIds.length; i++) {
+    const listing = listingMap.get(listingIds[i]);
+    if (!listing) {
+      logger.warn({ listingId: listingIds[i], sessionId }, 'Listing from session metadata not found; skipping order row');
+      continue;
+    }
+    const qty = listingQtys[i] ?? 1;
+    const orderId = crypto.randomUUID();
+    await db.insert(ordersTable).values({
+      id: orderId,
+      buyerId: userId,
+      sellerId: listing.artistId,
+      type: 'listing',
+      refId: listingIds[i],
+      title: listing.title,
+      description: null,
+      imageUrl: listing.imageUrl ?? null,
+      amount: listing.price * qty,
+      currency: 'USD',
+      status: 'confirmed',
+      shippingAddress: buyerShippingAddress,
+      notes: dedupeKey,
+      processingWindowDays: processingWindowMap.get(listing.artistId) ?? null,
+      processingWindowLabel: processingWindowLabelMap.get(listing.artistId) ?? null,
+      manualPayout,
+    });
+    result.push({ orderId, sellerId: listing.artistId });
+  }
+
+  return result;
 }
 
 async function activatePatronSubscription(tierId: string, userId: string): Promise<void> {
@@ -148,10 +260,31 @@ export class WebhookHandlers {
         const orderId = session.id.slice(-8).toUpperCase();
 
         if (session.mode === 'payment' && email) {
-          // Poll for the DB order UUID so the email can deep-link to the receipt
-          // page. Orders are created by the frontend after redirect, so there is a
-          // small race; we retry a few times before falling back to the orders list.
-          const receiptOrderId = await waitForSessionOrder(session.id);
+          // Create order rows server-side for listing checkouts so the receipt email
+          // deep link is always correct. For non-listing sessions (meta.listingIds absent
+          // or meta.userId absent), this is a no-op and the fallback path still works.
+          let webhookCreatedOrders: { orderId: string; sellerId: string }[] = [];
+          if (meta.listingIds && meta.userId) {
+            const listingIds = meta.listingIds.split(',').filter(Boolean);
+            const listingQtys = (meta.listingQtys ?? '').split(',').map((q) => parseInt(q, 10) || 1);
+            try {
+              webhookCreatedOrders = await createOrdersForSession({
+                sessionId: session.id,
+                amountTotal: session.amount_total ?? null,
+                userId: meta.userId,
+                listingIds,
+                listingQtys,
+                manualPayout: meta.manualPayout === 'true',
+              });
+            } catch (orderErr) {
+              logger.error({ err: orderErr, sessionId: session.id }, 'Webhook order creation failed; receipt email will omit deep link');
+            }
+          }
+
+          // Use the first order ID as the receipt deep-link target.
+          // If order creation was skipped or failed, the link falls back to null
+          // and the email renders without a deep link (still functional).
+          const receiptOrderId = webhookCreatedOrders[0]?.orderId ?? null;
 
           // Fetch all order rows for this session to build itemised receipt email.
           const sessionKey = `stripe:${session.id}`;

@@ -29,20 +29,140 @@ const router: IRouter = Router();
 const manualPayoutReceiptSent = new Set<string>();
 const manualPayoutArtistNotified = new Set<string>();
 
-async function waitForSessionOrder(sessionId: string, maxAttempts = 5, delayMs = 1200): Promise<string | null> {
-  const key = `stripe:${sessionId}`;
-  for (let i = 0; i < maxAttempts; i++) {
-    const row = await db
-      .select({ id: ordersTable.id })
-      .from(ordersTable)
-      .where(eq(ordersTable.notes, key))
-      .limit(1)
-      .then((rows) => rows[0] ?? null)
-      .catch(() => null);
-    if (row) return row.id;
-    if (i < maxAttempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
+/**
+ * Create order rows for a listing checkout session.
+ * Called inline from the webhook handler on checkout.session.completed so that
+ * order records exist before receipt emails are sent (eliminates the race between
+ * the webhook and the buyer's browser redirect).
+ *
+ * Safe to call multiple times for the same session — idempotent via the dedupeKey.
+ * Returns the created (or already-existing) order rows, or [] if creation is skipped
+ * (e.g. userId absent, no matching listings, amount mismatch).
+ */
+async function createOrdersForSession(params: {
+  sessionId: string;
+  amountTotal: number | null;
+  userId: string;
+  listingIds: string[];
+  listingQtys: number[];
+  manualPayout: boolean;
+}): Promise<{ orderId: string; sellerId: string }[]> {
+  const { sessionId, amountTotal, userId, listingIds, listingQtys, manualPayout } = params;
+  if (listingIds.length === 0) return [];
+
+  const dedupeKey = `stripe:${sessionId}`;
+
+  // Idempotency: return existing rows if already created (webhook replay / double call).
+  const existing = await db
+    .select({ id: ordersTable.id, sellerId: ordersTable.sellerId })
+    .from(ordersTable)
+    .where(eq(ordersTable.notes, dedupeKey));
+  if (existing.length > 0) {
+    return existing.map((r) => ({ orderId: r.id, sellerId: r.sellerId ?? '' }));
   }
-  return null;
+
+  // Fetch authoritative listing data from DB.
+  const listings = await db
+    .select({
+      id: listingsTable.id,
+      title: listingsTable.title,
+      artistId: listingsTable.artistId,
+      price: listingsTable.price,
+      imageUrl: listingsTable.imageUrl,
+    })
+    .from(listingsTable)
+    .where(inArray(listingsTable.id, listingIds));
+
+  const listingMap = new Map(listings.map((l) => [l.id, l]));
+
+  // Amount reconciliation: reject if server-computed total differs by more than $1.
+  let expectedCents = 0;
+  for (let i = 0; i < listingIds.length; i++) {
+    const listing = listingMap.get(listingIds[i]);
+    if (listing) expectedCents += Math.round(listing.price * 100) * (listingQtys[i] ?? 1);
+  }
+  const paidCents = amountTotal ?? 0;
+  if (Math.abs(expectedCents - paidCents) > 100) {
+    logger.warn({ sessionId, expectedCents, paidCents }, 'Webhook order creation rejected: amount mismatch');
+    return [];
+  }
+
+  // Fetch per-seller processing windows and buyer's stored shipping address in parallel.
+  const sellerIds = [...new Set(listings.map((l) => l.artistId))];
+  const [paymentSettingsRows, buyerShippingRows] = await Promise.all([
+    sellerIds.length > 0
+      ? db
+          .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+          .from(userSettingsTable)
+          .where(inArray(userSettingsTable.userId, sellerIds))
+      : Promise.resolve([]),
+    db
+      .select({ defaultShippingAddress: userSettingsTable.defaultShippingAddress })
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId))
+      .limit(1),
+  ]);
+
+  const processingWindowMap = new Map<string, number | null>();
+  const processingWindowLabelMap = new Map<string, string | null>();
+  for (const row of paymentSettingsRows) {
+    const ps = row.paymentSettings as Record<string, unknown> | null;
+    processingWindowMap.set(row.userId, ps && typeof ps.processingWindow === 'number' ? ps.processingWindow : null);
+    const label = ps && typeof ps.processingWindowLabel === 'string' && ps.processingWindowLabel.trim()
+      ? ps.processingWindowLabel.trim()
+      : null;
+    processingWindowLabelMap.set(row.userId, label);
+  }
+
+  // Format buyer's default shipping address as a multi-line string.
+  let buyerShippingAddress: string | null = null;
+  const addrRow = buyerShippingRows[0];
+  if (addrRow?.defaultShippingAddress) {
+    const addr = addrRow.defaultShippingAddress as Record<string, unknown>;
+    const street = typeof addr.street === 'string' ? addr.street.trim() : '';
+    const city = typeof addr.city === 'string' ? addr.city.trim() : '';
+    const state = typeof addr.state === 'string' ? addr.state.trim() : '';
+    const zip = typeof addr.zip === 'string' ? addr.zip.trim() : '';
+    const country = typeof addr.country === 'string' ? addr.country.trim() : '';
+    const line2 = [city, state, zip].filter(Boolean).join(', ');
+    const parts = [street, line2, country].filter(Boolean);
+    buyerShippingAddress = parts.length > 0 ? parts.join('\n') : null;
+  }
+
+  // Insert one order row per listing item.
+  const result: { orderId: string; sellerId: string }[] = [];
+  for (let i = 0; i < listingIds.length; i++) {
+    const listing = listingMap.get(listingIds[i]);
+    if (!listing) {
+      logger.warn({ listingId: listingIds[i], sessionId }, 'Listing from session metadata not found in DB; skipping');
+      continue;
+    }
+    const qty = listingQtys[i] ?? 1;
+    const orderId = crypto.randomUUID();
+    await db.insert(ordersTable).values({
+      id: orderId,
+      buyerId: userId,
+      sellerId: listing.artistId,
+      type: 'listing',
+      refId: listingIds[i],
+      title: listing.title,
+      description: null,
+      imageUrl: listing.imageUrl ?? null,
+      amount: listing.price * qty,
+      currency: 'USD',
+      status: 'confirmed',
+      shippingAddress: buyerShippingAddress,
+      // INVARIANT: notes must always equal dedupeKey so all rows for a session
+      // can be grouped, deduplicated, and looked up. Never omit on any insert path.
+      notes: dedupeKey,
+      processingWindowDays: processingWindowMap.get(listing.artistId) ?? null,
+      processingWindowLabel: processingWindowLabelMap.get(listing.artistId) ?? null,
+      manualPayout,
+    });
+    result.push({ orderId, sellerId: listing.artistId });
+  }
+
+  return result;
 }
 const connectArtistNotified = new Set<string>();
 const connectBuyerReceiptSent = new Set<string>();
@@ -871,6 +991,27 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
             .where(eq(auctionsTable.id, meta.auctionId));
         }
 
+        // 5b. For listing checkouts with a known userId, create order rows now so
+        //     receipt emails and notifications can deep-link to the correct order.
+        //     `createOrdersForSession` is idempotent — safe to call on webhook replay.
+        let webhookOrderRows: { orderId: string; sellerId: string }[] = [];
+        if (meta.listingIds && meta.userId) {
+          const _lIds = meta.listingIds.split(',').filter(Boolean);
+          const _lQtys = (meta.listingQtys ?? '').split(',').map((q) => parseInt(q, 10) || 1);
+          webhookOrderRows = await createOrdersForSession({
+            sessionId: session.id,
+            amountTotal: session.amount_total ?? null,
+            userId: meta.userId,
+            listingIds: _lIds,
+            listingQtys: _lQtys,
+            manualPayout: meta.manualPayout === 'true',
+          }).catch((err) => {
+            logger.error({ err, sessionId: session.id }, 'Webhook order creation failed');
+            return [];
+          });
+        }
+        const webhookOrderId = webhookOrderRows[0]?.orderId ?? null;
+
         // 6. Manual-payout order — send buyer a receipt email since Stripe won't
         //    automatically send one (no connected account to trigger their receipt flow).
         if (meta.manualPayout === 'true' && meta.listingIds) {
@@ -943,10 +1084,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 artistName: listingArtistName(idx),
               }));
 
-              // Poll for the DB order ID so the email can deep-link to the receipt.
-              // Orders are written by the frontend after the Stripe redirect, so there is
-              // a small race; retry a few times before falling back to the orders list.
-              const receiptOrderId = await waitForSessionOrder(session.id);
+              const receiptOrderId = webhookOrderId;
 
               const html = manualPayoutReceiptEmail(
                 session.id,
@@ -1034,9 +1172,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                     ? `New sale: "${itemSummary[0]}" — $${amountDollars}`
                     : `New sale: ${itemSummary.length} items — $${amountDollars}`;
 
-                  // Poll for the order ID so the notification deep-links to the
-                  // exact sale detail screen instead of just the earnings list.
-                  const saleOrderId = await waitForSessionOrder(session.id);
+                  const saleOrderId = webhookOrderId;
                   const saleLink = saleOrderId ? `/earnings/orders/${saleOrderId}` : '/earnings';
 
                   await db.insert(notificationsTable).values({
@@ -1137,10 +1273,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   };
                 });
 
-                // Poll for the DB order ID so the email can deep-link to the receipt.
-                // Orders are written by the frontend after the Stripe redirect, so there is
-                // a small race; retry a few times before falling back to the orders list.
-                const connectReceiptOrderId = await waitForSessionOrder(session.id);
+                const connectReceiptOrderId = webhookOrderId;
 
                 const html = manualPayoutReceiptEmail(
                   session.id,
@@ -1213,9 +1346,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   ? `New sale: "${itemSummary[0]}" — $${amountDollars}`
                   : `New sale: ${itemSummary.length} items — $${amountDollars}`;
 
-                // Poll for the order ID so the notification deep-links to the
-                // exact sale detail screen instead of just the earnings list.
-                const connectSaleOrderId = await waitForSessionOrder(session.id);
+                const connectSaleOrderId = webhookOrderId;
                 const connectSaleLink = connectSaleOrderId ? `/earnings/orders/${connectSaleOrderId}` : '/earnings';
 
                 await db.insert(notificationsTable).values({

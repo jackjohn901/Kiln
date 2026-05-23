@@ -406,9 +406,11 @@ router.post("/me/orders", async (req, res): Promise<void> => {
   }
 });
 
-// POST /me/orders/bulk — create multiple orders after a Stripe cart checkout.
-// All order data is derived from server-embedded session metadata + DB lookups.
-// The client only needs to supply the stripeSessionId; item data from the client is ignored.
+// POST /me/orders/bulk — fetch orders created by the webhook for a Stripe cart checkout.
+// Order creation now happens server-side in the webhook (checkout.session.completed).
+// This endpoint is read-only: it verifies the session for security then returns the
+// existing order rows. A short retry loop handles the race where the browser lands on
+// the success page just before the webhook has finished writing the order rows.
 router.post("/me/orders/bulk", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
@@ -424,178 +426,56 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
     res.status(402).json({ error: "Payment verification failed. Complete a valid Stripe checkout first." }); return;
   }
 
-  if (verified.listingIds.length === 0) {
-    res.status(400).json({ error: "No listing data found for this session." }); return;
-  }
-
   try {
     const dedupeKey = `stripe:${stripeSessionId}`;
-    const existing = await db
-      .select({ id: ordersTable.id, sellerId: ordersTable.sellerId })
-      .from(ordersTable)
-      .where(eq(ordersTable.notes, dedupeKey))
-      .limit(1);
 
-    if (existing.length > 0) {
-      // Fetch all orders for this session to collect seller IDs and processing windows.
-      const allExisting = await db
+    // Retry up to 4 times (total ~3s) in case the webhook hasn't finished writing
+    // order rows yet when the browser calls this endpoint after redirect.
+    let allOrders: Array<{ id: string; sellerId: string | null; processingWindowDays: number | null; processingWindowLabel: string | null }> = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      allOrders = await db
         .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, processingWindowDays: ordersTable.processingWindowDays, processingWindowLabel: ordersTable.processingWindowLabel })
         .from(ordersTable)
         .where(eq(ordersTable.notes, dedupeKey));
-      const sellerIds = [...new Set(allExisting.map((o) => o.sellerId).filter(Boolean))] as string[];
-      // Surface the most conservative processing window from the persisted order rows.
-      const existingWindows = allExisting
-        .map((o) => o.processingWindowDays)
-        .filter((w): w is number => typeof w === "number");
-      const maxProcessingWindowDays = existingWindows.length > 0 ? Math.max(...existingWindows) : null;
-      const existingLabel = allExisting.map((o) => o.processingWindowLabel).find((l): l is string => typeof l === "string") ?? null;
-
-      // Fetch seller display names so the buyer can see per-artist processing windows.
-      const existingSellerProfiles = sellerIds.length > 0
-        ? await db
-            .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
-            .from(profilesTable)
-            .where(inArray(profilesTable.userId, sellerIds))
-        : [];
-      const existingSellerNameMap = new Map(existingSellerProfiles.map((p) => [p.userId, p.displayName ?? p.userId]));
-      // Deduplicate: one entry per seller, using the window from any order row for that seller.
-      const seenSellerIds = new Set<string>();
-      const existingPerSellerWindows = allExisting
-        .filter((o): o is typeof o & { sellerId: string } => typeof o.sellerId === "string" && !seenSellerIds.has(o.sellerId) && !!(seenSellerIds.add(o.sellerId) || true))
-        .map((o) => ({
-          sellerName: existingSellerNameMap.get(o.sellerId) ?? o.sellerId,
-          days: o.processingWindowDays ?? null,
-          label: o.processingWindowLabel ?? null,
-        }));
-
-      res.json({ orderIds: [existing[0].id], duplicate: true, sellerIds, processingWindowDays: maxProcessingWindowDays, processingWindowLabel: existingLabel, perSellerWindows: existingPerSellerWindows }); return;
+      if (allOrders.length > 0) break;
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 800));
     }
 
-    // Look up listing data from the DB — authoritative source for seller, price, and title.
-    const listings = await db
-      .select({
-        id: listingsTable.id,
-        title: listingsTable.title,
-        artistId: listingsTable.artistId,
-        price: listingsTable.price,
-        imageUrl: listingsTable.imageUrl,
-      })
-      .from(listingsTable)
-      .where(inArray(listingsTable.id, verified.listingIds));
-
-    const listingMap = new Map(listings.map((l) => [l.id, l]));
-
-    // Reconcile: server-derived total must match Stripe-confirmed amount_total.
-    // This prevents a paid session for a cheap item from being used to mint high-value orders.
-    let expectedCents = 0;
-    for (let i = 0; i < verified.listingIds.length; i++) {
-      const listing = listingMap.get(verified.listingIds[i]);
-      if (listing) expectedCents += Math.round(listing.price * 100) * (verified.listingQtys[i] ?? 1);
-    }
-    const paidCents = verified.amountTotal ?? 0;
-    if (Math.abs(expectedCents - paidCents) > 100) {
-      logger.warn({ stripeSessionId, expectedCents, paidCents }, "Bulk order rejected: amount mismatch");
-      res.status(402).json({ error: "Payment amount does not match order total." }); return;
+    if (allOrders.length === 0) {
+      // Webhook hasn't created orders yet (or creation failed). Return a 202 so the
+      // success page can degrade gracefully rather than showing an error.
+      res.status(202).json({ orderIds: [], sellerIds: [], processingWindowDays: null, processingWindowLabel: null, perSellerWindows: [] });
+      return;
     }
 
-    // Fetch processing window for each seller (used to stamp the order record).
-    const sellerIdsForListings = [...new Set(listings.map((l) => l.artistId))];
-    const [paymentSettingsRows, sellerProfileRows] = await Promise.all([
-      sellerIdsForListings.length > 0
-        ? db
-            .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
-            .from(userSettingsTable)
-            .where(inArray(userSettingsTable.userId, sellerIdsForListings))
-        : Promise.resolve([]),
-      sellerIdsForListings.length > 0
-        ? db
-            .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
-            .from(profilesTable)
-            .where(inArray(profilesTable.userId, sellerIdsForListings))
-        : Promise.resolve([]),
-    ]);
-    const processingWindowMap = new Map<string, number | null>();
-    const processingWindowLabelMap = new Map<string, string | null>();
-    for (const row of paymentSettingsRows) {
-      const ps = row.paymentSettings as Record<string, unknown> | null;
-      const w = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
-      processingWindowMap.set(row.userId, w);
-      const label = ps && typeof ps.processingWindowLabel === "string" && ps.processingWindowLabel.trim()
-        ? ps.processingWindowLabel.trim()
-        : null;
-      processingWindowLabelMap.set(row.userId, label);
-    }
-    const sellerNameMap = new Map(sellerProfileRows.map((p) => [p.userId, p.displayName ?? p.userId]));
+    const orderIds = allOrders.map((o) => o.id);
+    const sellerIds = [...new Set(allOrders.map((o) => o.sellerId).filter((id): id is string => !!id))];
 
-    // Look up buyer's default shipping address once, reuse across all order rows.
-    const buyerShippingAddress = await getBuyerShippingAddress(userId);
+    const existingWindows = allOrders.map((o) => o.processingWindowDays).filter((w): w is number => typeof w === "number");
+    const maxProcessingWindowDays = existingWindows.length > 0 ? Math.max(...existingWindows) : null;
+    const processingWindowLabel = allOrders.map((o) => o.processingWindowLabel).find((l): l is string => typeof l === "string") ?? null;
 
-    const orderIds: string[] = [];
-    const sellerIdSet = new Set<string>();
-    // Track the processing window values actually stamped on each order row so the
-    // response is sourced from the persisted values, not from live payment settings.
-    const stampedWindows: number[] = [];
-    let stampedLabel: string | null = null;
+    const sellerProfiles = sellerIds.length > 0
+      ? await db
+          .select({ userId: profilesTable.userId, displayName: profilesTable.displayName })
+          .from(profilesTable)
+          .where(inArray(profilesTable.userId, sellerIds))
+      : [];
+    const sellerNameMap = new Map(sellerProfiles.map((p) => [p.userId, p.displayName ?? p.userId]));
 
-    for (let i = 0; i < verified.listingIds.length; i++) {
-      const listingId = verified.listingIds[i];
-      const listing = listingMap.get(listingId);
-      if (!listing) {
-        logger.warn({ listingId }, "Listing from session metadata not found in DB; skipping");
-        continue;
-      }
-      const qty = verified.listingQtys[i] ?? 1;
-      const orderId = crypto.randomUUID();
-      // Snapshot the seller's processing window at purchase time so it remains
-      // stable even if the seller later changes their settings.
-      const stampedWindow = processingWindowMap.get(listing.artistId) ?? null;
-      const sellerLabel = processingWindowLabelMap.get(listing.artistId) ?? null;
-      if (sellerLabel !== null) stampedLabel = sellerLabel;
-      await db.insert(ordersTable).values({
-        id: orderId,
-        buyerId: userId,
-        sellerId: listing.artistId,
-        type: "listing",
-        refId: listingId,
-        title: listing.title,
-        description: null,
-        imageUrl: listing.imageUrl ?? null,
-        // Amount is the DB listing price (authoritative) multiplied by quantity.
-        amount: listing.price * qty,
-        currency: "USD",
-        status: "confirmed",
-        shippingAddress: buyerShippingAddress,
-        // All order rows in a session share the deduplication key so they can be grouped.
-        notes: dedupeKey,
-        processingWindowDays: stampedWindow,
-        processingWindowLabel: sellerLabel,
-        manualPayout: verified.manualPayout,
-      });
-      orderIds.push(orderId);
-      sellerIdSet.add(listing.artistId);
-      if (stampedWindow !== null) stampedWindows.push(stampedWindow);
-    }
+    const seenSellerIds = new Set<string>();
+    const perSellerWindows = allOrders
+      .filter((o): o is typeof o & { sellerId: string } => typeof o.sellerId === "string" && !seenSellerIds.has(o.sellerId) && !!(seenSellerIds.add(o.sellerId) || true))
+      .map((o) => ({
+        sellerName: sellerNameMap.get(o.sellerId) ?? o.sellerId,
+        days: o.processingWindowDays ?? null,
+        label: o.processingWindowLabel ?? null,
+      }));
 
-    if (orderIds.length === 0) {
-      res.status(400).json({ error: "No valid listings found for this session." }); return;
-    }
-
-    // Return the max processing window sourced from the stamped order rows — same
-    // values that are now persisted in the DB, so the response is always consistent
-    // with what the buyer would see if they fetched their order history.
-    const maxProcessingWindowDays = stampedWindows.length > 0 ? Math.max(...stampedWindows) : null;
-
-    // Build per-seller breakdown so multi-seller carts can show individual processing times.
-    const perSellerWindows = [...sellerIdSet].map((sellerId) => ({
-      sellerName: sellerNameMap.get(sellerId) ?? sellerId,
-      days: processingWindowMap.get(sellerId) ?? null,
-      label: processingWindowLabelMap.get(sellerId) ?? null,
-    }));
-
-    res.json({ orderIds, sellerIds: [...sellerIdSet], processingWindowDays: maxProcessingWindowDays, processingWindowLabel: stampedLabel, perSellerWindows });
+    res.json({ orderIds, sellerIds, processingWindowDays: maxProcessingWindowDays, processingWindowLabel, perSellerWindows });
   } catch (err) {
     logger.error({ err }, "me/orders/bulk error");
-    res.status(500).json({ error: "Failed to create orders" });
+    res.status(500).json({ error: "Failed to fetch orders" });
   }
 });
 
