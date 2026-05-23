@@ -20,6 +20,7 @@ interface StripeConnectContextValue {
   hasUrgent: boolean;
   bannerDismissed: boolean;
   dismissBanner: () => void;
+  resetDismissal: () => void;
 }
 
 const StripeConnectContext = createContext<StripeConnectContextValue>({
@@ -30,6 +31,7 @@ const StripeConnectContext = createContext<StripeConnectContextValue>({
   hasUrgent: false,
   bannerDismissed: false,
   dismissBanner: () => undefined,
+  resetDismissal: () => undefined,
 });
 
 const STORAGE_KEY_WARNING = "stripe-banner-dismissed-warning";
@@ -102,9 +104,15 @@ export function StripeConnectProvider({ children }: { children: ReactNode }) {
     setDismissedKeys(prev => new Set([...prev, bannerKey]));
   }, [bannerKey]);
 
+  const resetDismissal = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY_WARNING);
+    localStorage.removeItem(STORAGE_KEY_URGENT);
+    setDismissedKeys(new Set());
+  }, []);
+
   return (
     <StripeConnectContext.Provider
-      value={{ status, loading, refresh: () => { void fetch_(); }, hasWarning, hasUrgent, bannerDismissed, dismissBanner }}
+      value={{ status, loading, refresh: () => { void fetch_(); }, hasWarning, hasUrgent, bannerDismissed, dismissBanner, resetDismissal }}
     >
       {children}
     </StripeConnectContext.Provider>

@@ -24,6 +24,7 @@ const REFRESH_LABELS: Record<RefreshInterval, string> = {
 import Nav from "@/components/Nav";
 import ShareModal from "@/components/ShareModal";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useStripeConnect } from "@/contexts/StripeConnectContext";
 
 interface EarningLine {
   id: string;
@@ -146,6 +147,7 @@ function formatDate(iso: string) {
 
 export default function Earnings() {
   const { profile } = useProfile();
+  const { bannerDismissed, resetDismissal } = useStripeConnect();
   const search = useSearch();
   const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
@@ -701,9 +703,19 @@ export default function Earnings() {
 
             {/* Stripe Payouts */}
             <div className="mb-6 rounded-2xl border border-white/8 bg-stone-900/40 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CreditCard size={14} className="text-indigo-400" />
-                <span className="text-sm font-medium text-stone-200">Stripe Payouts</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={14} className="text-indigo-400" />
+                  <span className="text-sm font-medium text-stone-200">Stripe Payouts</span>
+                </div>
+                {bannerDismissed && (
+                  <button
+                    onClick={resetDismissal}
+                    className="text-[11px] text-stone-500 hover:text-indigo-400 transition-colors"
+                  >
+                    Show account status
+                  </button>
+                )}
               </div>
 
               {connectLoading ? (
