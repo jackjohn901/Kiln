@@ -39,6 +39,22 @@ export interface Draft {
 
 const KEY = "kiln_posts";
 const DRAFT_KEY = "kiln_drafts";
+const MAX_POSTS_STORED = 20;
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Quota exceeded — free space and retry once
+    try {
+      localStorage.removeItem(KEY);
+      localStorage.removeItem(DRAFT_KEY);
+      localStorage.setItem(key, value);
+    } catch {
+      // Still failing (e.g. private browsing with no storage) — silently skip
+    }
+  }
+}
 
 export function getPosts(): Post[] {
   try {
@@ -49,14 +65,22 @@ export function getPosts(): Post[] {
 }
 
 export function addPost(post: Post): void {
+  // Strip large data URIs from mediaUrl before storing to avoid quota blow-up
+  const storable: Post = {
+    ...post,
+    mediaUrl: post.mediaUrl.startsWith("data:") ? "" : post.mediaUrl,
+    thumbnailUrl: post.thumbnailUrl?.startsWith("data:") ? undefined : post.thumbnailUrl,
+    mediaUrls: post.mediaUrls?.map((u) => (u.startsWith("data:") ? "" : u)),
+  };
   const posts = getPosts();
-  posts.unshift(post);
-  localStorage.setItem(KEY, JSON.stringify(posts));
+  posts.unshift(storable);
+  // Keep only the most recent N posts to prevent quota growth
+  safeSetItem(KEY, JSON.stringify(posts.slice(0, MAX_POSTS_STORED)));
 }
 
 export function deletePost(id: string): void {
   const posts = getPosts().filter((p) => p.id !== id);
-  localStorage.setItem(KEY, JSON.stringify(posts));
+  safeSetItem(KEY, JSON.stringify(posts));
 }
 
 export function clearPosts(): void {
@@ -78,18 +102,21 @@ export function getDrafts(): Draft[] {
 export function saveDraft(draft: Omit<Draft, "id" | "savedAt">): Draft {
   const newDraft: Draft = {
     ...draft,
+    // Don't store blob/data URLs — they expire and cause quota issues
+    mediaUrl: draft.mediaUrl.startsWith("data:") || draft.mediaUrl.startsWith("blob:") ? "" : draft.mediaUrl,
     id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     savedAt: new Date().toISOString(),
   };
   const drafts = getDrafts();
   drafts.unshift(newDraft);
-  localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  // Keep at most 10 drafts
+  safeSetItem(DRAFT_KEY, JSON.stringify(drafts.slice(0, 10)));
   return newDraft;
 }
 
 export function deleteDraft(id: string): void {
   const drafts = getDrafts().filter((d) => d.id !== id);
-  localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  safeSetItem(DRAFT_KEY, JSON.stringify(drafts));
 }
 
 export function publishDraft(id: string): void {

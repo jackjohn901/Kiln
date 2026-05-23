@@ -117,9 +117,12 @@ export default function BgRemoveToggle({ sourceFile, onResult, onReset }: Props)
           )}
 
           {error && !processing && (
-            <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2.5">
-              <AlertCircle size={13} className="text-rose-400 shrink-0" />
-              <p className="text-xs text-rose-300">Couldn't remove background — original photo will be used.</p>
+            <div className="flex items-start gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-2.5">
+              <AlertCircle size={13} className="text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs text-rose-300 font-medium">Background removal unavailable</p>
+                <p className="text-[10px] text-rose-400/70 mt-0.5">This feature requires a desktop browser — the AI model is too large for mobile. Your original photo will be used.</p>
+              </div>
             </div>
           )}
         </div>

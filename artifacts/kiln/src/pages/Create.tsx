@@ -488,7 +488,7 @@ export default function Create() {
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
 
-      <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mx-auto max-w-2xl px-4 pt-8 pb-36 md:pb-8">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -733,12 +733,20 @@ export default function Create() {
               </div>
             )}
 
-            <button
-              onClick={() => setStep("preview")}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-            >
-              Preview <ChevronRight size={16} />
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setStep("preview")}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+              >
+                Preview <ChevronRight size={16} />
+              </button>
+              <button
+                onClick={() => setStep("details")}
+                className="w-full py-2 text-xs text-stone-600 hover:text-amber-400 transition-colors"
+              >
+                Skip editing — go straight to post →
+              </button>
+            </div>
           </div>
         )}
 
