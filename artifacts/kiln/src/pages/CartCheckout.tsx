@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Check, Package, ArrowRight, Truck, ShieldCheck,
-  ExternalLink, MessageCircle, Info, CreditCard, Gift, AlertTriangle,
+  ExternalLink, MessageCircle, Info, CreditCard, Gift, AlertTriangle, Clock,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
@@ -122,6 +122,7 @@ export default function CartCheckout() {
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
+  const [redirectingToStripe, setRedirectingToStripe] = useState(false);
 
   const isDomestic = addr.country === "US";
 
@@ -288,29 +289,45 @@ export default function CartCheckout() {
             })),
           }));
         } catch {}
+        // Extract processing window from checkout response (both manual-payout and Connect)
+        const pwDays = typeof data.processingWindowDays === "number" ? data.processingWindowDays : null;
+        const pwLabel = typeof data.processingWindowLabel === "string" && data.processingWindowLabel.trim()
+          ? data.processingWindowLabel.trim()
+          : null;
+        // Show processing window in sidebar before any redirect
+        setProcessingWindowDays(pwDays);
+        setProcessingWindowLabel(pwLabel);
+
         if (data.manualPayout) {
           setPendingCheckoutUrl(data.url);
           setManualPayoutWarning(true);
-          setProcessingWindowDays(typeof data.processingWindowDays === "number" ? data.processingWindowDays : null);
-          setProcessingWindowLabel(typeof data.processingWindowLabel === "string" && data.processingWindowLabel.trim() ? data.processingWindowLabel.trim() : null);
           setCheckingOut(false);
         } else {
           // Persist processing window to localStorage so CartSuccess can display it
           // immediately after the Stripe redirect, before the /api/me/orders/bulk
           // response comes back (same pattern as manual-payout orders).
           try {
-            if (typeof data.processingWindowDays === "number") {
-              localStorage.setItem("kiln_processing_window", String(data.processingWindowDays));
+            if (pwDays !== null) {
+              localStorage.setItem("kiln_processing_window", String(pwDays));
             } else {
               localStorage.removeItem("kiln_processing_window");
             }
-            if (typeof data.processingWindowLabel === "string" && data.processingWindowLabel.trim()) {
-              localStorage.setItem("kiln_processing_window_label", data.processingWindowLabel.trim());
+            if (pwLabel !== null) {
+              localStorage.setItem("kiln_processing_window_label", pwLabel);
             } else {
               localStorage.removeItem("kiln_processing_window_label");
             }
           } catch {}
-          window.location.href = data.url;
+          // Show the "redirecting" spinner in place of the pay button; keep step="address"
+          // so the sidebar stays visible and displays the processing window.
+          // We intentionally do NOT call setStep("pay") here because that triggers an
+          // unrelated useEffect that fetches artist payment settings for the legacy manual flow.
+          setRedirectingToStripe(true);
+          setCheckingOut(false);
+          // Brief pause when there's a processing window to show so the sidebar renders it
+          // before the buyer lands on Stripe; redirect immediately when there's nothing to show.
+          const redirectDelay = (pwDays !== null || pwLabel !== null) ? 1500 : 0;
+          setTimeout(() => { window.location.href = data.url; }, redirectDelay);
         }
       } else {
         if (data.code === "no_payout_method") {
@@ -558,6 +575,15 @@ export default function CartCheckout() {
                             <MessageCircle size={14} /> Contact {noPayoutMethodCount > 1 ? "artists" : "artist"}
                           </button>
                         </div>
+                      </motion.div>
+                    ) : redirectingToStripe ? (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="mt-2 flex flex-col items-center gap-3 py-6"
+                      >
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500" />
+                        <p className="text-stone-400 text-xs">Redirecting to secure checkout…</p>
                       </motion.div>
                     ) : (
                       <>
@@ -843,6 +869,21 @@ export default function CartCheckout() {
                     <span>Total</span><span>${total.toFixed(2)}</span>
                   </div>
                 </div>
+                {(processingWindowLabel !== null || processingWindowDays !== null) && (
+                  <div className="border-t border-white/8 pt-3 flex items-start gap-2">
+                    <Clock size={12} className="text-amber-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 mb-0.5">Processing time</p>
+                      <p className="text-xs text-amber-300">
+                        {processingWindowLabel
+                          ? processingWindowLabel
+                          : processingWindowDays === 1
+                            ? "1 business day"
+                            : `${processingWindowDays} business days`}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
