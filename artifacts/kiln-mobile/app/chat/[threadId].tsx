@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { apiGet, apiPost, relativeTime } from "@/lib/api";
+import { useWebSocket, type TypingEvent } from "@/lib/useWebSocket";
 
 interface ThreadInfo {
   id: string;
@@ -37,6 +39,42 @@ interface Message {
   createdAt: string;
 }
 
+function BouncingDots({ color }: { color: string }) {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const bounce = (anim: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: -5, duration: 250, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.delay(500),
+        ])
+      );
+    const a1 = bounce(dot1, 0);
+    const a2 = bounce(dot2, 150);
+    const a3 = bounce(dot3, 300);
+    a1.start();
+    a2.start();
+    a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View style={styles.dotsRow}>
+      {[dot1, dot2, dot3].map((anim, i) => (
+        <Animated.View
+          key={i}
+          style={[styles.dot, { backgroundColor: color, transform: [{ translateY: anim }] }]}
+        />
+      ))}
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -46,7 +84,28 @@ export default function ChatScreen() {
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   const flatRef = useRef<FlatList>(null);
+  const typingDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+
+  useWebSocket({
+    onTyping: useCallback(
+      (evt: TypingEvent) => {
+        if (evt.threadId !== threadId) return;
+        setOtherUserTyping(true);
+        if (typingDismissRef.current) clearTimeout(typingDismissRef.current);
+        typingDismissRef.current = setTimeout(() => setOtherUserTyping(false), 3000);
+      },
+      [threadId]
+    ),
+  });
+
+  useEffect(() => {
+    return () => {
+      if (typingDismissRef.current) clearTimeout(typingDismissRef.current);
+    };
+  }, []);
 
   const queryKey = ["thread", threadId];
 
@@ -66,6 +125,22 @@ export default function ChatScreen() {
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
     }
   }, [messages.length]);
+
+  const sendTypingSignal = useCallback(() => {
+    if (!threadId || threadId === "inbox") return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < 1000) return;
+    lastTypingSentRef.current = now;
+    void apiPost("/api/messages/typing", { threadId });
+  }, [threadId]);
+
+  const handleDraftChange = useCallback(
+    (text: string) => {
+      setDraft(text);
+      if (text) sendTypingSignal();
+    },
+    [sendTypingSignal]
+  );
 
   const handleSend = useCallback(async () => {
     if (!draft.trim() || !thread?.otherUserId || sending) return;
@@ -160,6 +235,13 @@ export default function ChatScreen() {
               <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>No messages yet</Text>
             </View>
           }
+          ListFooterComponent={
+            otherUserTyping ? (
+              <View style={[styles.typingBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <BouncingDots color={colors.mutedForeground} />
+              </View>
+            ) : null
+          }
         />
       )}
 
@@ -174,7 +256,7 @@ export default function ChatScreen() {
           placeholder="Message…"
           placeholderTextColor={colors.mutedForeground}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={handleDraftChange}
           multiline
           returnKeyType="send"
           onSubmitEditing={handleSend}
@@ -253,5 +335,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 1,
+  },
+  typingBubble: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderBottomLeftRadius: 4,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  dotsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 21,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
 });

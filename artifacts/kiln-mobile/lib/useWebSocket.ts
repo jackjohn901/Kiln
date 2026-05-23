@@ -8,8 +8,14 @@ export interface SaleEvent {
   fromName: string;
 }
 
+export interface TypingEvent {
+  threadId: string;
+  userId: string;
+}
+
 interface UseWebSocketOptions {
   onSaleNotification?: (evt: SaleEvent) => void;
+  onTyping?: (evt: TypingEvent) => void;
 }
 
 export function useWebSocket(options?: UseWebSocketOptions) {
@@ -18,6 +24,8 @@ export function useWebSocket(options?: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const onSaleRef = useRef(options?.onSaleNotification);
   onSaleRef.current = options?.onSaleNotification;
+  const onTypingRef = useRef(options?.onTyping);
+  onTypingRef.current = options?.onTyping;
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -62,6 +70,11 @@ export function useWebSocket(options?: UseWebSocketOptions) {
             case "message":
               queryClient.invalidateQueries({ queryKey: ["message-threads"] });
               queryClient.invalidateQueries({ queryKey: ["messages", data.threadId] });
+              break;
+            case "typing":
+              if (onTypingRef.current) {
+                onTypingRef.current({ threadId: data.threadId as string, userId: data.userId as string });
+              }
               break;
           }
         } catch {
