@@ -89,6 +89,8 @@ export default function CreateListing() {
   const [cropPreview, setCropPreview] = useState("");
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [bgPreview, setBgPreview] = useState("");
+  const [wmFile, setWmFile] = useState<File | null>(null);
+  const [wmPreview, setWmPreview] = useState("");
   const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
   const [filterCss, setFilterCss] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -128,7 +130,7 @@ export default function CreateListing() {
     setSubmitting(true);
     try {
       let imageUrl = form.imageUrl;
-      const fileToUpload = bgFile ?? cropFile ?? imageFile;
+      const fileToUpload = bgFile ?? wmFile ?? cropFile ?? imageFile;
       if (fileToUpload) {
         try {
           const r = await upload(fileToUpload);
@@ -247,12 +249,13 @@ export default function CreateListing() {
                   </button>
                 </div>
                 <ImageEditPanel
-                  previewUrl={bgPreview || cropPreview || imagePreview}
+                  previewUrl={bgPreview || wmPreview || cropPreview || imagePreview}
                   sourceFile={cropFile ?? imageFile}
                   onFilterChange={(s, css) => { setFilterSettings(s); setFilterCss(css); }}
-                  onCrop={(url, f) => { setCropPreview(url); setCropFile(f); setBgFile(null); setBgPreview(""); }}
+                  onCrop={(url, f) => { setCropPreview(url); setCropFile(f); setBgFile(null); setBgPreview(""); setWmFile(null); setWmPreview(""); }}
                   onBgResult={(url, f) => { setBgPreview(url); setBgFile(f); }}
                   onBgReset={() => { setBgPreview(""); setBgFile(null); }}
+                  onWatermark={(url, f) => { setWmPreview(url); setWmFile(f); }}
                 />
               </div>
             ) : (

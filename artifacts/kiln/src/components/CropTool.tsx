@@ -9,6 +9,13 @@ const RATIOS = [
   { label: "16:9", v: 16 / 9 },
 ];
 
+const PAD_COLORS: { label: string; value: "black" | "white" | "blur" | "amber" }[] = [
+  { label: "Black", value: "black" },
+  { label: "White", value: "white" },
+  { label: "Blur",  value: "blur"  },
+  { label: "Sand",  value: "amber" },
+];
+
 interface Crop { x: number; y: number; w: number; h: number }
 interface Props {
   src: string;
@@ -26,6 +33,8 @@ const HANDLES = [
   { id: "w",  style: { top: "50%", left: -7, marginTop: -7 } },
   { id: "e",  style: { top: "50%", right: -7, marginTop: -7 } },
 ];
+
+type Mode = "crop" | "fit";
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
@@ -45,14 +54,19 @@ export default function CropTool({ src, onApply, onCancel }: Props) {
   const contRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ handle: string; ox: number; oy: number; sc: Crop } | null>(null);
 
-  const [rotation, setRotation] = useState(0);
-  const [aspect,   setAspect]   = useState<number | null>(1);
-  const [crop,     setCrop]     = useState<Crop>({ x: 0, y: 0, w: 1, h: 1 });
-  const [applying, setApplying] = useState(false);
+  const [mode,          setMode]         = useState<Mode>("crop");
+  const [rotation,      setRotation]     = useState(0);       // 90° steps
+  const [fineTune,      setFineTune]     = useState(0);       // ±20° fine
+  const [aspect,        setAspect]       = useState<number | null>(1);
+  const [crop,          setCrop]         = useState<Crop>({ x: 0, y: 0, w: 1, h: 1 });
+  const [padColor,      setPadColor]     = useState<"black" | "white" | "blur" | "amber">("black");
+  const [applying,      setApplying]     = useState(false);
+
+  const totalAngle = rotation + fineTune;
 
   useEffect(() => {
-    if (aspect !== null) setCrop(makeCenteredCrop(aspect));
-  }, [aspect]);
+    if (aspect !== null && mode === "crop") setCrop(makeCenteredCrop(aspect));
+  }, [aspect, mode]);
 
   const onPtrDown = useCallback(
     (e: React.PointerEvent, handle: string) => {
@@ -78,9 +92,9 @@ export default function CropTool({ src, onApply, onCancel }: Props) {
       if (!d) return;
       const cont = contRef.current;
       if (!cont) return;
-      const r   = cont.getBoundingClientRect();
-      const dx  = (e.clientX - r.left) / r.width  - d.ox;
-      const dy  = (e.clientY - r.top)  / r.height - d.oy;
+      const r  = cont.getBoundingClientRect();
+      const dx = (e.clientX - r.left) / r.width  - d.ox;
+      const dy = (e.clientY - r.top)  / r.height - d.oy;
       const { handle: h, sc } = d;
 
       let { x, y, w, hgt: hg } = { ...sc, hgt: sc.h };
@@ -126,12 +140,13 @@ export default function CropTool({ src, onApply, onCancel }: Props) {
     try {
       const iw = img.naturalWidth;
       const ih = img.naturalHeight;
-      const rad     = (rotation * Math.PI) / 180;
-      const absCos  = Math.abs(Math.cos(rad));
-      const absSin  = Math.abs(Math.sin(rad));
+      const rad    = (totalAngle * Math.PI) / 180;
+      const absCos = Math.abs(Math.cos(rad));
+      const absSin = Math.abs(Math.sin(rad));
       const rw = Math.round(iw * absCos + ih * absSin);
       const rh = Math.round(iw * absSin + ih * absCos);
 
+      // Rotate source onto temp canvas
       const tmp = document.createElement("canvas");
       tmp.width = rw; tmp.height = rh;
       const tCtx = tmp.getContext("2d")!;
@@ -139,33 +154,85 @@ export default function CropTool({ src, onApply, onCancel }: Props) {
       tCtx.rotate(rad);
       tCtx.drawImage(img, -iw / 2, -ih / 2);
 
-      const cx = Math.round(crop.x * rw);
-      const cy = Math.round(crop.y * rh);
-      const cw = Math.max(1, Math.round(crop.w * rw));
-      const ch = Math.max(1, Math.round(crop.h * rh));
+      let out: HTMLCanvasElement;
 
-      const out = document.createElement("canvas");
-      out.width = cw; out.height = ch;
-      out.getContext("2d")!.drawImage(tmp, cx, cy, cw, ch, 0, 0, cw, ch);
+      if (mode === "fit") {
+        // Letterbox: pick target aspect ratio
+        const targetAr = aspect ?? 1;
+        const fitW = Math.round(rh * targetAr);
+        const fitH = rh;
+        out = document.createElement("canvas");
+        out.width  = fitW;
+        out.height = fitH;
+        const oCtx = out.getContext("2d")!;
+
+        // Fill background
+        if (padColor === "white") {
+          oCtx.fillStyle = "#ffffff";
+          oCtx.fillRect(0, 0, fitW, fitH);
+        } else if (padColor === "amber") {
+          oCtx.fillStyle = "#1c1710";
+          oCtx.fillRect(0, 0, fitW, fitH);
+        } else if (padColor === "blur") {
+          // Draw blurred version of the rotated image as background
+          oCtx.filter = "blur(20px)";
+          const scale = Math.max(fitW / rw, fitH / rh) * 1.2;
+          const bw = rw * scale, bh = rh * scale;
+          oCtx.drawImage(tmp, (fitW - bw) / 2, (fitH - bh) / 2, bw, bh);
+          oCtx.filter = "none";
+        } else {
+          oCtx.fillStyle = "#000000";
+          oCtx.fillRect(0, 0, fitW, fitH);
+        }
+
+        // Draw the rotated image centered (object-fit: contain)
+        const scale = Math.min(fitW / rw, fitH / rh);
+        const dw = rw * scale, dh = rh * scale;
+        oCtx.drawImage(tmp, (fitW - dw) / 2, (fitH - dh) / 2, dw, dh);
+      } else {
+        // Crop mode
+        const cx = Math.round(crop.x * rw);
+        const cy = Math.round(crop.y * rh);
+        const cw = Math.max(1, Math.round(crop.w * rw));
+        const ch = Math.max(1, Math.round(crop.h * rh));
+        out = document.createElement("canvas");
+        out.width = cw; out.height = ch;
+        out.getContext("2d")!.drawImage(tmp, cx, cy, cw, ch, 0, 0, cw, ch);
+      }
 
       const blob = await new Promise<Blob>((res, rej) =>
         out.toBlob((b) => (b ? res(b) : rej(new Error("toBlob failed"))), "image/jpeg", 0.92),
       );
-      const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+      const file = new File([blob], mode === "fit" ? "letterbox.jpg" : "cropped.jpg", { type: "image/jpeg" });
       onApply(URL.createObjectURL(blob), file);
     } finally {
       setApplying(false);
     }
   }
 
+  const showFineTuneHint = fineTune !== 0;
+
   return (
     <div className="flex flex-col gap-3">
+      {/* Mode toggle */}
+      <div className="flex gap-1 rounded-xl border border-white/8 bg-stone-900/60 p-1">
+        {(["crop", "fit"] as Mode[]).map((m) => (
+          <button key={m} type="button" onClick={() => setMode(m)}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-all ${
+              mode === m ? "bg-stone-700 text-white shadow-sm" : "text-stone-500 hover:text-stone-300"
+            }`}>
+            {m === "crop" ? "✂ Crop" : "⊡ Letterbox"}
+          </button>
+        ))}
+      </div>
+
+      {/* Preview container */}
       <div
         ref={contRef}
         className="relative w-full aspect-square overflow-hidden rounded-xl bg-black select-none touch-none"
-        onPointerMove={onPtrMove}
-        onPointerUp={onPtrUp}
-        onPointerCancel={onPtrUp}
+        onPointerMove={mode === "crop" ? onPtrMove : undefined}
+        onPointerUp={mode === "crop" ? onPtrUp : undefined}
+        onPointerCancel={mode === "crop" ? onPtrUp : undefined}
       >
         <img
           ref={imgRef}
@@ -173,109 +240,117 @@ export default function CropTool({ src, onApply, onCancel }: Props) {
           alt="Crop preview"
           crossOrigin="anonymous"
           draggable={false}
-          className="absolute inset-0 h-full w-full object-contain"
-          style={{ transform: `rotate(${rotation}deg)`, transformOrigin: "center" }}
-        />
-
-        {/* Dark mask outside crop box using two gradient overlays */}
-        <div
-          className="absolute inset-0 pointer-events-none bg-black/55"
+          className="absolute inset-0 h-full w-full"
           style={{
-            clipPath: `polygon(
-              0% 0%, 100% 0%, 100% 100%, 0% 100%,
-              0% ${crop.y * 100}%,
-              ${crop.x * 100}% ${crop.y * 100}%,
-              ${crop.x * 100}% ${(crop.y + crop.h) * 100}%,
-              ${(crop.x + crop.w) * 100}% ${(crop.y + crop.h) * 100}%,
-              ${(crop.x + crop.w) * 100}% ${crop.y * 100}%,
-              0% ${crop.y * 100}%
-            )`,
+            objectFit: mode === "fit" ? "contain" : "contain",
+            transform: `rotate(${totalAngle}deg)`,
+            transformOrigin: "center",
           }}
         />
 
-        {/* Crop box */}
-        <div
-          className="absolute border-2 border-white/90 cursor-move"
-          style={{
-            left:   `${crop.x * 100}%`,
-            top:    `${crop.y * 100}%`,
-            width:  `${crop.w * 100}%`,
-            height: `${crop.h * 100}%`,
-          }}
-          onPointerDown={(e) => onPtrDown(e, "move")}
-        >
-          {/* Rule-of-thirds grid */}
-          {[33.3, 66.6].map((p) => (
-            <div key={`v${p}`} className="absolute top-0 bottom-0 w-px bg-white/20" style={{ left: `${p}%` }} />
-          ))}
-          {[33.3, 66.6].map((p) => (
-            <div key={`h${p}`} className="absolute left-0 right-0 h-px bg-white/20" style={{ top: `${p}%` }} />
-          ))}
-
-          {/* Resize handles */}
-          {HANDLES.map(({ id, style }) => (
-            <div
-              key={id}
-              className="absolute h-3.5 w-3.5 rounded-full bg-white shadow-md cursor-pointer"
-              style={style as React.CSSProperties}
-              onPointerDown={(e) => onPtrDown(e, id)}
+        {mode === "crop" && (
+          <>
+            {/* Dark overlay mask */}
+            <div className="absolute inset-0 pointer-events-none bg-black/55"
+              style={{
+                clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% ${crop.y * 100}%, ${crop.x * 100}% ${crop.y * 100}%, ${crop.x * 100}% ${(crop.y + crop.h) * 100}%, ${(crop.x + crop.w) * 100}% ${(crop.y + crop.h) * 100}%, ${(crop.x + crop.w) * 100}% ${crop.y * 100}%, 0% ${crop.y * 100}%)`,
+              }}
             />
-          ))}
-        </div>
+            {/* Crop box */}
+            <div
+              className="absolute border-2 border-white/90 cursor-move"
+              style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.w * 100}%`, height: `${crop.h * 100}%` }}
+              onPointerDown={(e) => onPtrDown(e, "move")}
+            >
+              {[33.3, 66.6].map((p) => <div key={`v${p}`} className="absolute top-0 bottom-0 w-px bg-white/20" style={{ left: `${p}%` }} />)}
+              {[33.3, 66.6].map((p) => <div key={`h${p}`} className="absolute left-0 right-0 h-px bg-white/20" style={{ top: `${p}%` }} />)}
+              {HANDLES.map(({ id, style }) => (
+                <div key={id} className="absolute h-3.5 w-3.5 rounded-full bg-white shadow-md cursor-pointer"
+                  style={style as React.CSSProperties} onPointerDown={(e) => onPtrDown(e, id)} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {mode === "fit" && (
+          <div className="absolute inset-x-0 bottom-2 flex justify-center">
+            <div className="rounded-full bg-black/50 px-2.5 py-1 text-[10px] text-stone-400">
+              Letterbox preview
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Aspect ratio + rotation */}
+      {/* Aspect ratio + 90° rotation */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-1.5 flex-wrap">
           {RATIOS.map(({ label, v }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setAspect(v)}
+            <button key={label} type="button" onClick={() => setAspect(v)}
               className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                aspect === v
-                  ? "bg-amber-500 text-black"
-                  : "bg-stone-800 text-stone-400 hover:text-white"
-              }`}
-            >
+                aspect === v ? "bg-amber-500 text-black" : "bg-stone-800 text-stone-400 hover:text-white"
+              }`}>
               {label}
             </button>
           ))}
         </div>
         <div className="flex gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
-            className="rounded-lg bg-stone-800 p-2 text-stone-400 hover:text-white transition-colors"
-          >
+          <button type="button" onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
+            className="rounded-lg bg-stone-800 p-2 text-stone-400 hover:text-white transition-colors">
             <RotateCcw size={14} />
           </button>
-          <button
-            type="button"
-            onClick={() => setRotation((r) => (r + 90) % 360)}
-            className="rounded-lg bg-stone-800 p-2 text-stone-400 hover:text-white transition-colors"
-          >
+          <button type="button" onClick={() => setRotation((r) => (r + 90) % 360)}
+            className="rounded-lg bg-stone-800 p-2 text-stone-400 hover:text-white transition-colors">
             <RotateCw size={14} />
           </button>
         </div>
       </div>
 
+      {/* Fine-tune rotation */}
+      <div className="rounded-xl border border-white/8 bg-stone-900/40 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-stone-500">Straighten</span>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs tabular-nums ${showFineTuneHint ? "text-amber-400" : "text-stone-600"}`}>
+              {fineTune > 0 ? `+${fineTune}°` : `${fineTune}°`}
+            </span>
+            {showFineTuneHint && (
+              <button type="button" onClick={() => setFineTune(0)} className="text-[10px] text-stone-500 hover:text-stone-300">Reset</button>
+            )}
+          </div>
+        </div>
+        <input type="range" min={-20} max={20} step={0.5} value={fineTune}
+          onChange={(e) => setFineTune(Number(e.target.value))} className="w-full accent-amber-400" />
+        <div className="flex justify-between text-[10px] text-stone-600">
+          <span>−20°</span><span>−10°</span><span>0°</span><span>+10°</span><span>+20°</span>
+        </div>
+      </div>
+
+      {/* Letterbox pad color */}
+      {mode === "fit" && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-stone-500 shrink-0">Background</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {PAD_COLORS.map(({ label, value }) => (
+              <button key={value} type="button" onClick={() => setPadColor(value)}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  padColor === value ? "bg-amber-500 text-black" : "bg-stone-800 text-stone-400 hover:text-white"
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Apply / Cancel */}
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-stone-400 hover:text-white transition-colors"
-        >
+        <button type="button" onClick={onCancel}
+          className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm text-stone-400 hover:text-white transition-colors">
           Cancel
         </button>
-        <button
-          type="button"
-          onClick={apply}
-          disabled={applying}
-          className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-black hover:bg-amber-400 transition-colors disabled:opacity-50"
-        >
-          {applying ? "Applying…" : "Apply crop"}
+        <button type="button" onClick={apply} disabled={applying}
+          className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-black hover:bg-amber-400 transition-colors disabled:opacity-50">
+          {applying ? "Applying…" : mode === "fit" ? "Apply letterbox" : "Apply crop"}
         </button>
       </div>
     </div>

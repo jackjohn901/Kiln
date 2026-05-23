@@ -78,6 +78,8 @@ export default function Create() {
   const [bgPreview, setBgPreview] = useState("");
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropPreview, setCropPreview] = useState("");
+  const [wmFile, setWmFile] = useState<File | null>(null);
+  const [wmPreview, setWmPreview] = useState("");
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
   const [filterCss, setFilterCss] = useState("");
@@ -313,8 +315,8 @@ export default function Create() {
         }
       } else if (file) {
         // Images: prefer bg-removed file if available, then try server upload
-        const imgFile = bgFile ?? cropFile ?? file;
-        if (bgPreview || cropPreview) mediaUrl = bgPreview || cropPreview;
+        const imgFile = bgFile ?? wmFile ?? cropFile ?? file;
+        if (bgPreview || wmPreview || cropPreview) mediaUrl = bgPreview || wmPreview || cropPreview;
         try {
           const result = await upload(imgFile);
           mediaUrl = result.servingUrl;
@@ -622,12 +624,13 @@ export default function Create() {
           <div className="space-y-4">
             {mediaType === "image" ? (
               <ImageEditPanel
-                previewUrl={bgPreview || cropPreview || previewUrl}
+                previewUrl={bgPreview || wmPreview || cropPreview || previewUrl}
                 sourceFile={cropFile ?? file}
                 onFilterChange={(s, css) => { setFilterSettings(s); setFilterCss(css); }}
-                onCrop={(url, f) => { setCropPreview(url); setCropFile(f); setBgFile(null); setBgPreview(""); }}
+                onCrop={(url, f) => { setCropPreview(url); setCropFile(f); setBgFile(null); setBgPreview(""); setWmFile(null); setWmPreview(""); }}
                 onBgResult={(url, f) => { setBgPreview(url); setBgFile(f); }}
                 onBgReset={() => { setBgPreview(""); setBgFile(null); }}
+                onWatermark={(url, f) => { setWmPreview(url); setWmFile(f); }}
               />
             ) : (
               <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
