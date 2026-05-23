@@ -17,12 +17,25 @@ async function initStripe() {
     logger.warn("DATABASE_URL not set — skipping Stripe initialization");
     return;
   }
+
   try {
     logger.info("Initializing Stripe schema...");
     await runMigrations({ databaseUrl });
     logger.info("Stripe schema ready");
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "Stripe init skipped — connect integration to enable payments");
+    return;
+  }
 
-    const stripeSync = await getStripeSync();
+  let stripeSync: Awaited<ReturnType<typeof getStripeSync>>;
+  try {
+    stripeSync = await getStripeSync();
+  } catch (err: any) {
+    logger.warn({ err: err.message }, "Stripe init skipped — connect integration to enable payments");
+    return;
+  }
+
+  try {
     const webhookBase = process.env.REPLIT_DOMAINS
       ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
       : "";
@@ -30,10 +43,14 @@ async function initStripe() {
       await stripeSync.findOrCreateManagedWebhook(`${webhookBase}/api/stripe/webhook`);
       logger.info("Stripe webhook configured");
     }
-    stripeSync.syncBackfill().catch((err) => logger.error({ err }, "Stripe backfill error"));
   } catch (err: any) {
-    logger.warn({ err: err.message }, "Stripe init skipped — connect integration to enable payments");
+    logger.warn(
+      { err: err.message },
+      "Stripe webhook registration failed — payments will still work if the webhook was previously registered",
+    );
   }
+
+  stripeSync.syncBackfill().catch((err) => logger.error({ err }, "Stripe backfill error"));
 }
 
 const rawPort = process.env["PORT"];
