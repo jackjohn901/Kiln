@@ -297,6 +297,7 @@ interface SocialContextType extends SocialState {
   getThread: (participantId: string) => MessageThread | undefined;
   unreadMessageCount: number;
   markThreadRead: (threadId: string) => void;
+  refreshUnreadMessageCount: () => void;
   quoteInquiry: (id: string, quote: CommissionQuote) => void;
   addReview: (review: Omit<ShopReview, "id" | "createdAt">) => void;
   getReviews: (listingId: string) => ShopReview[];
@@ -442,8 +443,20 @@ function genId(): string {
 
 export function SocialProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SocialState>(readState);
+  const [apiUnreadMessageCount, setApiUnreadMessageCount] = useState<number | null>(null);
   const { isAuthenticated } = useAuth();
   const { subscribe: wsSubscribe } = useWebSocket();
+
+  const fetchUnreadMessageCount = useCallback(() => {
+    fetch("/api/messages/unread-count", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { unreadCount?: number } | null) => {
+        if (data && typeof data.unreadCount === "number") {
+          setApiUnreadMessageCount(data.unreadCount);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   function update(updater: (prev: SocialState) => SocialState) {
     setState((prev) => {
@@ -452,6 +465,23 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }
+
+  // Fetch real unread message count on login
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setApiUnreadMessageCount(null);
+      return;
+    }
+    fetchUnreadMessageCount();
+  }, [isAuthenticated, fetchUnreadMessageCount]);
+
+  // Refresh unread message count when an incoming message WebSocket event arrives
+  useEffect(() => {
+    const unsub = wsSubscribe("message", () => {
+      fetchUnreadMessageCount();
+    });
+    return unsub;
+  }, [wsSubscribe, fetchUnreadMessageCount]);
 
   // Sync from server on login: load real following IDs + notifications
   useEffect(() => {
@@ -791,7 +821,9 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         t.id === threadId ? { ...t, messages: t.messages.map((m) => ({ ...m, read: true })) } : t
       ),
     }));
-  }, []);
+    // Refresh API count so the nav badge reflects the change immediately
+    fetchUnreadMessageCount();
+  }, [fetchUnreadMessageCount]);
 
   const quoteInquiry = useCallback((id: string, quote: CommissionQuote) => {
     fetch(`/api/commissions/${id}`, {
@@ -826,10 +858,12 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const unreadCount = state.notifications.filter((n) => !n.read).length;
   const unreadWorkshopCount = state.notifications.filter((n) => !n.read && n.type === "workshop_booking").length;
   const unreadCommissionPaymentCount = state.notifications.filter((n) => !n.read && n.type === "commission_payment").length;
-  const unreadMessageCount = state.threads.reduce(
+  // Prefer the server-sourced count when authenticated; fall back to local seed thread count otherwise
+  const localUnreadMessageCount = state.threads.reduce(
     (sum, t) => sum + t.messages.filter((m) => !m.read && m.senderId !== "__current_user__").length,
     0
   );
+  const unreadMessageCount = apiUnreadMessageCount !== null ? apiUnreadMessageCount : localUnreadMessageCount;
 
   return (
     <SocialContext.Provider
@@ -868,6 +902,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         getThread,
         unreadMessageCount,
         markThreadRead,
+        refreshUnreadMessageCount: fetchUnreadMessageCount,
         quoteInquiry,
         addReview,
         getReviews,

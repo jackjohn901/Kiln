@@ -7,6 +7,29 @@ import { broadcast } from "../lib/websocket";
 
 const router = Router();
 
+// GET /messages/unread-count — lightweight total unread message count for the nav badge
+router.get("/messages/unread-count", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
+  try {
+    const threads = await db.select({ id: messageThreadsTable.id }).from(messageThreadsTable)
+      .where(or(eq(messageThreadsTable.participantA, userId), eq(messageThreadsTable.participantB, userId)));
+
+    let total = 0;
+    for (const t of threads) {
+      const unread = await db.select({ id: messagesTable.id }).from(messagesTable)
+        .where(and(eq(messagesTable.threadId, t.id), eq(messagesTable.read, false), ne(messagesTable.senderId, userId)));
+      total += unread.length;
+    }
+
+    res.json({ unreadCount: total });
+  } catch (err) {
+    req.log.error({ err }, "unreadMessageCount error");
+    res.status(500).json({ error: "Failed to fetch unread count" });
+  }
+});
+
 // GET /messages/threads
 router.get("/messages/threads", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

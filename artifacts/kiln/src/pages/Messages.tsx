@@ -209,7 +209,7 @@ export default function Messages() {
   const [composeSearch, setComposeSearch] = useState("");
   const params = useParams<{ participantId?: string }>();
   const { profile } = useProfile();
-  const { threads, sendDirectMessage, markThreadRead } = useSocial();
+  const { threads, sendDirectMessage, markThreadRead, refreshUnreadMessageCount } = useSocial();
   const { subscribe } = useWebSocket();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [newMsg, setNewMsg] = useState("");
@@ -324,19 +324,21 @@ export default function Messages() {
             if (Array.isArray(d?.messages)) {
               setApiMessages([...d.messages].reverse());
             }
-            // Zero out unread count for this thread in the sidebar
+            // Zero out unread count for this thread in the sidebar and update nav badge
             setApiThreads(prev =>
               prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t)
             );
+            refreshUnreadMessageCount();
           })
           .catch(() => {});
       } else {
-        // Message arrived in a different thread — refresh thread list so badge updates
+        // Message arrived in a different thread — refresh thread list and nav badge
         void refreshThreads();
+        refreshUnreadMessageCount();
       }
     });
     return unsub;
-  }, [subscribe, refreshThreads]);
+  }, [subscribe, refreshThreads, refreshUnreadMessageCount]);
 
   useEffect(() => {
     if (!activeApiThreadId) return;
@@ -385,6 +387,7 @@ export default function Messages() {
               incoming[incoming.length - 1]?.id !== prev[prev.length - 1]?.id ||
               readChanged
             ) {
+              refreshUnreadMessageCount();
               return incoming;
             }
             return prev;
@@ -396,7 +399,7 @@ export default function Messages() {
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
-  }, [activeApiThreadId]);
+  }, [activeApiThreadId, refreshUnreadMessageCount]);
 
   const filtered = threads.filter((t) => t.participantName.toLowerCase().includes(search.toLowerCase()));
 
@@ -483,6 +486,7 @@ export default function Messages() {
         const d = await r.json() as { messages?: ApiMsg[] };
         setApiMessages([...(d.messages ?? [])].reverse());
         setApiThreads(prev => prev.map(t => t.id === id ? { ...t, unreadCount: 0 } : t));
+        refreshUnreadMessageCount();
       }
     } catch {}
   }
