@@ -370,7 +370,11 @@ export default function Messages() {
     if (!activeApiThreadId) return;
     const interval = setInterval(async () => {
       try {
-        const r = await fetch(`/api/messages/threads/${activeApiThreadId}`, { credentials: "include" });
+        const threadId = activeApiThreadId;
+        const [r] = await Promise.all([
+          fetch(`/api/messages/threads/${threadId}`, { credentials: "include" }),
+          fetch(`/api/messages/threads/${threadId}/read`, { method: "POST", credentials: "include" }),
+        ]);
         if (r.ok) {
           const d = await r.json() as { messages?: ApiMsg[] };
           const incoming = [...(d.messages ?? [])].reverse();
@@ -385,6 +389,9 @@ export default function Messages() {
             }
             return prev;
           });
+          setApiThreads(prev =>
+            prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t)
+          );
         }
       } catch {}
     }, 5000);
