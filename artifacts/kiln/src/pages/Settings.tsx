@@ -946,6 +946,11 @@ export default function Settings() {
                     Orders over ${shipping.freeThreshold.toFixed(0)} qualify for free shipping
                   </p>
                 )}
+                {!shipping.offerFreeShipping && shipping.freeThreshold > 0 && avgListingPrice != null && avgListingPrice < shipping.freeThreshold && (
+                  <p className="text-[10px] text-amber-600/80 mt-1">
+                    Your avg. listing (${avgListingPrice.toFixed(0)}) is below your free-shipping threshold (${shipping.freeThreshold.toFixed(0)})
+                  </p>
+                )}
               </div>
 
               <button
