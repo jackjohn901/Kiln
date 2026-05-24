@@ -275,6 +275,7 @@ export default function NotificationSettingsScreen() {
     apiPatch("/api/me/settings", { contactEmail: trimmed })
       .then(() => {
         if (!mountedRef.current) return;
+        setNotifEmail(trimmed);
         setEmailError(false);
         setEmailSaved(true);
         if (emailSavedTimerRef.current) clearTimeout(emailSavedTimerRef.current);
