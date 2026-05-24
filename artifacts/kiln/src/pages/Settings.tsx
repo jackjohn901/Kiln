@@ -49,7 +49,7 @@ type Section = "notifications" | "privacy" | "display" | "account" | "payments" 
 
 export default function Settings() {
   const { profile, logout } = useProfile();
-  const { settings, settingsLoaded, updateSetting } = useSettings();
+  const { settings, settingsLoaded, updateSetting, patchSettings } = useSettings();
   const search = useSearch();
   const [section, setSection] = useState<Section | null>(() => {
     const params = new URLSearchParams(search);
@@ -72,6 +72,8 @@ export default function Settings() {
   const [address, setAddress] = useState<DefaultShippingAddress>(defaultAddress);
   const [addressSaved, setAddressSaved] = useState(false);
   const [emailPausedAt, setEmailPausedAt] = useState<string | null>(null);
+  const [emailResumeAt, setEmailResumeAt] = useState<string | null>(null);
+  const [snoozePickerOpen, setSnoozePickerOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -88,7 +90,7 @@ export default function Settings() {
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null; notifEmailPausedAt?: string | null }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null; notifEmailPausedAt?: string | null; notifEmailResumeAt?: string | null }> : null)
       .then(data => {
         if (!data) return;
         if (data.shippingSettings && Object.keys(data.shippingSettings).length > 0) {
@@ -105,6 +107,7 @@ export default function Settings() {
           setAddress({ ...defaultAddress(), ...data.defaultShippingAddress });
         }
         setEmailPausedAt(data.notifEmailPausedAt ?? null);
+        setEmailResumeAt(data.notifEmailResumeAt ?? null);
       })
       .catch(() => {});
   }, []);
@@ -116,11 +119,63 @@ export default function Settings() {
         setEmailPausedAt(new Date().toISOString());
       } else {
         setEmailPausedAt(null);
+        setEmailResumeAt(null);
       }
     }
     updateSetting(key);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  }
+
+  // SNOOZE_OPTIONS: label → duration in milliseconds (null = indefinite)
+  const SNOOZE_OPTIONS: { label: string; ms: number | null }[] = [
+    { label: "1 day", ms: 24 * 60 * 60 * 1000 },
+    { label: "3 days", ms: 3 * 24 * 60 * 60 * 1000 },
+    { label: "1 week", ms: 7 * 24 * 60 * 60 * 1000 },
+    { label: "Indefinitely", ms: null },
+  ];
+
+  function applySnooze(ms: number | null) {
+    const resumeAt = ms !== null ? new Date(Date.now() + ms).toISOString() : null;
+    setEmailResumeAt(resumeAt);
+    setEmailPausedAt(new Date().toISOString());
+    setSnoozePickerOpen(false);
+    // Update settings boolean
+    patchSettings({ notif_email_paused: true });
+    // Persist resume timestamp separately
+    fetch("/api/me/settings", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifEmailResumeAt: resumeAt }),
+    }).catch(() => {});
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  function clearSnooze() {
+    setEmailResumeAt(null);
+    setEmailPausedAt(null);
+    setSnoozePickerOpen(false);
+    patchSettings({ notif_email_paused: false });
+    fetch("/api/me/settings", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifEmailResumeAt: null }),
+    }).catch(() => {});
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  function snoozeCountdown(): string | null {
+    if (!emailResumeAt) return null;
+    const ms = new Date(emailResumeAt).getTime() - Date.now();
+    if (ms <= 0) return null;
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    if (hours < 24) return hours <= 1 ? "less than 1 hour" : `${hours} hours`;
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    return days === 1 ? "1 day" : `${days} days`;
   }
 
   function savePhoneNumber(phone: string) {
@@ -188,7 +243,9 @@ export default function Settings() {
     : !contactEmail.trim()
     ? "No email address set"
     : emailPaused
-    ? `Emails globally paused · ${activeEmailCount} type${activeEmailCount === 1 ? "" : "s"} affected`
+    ? emailResumeAt
+      ? (() => { const ms = new Date(emailResumeAt).getTime() - Date.now(); if (ms <= 0) return `Emails snoozed · resuming soon`; const days = Math.ceil(ms / (1000 * 60 * 60 * 24)); return `Emails snoozed · resuming in ${days === 1 ? "1 day" : `${days} days`}`; })()
+      : `Emails paused indefinitely · ${activeEmailCount} type${activeEmailCount === 1 ? "" : "s"} affected`
     : activeEmailCount === 0
     ? "Emails off · push only"
     : `${activeEmailCount} of ${EMAIL_KEYS.length} email types active`;
@@ -374,24 +431,64 @@ export default function Settings() {
                 </div>
               );
             })()}
-            <div className="flex items-center justify-between py-3 border-b border-white/5">
-              <div className="flex-1 min-w-0 pr-4">
-                <p className="text-sm text-stone-200">Pause all email notifications</p>
-                <p className="text-xs text-stone-600 mt-0.5">Mute every notification email in one switch — individual settings are preserved</p>
+            {/* Snooze email notifications row */}
+            <div className="py-3 border-b border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-4">
+                  <p className="text-sm text-stone-200">Snooze all email notifications</p>
+                  <p className="text-xs text-stone-600 mt-0.5">
+                    {settings.notif_email_paused
+                      ? emailResumeAt
+                        ? (() => { const cd = snoozeCountdown(); return cd ? `Resuming in ${cd}` : "Resuming soon…"; })()
+                        : "Paused indefinitely"
+                      : "Auto-resumes after the chosen period"}
+                  </p>
+                </div>
+                {settings.notif_email_paused ? (
+                  <button
+                    onClick={clearSnooze}
+                    className="shrink-0 rounded-full bg-red-500/20 border border-red-500/40 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/30 transition-colors"
+                  >
+                    Resume now
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setSnoozePickerOpen(v => !v)}
+                    className="shrink-0 rounded-full bg-stone-800 border border-white/10 px-3 py-1 text-xs font-medium text-stone-300 hover:bg-stone-700 transition-colors"
+                  >
+                    Snooze
+                  </button>
+                )}
               </div>
-              <button
-                onClick={() => toggle("notif_email_paused")}
-                className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${settings.notif_email_paused ? "bg-red-500" : "bg-stone-700"}`}
-              >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings.notif_email_paused ? "translate-x-5" : "translate-x-0.5"}`} />
-              </button>
+              {/* Snooze duration picker */}
+              {snoozePickerOpen && !settings.notif_email_paused && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {SNOOZE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.label}
+                      onClick={() => applySnooze(opt.ms)}
+                      className="rounded-full bg-stone-800 border border-white/10 px-3 py-1.5 text-xs font-medium text-stone-300 hover:bg-amber-500/20 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setSnoozePickerOpen(false)}
+                    className="rounded-full bg-stone-800/50 border border-white/5 px-3 py-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
             {settings.notif_email_paused && (
               <div className={`flex items-start gap-2 py-2.5 px-3 rounded-xl mb-1 ${contactEmail.trim() ? "bg-amber-500/10 border border-amber-500/20" : "bg-stone-800/50 border border-white/8 opacity-50"}`}>
                 <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${contactEmail.trim() ? "text-amber-400" : "text-stone-500"}`} />
                 <p className={`text-xs ${contactEmail.trim() ? "text-amber-300" : "text-stone-500"}`}>
                   {contactEmail.trim()
-                    ? `Emails are globally paused${emailPausedAt ? ` since ${new Date(emailPausedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(emailPausedAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })}` : ""} — no notifications will be sent even if individual types are enabled below. Flip the switch above to resume.`
+                    ? emailResumeAt
+                      ? `Emails snoozed until ${new Date(emailResumeAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(emailResumeAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })} — no notifications will be sent even if individual types are enabled below.`
+                      : `Emails are paused indefinitely${emailPausedAt ? ` since ${new Date(emailPausedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(emailPausedAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })}` : ""} — click "Resume now" above to re-enable.`
                     : "No email address saved — add one above before pausing has any effect."}
                 </p>
               </div>

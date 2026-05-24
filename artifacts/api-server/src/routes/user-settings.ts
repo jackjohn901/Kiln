@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { userSettingsTable, profilesTable } from "@workspace/db";
+import { isEmailPaused } from "../lib/emailPaused";
 
 import { eq } from "drizzle-orm";
 import { verifyUnsubscribeToken } from "../lib/unsubscribeTokens";
@@ -37,19 +38,52 @@ router.get("/me/settings", async (req, res): Promise<void> => {
       shippingSettings: {},
       paymentSettings: {},
       defaultShippingAddress: null,
+      notifEmailResumeAt: null,
       contactEmail: profile?.contactEmail ?? null,
       phoneNumber: profile?.phoneNumber ?? null,
     });
     return;
   }
-  res.json({ ...row, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null });
+
+  // Auto-clear an expired timed snooze so the client always sees up-to-date state
+  let resolvedRow = row;
+  if (row.notifEmailResumeAt && row.notifEmailResumeAt <= new Date()) {
+    const rowSettings = (row.settings as Record<string, unknown> | null) ?? {};
+    const clearedSettings = { ...rowSettings, notif_email_paused: false };
+    await db.update(userSettingsTable).set({
+      settings: clearedSettings,
+      notifEmailPausedAt: null,
+      notifEmailResumeAt: null,
+    }).where(eq(userSettingsTable.userId, req.user.id)).catch(() => {});
+    resolvedRow = { ...row, settings: clearedSettings, notifEmailPausedAt: null, notifEmailResumeAt: null };
+  }
+
+  res.json({ ...resolvedRow, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null });
 });
 
 // PATCH /me/settings
 router.patch("/me/settings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
-  const { settings, shippingSettings, paymentSettings, contactEmail, phoneNumber, defaultShippingAddress } = req.body;
+  const { settings, shippingSettings, paymentSettings, contactEmail, phoneNumber, defaultShippingAddress, notifEmailResumeAt: rawResumeAt } = req.body;
+
+  // Validate notifEmailResumeAt if provided — must be a future ISO date string or null
+  let notifEmailResumeAtValue: Date | null | undefined;
+  if (rawResumeAt !== undefined) {
+    if (rawResumeAt === null) {
+      notifEmailResumeAtValue = null;
+    } else if (typeof rawResumeAt === "string") {
+      const parsed = new Date(rawResumeAt);
+      if (isNaN(parsed.getTime())) {
+        res.status(400).json({ error: "notifEmailResumeAt must be a valid ISO date string or null" });
+        return;
+      }
+      notifEmailResumeAtValue = parsed;
+    } else {
+      res.status(400).json({ error: "notifEmailResumeAt must be a valid ISO date string or null" });
+      return;
+    }
+  }
 
   // Detect notif_email_paused transitions to set/clear the timestamp
   let notifEmailPausedAtUpdate: { notifEmailPausedAt: Date | null } | undefined;
@@ -65,6 +99,8 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
         }
       } else if (incoming.notif_email_paused === false) {
         notifEmailPausedAtUpdate = { notifEmailPausedAt: null };
+        // Unpausing always clears the snooze resume timestamp too
+        if (notifEmailResumeAtValue === undefined) notifEmailResumeAtValue = null;
       }
     }
   }
@@ -116,6 +152,7 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
       ...(paymentSettings !== undefined && { paymentSettings }),
       ...(defaultShippingAddress !== undefined && { defaultShippingAddress: defaultShippingAddress ?? null }),
       ...notifEmailPausedAtUpdate,
+      ...(notifEmailResumeAtValue !== undefined && { notifEmailResumeAt: notifEmailResumeAtValue }),
     }).where(eq(userSettingsTable.userId, userId)).returning();
     res.json(updated);
   } else {
@@ -126,6 +163,7 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
       paymentSettings: paymentSettings ?? {},
       defaultShippingAddress: defaultShippingAddress ?? null,
       ...(notifEmailPausedAtUpdate?.notifEmailPausedAt !== undefined && { notifEmailPausedAt: notifEmailPausedAtUpdate.notifEmailPausedAt }),
+      ...(notifEmailResumeAtValue !== undefined && notifEmailResumeAtValue !== null && { notifEmailResumeAt: notifEmailResumeAtValue }),
     }).returning();
     res.json(created);
   }

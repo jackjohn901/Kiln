@@ -4,6 +4,7 @@ import {
   postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable,
 } from "@workspace/db";
 import { sendEmail, newCommentEmail, newMentionEmail } from "../lib/email";
+import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
@@ -269,10 +270,10 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
         // Email notification (fire-and-forget)
         Promise.all([
           db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, post.authorId)).limit(1),
-          db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, post.authorId)).limit(1),
+          db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, post.authorId)).limit(1),
         ]).then(([[p], [s]]) => {
-          const emailSettings = s?.settings as Record<string, boolean> | null;
-          const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_comments !== false;
+          const emailSettings = s?.settings as Record<string, unknown> | null;
+          const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_comments !== false;
           if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }).catch(() => {});
         }).catch(() => {});
       }
@@ -313,10 +314,10 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
           const mentionedUserId = mp.userId;
           Promise.all([
             db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, mentionedUserId)).limit(1),
-            db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, mentionedUserId)).limit(1),
+            db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, mentionedUserId)).limit(1),
           ]).then(([[p], [s]]) => {
-            const emailSettings = s?.settings as Record<string, boolean> | null;
-            const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_mentions !== false;
+            const emailSettings = s?.settings as Record<string, unknown> | null;
+            const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_mentions !== false;
             if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: newMentionEmail(authorName, text.trim(), postId) }).catch(() => {});
           }).catch(() => {});
         }

@@ -17,6 +17,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
+import { isEmailPaused } from '../lib/emailPaused';
 import { broadcast } from '../lib/websocket';
 import { getDigitalProduct } from '../lib/digitalProducts';
 import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, newSaleEmail, newWorkshopBookingArtistEmail, workshopBookingEmail, commissionPaymentEmail, type WorkshopCalendarParams } from '../lib/email';
@@ -843,15 +844,15 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   .from(usersTable)
                   .where(eq(usersTable.id, w.artistId))
                   .then((rows) => rows[0] ?? null),
-                db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
                   .from(userSettingsTable)
                   .where(eq(userSettingsTable.userId, w.artistId))
                   .then((rows) => rows[0] ?? null),
               ]);
 
               if (artistUserRow) {
-                const artistSettings = artistSettingsRow?.settings as Record<string, boolean> | null;
-                const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_new_booking !== false;
+                const artistSettings = artistSettingsRow?.settings as Record<string, unknown> | null;
+                const wantsEmail = !isEmailPaused(artistSettings, artistSettingsRow?.notifEmailResumeAt) && artistSettings?.notif_email_new_booking !== false;
                 if (wantsEmail && artistUserRow.email) {
                   const html = newWorkshopBookingArtistEmail(studentName, studentEmail, w.title, amountCents);
                   await sendEmail({
@@ -928,15 +929,15 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                     .from(usersTable)
                     .where(eq(usersTable.id, commission.artistId))
                     .then((rows) => rows[0] ?? null),
-                  db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                  db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
                     .from(userSettingsTable)
                     .where(eq(userSettingsTable.userId, commission.artistId))
                     .then((rows) => rows[0] ?? null),
                 ]);
 
                 if (artistUserRow) {
-                  const artistSettings = artistSettingsRow?.settings as Record<string, boolean> | null;
-                  const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_commission_payment !== false;
+                  const artistSettings = artistSettingsRow?.settings as Record<string, unknown> | null;
+                  const wantsEmail = !isEmailPaused(artistSettings, artistSettingsRow?.notifEmailResumeAt) && artistSettings?.notif_email_commission_payment !== false;
                   if (wantsEmail && artistUserRow.email) {
                     const html = commissionPaymentEmail(
                       commission.clientName,
@@ -1126,13 +1127,13 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                     .from(usersTable)
                     .where(inArray(usersTable.id, artistIds)),
                   db
-                    .select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                    .select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
                     .from(userSettingsTable)
                     .where(inArray(userSettingsTable.userId, artistIds)),
                 ]);
 
                 const artistSettingsMap = new Map(
-                  artistSettingsRows.map((r) => [r.userId, r.settings as Record<string, unknown> | null]),
+                  artistSettingsRows.map((r) => [r.userId, { settings: r.settings as Record<string, unknown> | null, notifEmailResumeAt: r.notifEmailResumeAt }]),
                 );
 
                 const buyerName = session.customer_details?.name ?? '';
@@ -1151,8 +1152,9 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   if (artistItems.length === 0) continue;
 
                   // Send email if the artist has opted in (default: opt-in).
-                  const artistSettings = artistSettingsMap.get(artist.id);
-                  const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_new_sale !== false;
+                  const artistSettingsEntry = artistSettingsMap.get(artist.id);
+                  const artistSettings = artistSettingsEntry?.settings ?? null;
+                  const wantsEmail = !isEmailPaused(artistSettings, artistSettingsEntry?.notifEmailResumeAt) && artistSettings?.notif_email_new_sale !== false;
                   if (wantsEmail && artist.email) {
                     const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
                     await sendEmail({
@@ -1301,13 +1303,13 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   .from(usersTable)
                   .where(inArray(usersTable.id, artistIds)),
                 db
-                  .select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings })
+                  .select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
                   .from(userSettingsTable)
                   .where(inArray(userSettingsTable.userId, artistIds)),
               ]);
 
               const artistSettingsMap = new Map(
-                artistSettingsRows.map((r) => [r.userId, r.settings as Record<string, unknown> | null]),
+                artistSettingsRows.map((r) => [r.userId, { settings: r.settings as Record<string, unknown> | null, notifEmailResumeAt: r.notifEmailResumeAt }]),
               );
 
               const buyerName = session.customer_details?.name ?? '';
@@ -1326,8 +1328,9 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 if (artistItems.length === 0) continue;
 
                 // Respect the artist's email notification preference (default: opt-in).
-                const artistSettings = artistSettingsMap.get(artist.id);
-                const wantsEmail = artistSettings?.notif_email_paused !== true && artistSettings?.notif_email_new_sale !== false;
+                const artistSettingsEntry = artistSettingsMap.get(artist.id);
+                const artistSettings = artistSettingsEntry?.settings ?? null;
+                const wantsEmail = !isEmailPaused(artistSettings, artistSettingsEntry?.notifEmailResumeAt) && artistSettings?.notif_email_new_sale !== false;
                 if (wantsEmail && artist.email) {
                   const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
                   await sendEmail({

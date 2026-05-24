@@ -4,6 +4,7 @@ import { commissionsTable, notificationsTable, usersTable, userSettingsTable } f
 import { eq, or, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { sendEmail, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
+import { isEmailPaused } from "../lib/emailPaused";
 
 const router = Router();
 
@@ -24,10 +25,10 @@ router.post("/commissions", async (req, res): Promise<void> => {
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions/${commission.id}` });
     const [[artistUser], [artistSettings]] = await Promise.all([
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId)),
-      db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, artistId)),
+      db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, artistId)),
     ]);
-    const emailSettings = (artistSettings?.settings as Record<string, boolean> | null);
-    const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_new_commission !== false;
+    const emailSettings = (artistSettings?.settings as Record<string, unknown> | null);
+    const wantsEmail = !isEmailPaused(emailSettings, artistSettings?.notifEmailResumeAt) && emailSettings?.notif_email_new_commission !== false;
     if (wantsEmail && artistUser?.email) {
       sendEmail({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }).catch(() => {});
     }

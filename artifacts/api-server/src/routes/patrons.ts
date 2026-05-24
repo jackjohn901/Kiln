@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable, userSettingsTable } from "@workspace/db";
 import { sendEmail, newPatronEmail } from "../lib/email";
+import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -69,10 +70,10 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
   // Email notification (fire-and-forget)
   Promise.all([
     db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1),
-    db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
+    db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
   ]).then(([[p], [s]]) => {
-    const emailSettings = (s?.settings as Record<string, boolean> | null);
-    const wantsEmail = emailSettings?.notif_email_paused !== true && emailSettings?.notif_email_new_patron !== false;
+    const emailSettings = (s?.settings as Record<string, unknown> | null);
+    const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_new_patron !== false;
     if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }).catch(() => {});
   }).catch(() => {});
 
