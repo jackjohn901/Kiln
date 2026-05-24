@@ -212,6 +212,36 @@ export default function NotificationSettingsScreen() {
     };
   }, []);
 
+  const performSave = useCallback(async () => {
+    try {
+      await apiPatch("/api/me/settings", { settings: latestSettingsRef.current });
+      if (!mountedRef.current) return;
+      setSaveError(false);
+      setSaved(true);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) setSaved(false);
+      }, 1800);
+    } catch {
+      if (!mountedRef.current) return;
+      setSaved(false);
+      setSaveError(true);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) setSaveError(false);
+      }, 3000);
+    }
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+    setSaveError(false);
+    performSave();
+  }, [performSave]);
+
   const scheduleAutoSave = useCallback((nextSettings: NotifSettings) => {
     latestSettingsRef.current = nextSettings;
     hasPendingSaveRef.current = true;
@@ -220,26 +250,9 @@ export default function NotificationSettingsScreen() {
     debounceRef.current = setTimeout(async () => {
       hasPendingSaveRef.current = false;
       debounceRef.current = null;
-      try {
-        await apiPatch("/api/me/settings", { settings: latestSettingsRef.current });
-        if (!mountedRef.current) return;
-        setSaveError(false);
-        setSaved(true);
-        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-        savedTimerRef.current = setTimeout(() => {
-          if (mountedRef.current) setSaved(false);
-        }, 1800);
-      } catch {
-        if (!mountedRef.current) return;
-        setSaved(false);
-        setSaveError(true);
-        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-        errorTimerRef.current = setTimeout(() => {
-          if (mountedRef.current) setSaveError(false);
-        }, 3000);
-      }
+      await performSave();
     }, 400);
-  }, []);
+  }, [performSave]);
 
   const set = (key: keyof NotifSettings) => (value: boolean) => {
     setSaved(false);
@@ -303,6 +316,9 @@ export default function NotificationSettingsScreen() {
           <Animated.View style={{ opacity: errorOpacity, transform: [{ scale: errorScale }], flexDirection: "row", alignItems: "center", gap: 3 }}>
             <Feather name="x" size={14} color="#ef4444" />
             <Text style={[styles.errorLabel, { color: "#ef4444" }]}>Couldn't save</Text>
+            <Pressable onPress={handleRetry} hitSlop={8}>
+              <Text style={[styles.errorLabel, { color: colors.primary }]}> Retry</Text>
+            </Pressable>
           </Animated.View>
         </View>
       </View>
@@ -491,7 +507,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 34, alignItems: "flex-start" },
   headerTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
-  headerRight: { width: 90, alignItems: "flex-end", justifyContent: "center" },
+  headerRight: { width: 120, alignItems: "flex-end", justifyContent: "center" },
   errorLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { padding: 16, gap: 8 },
