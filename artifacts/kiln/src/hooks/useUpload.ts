@@ -49,6 +49,21 @@ export function useUpload() {
       });
       if (!uploadRes.ok) throw new Error("Upload to storage failed");
 
+      // Mark the object as publicly readable so it can be displayed on profiles,
+      // feeds, and to other users. Without this, the GET /storage/objects/* route
+      // returns 403 because objects with no ACL policy are treated as private.
+      // This MUST succeed — otherwise viewers will see broken images and the
+      // caller will silently persist an unreadable URL.
+      const aclRes = await fetch("/api/storage/uploads/make-public", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+      if (!aclRes.ok) {
+        throw new Error("Upload succeeded but the file couldn't be made readable. Please try again.");
+      }
+
       setProgress(100);
       return { servingUrl: `/api/storage${objectPath}`, objectPath };
     } catch (e) {

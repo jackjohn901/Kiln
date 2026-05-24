@@ -108,6 +108,7 @@ export default function Create() {
   const [collaboratorId, setCollaboratorId] = useState("");
   const [isPatronOnly, setIsPatronOnly] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [captionSuggestions, setCaptionSuggestions] = useState<string[]>([]);
@@ -278,6 +279,7 @@ export default function Create() {
       return;
     }
     setPublishing(true);
+    setPublishError(null);
     try {
       let thumbnailUrl: string | undefined;
       let mediaUrl = previewUrl;
@@ -380,13 +382,14 @@ export default function Create() {
       });
       window.dispatchEvent(new CustomEvent("kiln:post-added"));
 
-      // Persist to the real database so the post appears in the global feed
-      fetch("/api/posts", {
+      // Persist to the real database so the post appears in the global feed.
+      // Don't swallow failures silently — surface them so the user knows.
+      const postRes = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          caption: caption || technique,
+          caption: caption || technique || "",
           videoUrl: mediaType === "video" ? mediaUrl : null,
           thumbnailUrl: mediaType === "image" ? mediaUrl : null,
           technique: technique || null,
@@ -398,7 +401,24 @@ export default function Create() {
           collaboratorId: collaboratorId || null,
           collaboratorName: collabArtist || null,
         }),
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error("Failed to save post to server", err);
+        return null;
+      });
+      if (!postRes) {
+        setPublishError("Couldn't reach the server. Check your connection and try again.");
+        return;
+      }
+      if (!postRes.ok) {
+        const errText = await postRes.text().catch(() => "");
+        console.error("Server rejected post", postRes.status, errText);
+        setPublishError(
+          postRes.status === 401
+            ? "Your session expired. Please sign in again."
+            : "We couldn't publish your post. Please try again."
+        );
+        return;
+      }
 
       // Instagram cross-post if enabled and media is server-hosted
       if (crossPost.instagram && mediaUrl && !mediaUrl.startsWith("blob:") && !mediaUrl.startsWith("data:") && !mediaUrl.startsWith("idb:")) {
@@ -416,6 +436,9 @@ export default function Create() {
 
       recordPost();
       setStep("done");
+    } catch (err) {
+      console.error("Publish flow failed", err);
+      setPublishError(err instanceof Error ? err.message : "Something went wrong while publishing. Please try again.");
     } finally {
       setPublishing(false);
     }
@@ -1365,6 +1388,12 @@ export default function Create() {
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+              </div>
+            )}
+
+            {publishError && (
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-sm text-red-300">
+                {publishError}
               </div>
             )}
 

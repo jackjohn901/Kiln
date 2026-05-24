@@ -23,7 +23,13 @@ router.post("/posts", async (req, res): Promise<void> => {
     tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; isDraft?: boolean;
     collaboratorId?: string; collaboratorName?: string;
   };
-  if (!caption) { res.status(400).json({ error: "caption required" }); return; }
+  // Caption is optional, but a post must have *some* content —
+  // either a caption, an image, or a video.
+  const hasContent = (caption && caption.trim()) || thumbnailUrl || videoUrl;
+  if (!hasContent) {
+    res.status(400).json({ error: "Post must include a caption, image, or video" });
+    return;
+  }
 
   const schedDate = scheduledAt ? new Date(scheduledAt) : null;
   const asDraft = isDraft ?? (schedDate ? true : false);
@@ -36,7 +42,7 @@ router.post("/posts", async (req, res): Promise<void> => {
       authorId: user.id,
       authorName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist",
       authorAvatarUrl: user.profileImageUrl ?? null,
-      caption,
+      caption: caption ?? "",
       videoUrl: videoUrl ?? null,
       thumbnailUrl: thumbnailUrl ?? null,
       technique: technique ?? null,
