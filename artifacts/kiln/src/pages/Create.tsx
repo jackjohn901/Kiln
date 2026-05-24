@@ -437,36 +437,15 @@ export default function Create() {
 
   if (step === "done") {
     return (
-      <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="h-20 w-20 overflow-hidden rounded-2xl border border-amber-500/30">
-          {previewUrl && (
-            <img src={previewUrl} alt="" className="h-full w-full object-cover" style={{ filter: filterCss || undefined }} />
-          )}
-        </div>
-        <Check size={40} className="text-amber-400" />
-        <h2 className="font-serif text-2xl text-amber-100">Posted to Kiln</h2>
-        <p className="text-stone-400">Your process is live. Artists and collectors can now discover your work.</p>
-        {/* AI Reel Studio CTA */}
-        <button
-          onClick={() => navigate("/reel-studio")}
-          className="w-full max-w-xs flex items-center gap-3 p-4 rounded-2xl border border-amber-400/30 bg-amber-400/6 hover:bg-amber-400/12 transition-colors text-left"
-        >
-          <div className="h-10 w-10 rounded-xl bg-amber-400/15 flex items-center justify-center shrink-0">
-            <Sparkles size={18} className="text-amber-400" />
+      <div className="min-h-screen bg-[#12100e] flex flex-col">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 pt-6 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500">
+              <Check size={13} className="text-stone-950" />
+            </div>
+            <span className="font-semibold text-amber-100">Posted to Kiln</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-amber-100">Turn it into a cinematic clip</p>
-            <p className="text-xs text-stone-400 mt-0.5">AI Reel Studio — movie trailer, ad, or 7-sec clip</p>
-          </div>
-        </button>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate("/")}
-            className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-          >
-            View Feed
-          </button>
           <button
             onClick={() => {
               setStep("upload");
@@ -476,10 +455,89 @@ export default function Create() {
               setTags([]);
               setSelectedTrack(null);
             }}
-            className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors"
+            className="text-xs text-stone-500 hover:text-stone-300 transition-colors"
           >
-            Post Again
+            Post again
           </button>
+        </div>
+
+        {/* Full post preview — phone frame */}
+        <div className="flex-1 flex flex-col items-center px-4 pb-4">
+          <div className="w-full max-w-sm">
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl" style={{ aspectRatio: "9/16" }}>
+              {previewUrl && (
+                mediaType === "image" ? (
+                  <img src={previewUrl} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ filter: filterCss || undefined }} />
+                ) : (
+                  <video src={previewUrl} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
+                )
+              )}
+              {/* Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-black/25 pointer-events-none" />
+              {/* Right actions */}
+              <div className="absolute right-3 bottom-28 flex flex-col items-center gap-5">
+                {[Heart, MessageCircle, Bookmark, Share2].map((Icon, i) => (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm">
+                      <Icon size={18} className="text-white" />
+                    </div>
+                    {i < 3 && <span className="text-[10px] text-white/60">0</span>}
+                  </div>
+                ))}
+              </div>
+              {/* Bottom info */}
+              <div className="absolute bottom-0 left-0 right-12 p-4 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  {profile?.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover border border-white/20" />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/30 text-xs font-bold text-amber-300">
+                      {profile?.name?.charAt(0) ?? "?"}
+                    </div>
+                  )}
+                  <span className="text-sm font-semibold text-white">@{profile?.handle ?? "you"}</span>
+                </div>
+                {caption ? (
+                  <p className="text-xs text-white/80 leading-relaxed line-clamp-2">{caption}</p>
+                ) : technique ? (
+                  <p className="text-xs text-white/60">{technique}</p>
+                ) : null}
+                {selectedTrack && (
+                  <div className="flex items-center gap-1.5">
+                    <Music size={11} className="text-amber-300 shrink-0" />
+                    <p className="text-[10px] text-white/60 truncate">{selectedTrack.title} — {selectedTrack.artist}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* CTA buttons */}
+          <div className="w-full max-w-sm mt-4 space-y-2.5">
+            {/* Primary — go see the post on profile */}
+            <button
+              onClick={() => navigate(`/artists/${profile?.id}`)}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+            >
+              View on your profile
+            </button>
+
+            {/* Secondary row */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate("/")}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+              >
+                View feed
+              </button>
+              <button
+                onClick={() => navigate("/reel-studio")}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-amber-500/30 py-2.5 text-sm text-amber-300 hover:bg-amber-500/10 transition-colors"
+              >
+                <Sparkles size={13} /> Reel Studio
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
