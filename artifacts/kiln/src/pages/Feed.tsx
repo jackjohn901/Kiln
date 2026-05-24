@@ -6,7 +6,7 @@ import {
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
   SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown, GitBranch,
-  Mic, MicOff, DollarSign, BadgeCheck,
+  Mic, MicOff, DollarSign, BadgeCheck, ArrowUp,
 } from "lucide-react";
 import TipModal from "@/components/TipModal";
 import ReportModal from "@/components/ReportModal";
@@ -852,9 +852,13 @@ export default function Feed() {
   const audioRef        = useRef<HTMLAudioElement | null>(null);
   const beatLooperRef   = useRef<{ stop: () => void } | null>(null);
   const activeReelRef   = useRef<Reel | null>(null);
+  const followingLoadedRef = useRef(false);
+  const followingReelIdsRef = useRef<Set<string>>(new Set());
   const [activeIndex, setActiveIndex] = useState(0);
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
+  const [pendingFollowingReels, setPendingFollowingReels] = useState<Reel[]>([]);
+  const [newFollowingPostCount, setNewFollowingPostCount] = useState(0);
   const [apiPostOffset, setApiPostOffset] = useState(20);
   const [hasMoreApiPosts, setHasMoreApiPosts] = useState(true);
   const [musicMuted, setMusicMuted] = useState(false);
@@ -953,9 +957,47 @@ export default function Feed() {
           artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
           beforeImageUrl: p.beforeImageUrl ?? undefined,
         }));
-        setFollowingApiReels(apiReels);
+        if (!followingLoadedRef.current) {
+          // First load: apply immediately, no pill
+          followingLoadedRef.current = true;
+          followingReelIdsRef.current = new Set(apiReels.map((r) => r.id));
+          setFollowingApiReels(apiReels);
+        } else {
+          // Background refresh: only show pill if there are genuinely new posts
+          const newPosts = apiReels.filter((r) => !followingReelIdsRef.current.has(r.id));
+          if (newPosts.length > 0) {
+            setNewFollowingPostCount(newPosts.length);
+            setPendingFollowingReels(apiReels);
+          }
+        }
       })
       .catch(() => {});
+  }, []);
+
+  // Reset following pill state when leaving the Following tab so next entry is treated as first load
+  useEffect(() => {
+    if (feedTab !== "following") {
+      followingLoadedRef.current = false;
+      followingReelIdsRef.current = new Set();
+      setPendingFollowingReels([]);
+      setNewFollowingPostCount(0);
+    }
+  }, [feedTab]);
+
+  // Apply pending following reels: update feed, scroll to top, clear pill
+  const applyPendingFollowingReels = useCallback(() => {
+    followingReelIdsRef.current = new Set(pendingFollowingReels.map((r) => r.id));
+    setFollowingApiReels(pendingFollowingReels);
+    setPendingFollowingReels([]);
+    setNewFollowingPostCount(0);
+    setActiveIndex(0);
+    containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [pendingFollowingReels]);
+
+  // Dismiss pill: keep current scroll and feed unchanged
+  const dismissPendingFollowingReels = useCallback(() => {
+    setPendingFollowingReels([]);
+    setNewFollowingPostCount(0);
   }, []);
 
   // Fetch on tab switch
@@ -1394,6 +1436,38 @@ export default function Feed() {
       {showNotifications && (
         <NotificationPanel onClose={() => setShowNotifications(false)} />
       )}
+
+      {/* New posts pill — Following tab background refresh */}
+      <AnimatePresence>
+        {feedTab === "following" && newFollowingPostCount > 0 && (
+          <motion.div
+            className="pointer-events-auto absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 overflow-hidden rounded-full border border-amber-500/40 bg-stone-950/90 shadow-xl shadow-black/40 backdrop-blur-md"
+            style={{ top: "170px" }}
+            initial={{ y: -12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          >
+            <button
+              onClick={applyPendingFollowingReels}
+              className="flex items-center gap-1.5 pl-3 pr-2 py-2"
+            >
+              <ArrowUp size={12} className="text-amber-400" />
+              <span className="text-xs font-semibold text-amber-200 whitespace-nowrap">
+                {newFollowingPostCount === 1 ? "1 new post" : `${newFollowingPostCount} new posts`}
+              </span>
+            </button>
+            <div className="w-px h-4 bg-white/10" />
+            <button
+              onClick={dismissPendingFollowingReels}
+              className="flex items-center justify-center pl-2 pr-3 py-2 text-stone-500 hover:text-stone-300 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X size={11} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Scheduled posts auto-publish banner */}
       <AnimatePresence>
