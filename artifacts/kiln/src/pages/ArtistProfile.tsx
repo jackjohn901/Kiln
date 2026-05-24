@@ -404,7 +404,7 @@ export default function ArtistProfile() {
 
   async function handleDbFollow() {
     if (!id) return;
-    const res = await fetch(`/api/users/${id}/follow`, { method: "POST" });
+    const res = await fetch(`/api/users/${id}/follow`, { method: "POST", credentials: "include" });
     if (res.ok) {
       const data = await res.json();
       setDbFollowing(data.following);

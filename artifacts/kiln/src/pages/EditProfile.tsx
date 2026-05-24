@@ -226,6 +226,7 @@ export default function EditProfile() {
     try {
       await fetch("/api/me/profile", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName: form.name,
