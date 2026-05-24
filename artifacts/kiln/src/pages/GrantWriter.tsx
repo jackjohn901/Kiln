@@ -83,6 +83,7 @@ export default function GrantWriter() {
       const res = await fetch("/api/grant-writer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ prompt }),
       });
       if (!res.ok) throw new Error("api-error");

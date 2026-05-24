@@ -161,6 +161,7 @@ export default function GlazeOracle() {
       const res = await fetch("/api/glaze-oracle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })) }),
       });
       if (!res.ok) throw new Error("API error");
