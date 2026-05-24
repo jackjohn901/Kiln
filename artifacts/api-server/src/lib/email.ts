@@ -456,6 +456,8 @@ export function newSaleEmail(
   amountTotalCents: number,
   items: ManualPayoutReceiptItem[],
   orderId?: string | null,
+  buyerHandle?: string | null,
+  buyerId?: string | null,
 ): string {
   const itemRows = items
     .map(
@@ -467,13 +469,24 @@ export function newSaleEmail(
     )
     .join("");
 
+  const buyerProfileUrl = buyerHandle
+    ? `${BASE_URL}/artists/${encodeURIComponent(buyerHandle)}`
+    : buyerId
+      ? `${BASE_URL}/artists/${encodeURIComponent(buyerId)}`
+      : null;
+
+  const buyerNameHtml = buyerProfileUrl
+    ? `<a href="${buyerProfileUrl}" style="color:#fcd34d;text-decoration:none;font-weight:bold;">${escHtml(buyerName || "A buyer")}</a>`
+    : `<strong>${escHtml(buyerName || "A buyer")}</strong>`;
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Sale! 🎉</h1>
     <p style="color:#78716c;margin-bottom:0;">Someone just purchased your work on Kiln.</p>
     ${card(`
       <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Buyer</p>
-      <p style="margin:0 0 4px;"><strong>${escHtml(buyerName || "A buyer")}</strong></p>
+      <p style="margin:0 0 4px;">${buyerNameHtml}</p>
       <p style="margin:0;color:#78716c;">${escHtml(buyerEmail)}</p>
+      ${buyerProfileUrl ? `<p style="margin:4px 0 0;font-size:12px;"><a href="${buyerProfileUrl}" style="color:#a8a29e;text-decoration:none;">View buyer profile →</a></p>` : ""}
     `)}
     ${card(`
       <p style="margin:0 0 10px;font-size:14px;color:#fcd34d;font-weight:bold;">Items ordered</p>

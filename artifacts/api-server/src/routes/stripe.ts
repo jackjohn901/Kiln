@@ -1140,6 +1140,18 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 const buyerEmail = session.customer_email ?? session.customer_details?.email ?? '';
                 const amountTotal = session.amount_total ?? 0;
 
+                // Look up buyer's Kiln profile for the profile link in the artist email.
+                const buyerProfile = meta.userId
+                  ? await db
+                      .select({ handle: profilesTable.handle })
+                      .from(profilesTable)
+                      .where(eq(profilesTable.userId, meta.userId))
+                      .limit(1)
+                      .then((rows) => rows[0] ?? null)
+                  : null;
+                const buyerHandle = buyerProfile?.handle ?? null;
+                const buyerProfileId = meta.userId ?? null;
+
                 for (const artist of artistUserRows) {
                   const artistItems = ids
                     .map((id, idx) => {
@@ -1156,7 +1168,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   const artistSettings = artistSettingsEntry?.settings ?? null;
                   const wantsEmail = !isEmailPaused(artistSettings, artistSettingsEntry?.notifEmailResumeAt) && artistSettings?.notif_email_new_sale !== false;
                   if (wantsEmail && artist.email) {
-                    const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems, webhookOrderId);
+                    const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems, webhookOrderId, buyerHandle, buyerProfileId);
                     await sendEmail({
                       to: artist.email,
                       subject: 'You have a new sale on Kiln',
@@ -1316,6 +1328,18 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
               const buyerEmail = session.customer_email ?? session.customer_details?.email ?? '';
               const amountTotal = session.amount_total ?? 0;
 
+              // Look up buyer's Kiln profile for the profile link in the artist email.
+              const connectBuyerProfile = meta.userId
+                ? await db
+                    .select({ handle: profilesTable.handle })
+                    .from(profilesTable)
+                    .where(eq(profilesTable.userId, meta.userId))
+                    .limit(1)
+                    .then((rows) => rows[0] ?? null)
+                : null;
+              const connectBuyerHandle = connectBuyerProfile?.handle ?? null;
+              const connectBuyerProfileId = meta.userId ?? null;
+
               for (const artist of artistUserRows) {
                 const artistItems = ids
                   .map((id, idx) => {
@@ -1332,7 +1356,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 const artistSettings = artistSettingsEntry?.settings ?? null;
                 const wantsEmail = !isEmailPaused(artistSettings, artistSettingsEntry?.notifEmailResumeAt) && artistSettings?.notif_email_new_sale !== false;
                 if (wantsEmail && artist.email) {
-                  const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems, webhookOrderId);
+                  const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems, webhookOrderId, connectBuyerHandle, connectBuyerProfileId);
                   await sendEmail({
                     to: artist.email,
                     subject: 'You have a new sale on Kiln',
