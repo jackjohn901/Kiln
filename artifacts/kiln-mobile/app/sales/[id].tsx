@@ -137,6 +137,8 @@ export default function SaleDetailScreen() {
 
   const [shippingModalVisible, setShippingModalVisible] = useState(false);
   const [trackingInput, setTrackingInput] = useState("");
+  const [trackingEditModalVisible, setTrackingEditModalVisible] = useState(false);
+  const [trackingEditInput, setTrackingEditInput] = useState("");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["me/sales", id],
@@ -155,6 +157,30 @@ export default function SaleDetailScreen() {
       Alert.alert("Update failed", err.message ?? "Something went wrong. Please try again.");
     },
   });
+
+  const { mutate: updateTracking, isPending: isTrackingUpdating } = useMutation({
+    mutationFn: (trackingNumber: string | null) =>
+      apiPatch<{ sale: Sale }>(`/api/me/sales/${encodeURIComponent(id!)}`, {
+        trackingNumber: trackingNumber ?? "",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me/sales", id] });
+      queryClient.invalidateQueries({ queryKey: ["me/sales"] });
+      setTrackingEditModalVisible(false);
+    },
+    onError: (err: Error) => {
+      Alert.alert("Update failed", err.message ?? "Something went wrong. Please try again.");
+    },
+  });
+
+  function handleOpenTrackingEdit() {
+    setTrackingEditInput(sale?.trackingNumber ?? "");
+    setTrackingEditModalVisible(true);
+  }
+
+  function handleSaveTracking() {
+    updateTracking(trackingEditInput.trim() || null);
+  }
 
   function handleAction(action: StatusAction) {
     if (action.newStatus === "cancelled") {
@@ -218,6 +244,8 @@ export default function SaleDetailScreen() {
   const typeIconName = (TYPE_ICON[sale.type] ?? "shopping-bag") as any;
   const buyerName = sale.buyerDisplayName ?? sale.buyerHandle ?? "Unknown buyer";
   const isActive = !["delivered", "cancelled"].includes(sale.status);
+  const isPhysical = ["listing", "drop"].includes(sale.type);
+  const canEditTracking = sale.status === "shipped" && isPhysical;
   const hasDeliveryEstimate =
     sale.processingWindowLabel !== null || sale.processingWindowDays !== null;
   const deliveryEstimateText = sale.processingWindowLabel
@@ -343,6 +371,20 @@ export default function SaleDetailScreen() {
                 </Text>
               </View>
             ) : null}
+            {canEditTracking && (
+              <Pressable
+                style={[
+                  styles.editTrackingBtn,
+                  { borderColor: colors.border, backgroundColor: colors.secondary },
+                ]}
+                onPress={handleOpenTrackingEdit}
+              >
+                <Feather name="edit-2" size={13} color={colors.primary} />
+                <Text style={[styles.editTrackingBtnText, { color: colors.foreground }]}>
+                  {sale.trackingNumber ? "Edit tracking number" : "Add tracking number"}
+                </Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -432,6 +474,76 @@ export default function SaleDetailScreen() {
           )}
         </View>
       )}
+
+      <Modal
+        visible={trackingEditModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTrackingEditModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setTrackingEditModalVisible(false)}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 },
+          ]}
+        >
+          <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+            {data?.sale?.trackingNumber ? "Edit Tracking Number" : "Add Tracking Number"}
+          </Text>
+          <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+            Update the tracking number for this shipment.
+          </Text>
+          <TextInput
+            style={[
+              styles.trackingInput,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                color: colors.foreground,
+              },
+            ]}
+            placeholder="Tracking number"
+            placeholderTextColor={colors.mutedForeground}
+            value={trackingEditInput}
+            onChangeText={setTrackingEditInput}
+            autoCapitalize="characters"
+            returnKeyType="done"
+            onSubmitEditing={handleSaveTracking}
+          />
+          <Pressable
+            style={[
+              styles.actionBtn,
+              {
+                backgroundColor: isTrackingUpdating ? colors.secondary : colors.primary,
+                opacity: isTrackingUpdating ? 0.7 : 1,
+              },
+            ]}
+            onPress={handleSaveTracking}
+            disabled={isTrackingUpdating}
+          >
+            {isTrackingUpdating ? (
+              <ActivityIndicator color={colors.primaryForeground} size="small" />
+            ) : (
+              <Feather name="save" size={16} color={colors.primaryForeground} />
+            )}
+            <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
+              Save Tracking
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.cancelLink}
+            onPress={() => setTrackingEditModalVisible(false)}
+            disabled={isTrackingUpdating}
+          >
+            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
 
       <Modal
         visible={shippingModalVisible}
@@ -626,4 +738,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   cancelLinkText: { fontFamily: "Inter_500Medium", fontSize: 14 },
+  editTrackingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+  },
+  editTrackingBtnText: { fontFamily: "Inter_500Medium", fontSize: 13 },
 });
