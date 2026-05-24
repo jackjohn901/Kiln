@@ -1,10 +1,20 @@
 import { useEffect, useRef } from "react";
-import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar } from "lucide-react";
+import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star } from "lucide-react";
 import { useSocial, KilnNotification } from "@/contexts/SocialContext";
 import { useLocation } from "wouter";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
 import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
+
+const SALE_FALLBACK_LINK = "/earnings";
+
+const TYPE_FALLBACK_LINKS: Partial<Record<KilnNotification["type"], string>> = {
+  sale: SALE_FALLBACK_LINK,
+  commission: "/commissions",
+  commission_payment: "/commissions",
+  workshop_booking: "/workshops",
+  tip: "/earnings",
+};
 
 function NotifIcon({ type }: { type: KilnNotification["type"] }) {
   const cls = "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0";
@@ -16,6 +26,9 @@ function NotifIcon({ type }: { type: KilnNotification["type"] }) {
   if (type === "workshop") return <div className={`${cls} bg-sky-500/20`}><Calendar size={13} className="text-sky-400" /></div>;
   if (type === "workshop_booking") return <div className={`${cls} bg-sky-500/20`}><Calendar size={13} className="text-sky-400" /></div>;
   if (type === "commission_payment") return <div className={`${cls} bg-emerald-500/20`}><DollarSign size={13} className="text-emerald-400" /></div>;
+  if (type === "sale") return <div className={`${cls} bg-green-500/20`}><ShoppingBag size={13} className="text-green-400" /></div>;
+  if (type === "drop") return <div className={`${cls} bg-orange-500/20`}><Zap size={13} className="text-orange-400" /></div>;
+  if (type === "subscription") return <div className={`${cls} bg-amber-400/20`}><Star size={13} className="text-amber-300" /></div>;
   return <div className={`${cls} bg-stone-700`}><Bell size={13} className="text-stone-400" /></div>;
 }
 
@@ -40,8 +53,9 @@ export default function NotificationPanel({ onClose }: Props) {
 
   function handleNotifClick(n: KilnNotification) {
     markRead(n.id);
-    if (n.link) {
-      navigate(n.link);
+    const dest = n.link || TYPE_FALLBACK_LINKS[n.type];
+    if (dest) {
+      navigate(dest);
     }
     onClose();
   }
