@@ -139,11 +139,14 @@ export default function CartCheckout() {
     artistItemQtys.set(aid, (artistItemQtys.get(aid) ?? 0) + quantity);
   }
 
-  const shipping = Array.from(artistSubtotals.entries()).reduce((sum, [aid, artistSub]) => {
+  const perArtistShipping: Array<{ artistId: string; artistName: string; cost: number }> = Array.from(artistSubtotals.entries()).map(([aid, artistSub]) => {
     const info = shippingRates.get(aid);
-    if (!info) return sum;
-    return sum + calcArtistShipping(info, artistSub, isDomestic, artistItemQtys.get(aid) ?? 1);
-  }, 0);
+    const cost = info ? calcArtistShipping(info, artistSub, isDomestic, artistItemQtys.get(aid) ?? 1) : 0;
+    const artist = ALL_ARTISTS.find(a => a.id === aid);
+    return { artistId: aid, artistName: artist?.name ?? aid, cost };
+  });
+
+  const shipping = perArtistShipping.reduce((sum, { cost }) => sum + cost, 0);
 
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
@@ -860,14 +863,33 @@ export default function CartCheckout() {
                   <div className="flex justify-between">
                     <span>Subtotal</span><span>${subtotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
-                    {shippingRates.size === 0 && items.length > 0 ? (
+                  {shippingRates.size === 0 && items.length > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
                       <span className="text-stone-600 italic">calculating…</span>
-                    ) : (
+                    </div>
+                  ) : perArtistShipping.length >= 2 ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-stone-500">
+                        <Truck size={9} /> <span>Shipping</span>
+                      </div>
+                      {perArtistShipping.map(({ artistId, artistName, cost }) => (
+                        <div key={artistId} className="flex justify-between pl-3">
+                          <span className="text-stone-600 truncate max-w-[130px]">{artistName}</span>
+                          <span className={cost === 0 ? "text-emerald-400" : ""}>{cost === 0 ? "Free" : `$${cost.toFixed(2)}`}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-0.5 border-t border-white/5">
+                        <span className="text-stone-500">Total shipping</span>
+                        <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
                       <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>Tax (est.)</span><span>${tax.toFixed(2)}</span>
                   </div>
