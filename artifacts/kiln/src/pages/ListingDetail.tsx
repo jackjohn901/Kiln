@@ -14,6 +14,7 @@ interface ArtistShipping {
   offerFreeShipping: boolean;
   domesticRate: number | null;
   internationalRate: number | null;
+  perItemRate: number | null;
   freeThreshold: number | null;
   offerLocalPickup: boolean;
 }
@@ -724,7 +725,11 @@ export default function ListingDetail() {
                     <>
                       {artistShipping.domesticRate != null && artistShipping.domesticRate > 0 && (
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-stone-900/60 px-2.5 py-1 text-[11px] text-stone-400">
-                          <Truck size={10} />US from ${artistShipping.domesticRate}
+                          <Truck size={10} />
+                          US from ${artistShipping.domesticRate}
+                          {artistShipping.perItemRate != null && artistShipping.perItemRate > 0 && (
+                            <> + ${artistShipping.perItemRate} per additional item</>
+                          )}
                         </span>
                       )}
                       {artistShipping.internationalRate != null && artistShipping.internationalRate > 0 && (
