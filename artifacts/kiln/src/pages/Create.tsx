@@ -323,8 +323,8 @@ export default function Create() {
           const result = await upload(imgFile);
           mediaUrl = result.servingUrl;
         } catch {
-          // Fall back to IndexedDB blob storage (idb: URLs persist and can be resolved in feed)
-          try { mediaUrl = await storeBlob(imgFile); } catch { /* keep previewUrl */ }
+          // Fall back to a data URL so the image is stored in the DB and works on every device
+          try { mediaUrl = await fileToDataUrl(imgFile); } catch { /* keep previewUrl */ }
         }
       }
 
