@@ -17,6 +17,7 @@ interface ArtistShipping {
   perItemRate: number | null;
   freeThreshold: number | null;
   offerLocalPickup: boolean;
+  shipsTo: string[];
 }
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import Nav from "@/components/Nav";
@@ -746,17 +747,24 @@ export default function ListingDetail() {
                   )}
                 </div>
               )}
-              {listing.shipsTo && listing.shipsTo.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <MapPin size={10} className="text-stone-600 shrink-0" />
-                  <span className="text-[10px] text-stone-600">Ships to:</span>
-                  {listing.shipsTo.map((region) => (
-                    <span key={region} className="rounded-full border border-white/8 bg-stone-900/50 px-2 py-0.5 text-[10px] text-stone-400">
-                      {region}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const regions =
+                  listing.shipsTo && listing.shipsTo.length > 0
+                    ? listing.shipsTo
+                    : (artistShipping?.shipsTo ?? []);
+                if (regions.length === 0) return null;
+                return (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <MapPin size={10} className="text-stone-600 shrink-0" />
+                    <span className="text-[10px] text-stone-600">Ships to:</span>
+                    {regions.map((region) => (
+                      <span key={region} className="rounded-full border border-white/8 bg-stone-900/50 px-2 py-0.5 text-[10px] text-stone-400">
+                        {region}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* AR Preview */}

@@ -124,6 +124,7 @@ router.get("/artists/:artistId/shipping", async (req, res): Promise<void> => {
       perItemRate: typeof s.perItemRate === "number" ? s.perItemRate : null,
       freeThreshold: typeof s.freeThreshold === "number" ? s.freeThreshold : null,
       offerLocalPickup: s.offerLocalPickup === true,
+      shipsTo: Array.isArray(s.shipsTo) ? (s.shipsTo as string[]).filter((x) => typeof x === "string") : [],
     });
   } catch (err) { req.log.error({ err }, "getArtistShipping error"); res.status(500).json({ error: "Failed to load shipping" }); }
 });

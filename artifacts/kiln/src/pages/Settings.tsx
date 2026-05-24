@@ -8,16 +8,19 @@ import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@
 const SETTING_KEY = "kiln_settings_v1";
 const SHIPPING_KEY = "kiln_shipping_v1";
 
+const SHIPS_TO_OPTIONS = ["Worldwide", "United States", "Canada", "Europe", "Australia", "United Kingdom"];
+
 interface ShippingSettings {
   domesticRate: number;
   internationalRate: number;
   perItemRate: number;
   freeThreshold: number;
   offerFreeShipping: boolean;
+  shipsTo: string[];
 }
 
 function defaultShipping(): ShippingSettings {
-  return { domesticRate: 18, internationalRate: 45, perItemRate: 0, freeThreshold: 500, offerFreeShipping: false };
+  return { domesticRate: 18, internationalRate: 45, perItemRate: 0, freeThreshold: 500, offerFreeShipping: false, shipsTo: [] };
 }
 
 function readShippingSettings(): ShippingSettings {
@@ -887,6 +890,43 @@ export default function Settings() {
                   </div>
                 </div>
               )}
+
+              {/* Destination regions */}
+              <div className="space-y-2 border-t border-white/5 pt-4">
+                <div>
+                  <p className="text-sm text-stone-200">Destination regions</p>
+                  <p className="text-xs text-stone-600 mt-0.5">Which regions you ship to — shown on your listings</p>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {SHIPS_TO_OPTIONS.map((opt) => {
+                    const selected = shipping.shipsTo.includes(opt);
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() =>
+                          setShipping((s) => ({
+                            ...s,
+                            shipsTo: selected
+                              ? s.shipsTo.filter((x) => x !== opt)
+                              : [...s.shipsTo, opt],
+                          }))
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          selected
+                            ? "border-amber-400/60 bg-amber-500/20 text-amber-300"
+                            : "border-white/10 bg-stone-800/60 text-stone-400 hover:border-amber-500/30"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                {shipping.shipsTo.length === 0 && (
+                  <p className="text-[10px] text-stone-700">No regions selected — buyers won&apos;t see shipping destinations.</p>
+                )}
+              </div>
 
               {/* Buyer preview */}
               <div>
