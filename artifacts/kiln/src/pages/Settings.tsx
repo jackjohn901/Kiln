@@ -131,6 +131,8 @@ export default function Settings() {
     return (s && (valid as string[]).includes(s)) ? (s as Section) : null;
   });
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const saveErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [payments, setPayments] = useState<ArtistPayments>(readPaymentSettings);
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
@@ -199,7 +201,14 @@ export default function Settings() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: s }),
-      }).catch(() => { /* silent */ });
+      }).then(r => {
+        if (!r.ok) throw new Error("save failed");
+        setSaveError(false);
+      }).catch(() => {
+        setSaveError(true);
+        if (saveErrorTimeout.current) clearTimeout(saveErrorTimeout.current);
+        saveErrorTimeout.current = setTimeout(() => setSaveError(false), 4000);
+      });
     }, 800);
   }
 
@@ -380,7 +389,8 @@ export default function Settings() {
           )}
           <div>
             <h1 className="font-serif text-2xl text-amber-100">{section ? sections.find(s => s.key === section)?.label : "Settings"}</h1>
-            {saved && <p className="text-xs text-emerald-400 mt-0.5">Saved</p>}
+            {saved && !saveError && <p className="text-xs text-emerald-400 mt-0.5">Saved</p>}
+            {saveError && <p className="text-xs text-red-400 mt-0.5">Couldn't save — check your connection</p>}
           </div>
         </div>
 
