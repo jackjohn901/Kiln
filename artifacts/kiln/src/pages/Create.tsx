@@ -413,7 +413,7 @@ export default function Create() {
       }
 
       recordPost();
-      navigate("/");
+      setStep("done");
     } finally {
       setPublishing(false);
     }
@@ -866,19 +866,46 @@ export default function Create() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex gap-3">
+            <div className="space-y-2.5">
+              {/* Post now — primary */}
               <button
-                onClick={() => setStep("edit")}
-                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-3 text-sm font-medium text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+                onClick={handlePublish}
+                disabled={publishing || uploading}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-50"
               >
-                <ChevronLeft size={15} /> Edit
+                {publishing ? <Loader2 size={16} className="animate-spin" /> : <Flame size={16} />}
+                {publishing ? "Publishing…" : "Post now"}
               </button>
-              <button
-                onClick={() => setStep("details")}
-                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-              >
-                Add caption <ChevronRight size={16} />
-              </button>
+
+              {/* Upload progress (inline) */}
+              {uploading && (
+                <div className="rounded-xl bg-stone-900/60 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-stone-400">Uploading…</span>
+                    <span className="text-xs text-amber-400">{progress}%</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-stone-700">
+                    <div className="h-full rounded-full bg-amber-400 transition-all duration-300" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Secondary row */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStep("edit")}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm font-medium text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+                >
+                  <ChevronLeft size={14} /> Edit
+                </button>
+                <button
+                  onClick={() => setStep("details")}
+                  disabled={publishing || uploading}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm font-medium text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors disabled:opacity-40"
+                >
+                  Add caption <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
           </div>
         )}
