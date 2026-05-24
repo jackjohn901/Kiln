@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { auctionsTable, auctionBidsTable, notificationsTable, usersTable, userSettingsTable, profilesTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
-import { eq, desc, and, gt } from "drizzle-orm";
+import { eq, desc, and, gt, max } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
 import { sendEmail, outbidEmail } from "../lib/email";
@@ -15,8 +15,22 @@ const router = Router();
 // GET /auctions
 router.get("/auctions", async (req, res): Promise<void> => {
   try {
-    const auctions = await db.select().from(auctionsTable).orderBy(desc(auctionsTable.endDate));
-    res.json({ auctions: auctions.map(a => ({ ...a, startDate: a.startDate.toISOString(), endDate: a.endDate.toISOString(), createdAt: a.createdAt.toISOString() })) });
+    const [auctions, latestBids] = await Promise.all([
+      db.select().from(auctionsTable).orderBy(desc(auctionsTable.endDate)),
+      db.select({ auctionId: auctionBidsTable.auctionId, lastBidAt: max(auctionBidsTable.createdAt) })
+        .from(auctionBidsTable)
+        .groupBy(auctionBidsTable.auctionId),
+    ]);
+    const lastBidMap = new Map(latestBids.map(r => [r.auctionId, r.lastBidAt]));
+    res.json({
+      auctions: auctions.map(a => ({
+        ...a,
+        startDate: a.startDate.toISOString(),
+        endDate: a.endDate.toISOString(),
+        createdAt: a.createdAt.toISOString(),
+        lastBidAt: lastBidMap.get(a.id)?.toISOString() ?? null,
+      })),
+    });
   } catch (err) { req.log.error({ err }, "getAuctions error"); res.status(500).json({ error: "Failed to load auctions" }); }
 });
 
@@ -24,8 +38,9 @@ router.get("/auctions", async (req, res): Promise<void> => {
 router.get("/auctions/:id", async (req, res): Promise<void> => {
   const [auction] = await db.select().from(auctionsTable).where(eq(auctionsTable.id, req.params.id));
   if (!auction) { res.status(404).json({ error: "Not found" }); return; }
-  const bids = await db.select().from(auctionBidsTable).where(eq(auctionBidsTable.auctionId, auction.id)).orderBy(desc(auctionBidsTable.amount));
-  res.json({ ...auction, bids: bids.map(b => ({ ...b, createdAt: b.createdAt.toISOString() })), startDate: auction.startDate.toISOString(), endDate: auction.endDate.toISOString(), createdAt: auction.createdAt.toISOString() });
+  const bids = await db.select().from(auctionBidsTable).where(eq(auctionBidsTable.auctionId, auction.id)).orderBy(desc(auctionBidsTable.createdAt));
+  const lastBidAt = bids[0]?.createdAt.toISOString() ?? null;
+  res.json({ ...auction, bids: bids.map(b => ({ ...b, createdAt: b.createdAt.toISOString() })), lastBidAt, startDate: auction.startDate.toISOString(), endDate: auction.endDate.toISOString(), createdAt: auction.createdAt.toISOString() });
 });
 
 // POST /auctions — create
@@ -71,7 +86,7 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
       sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilnfire.replit.app/kiln/auctions/${auction.id}`);
     }).catch(() => {});
   }
-  broadcastAll({ type: "bid", auctionId: auction.id, currentBid: bidAmount, bidCount: auction.bidCount + 1, bidderName: name });
+  broadcastAll({ type: "bid", auctionId: auction.id, currentBid: bidAmount, bidCount: auction.bidCount + 1, bidderName: name, bidAt: bid.createdAt.toISOString() });
   res.json({ bid: { ...bid, createdAt: bid.createdAt.toISOString() }, auction: { ...updated, startDate: updated.startDate.toISOString(), endDate: updated.endDate.toISOString(), createdAt: updated.createdAt.toISOString() } });
 });
 

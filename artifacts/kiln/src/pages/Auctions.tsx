@@ -36,6 +36,7 @@ interface Auction {
   startDate: string;
   endDate: string;
   bids?: Bid[];
+  lastBidAt?: string;
 }
 
 function formatPrice(n: number) {
@@ -132,6 +133,13 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
           <span className="text-stone-700">·</span>
           <span className="text-stone-500">Starts at {formatPrice(auction.startingPrice)}</span>
         </div>
+
+        {isLive && auction.lastBidAt && (
+          <p className="flex items-center gap-1 text-[10px] text-stone-500">
+            <TrendingUp size={9} className="text-amber-500/70" />
+            last bid <RelativeTime since={auction.lastBidAt} className="text-amber-400/80" intervalMs={10_000} />
+          </p>
+        )}
 
         {auction.medium && (
           <p className="text-[11px] text-stone-600">{auction.medium}{auction.dimensions ? ` · ${auction.dimensions}` : ""}</p>
@@ -292,13 +300,14 @@ export default function Auctions() {
 
   useEffect(() => {
     return subscribe("bid", (event) => {
-      const e = event as { auctionId: string; currentBid: number; bidCount: number; bidderName: string };
+      const e = event as { auctionId: string; currentBid: number; bidCount: number; bidderName: string; bidAt?: string };
+      const lastBidAt = e.bidAt ?? new Date().toISOString();
       setAuctions(prev => prev.map(a => a.id === e.auctionId
-        ? { ...a, currentBid: e.currentBid, bidCount: e.bidCount, currentBidderName: e.bidderName }
+        ? { ...a, currentBid: e.currentBid, bidCount: e.bidCount, currentBidderName: e.bidderName, lastBidAt }
         : a
       ));
       setSelectedAuction(prev => prev?.id === e.auctionId
-        ? { ...prev, currentBid: e.currentBid, bidCount: e.bidCount, currentBidderName: e.bidderName }
+        ? { ...prev, currentBid: e.currentBid, bidCount: e.bidCount, currentBidderName: e.bidderName, lastBidAt }
         : prev
       );
     });
@@ -307,14 +316,17 @@ export default function Auctions() {
   const handleOpenBid = async (auction: Auction) => {
     try {
       const r = await fetch(`/api/auctions/${auction.id}`, { credentials: "include" });
-      const data = await r.json();
-      setSelectedAuction(data);
+      const data = await r.json() as Auction;
+      const lastBidAt = data.bids?.[0]?.createdAt ?? auction.lastBidAt;
+      setSelectedAuction({ ...data, lastBidAt });
     } catch { setSelectedAuction(auction); }
   };
 
   const handleBidPlaced = (updated: Auction) => {
-    setAuctions(prev => prev.map(a => a.id === updated.id ? { ...a, ...updated } : a));
-    if (selectedAuction?.id === updated.id) setSelectedAuction(prev => prev ? { ...prev, ...updated } : prev);
+    const lastBidAt = updated.bids?.[0]?.createdAt ?? updated.lastBidAt;
+    const merged = { ...updated, lastBidAt };
+    setAuctions(prev => prev.map(a => a.id === updated.id ? { ...a, ...merged } : a));
+    if (selectedAuction?.id === updated.id) setSelectedAuction(prev => prev ? { ...prev, ...merged } : prev);
   };
 
   const now = new Date();
