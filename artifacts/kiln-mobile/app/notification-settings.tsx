@@ -112,6 +112,11 @@ export default function NotificationSettingsScreen() {
   const errorOpacity = useRef(new Animated.Value(0)).current;
   const errorScale = useRef(new Animated.Value(0.6)).current;
 
+  const emailSavedOpacity = useRef(new Animated.Value(0)).current;
+  const emailSavedScale = useRef(new Animated.Value(0.6)).current;
+  const emailErrorOpacity = useRef(new Animated.Value(0)).current;
+  const emailErrorScale = useRef(new Animated.Value(0.6)).current;
+
   useEffect(() => {
     if (saved) {
       Animated.parallel([
@@ -137,6 +142,32 @@ export default function NotificationSettingsScreen() {
       });
     }
   }, [saveError, errorOpacity, errorScale]);
+
+  useEffect(() => {
+    if (emailSaved) {
+      Animated.parallel([
+        Animated.timing(emailSavedOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(emailSavedScale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 12 }),
+      ]).start();
+    } else {
+      Animated.timing(emailSavedOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        emailSavedScale.setValue(0.6);
+      });
+    }
+  }, [emailSaved, emailSavedOpacity, emailSavedScale]);
+
+  useEffect(() => {
+    if (emailError) {
+      Animated.parallel([
+        Animated.timing(emailErrorOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(emailErrorScale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 12 }),
+      ]).start();
+    } else {
+      Animated.timing(emailErrorOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        emailErrorScale.setValue(0.6);
+      });
+    }
+  }, [emailError, emailErrorOpacity, emailErrorScale]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -401,12 +432,19 @@ export default function NotificationSettingsScreen() {
             />
             <View style={[styles.emailInputRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
               <View style={styles.emailInputHeader}>
-                <Text style={[styles.toggleLabel, { color: colors.foreground }]}>Notification email address</Text>
-                {emailError ? (
-                  <Text style={[styles.savedLabel, { color: "#ef4444" }]}>Couldn't save</Text>
-                ) : emailSaved ? (
-                  <Text style={[styles.savedLabel, { color: colors.primary }]}>Saved ✓</Text>
-                ) : null}
+                <Text style={[styles.toggleLabel, { color: colors.foreground, flex: 1 }]}>Notification email address</Text>
+                <View style={styles.emailStatusContainer}>
+                  <Animated.Text
+                    style={[styles.savedLabel, styles.emailStatusAbsolute, { color: colors.primary, opacity: emailSavedOpacity, transform: [{ scale: emailSavedScale }] }]}
+                  >
+                    Saved ✓
+                  </Animated.Text>
+                  <Animated.Text
+                    style={[styles.savedLabel, styles.emailStatusAbsolute, { color: "#ef4444", opacity: emailErrorOpacity, transform: [{ scale: emailErrorScale }] }]}
+                  >
+                    Couldn't save
+                  </Animated.Text>
+                </View>
               </View>
               <Text style={[styles.toggleDesc, { color: colors.mutedForeground, marginBottom: 8 }]}>
                 Where we send email alerts. Never shown publicly.
@@ -492,6 +530,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   savedLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  emailStatusContainer: {
+    position: "relative",
+    height: 18,
+    minWidth: 80,
+    alignItems: "flex-end",
+  },
+  emailStatusAbsolute: {
+    position: "absolute",
+    right: 0,
+  },
   emailInput: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 10,
