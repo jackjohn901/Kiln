@@ -31,6 +31,7 @@ interface NotifSettings {
   notif_email_new_commission: boolean;
   notif_email_new_patron: boolean;
   notif_email_outbid: boolean;
+  notif_email_mentions: boolean;
 }
 
 const DEFAULTS: NotifSettings = {
@@ -47,6 +48,7 @@ const DEFAULTS: NotifSettings = {
   notif_email_new_commission: true,
   notif_email_new_patron: true,
   notif_email_outbid: true,
+  notif_email_mentions: true,
 };
 
 function ToggleRow({
@@ -445,6 +447,13 @@ export default function NotificationSettingsScreen() {
               desc="Email when someone outbids you in an auction"
               value={settings.notif_email_outbid}
               onChange={set("notif_email_outbid")}
+              colors={colors}
+            />
+            <ToggleRow
+              label="Mention alerts"
+              desc="Email when someone @mentions you in a comment or post"
+              value={settings.notif_email_mentions}
+              onChange={set("notif_email_mentions")}
               colors={colors}
             />
             <View style={[styles.emailInputRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>

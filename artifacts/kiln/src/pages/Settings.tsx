@@ -49,6 +49,7 @@ interface KilnSettings {
   notif_email_new_commission: boolean;
   notif_email_new_patron: boolean;
   notif_email_outbid: boolean;
+  notif_email_mentions: boolean;
   notif_sms_paused: boolean;
   notif_sms_outbid: boolean;
   notif_sms_drops: boolean;
@@ -88,6 +89,7 @@ function defaultSettings(): KilnSettings {
     notif_email_new_commission: true,
     notif_email_new_patron: true,
     notif_email_outbid: true,
+    notif_email_mentions: true,
     notif_sms_paused: false,
     notif_sms_outbid: true,
     notif_sms_drops: true,
@@ -282,6 +284,7 @@ export default function Settings() {
     "notif_email_new_commission",
     "notif_email_new_patron",
     "notif_email_outbid",
+    "notif_email_mentions",
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
   const emailPaused = settings.notif_email_paused;
@@ -509,6 +512,7 @@ export default function Settings() {
               <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
               <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
               <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />
+              <Toggle settingKey="notif_email_mentions" label="Mention alerts" desc="Email when someone @mentions you in a comment or post" />
             </div>
             <div className={`py-3${settings.notif_email_paused ? " opacity-40 pointer-events-none" : ""}`}>
               <p className="text-sm text-stone-200 mb-1">Notification email address</p>
