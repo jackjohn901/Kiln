@@ -114,7 +114,16 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
   }).where(eq(commissionsTable.id, req.params.id)).returning();
 
   if (status && isArtist && !isClient) {
-    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: `updated your commission: ${status}`, link: `/commissions` });
+    const notifText = status === "quoted"
+      ? `sent you a quote for your commission`
+      : status === "in_progress"
+      ? `accepted your commission and started work`
+      : status === "completed"
+      ? `marked your commission as completed`
+      : status === "declined"
+      ? `declined your commission request`
+      : `updated your commission: ${status}`;
+    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: notifText, link: `/commissions` });
     const clientEmail = commission.clientEmail ?? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, commission.clientId)).then(r => r[0]?.email));
     if (clientEmail) {
       sendEmail({ to: clientEmail, subject: `Commission update from ${commission.artistName}`, html: commissionUpdateEmail(commission.artistName, status, commission.workType ?? "") }).catch(() => {});
