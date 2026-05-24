@@ -85,4 +85,20 @@ if (Number.isNaN(port) || port <= 0) {
     logger.error({ err }, "Server error");
     process.exit(1);
   });
+
+  function shutdown(signal: string) {
+    logger.info({ signal }, "Shutting down gracefully…");
+    server.close(() => {
+      logger.info("HTTP server closed — exiting");
+      process.exit(0);
+    });
+    // Force-exit after 8 s if connections don't drain in time
+    setTimeout(() => {
+      logger.warn("Forced exit after shutdown timeout");
+      process.exit(1);
+    }, 8_000).unref();
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT",  () => shutdown("SIGINT"));
 })();
