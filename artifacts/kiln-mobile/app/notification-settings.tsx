@@ -467,7 +467,7 @@ export default function NotificationSettingsScreen() {
               </Text>
               <TextInput
                 value={notifEmail}
-                onChangeText={(text) => { setNotifEmail(text); if (emailValidationError) setEmailValidationError(false); }}
+                onChangeText={(text) => { setNotifEmail(text); if (emailValidationError && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim())) setEmailValidationError(false); }}
                 onBlur={() => saveNotifEmail(notifEmail)}
                 placeholder="you@example.com"
                 placeholderTextColor={colors.mutedForeground}

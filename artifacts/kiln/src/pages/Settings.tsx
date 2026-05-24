@@ -515,7 +515,7 @@ export default function Settings() {
                 <input
                   type="email"
                   value={contactEmail}
-                  onChange={(e) => { setContactEmail(e.target.value); if (emailValidationError) setEmailValidationError(false); }}
+                  onChange={(e) => { setContactEmail(e.target.value); if (emailValidationError && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value.trim())) setEmailValidationError(false); }}
                   onBlur={(e) => saveContactEmail(e.target.value)}
                   placeholder="you@example.com"
                   className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${emailValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-amber-500/50"}`}
