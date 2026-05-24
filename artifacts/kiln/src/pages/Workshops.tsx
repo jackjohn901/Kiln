@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { markFeatureVisited } from "@/lib/featureDiscovery";
-import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X, CalendarPlus, Download } from "lucide-react";
 import { useLocation } from "wouter";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
@@ -27,6 +27,59 @@ interface ApiWorkshop {
   tags: string[];
 }
 
+function buildApiWorkshopGcalUrl(w: ApiWorkshop): string {
+  if (!w.startDate) return "";
+  const start = new Date(w.startDate);
+  const end = new Date(start.getTime() + w.durationHours * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const location = w.isOnline ? "Online" : (w.location ?? "");
+  const qs = new URLSearchParams({
+    action: "TEMPLATE",
+    text: w.title,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `Workshop with ${w.artistName} on Kiln.`,
+    ...(location ? { location } : {}),
+  });
+  return `https://calendar.google.com/calendar/render?${qs.toString()}`;
+}
+
+function BookingConfirmedModal({ w, onClose }: { w: ApiWorkshop; onClose: () => void }) {
+  const gcalUrl = buildApiWorkshopGcalUrl(w);
+  const icsUrl = `/api/workshops/${w.id}/calendar.ics`;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-stone-900 p-6 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/30">
+          <CheckCircle2 size={30} className="text-emerald-400" />
+        </div>
+        <h2 className="font-serif text-2xl text-amber-100 mb-1">You're In!</h2>
+        <p className="text-sm text-stone-400 mb-1 font-semibold">{w.title}</p>
+        <p className="text-xs text-amber-400 mb-4">with {w.artistName}</p>
+        {w.startDate && (
+          <p className="text-xs text-stone-500 mb-5">
+            {new Date(w.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+            {" · "}{w.isOnline ? "Online" : (w.location ?? "")}
+          </p>
+        )}
+        <p className="text-xs text-stone-500 mb-3">Add this workshop to your calendar:</p>
+        <div className="flex flex-wrap gap-2 justify-center mb-5">
+          {gcalUrl && (
+            <a href={gcalUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition-colors">
+              <CalendarPlus size={13} /> Google Calendar
+            </a>
+          )}
+          <a href={icsUrl} download
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-stone-800 px-4 py-2 text-xs font-semibold text-stone-300 hover:border-amber-500/40 hover:text-stone-100 transition-colors">
+            <Download size={13} /> Download .ics
+          </a>
+        </div>
+        <button onClick={onClose} className="text-xs text-stone-500 hover:text-stone-300 transition-colors">Close</button>
+      </div>
+    </div>
+  );
+}
+
 const LEVEL_COLORS: Record<string, string> = {
   Beginner: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
   Intermediate: "text-amber-400 bg-amber-500/10 border-amber-500/30",
@@ -44,7 +97,7 @@ function StarRating({ value, size = 11 }: { value: number; size?: number }) {
   );
 }
 
-function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (id: string) => void; onCancel: (id: string) => void }) {
+function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (workshop: ApiWorkshop) => void; onCancel: (id: string) => void }) {
   const [, navigate] = useLocation();
   const soldOut = w.spotsLeft === 0;
   const [booking, setBooking] = useState(false);
@@ -61,7 +114,7 @@ function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (id: st
     setBooking(true);
     try {
       const r = await fetch(`/api/workshops/${w.id}/book`, { method: "POST", credentials: "include" });
-      if (r.ok) onBook(w.id);
+      if (r.ok) onBook(w);
     } catch {}
     setBooking(false);
   };
@@ -165,6 +218,7 @@ export default function Workshops() {
   const [workshops, setWorkshops] = useState<ApiWorkshop[]>([]);
   const [loading, setLoading] = useState(true);
   const [medium, setMedium] = useState("All");
+  const [confirmedWorkshop, setConfirmedWorkshop] = useState<ApiWorkshop | null>(null);
   const { markTypeRead } = useSocial();
 
   useEffect(() => { markFeatureVisited("workshops"); }, []);
@@ -181,8 +235,9 @@ export default function Workshops() {
   const techniques = ["All", ...Array.from(new Set(workshops.map(w => w.technique).filter(Boolean) as string[]))];
   const filtered = medium === "All" ? workshops : workshops.filter(w => w.technique === medium);
 
-  const handleBook = (workshopId: string) => {
-    setWorkshops(prev => prev.map(w => w.id === workshopId ? { ...w, isBooked: true, spotsBooked: w.spotsBooked + 1, spotsLeft: w.spotsLeft - 1 } : w));
+  const handleBook = (workshop: ApiWorkshop) => {
+    setWorkshops(prev => prev.map(w => w.id === workshop.id ? { ...w, isBooked: true, spotsBooked: w.spotsBooked + 1, spotsLeft: w.spotsLeft - 1 } : w));
+    setConfirmedWorkshop(workshop);
   };
 
   const handleCancel = (workshopId: string) => {
@@ -191,6 +246,9 @@ export default function Workshops() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">
+      {confirmedWorkshop && (
+        <BookingConfirmedModal w={confirmedWorkshop} onClose={() => setConfirmedWorkshop(null)} />
+      )}
       <Nav />
       <div className="pt-16">
         <div className="max-w-5xl mx-auto px-4 pb-12">

@@ -1,10 +1,42 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, Flame } from "lucide-react";
+import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, CalendarPlus, Download } from "lucide-react";
 import Nav from "@/components/Nav";
-import { workshops } from "@/data/workshops";
+import { workshops, type Workshop } from "@/data/workshops";
 import { useProfile } from "@/contexts/ProfileContext";
 import ReviewsSection from "@/components/ReviewsSection";
+
+function buildGcalUrl(workshop: Workshop): string {
+  const details = `Workshop with ${workshop.artistName} on Kiln.`;
+  const location = workshop.location ?? "";
+
+  const match = workshop.startDate.match(/^([A-Za-z]+ \d+)[–\-]?\d*,?\s*(\d{4})/);
+  let datesParam = "";
+  if (match) {
+    const parsed = new Date(`${match[1]}, ${match[2]}`);
+    if (!isNaN(parsed.getTime())) {
+      const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      const durationMs = (() => {
+        const dur = workshop.duration.toLowerCase();
+        const dayMatch = dur.match(/(\d+)\s*day/);
+        const hourMatch = dur.match(/(\d+)\s*hour/);
+        if (dayMatch) return parseInt(dayMatch[1]) * 8 * 60 * 60 * 1000;
+        if (hourMatch) return parseInt(hourMatch[1]) * 60 * 60 * 1000;
+        return 6 * 60 * 60 * 1000;
+      })();
+      datesParam = `${fmt(parsed)}/${fmt(new Date(parsed.getTime() + durationMs))}`;
+    }
+  }
+
+  const qs = new URLSearchParams({
+    action: "TEMPLATE",
+    text: workshop.title,
+    details,
+    ...(datesParam ? { dates: datesParam } : {}),
+    ...(location ? { location } : {}),
+  });
+  return `https://calendar.google.com/calendar/render?${qs.toString()}`;
+}
 
 type Step = "info" | "confirm";
 
@@ -136,6 +168,29 @@ export default function WorkshopCheckout() {
             <div className="mt-3 pt-3 border-t border-white/8 flex justify-between items-center">
               <span className="text-xs text-stone-500">Amount paid</span>
               <span className="font-bold text-stone-100">${workshop.price}</span>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <p className="text-xs text-stone-500 mb-3">Add this workshop to your calendar:</p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <a
+                href={buildGcalUrl(workshop)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
+              >
+                <CalendarPlus size={14} />
+                Google Calendar
+              </a>
+              <a
+                href={`/api/workshops/${workshop.id}/calendar.ics`}
+                download
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-stone-800 px-5 py-2.5 text-sm font-semibold text-stone-300 hover:border-amber-500/40 hover:text-stone-100 transition-colors"
+              >
+                <Download size={14} />
+                Download .ics
+              </a>
             </div>
           </div>
 
