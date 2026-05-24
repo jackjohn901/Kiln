@@ -59,6 +59,11 @@ async function sendWorkshopReminders() {
           workshop.artistName,
           startLabel,
           workshop.id,
+          {
+            isOnline: workshop.isOnline,
+            location: workshop.location,
+            meetingUrl: workshop.meetingUrl,
+          },
         );
 
         const sent = await sendEmail({

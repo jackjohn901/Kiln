@@ -335,7 +335,27 @@ export function workshopBookingEmail(
   `);
 }
 
-export function workshopReminderEmail(workshopTitle: string, artistName: string, startDate: string, workshopId: string): string {
+export interface WorkshopReminderOptions {
+  isOnline?: boolean;
+  location?: string | null;
+  meetingUrl?: string | null;
+}
+
+export function workshopReminderEmail(
+  workshopTitle: string,
+  artistName: string,
+  startDate: string,
+  workshopId: string,
+  opts?: WorkshopReminderOptions,
+): string {
+  const locationLine = opts?.isOnline
+    ? opts.meetingUrl
+      ? `<p style="margin:8px 0 0;font-size:13px;">🌐 <strong>Online workshop</strong> — <a href="${escHtml(opts.meetingUrl)}" style="color:#f59e0b;word-break:break-all;">${escHtml(opts.meetingUrl)}</a></p>`
+      : `<p style="margin:8px 0 0;font-size:13px;color:#4ade80;">🌐 Online workshop — the artist will share the link shortly.</p>`
+    : opts?.location
+      ? `<p style="margin:8px 0 0;font-size:13px;color:#a8a29e;">📍 ${escHtml(opts.location)}</p>`
+      : "";
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your workshop is tomorrow!</h1>
     <p style="color:#78716c;margin-bottom:0;">A friendly reminder that you have a workshop booked for tomorrow.</p>
@@ -343,6 +363,7 @@ export function workshopReminderEmail(workshopTitle: string, artistName: string,
       <p style="margin:0 0 8px;font-size:16px;"><strong>${escHtml(workshopTitle)}</strong></p>
       <p style="margin:0 0 8px;">with <strong style="color:#fcd34d;">${escHtml(artistName)}</strong></p>
       <p style="margin:0;color:#78716c;">${escHtml(startDate)}</p>
+      ${locationLine}
     `)}
     ${btn(`${BASE_URL}/workshops/book/${escHtml(workshopId)}`, "View Workshop Details")}
   `);

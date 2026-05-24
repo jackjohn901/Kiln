@@ -16,6 +16,7 @@ export const workshopsTable = pgTable("workshops", {
   maxSpots: integer("max_spots").notNull().default(8),
   spotsBooked: integer("spots_booked").notNull().default(0),
   durationHours: integer("duration_hours").notNull().default(3),
+  meetingUrl: text("meeting_url"),
   imageUrl: text("image_url"),
   startDate: timestamp("start_date", { withTimezone: true }),
   endDate: timestamp("end_date", { withTimezone: true }),
