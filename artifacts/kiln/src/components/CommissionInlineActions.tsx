@@ -1,17 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, X, Loader2 } from "lucide-react";
 
-type ActionState = "idle" | "loading" | "accepted" | "declined" | "error";
+type ActionState = "loading" | "idle" | "saving" | "accepted" | "declined" | "other" | "error";
 
 interface Props {
   commissionId: string;
 }
 
+function statusToActionState(status: string): ActionState {
+  if (status === "pending") return "idle";
+  if (status === "in_progress" || status === "quoted" || status === "revision" || status === "completed") return "accepted";
+  if (status === "declined" || status === "cancelled") return "declined";
+  return "other";
+}
+
 export default function CommissionInlineActions({ commissionId }: Props) {
-  const [state, setState] = useState<ActionState>("idle");
+  const [state, setState] = useState<ActionState>("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/commissions/${commissionId}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("fetch failed");
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setState(statusToActionState(data.status ?? "pending"));
+      })
+      .catch(() => {
+        if (!cancelled) setState("idle");
+      });
+    return () => { cancelled = true; };
+  }, [commissionId]);
 
   async function handleAction(action: "accepted" | "declined") {
-    setState("loading");
+    setState("saving");
     try {
       const res = await fetch(`/api/commissions/${commissionId}`, {
         method: "PATCH",
@@ -29,11 +52,11 @@ export default function CommissionInlineActions({ commissionId }: Props) {
     }
   }
 
-  if (state === "loading") {
+  if (state === "loading" || state === "saving") {
     return (
       <div className="mt-2 flex items-center gap-1.5">
         <Loader2 size={12} className="animate-spin text-stone-500" />
-        <span className="text-xs text-stone-500">Updating…</span>
+        <span className="text-xs text-stone-500">{state === "loading" ? "Loading…" : "Updating…"}</span>
       </div>
     );
   }
@@ -54,6 +77,14 @@ export default function CommissionInlineActions({ commissionId }: Props) {
         <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">
           <X size={10} /> Declined
         </span>
+      </div>
+    );
+  }
+
+  if (state === "other") {
+    return (
+      <div className="mt-2">
+        <span className="text-xs text-stone-500">Commission resolved</span>
       </div>
     );
   }

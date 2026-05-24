@@ -52,6 +52,17 @@ router.get("/me/commissions/received", async (req, res): Promise<void> => {
   res.json({ commissions: rows.map(c => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), estimatedDelivery: c.estimatedDelivery?.toISOString() ?? null })) });
 });
 
+// GET /commissions/:id — fetch a single commission (artist or client only)
+router.get("/commissions/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [commission] = await db.select().from(commissionsTable).where(eq(commissionsTable.id, req.params.id));
+  if (!commission) { res.status(404).json({ error: "Not found" }); return; }
+  if (commission.artistId !== req.user.id && commission.clientId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  res.json({ ...commission, createdAt: commission.createdAt.toISOString(), updatedAt: commission.updatedAt.toISOString(), estimatedDelivery: commission.estimatedDelivery?.toISOString() ?? null });
+});
+
 // PATCH /commissions/:id — update commission state with per-role field authorization.
 // Artist fields: status (quoted/declined/in_progress/revision/completed), quotedPrice, artistNotes, milestone, estimatedDelivery.
 // Client fields: status (accepted/cancelled only — to accept a quote or cancel the request).
