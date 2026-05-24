@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ChevronLeft, CheckCircle, Circle, Clock, MessageCircle, DollarSign, Image, Truck, Package, Star, Loader2, ChevronRight } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useSocial } from "@/contexts/SocialContext";
 
 interface Commission {
   id: string;
@@ -272,6 +273,9 @@ export default function CommissionTracker() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "active" | "received">("all");
+  const { markTypeRead } = useSocial();
+
+  useEffect(() => { markTypeRead("commission_payment"); }, [markTypeRead]);
 
   useEffect(() => {
     fetch("/api/me/commissions", { credentials: "include" })
