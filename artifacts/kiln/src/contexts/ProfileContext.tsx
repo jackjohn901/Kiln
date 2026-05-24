@@ -25,6 +25,7 @@ interface ProfileContextType {
   profile: UserProfile | null;
   setProfile: (p: UserProfile | null) => void;
   isLoggedIn: boolean;
+  profileLoaded: boolean;
   demoAs: (artistId: string) => void;
   logout: () => void;
 }
@@ -33,6 +34,7 @@ const ProfileContext = createContext<ProfileContextType>({
   profile: null,
   setProfile: () => undefined,
   isLoggedIn: false,
+  profileLoaded: false,
   demoAs: () => undefined,
   logout: () => undefined,
 });
@@ -47,7 +49,10 @@ function readStored(): UserProfile | null {
 }
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfileState] = useState<UserProfile | null>(readStored);
+  const stored = readStored();
+  const [profile, setProfileState] = useState<UserProfile | null>(stored);
+  // If we already have a local profile, consider it loaded immediately
+  const [profileLoaded, setProfileLoaded] = useState(!!stored);
   const { isAuthenticated, user } = useAuth();
   const dbSynced = useRef(false);
 
@@ -86,8 +91,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           return newProfile;
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setProfileLoaded(true);
+      });
   }, [isAuthenticated, user]);
+
+  // If not authenticated, profile is definitively "loaded" (there's nothing to load)
+  useEffect(() => {
+    if (!isAuthenticated) setProfileLoaded(true);
+  }, [isAuthenticated]);
 
   function demoAs(artistId: string) {
     const artist = artists.find((a) => a.id === artistId);
@@ -112,7 +125,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ProfileContext.Provider value={{ profile, setProfile, isLoggedIn: !!profile, demoAs, logout }}>
+    <ProfileContext.Provider value={{ profile, setProfile, isLoggedIn: !!profile, profileLoaded, demoAs, logout }}>
       {children}
     </ProfileContext.Provider>
   );

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import PressPage from "@/pages/PressPage";
 import { Switch, Route, Router as WouterRouter, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import Landing from "@/pages/Landing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -170,15 +171,33 @@ const QUIZ_PREFS_KEY = "kiln_prefs_v1";
 function QuizGate() {
   const [location, navigate] = useLocation();
   const { isAuthenticated } = useAuth();
+  const { profile, profileLoaded } = useProfile();
   useEffect(() => {
-    if (location !== "/" || !isAuthenticated) return;
+    // Don't compete with SetupGate — only offer quiz to users who have completed setup
+    if (location !== "/" || !isAuthenticated || !profileLoaded || !profile) return;
     try {
       if (!localStorage.getItem(QUIZ_PREFS_KEY) && !sessionStorage.getItem("kiln_quiz_offered")) {
         sessionStorage.setItem("kiln_quiz_offered", "1");
         navigate("/quiz");
       }
     } catch {}
-  }, [location, navigate, isAuthenticated]);
+  }, [location, navigate, isAuthenticated, profile, profileLoaded]);
+  return null;
+}
+
+// Pages that should never trigger the setup redirect
+const SETUP_EXEMPT = ["/setup", "/quiz", "/login", "/callback", "/terms", "/privacy", "/help", "/landing"];
+
+function SetupGate() {
+  const [location, navigate] = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
+  const { profile, profileLoaded } = useProfile();
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !profileLoaded) return;
+    if (profile) return;
+    if (SETUP_EXEMPT.some((p) => location.startsWith(p))) return;
+    navigate("/setup");
+  }, [isLoading, isAuthenticated, profileLoaded, profile, location, navigate]);
   return null;
 }
 
@@ -266,6 +285,7 @@ function Router() {
       <TitleSetter />
       <RefCapture />
       <QuizGate />
+      <SetupGate />
       <Switch>
         <Route path="/" component={RootPage} />
       <Route path="/discover" component={Discover} />
