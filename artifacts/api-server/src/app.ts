@@ -60,15 +60,15 @@ app.use("/api", router);
 // ── Onboarding & digest crons ─────────────────────────────────────────────────
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
-// Run onboarding check once a day (first run after 10s)
+// Run onboarding check once a day (first run after 5min so rapid restarts don't flood Resend)
 setTimeout(() => {
   void runOnboardingCron();
   setInterval(() => void runOnboardingCron(), DAY_MS);
-}, 10_000);
-// Run weekly digest on Mondays (first run after 15s startup delay, then weekly)
+}, 5 * 60_000);
+// Run weekly digest weekly (first run after 6min startup delay)
 setTimeout(() => {
   void runWeeklyDigest();
   setInterval(() => void runWeeklyDigest(), WEEK_MS);
-}, 15_000);
+}, 6 * 60_000);
 
 export default app;

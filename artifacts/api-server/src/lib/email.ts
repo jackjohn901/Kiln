@@ -73,7 +73,17 @@ export async function sendEmailWithRetry(
   return false;
 }
 
+// Known fake/internal domains used in seed data — never attempt real sends to these
+const FAKE_DOMAINS = [".kiln", ".internal", ".test", ".example", ".invalid", ".localhost"];
+
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
+  // Skip fake seed addresses silently — they always fail and flood the logs
+  const domain = payload.to.slice(payload.to.lastIndexOf("@") + 1).toLowerCase();
+  if (FAKE_DOMAINS.some((d) => domain.endsWith(d)) || domain === "example.com") {
+    logger.debug({ to: payload.to }, "Email skipped — fake/seed address");
+    return false;
+  }
+
   const apiKey = await getResendApiKey();
 
   if (!apiKey) {
