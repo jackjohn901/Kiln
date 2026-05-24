@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ShoppingBag, X } from "lucide-react";
+import { ShoppingBag, X, BellOff } from "lucide-react";
 import { useLocation } from "wouter";
 import RelativeTime from "./RelativeTime";
 
@@ -14,11 +14,12 @@ interface Props {
   sale: SaleInfo;
   queueLength: number;
   onDismiss: () => void;
+  onSnooze: () => void;
 }
 
 const AUTO_DISMISS_MS = 6_000;
 
-export default function SaleBanner({ sale, queueLength, onDismiss }: Props) {
+export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze }: Props) {
   const [, navigate] = useLocation();
 
   useEffect(() => {
@@ -65,6 +66,14 @@ export default function SaleBanner({ sale, queueLength, onDismiss }: Props) {
             className="rounded-md px-2 py-1 text-xs font-medium text-green-300 border border-green-500/40 hover:bg-green-500/10 transition-colors"
           >
             View
+          </button>
+          <button
+            onClick={onSnooze}
+            aria-label="Snooze banners for 5 minutes"
+            title="Snooze 5 min"
+            className="rounded-md p-1 text-stone-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+          >
+            <BellOff size={14} />
           </button>
           <button
             onClick={onDismiss}
