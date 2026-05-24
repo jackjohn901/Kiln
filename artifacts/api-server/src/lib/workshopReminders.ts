@@ -1,7 +1,8 @@
-import { db, workshopsTable, workshopBookingsTable } from "@workspace/db";
+import { db, workshopsTable, workshopBookingsTable, userSettingsTable } from "@workspace/db";
 import { and, gte, lte, isNull, isNotNull, eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendEmail, workshopReminderEmail } from "./email";
+import { generateUnsubscribeToken } from "./unsubscribeTokens";
 
 async function sendWorkshopReminders() {
   try {
@@ -42,6 +43,18 @@ async function sendWorkshopReminders() {
           continue;
         }
 
+        // Check if the student has opted out of workshop reminder emails
+        const [userSettings] = await db
+          .select({ settings: userSettingsTable.settings })
+          .from(userSettingsTable)
+          .where(eq(userSettingsTable.userId, booking.userId));
+
+        const settings = userSettings?.settings as Record<string, unknown> | null ?? {};
+        if (settings.workshopReminderOptOut === true) {
+          logger.debug({ bookingId: booking.id, userId: booking.userId }, "workshopReminders: skipping opted-out user");
+          continue;
+        }
+
         const startLabel = workshop.startDate
           ? workshop.startDate.toLocaleString("en-US", {
               weekday: "long",
@@ -54,6 +67,8 @@ async function sendWorkshopReminders() {
             })
           : "Tomorrow";
 
+        const unsubscribeToken = generateUnsubscribeToken(booking.userId);
+
         const html = workshopReminderEmail(
           workshop.title,
           workshop.artistName,
@@ -63,6 +78,7 @@ async function sendWorkshopReminders() {
             isOnline: workshop.isOnline,
             location: workshop.location,
             meetingUrl: workshop.meetingUrl,
+            unsubscribeToken,
           },
         );
 

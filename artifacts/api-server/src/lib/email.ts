@@ -339,6 +339,7 @@ export interface WorkshopReminderOptions {
   isOnline?: boolean;
   location?: string | null;
   meetingUrl?: string | null;
+  unsubscribeToken?: string | null;
 }
 
 export function workshopReminderEmail(
@@ -356,6 +357,10 @@ export function workshopReminderEmail(
       ? `<p style="margin:8px 0 0;font-size:13px;color:#a8a29e;">📍 ${escHtml(opts.location)}</p>`
       : "";
 
+  const unsubscribeLink = opts?.unsubscribeToken
+    ? `<a href="${BASE_URL.replace(/\/kiln$/, "")}/api/unsubscribe/workshop-reminders?token=${encodeURIComponent(opts.unsubscribeToken)}" style="color:#78716c;">Don't remind me for future workshops</a>`
+    : `<a href="${BASE_URL}/settings" style="color:#78716c;">Manage notification preferences</a>`;
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your workshop is tomorrow!</h1>
     <p style="color:#78716c;margin-bottom:0;">A friendly reminder that you have a workshop booked for tomorrow.</p>
@@ -366,6 +371,7 @@ export function workshopReminderEmail(
       ${locationLine}
     `)}
     ${btn(`${BASE_URL}/workshops/book/${escHtml(workshopId)}`, "View Workshop Details")}
+    <p style="margin-top:20px;font-size:12px;color:#57534e;">${unsubscribeLink}</p>
   `);
 }
 

@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { userSettingsTable, profilesTable } from "@workspace/db";
 
 import { eq } from "drizzle-orm";
+import { verifyUnsubscribeToken } from "../lib/unsubscribeTokens";
 
 const router = Router();
 
@@ -109,5 +110,81 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     res.json(created);
   }
 });
+
+// GET /api/unsubscribe/workshop-reminders?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+router.get("/unsubscribe/workshop-reminders", async (req, res): Promise<void> => {
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  if (!token) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is missing a token. Please use the link from your email.", false));
+    return;
+  }
+
+  const userId = verifyUnsubscribeToken(token);
+  if (!userId) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is invalid or has been tampered with. Please use the link from your original reminder email.", false));
+    return;
+  }
+
+  try {
+    const existing = await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
+    const currentSettings = (existing[0]?.settings as Record<string, unknown>) ?? {};
+    const newSettings = { ...currentSettings, workshopReminderOptOut: true };
+
+    if (existing.length > 0) {
+      await db.update(userSettingsTable)
+        .set({ settings: newSettings })
+        .where(eq(userSettingsTable.userId, userId));
+    } else {
+      await db.insert(userSettingsTable).values({
+        userId,
+        settings: newSettings,
+        shippingSettings: {},
+        paymentSettings: {},
+      });
+    }
+
+    res.send(unsubscribePage(
+      "You've been unsubscribed",
+      "You won't receive workshop reminder emails for future bookings. You can re-enable them any time in your notification settings.",
+      true,
+    ));
+  } catch {
+    res.status(500).send(unsubscribePage("Something went wrong", "We couldn't update your preference right now. Please try again later or manage your settings from your account.", false));
+  }
+});
+
+function unsubscribePage(title: string, message: string, success: boolean): string {
+  const color = success ? "#4ade80" : "#f87171";
+  const icon = success ? "✓" : "✗";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title} — Kiln</title>
+  <style>
+    body { font-family: Georgia, serif; background: #1a1714; color: #d6d3d1; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .card { background: #292524; border-radius: 16px; padding: 40px 48px; max-width: 480px; text-align: center; }
+    .icon { font-size: 48px; color: ${color}; margin-bottom: 16px; }
+    h1 { color: ${color}; font-size: 22px; margin: 0 0 12px; }
+    p { color: #a8a29e; font-size: 15px; line-height: 1.6; margin: 0 0 24px; }
+    a { display: inline-block; background: #f59e0b; color: #1c1917; padding: 10px 24px; border-radius: 24px; text-decoration: none; font-weight: bold; font-size: 14px; }
+    .brand { font-size: 20px; font-weight: bold; color: #f59e0b; margin-bottom: 32px; }
+    .sub { color: #78716c; font-size: 12px; margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">Kiln</div>
+    <div class="icon">${icon}</div>
+    <h1>${title}</h1>
+    <p>${message}</p>
+    <a href="https://kilnfire.replit.app/kiln/settings">Manage all preferences</a>
+    <p class="sub" style="margin-top:20px;">You can re-enable reminders from your notification settings at any time.</p>
+  </div>
+</body>
+</html>`;
+}
 
 export default router;
