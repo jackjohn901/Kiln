@@ -119,7 +119,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
 export default function MobileNav() {
   const [location] = useLocation();
   const { profile } = useProfile();
-  const { unreadCount, unreadMessageCount } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries } = useSocial();
+  const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const [showMore, setShowMore] = useState(false);
@@ -305,7 +306,9 @@ export default function MobileNav() {
                         const badge =
                           href === "/notifications" ? unreadCount :
                           href === "/messages" ? unreadMessageCount :
-                          href === "/cart" ? itemCount : 0;
+                          href === "/cart" ? itemCount :
+                          href === "/workshops" ? unreadWorkshopCount :
+                          href === "/inbox" ? (pendingInquiries + unreadCommissionPaymentCount) : 0;
 
                         return (
                           <Link key={href} href={href} onClick={() => setShowMore(false)}>
