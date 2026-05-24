@@ -23,56 +23,6 @@ interface ParliamentState {
 
 const STORAGE_KEY = "kiln_parliament_v1";
 
-const SEED_PROPOSALS: Proposal[] = [
-  {
-    id: "prop-001",
-    title: "Next Monthly Technique Spotlight",
-    description: "Which technique should Kiln feature in the June spotlight — with a dedicated week of curated reels, a master Q&A, and a beginner challenge?",
-    category: "technique",
-    options: [
-      { id: "raku", label: "Raku Firing", votes: 412 },
-      { id: "flamework", label: "Flameworking", votes: 387 },
-      { id: "anagama", label: "Wood-Fired / Anagama", votes: 291 },
-      { id: "bronze", label: "Bronze Casting", votes: 203 },
-    ],
-    endsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    totalVoices: 1293,
-    proposedBy: "Kiln Team",
-    proposedByAvatar: "https://picsum.photos/seed/kiln/60/60",
-  },
-  {
-    id: "prop-002",
-    title: "Summer Challenge Theme",
-    description: "The July community challenge draws hundreds of participants. You decide the theme — artists will have 30 days to create and share work around the winning concept.",
-    category: "challenge",
-    options: [
-      { id: "found", label: "Found Materials", votes: 534 },
-      { id: "origin", label: "Honoring Your Origin", votes: 489 },
-      { id: "constraint", label: "One Tool, One Day", votes: 378 },
-      { id: "collab", label: "Cross-Craft Collaboration", votes: 312 },
-    ],
-    endsAt: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
-    totalVoices: 1713,
-    proposedBy: "Community Council",
-    proposedByAvatar: "https://picsum.photos/seed/council/60/60",
-  },
-  {
-    id: "prop-003",
-    title: "Grant Spotlight Partner — Q3",
-    description: "Kiln will promote one grant-writing partner for Q3, featuring their opportunities to all artists. Which type of funding organization should we prioritize?",
-    category: "grant",
-    options: [
-      { id: "state", label: "State Arts Councils", votes: 621 },
-      { id: "private", label: "Private Foundations", votes: 445 },
-      { id: "international", label: "International Residencies", votes: 388 },
-      { id: "craft", label: "Craft-Specific Endowments", votes: 512 },
-    ],
-    endsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    totalVoices: 1966,
-    proposedBy: "Artist Advisory Board",
-    proposedByAvatar: "https://picsum.photos/seed/advisory/60/60",
-  },
-];
 
 const CATEGORY_COLORS: Record<string, string> = {
   technique: "text-blue-400 bg-blue-500/10 border-blue-500/20",
@@ -113,7 +63,8 @@ function saveState(s: ParliamentState) {
 export default function Parliament() {
   const { following, subscriptions, reelLikes, reelSaves, streak } = useSocial();
   const [state, setState] = useState<ParliamentState>(readState);
-  const [proposals, setProposals] = useState<Proposal[]>(SEED_PROPOSALS);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalsLoading, setProposalsLoading] = useState(true);
   const [selected, setSelected] = useState<Proposal | null>(null);
   const [votingFor, setVotingFor] = useState<string | null>(null);
   const [showPropose, setShowPropose] = useState(false);
@@ -131,22 +82,19 @@ export default function Parliament() {
     streak.current * 4 + 8
   );
 
-  // Load live proposals from API, fall back to seeds
+  // Load live proposals from API
   useEffect(() => {
     fetch("/api/parliament/proposals", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ proposals: Array<Proposal & { myVote: string | null }> }> : null)
       .then(data => {
-        if (!data?.proposals?.length) return;
-        // Merge API votes back into local state
+        if (!data?.proposals) return;
         const apiVotes: Record<string, string> = {};
         data.proposals.forEach(p => { if (p.myVote) apiVotes[p.id] = p.myVote; });
         setState(prev => ({ ...prev, myVotes: { ...apiVotes, ...prev.myVotes } }));
-        // Combine API proposals with seeds (seeds fill in if API has none)
-        const apiIds = new Set(data.proposals.map(p => p.id));
-        const seeds = SEED_PROPOSALS.filter(s => !apiIds.has(s.id));
-        setProposals([...data.proposals, ...seeds]);
+        setProposals(data.proposals);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setProposalsLoading(false));
   }, []);
 
   useEffect(() => { saveState(state); }, [state]);
@@ -256,6 +204,16 @@ export default function Parliament() {
         {/* Active proposals */}
         <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Active Votes ({proposals.length})</p>
         <div className="space-y-4">
+          {proposalsLoading && (
+            <div className="flex items-center justify-center py-12 text-stone-600 text-sm">Loading proposals…</div>
+          )}
+          {!proposalsLoading && proposals.length === 0 && (
+            <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-8 text-center">
+              <Vote size={32} className="mx-auto mb-3 text-stone-700" />
+              <p className="text-sm font-medium text-stone-400 mb-1">No active proposals yet</p>
+              <p className="text-xs text-stone-600">Be the first to propose something for the community to vote on.</p>
+            </div>
+          )}
           {proposals.map((proposal) => {
             const myVote = state.myVotes[proposal.id];
             const topOption = [...proposal.options].sort((a, b) => b.votes - a.votes)[0];

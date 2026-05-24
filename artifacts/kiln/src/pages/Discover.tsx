@@ -19,6 +19,18 @@ const TRENDING_TECHNIQUES = [
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
+interface NormalizedArtist {
+  id: string;
+  name: string;
+  handle: string;
+  medium: string;
+  location: string;
+  avatarUrl: string;
+  followerCount: number;
+  keywords?: string[];
+  images?: { url: string }[];
+}
+
 const MEDIUMS = ["All", "Ceramics", "Glass", "Painting", "Resin", "Fiber", "Metal", "Wood", "Drawing", "Printmaking", "Photography", "Enamel", "Sculpture", "Mosaic", "Leather", "Mixed"];
 const STATUS_FILTERS = ["Any", "Open", "Waitlisted"] as const;
 
@@ -54,6 +66,27 @@ export default function Discover() {
     fetch("/api/users/search?limit=8")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => { if (data?.profiles?.length) setCommunityProfiles(data.profiles); })
+      .catch(() => {});
+  }, []);
+
+  const [leaderboardArtists, setLeaderboardArtists] = useState<NormalizedArtist[]>([]);
+  useEffect(() => {
+    fetch("/api/leaderboard?limit=100")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.profiles?.length) return;
+        setLeaderboardArtists(data.profiles.map((p: Record<string, unknown>) => ({
+          id: p.userId as string,
+          name: (p.displayName as string | null) ?? (p.handle as string | null) ?? "Artist",
+          handle: (p.handle as string | null) ?? (p.userId as string),
+          medium: (p.medium as string | null) ?? "",
+          location: (p.location as string | null) ?? "",
+          avatarUrl: (p.avatarUrl as string | null) ?? `https://picsum.photos/seed/${p.userId}/200/200`,
+          followerCount: (p.followerCount as number | null) ?? 0,
+          keywords: [],
+          images: [{ url: (p.avatarUrl as string | null) ?? `https://picsum.photos/seed/${p.userId}/200/200` }],
+        })));
+      })
       .catch(() => {});
   }, []);
 
@@ -131,16 +164,31 @@ export default function Discover() {
     });
   };
 
+  const combinedArtists = useMemo<NormalizedArtist[]>(() => {
+    if (leaderboardArtists.length > 0) return leaderboardArtists;
+    return ALL_ARTISTS.map(a => ({
+      id: a.id,
+      name: a.name,
+      handle: a.id,
+      medium: a.medium,
+      location: a.location ?? "",
+      avatarUrl: a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/200/200`,
+      followerCount: 0,
+      keywords: a.keywords ?? [],
+      images: a.images,
+    }));
+  }, [leaderboardArtists]);
+
   const suggestions = useMemo(() => {
     if (query.length < 2) return { artists: [], techniques: [] };
     const q = query.toLowerCase();
-    const artistMatches = ALL_ARTISTS
+    const artistMatches = combinedArtists
       .filter((a) => a.name.toLowerCase().includes(q) || a.location.toLowerCase().includes(q))
       .slice(0, 5);
     const allTechniques = [...new Set(ALL_REELS.map((r) => r.technique))];
     const techniqueMatches = allTechniques.filter((t) => t.toLowerCase().includes(q)).slice(0, 3);
     return { artists: artistMatches, techniques: techniqueMatches };
-  }, [query]);
+  }, [query, combinedArtists]);
 
   // Personalised recommendations: artists sharing mediums/techniques with who the user follows
   const recommended = useMemo(() => {
@@ -148,12 +196,12 @@ export default function Discover() {
     const followedIds = new Set(following);
     const followedMediumWords = new Set<string>();
     following.forEach((artistId) => {
-      const a = ALL_ARTISTS.find((x) => x.id === artistId);
+      const a = combinedArtists.find((x) => x.id === artistId);
       if (a) {
         a.medium.toLowerCase().split(/[,/\s]+/).filter((w) => w.length > 3).forEach((w) => followedMediumWords.add(w));
       }
     });
-    return ALL_ARTISTS
+    return combinedArtists
       .filter((a) => !followedIds.has(a.id))
       .map((a) => {
         const words = a.medium.toLowerCase().split(/[,/\s]+/).filter((w) => w.length > 3);
@@ -164,15 +212,15 @@ export default function Discover() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
       .map((x) => x.artist);
-  }, [following]);
+  }, [following, combinedArtists]);
 
   const uniqueLocations = useMemo(() => {
-    const cities = ALL_ARTISTS.map((a) => a.location?.split(",")[0]?.trim()).filter(Boolean);
+    const cities = combinedArtists.map((a) => a.location?.split(",")[0]?.trim()).filter(Boolean);
     return ["Any", ...Array.from(new Set(cities)).sort()];
-  }, []);
+  }, [combinedArtists]);
 
   const filtered = useMemo(() => {
-    return ALL_ARTISTS.filter((a) => {
+    return combinedArtists.filter((a) => {
       const q = query.toLowerCase();
       const matchesQuery =
         !q ||
@@ -195,7 +243,7 @@ export default function Discover() {
 
       return matchesQuery && matchesMedium && matchesStatus && matchesLocation;
     });
-  }, [query, medium, statusFilter, locationFilter, getArtistCommissionStatus]);
+  }, [query, medium, statusFilter, locationFilter, getArtistCommissionStatus, combinedArtists]);
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">
@@ -268,8 +316,8 @@ export default function Discover() {
               <h2 className="text-sm font-semibold text-stone-300">Rising artists</h2>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-              {[...artists, ...seedArtists].slice(0, 8).map((a) => {
-                const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/200/200`;
+              {combinedArtists.slice(0, 8).map((a) => {
+                const avatar = a.avatarUrl ?? `https://picsum.photos/seed/${a.id}/200/200`;
                 return (
                   <Link key={a.id} href={`/artists/${a.id}`}>
                     <div className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer group">
@@ -632,7 +680,7 @@ export default function Discover() {
                         )}
                         <span className="flex items-center gap-0.5">
                           <Users size={9} />
-                          {(Math.abs(artist.name.charCodeAt(0) * 317 + artist.name.charCodeAt(1) * 131) % 4200 + 800).toLocaleString()}
+                          {artist.followerCount > 0 ? artist.followerCount.toLocaleString() : "—"}
                         </span>
                       </div>
                       <button

@@ -24,106 +24,13 @@ interface CollabPost {
   interested: boolean;
 }
 
-const SEED_COLLABS: CollabPost[] = [
-  {
-    id: "collab-001",
-    authorId: "maya-chen",
-    authorName: "Maya Chen",
-    authorAvatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80",
-    title: "Ceramic artist seeking glassblower for joint exhibition",
-    description: "I'm planning a show exploring the contrast between thrown forms and blown forms — both starting as molten or soft material and ending in totally different visual languages. Looking for a glassblower in the Pacific Northwest to split a gallery space and create companion pieces.",
-    seeking: ["Glass Blowing", "Flamework"],
-    offering: "50/50 gallery split, shared marketing, co-promotion to my 14k followers",
-    location: "Seattle, WA",
-    remote: false,
-    tags: ["exhibition", "gallery", "pacific-northwest", "joint-show"],
-    createdAt: "2026-05-13T10:00:00Z",
-    responses: 4,
-    interested: false,
-  },
-  {
-    id: "collab-002",
-    authorId: "james-okafor",
-    authorName: "James Okafor",
-    authorAvatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80",
-    title: "Woodturner + metalsmith wanted for functional art series",
-    description: "I'm a ceramics artist creating functional vessels and want to expand into furniture-scale functional art. Looking for a woodturner and a metalsmith to collaborate on a series of stools/tables with ceramic inlays and metal joinery. Remote collab possible for design, in-person for assembly.",
-    seeking: ["Woodturning", "Blacksmithing", "Metalsmithing"],
-    offering: "Equal credit, shared revenue, I'll handle gallery outreach",
-    location: "Chicago, IL",
-    remote: true,
-    tags: ["functional", "furniture", "multi-medium", "revenue-share"],
-    createdAt: "2026-05-11T14:30:00Z",
-    responses: 7,
-    interested: false,
-  },
-  {
-    id: "collab-003",
-    authorId: "elena-vasquez",
-    authorName: "Elena Vasquez",
-    authorAvatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80",
-    title: "Textile artist looking for a ceramicist for online course",
-    description: "Creating a video course on surface decoration — I'll cover resist dyeing and wax batik on fabric, looking for a ceramicist to cover wax resist and underglaze on clay. We'd offer it as a bundle and split the revenue. Full remote collab, flexible timeline.",
-    seeking: ["Ceramics", "Raku"],
-    offering: "50/50 course revenue, I handle all video production and editing",
-    location: "Remote",
-    remote: true,
-    tags: ["online-course", "education", "remote", "revenue-share", "surface-decoration"],
-    createdAt: "2026-05-09T09:15:00Z",
-    responses: 12,
-    interested: false,
-  },
-  {
-    id: "collab-004",
-    authorId: "takeshi-mori",
-    authorName: "Takeshi Mori",
-    authorAvatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80",
-    title: "Seeking enamelist for jewelry collab",
-    description: "I'm a silversmith and jewelry artist who wants to add enamel work to my pieces. Looking for an enamelist for a small 15-piece collection. You focus on the enamel elements, I handle the metalwork and setting. Looking for someone who works in vitreous or cloisonné.",
-    seeking: ["Enamel", "Studio Jewelry"],
-    offering: "60/40 split (your favor for enamel work), shared Etsy listing, cross-promotion",
-    location: "Portland, OR",
-    remote: false,
-    tags: ["jewelry", "enamel", "silversmithing", "collection"],
-    createdAt: "2026-05-08T16:00:00Z",
-    responses: 3,
-    interested: false,
-  },
-  {
-    id: "collab-005",
-    authorId: "sarah-thornton",
-    authorName: "Sarah Thornton",
-    authorAvatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80",
-    title: "Multi-artist residency application — need 2 more artists",
-    description: "Found a 3-month group residency at a well-funded arts center in Vermont (stipend + housing + studio). They want a cohesive group of 3–4 artists working in related media. I'm a glass artist. Looking for 1–2 more craft artists to apply together. Application deadline June 15.",
-    seeking: ["Ceramics", "Glass Blowing", "Flamework", "Metalsmithing"],
-    offering: "Shared residency, group stipend, professional development",
-    location: "Vermont (residency)",
-    remote: false,
-    tags: ["residency", "urgent", "stipend", "vermont", "group-application"],
-    createdAt: "2026-05-07T11:00:00Z",
-    responses: 9,
-    interested: false,
-  },
-];
 
 const MEDIUM_OPTIONS = ALL_CRAFTS;
 
-const COLLAB_KEY = "kiln_collabs_v1";
-
-function getCollabs(): CollabPost[] {
-  try {
-    const stored = JSON.parse(localStorage.getItem(COLLAB_KEY) ?? "[]") as CollabPost[];
-    return [...stored, ...SEED_COLLABS];
-  } catch {
-    return SEED_COLLABS;
-  }
-}
-
-
 export default function CollabBoard() {
   const { profile } = useProfile();
-  const [collabs, setCollabs] = useState<CollabPost[]>(getCollabs);
+  const [collabs, setCollabs] = useState<CollabPost[]>([]);
+  const [collabsLoading, setCollabsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterMedium, setFilterMedium] = useState<string>("all");
   const [filterRemote, setFilterRemote] = useState<"all" | "remote" | "local">("all");
@@ -141,14 +48,9 @@ export default function CollabBoard() {
   useEffect(() => {
     fetch("/api/collab-board", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ posts: CollabPost[] }> : null)
-      .then(data => {
-        if (data?.posts?.length) {
-          const apiIds = new Set(data.posts.map(p => p.id));
-          const seeds = SEED_COLLABS.filter(s => !apiIds.has(s.id));
-          setCollabs([...data.posts, ...seeds]);
-        }
-      })
-      .catch(() => {});
+      .then(data => { if (data?.posts) setCollabs(data.posts); })
+      .catch(() => {})
+      .finally(() => setCollabsLoading(false));
   }, []);
 
   async function toggleInterest(id: string) {
@@ -250,6 +152,16 @@ export default function CollabBoard() {
 
         {/* Cards */}
         <div className="flex flex-col gap-4">
+          {collabsLoading && (
+            <div className="flex items-center justify-center py-12 text-stone-600 text-sm">Loading…</div>
+          )}
+          {!collabsLoading && filtered.length === 0 && collabs.length === 0 && (
+            <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-8 text-center">
+              <Users size={32} className="mx-auto mb-3 text-stone-700" />
+              <p className="text-sm font-medium text-stone-400 mb-1">No collab posts yet</p>
+              <p className="text-xs text-stone-600">Be the first to post a collaboration opportunity.</p>
+            </div>
+          )}
           {filtered.map(collab => (
             <motion.div
               key={collab.id}

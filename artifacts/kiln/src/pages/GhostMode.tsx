@@ -42,70 +42,6 @@ const UPDATE_COLORS = {
   context: "text-emerald-400",
 };
 
-const SEED_PIECES: GhostPiece[] = [
-  {
-    id: "ghost-001",
-    title: "Amber Column #7",
-    artistName: "You",
-    medium: "Cast & Carved Glass",
-    soldTo: "Rachel Osei",
-    soldAt: "2023-11-03T14:20:00Z",
-    imageUrl: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&q=80",
-    subscriberCount: 14,
-    ownerSubscribed: true,
-    updates: [
-      {
-        id: "gu-001",
-        type: "note",
-        content: "Just looked back at the photos from making this piece. I was working through some difficult ideas about transparency at the time — both literally and otherwise. The amber color was an accident on the third pour that turned into the whole reason it works.",
-        postedAt: "2024-01-15T10:30:00Z",
-        likedBy: 8,
-      },
-      {
-        id: "gu-002",
-        type: "photo",
-        content: "Rachel sent me this — the piece in its new home. The afternoon light through her west-facing window hits it in a way I couldn't have planned. It looks like it was made for that exact spot.",
-        imageUrl: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80",
-        postedAt: "2024-02-10T14:00:00Z",
-        likedBy: 23,
-      },
-      {
-        id: "gu-003",
-        type: "anniversary",
-        content: "One year since this piece left the studio. I think about it often — that's what I hope for with each piece, that they go somewhere where they keep having a life.",
-        postedAt: "2024-11-03T09:00:00Z",
-        likedBy: 31,
-      },
-    ],
-  },
-  {
-    id: "ghost-002",
-    title: "Raku Fragment Vessel",
-    artistName: "Maya Chen",
-    medium: "Raku Ceramics",
-    soldTo: "You",
-    soldAt: "2025-03-15T11:00:00Z",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80",
-    subscriberCount: 7,
-    ownerSubscribed: true,
-    updates: [
-      {
-        id: "gu-004",
-        type: "context",
-        content: "This piece was from a series I made after returning from a residency in Mashiko, Japan. The crackle pattern in the glaze was intentionally induced by the post-firing reduction — I wanted the vessel to look like it had survived something, like it carried a history even though it was newly made.",
-        postedAt: "2025-04-02T12:00:00Z",
-        likedBy: 12,
-      },
-      {
-        id: "gu-005",
-        type: "exhibition",
-        content: "A piece from the same series was just included in 'Earth & Fire: Contemporary Ceramics' at the Portland Art Museum. I'll be giving a talk there in June — if you're nearby and want to join, DM me.",
-        postedAt: "2025-05-01T09:00:00Z",
-        likedBy: 19,
-      },
-    ],
-  },
-];
 
 function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 
@@ -130,9 +66,9 @@ export default function GhostMode() {
 
   useEffect(() => {
     fetch("/api/ghost-mode/pieces", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ pieces: GhostPiece[] }> : { pieces: SEED_PIECES })
+      .then(r => r.ok ? r.json() as Promise<{ pieces: GhostPiece[] }> : { pieces: [] })
       .then(data => setPieces(data.pieces))
-      .catch(() => setPieces(SEED_PIECES))
+      .catch(() => setPieces([]))
       .finally(() => setLoading(false));
   }, []);
 
