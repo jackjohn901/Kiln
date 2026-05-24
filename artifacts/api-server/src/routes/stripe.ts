@@ -1156,7 +1156,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                   const artistSettings = artistSettingsEntry?.settings ?? null;
                   const wantsEmail = !isEmailPaused(artistSettings, artistSettingsEntry?.notifEmailResumeAt) && artistSettings?.notif_email_new_sale !== false;
                   if (wantsEmail && artist.email) {
-                    const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
+                    const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems, webhookOrderId);
                     await sendEmail({
                       to: artist.email,
                       subject: 'You have a new sale on Kiln',
@@ -1332,7 +1332,7 @@ router.post('/stripe/webhook', async (req, res): Promise<void> => {
                 const artistSettings = artistSettingsEntry?.settings ?? null;
                 const wantsEmail = !isEmailPaused(artistSettings, artistSettingsEntry?.notifEmailResumeAt) && artistSettings?.notif_email_new_sale !== false;
                 if (wantsEmail && artist.email) {
-                  const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems);
+                  const html = newSaleEmail(buyerName, buyerEmail, session.id, amountTotal, artistItems, webhookOrderId);
                   await sendEmail({
                     to: artist.email,
                     subject: 'You have a new sale on Kiln',

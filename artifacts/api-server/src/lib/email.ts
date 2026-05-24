@@ -455,6 +455,7 @@ export function newSaleEmail(
   sessionId: string,
   amountTotalCents: number,
   items: ManualPayoutReceiptItem[],
+  orderId?: string | null,
 ): string {
   const itemRows = items
     .map(
@@ -486,7 +487,7 @@ export function newSaleEmail(
       <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">Next steps</p>
       <p style="margin:0;color:#d6d3d1;">Contact the buyer at the email above to confirm their shipping address and send tracking once the item is on its way.</p>
     `)}
-    ${btn(`${BASE_URL}/earnings`, "View Earnings")}
+    ${btn(orderId ? `${BASE_URL}/earnings/orders/${orderId}` : `${BASE_URL}/earnings`, "View order")}
   `);
 }
 
