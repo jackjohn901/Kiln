@@ -23,12 +23,10 @@ function webLinkToMobileRoute(link: string): string {
 }
 
 /**
- * How long to wait (ms) after dismissing a banner before showing the next
- * queued sale. This gives the slide-out spring animation time to complete
- * so the user sees a clear dismiss → reappear transition instead of an
- * in-place text swap.
+ * Brief pause (ms) between the slide-out animation completing and the next
+ * queued banner sliding in. Keeps the transition from feeling too instant.
  */
-const BETWEEN_BANNERS_MS = 400;
+const POST_ANIMATION_GAP_MS = 80;
 
 export function SaleNotificationListener() {
   const [currentSale, setCurrentSale] = useState<SaleEvent | null>(null);
@@ -44,31 +42,37 @@ export function SaleNotificationListener() {
   // Prevents concurrent dismiss→show transitions from racing each other.
   const isTransitioningRef = useRef(false);
 
-  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const postAnimationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
-  /** Show the next queued sale, or mark the transition as finished. */
-  const showNext = useCallback(() => {
-    isTransitioningRef.current = false;
-    const next = queueRef.current.shift();
-    if (next) {
-      currentSaleRef.current = next;
-      setCurrentSale(next);
-    }
+  /**
+   * Called by SaleBanner once the slide-out animation has fully completed.
+   * Shows the next queued sale (with a tiny gap) or marks the transition done.
+   */
+  const handleAnimatedOut = useCallback(() => {
+    if (postAnimationTimerRef.current)
+      clearTimeout(postAnimationTimerRef.current);
+    postAnimationTimerRef.current = setTimeout(() => {
+      isTransitioningRef.current = false;
+      const next = queueRef.current.shift();
+      if (next) {
+        currentSaleRef.current = next;
+        setCurrentSale(next);
+      }
+    }, POST_ANIMATION_GAP_MS);
   }, []);
 
   /**
-   * Dismiss the current banner.  If sales are queued, a new one slides in
-   * after BETWEEN_BANNERS_MS to give a visible dismiss → reappear cycle.
+   * Dismiss the current banner. The slide-out animation runs inside SaleBanner,
+   * and onAnimatedOut fires once it finishes to trigger the next queued item.
    */
   const dismiss = useCallback(() => {
     if (isTransitioningRef.current) return;
     isTransitioningRef.current = true;
     currentSaleRef.current = null;
     setCurrentSale(null);
-
-    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
-    transitionTimerRef.current = setTimeout(showNext, BETWEEN_BANNERS_MS);
-  }, [showNext]);
+  }, []);
 
   const handleSale = useCallback(
     (evt: SaleEvent) => {
@@ -106,6 +110,7 @@ export function SaleNotificationListener() {
       sale={currentSale}
       onDismiss={handleDismiss}
       onView={handleView}
+      onAnimatedOut={handleAnimatedOut}
     />
   );
 }

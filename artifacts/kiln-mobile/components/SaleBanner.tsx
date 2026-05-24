@@ -1,4 +1,11 @@
-import { Pressable, Text, View, StyleSheet, Animated } from "react-native";
+import {
+  Pressable,
+  Text,
+  View,
+  StyleSheet,
+  Animated,
+  Easing,
+} from "react-native";
 import { useEffect, useRef } from "react";
 import type { SaleEvent } from "@/lib/useWebSocket";
 
@@ -6,13 +13,19 @@ interface Props {
   sale: SaleEvent | null;
   onDismiss: () => void;
   onView: () => void;
+  onAnimatedOut?: () => void;
 }
 
-const AUTO_DISMISS_MS = 6000;
+export const AUTO_DISMISS_MS = 6000;
 
-export function SaleBanner({ sale, onDismiss, onView }: Props) {
-  const translateY = useRef(new Animated.Value(-100)).current;
+/** Duration of the slide-out (dismiss) timing animation in ms. */
+export const SLIDE_OUT_MS = 300;
+
+export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
+  const translateY = useRef(new Animated.Value(-120)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onAnimatedOutRef = useRef(onAnimatedOut);
+  onAnimatedOutRef.current = onAnimatedOut;
 
   useEffect(() => {
     if (sale) {
@@ -28,12 +41,16 @@ export function SaleBanner({ sale, onDismiss, onView }: Props) {
         onDismiss();
       }, AUTO_DISMISS_MS);
     } else {
-      Animated.spring(translateY, {
-        toValue: -100,
+      Animated.timing(translateY, {
+        toValue: -120,
+        duration: SLIDE_OUT_MS,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
-        tension: 80,
-        friction: 12,
-      }).start();
+      }).start(({ finished }) => {
+        if (finished) {
+          onAnimatedOutRef.current?.();
+        }
+      });
     }
 
     return () => {
