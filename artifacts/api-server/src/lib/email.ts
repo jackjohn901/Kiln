@@ -348,6 +348,7 @@ export function workshopReminderEmail(
   startDate: string,
   workshopId: string,
   opts?: WorkshopReminderOptions,
+  calParams?: WorkshopCalendarParams,
 ): string {
   const locationLine = opts?.isOnline
     ? opts.meetingUrl
@@ -356,6 +357,18 @@ export function workshopReminderEmail(
     : opts?.location
       ? `<p style="margin:8px 0 0;font-size:13px;color:#a8a29e;">📍 ${escHtml(opts.location)}</p>`
       : "";
+
+  const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, artistName, calParams) : "";
+  const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
+
+  const calendarLinks = (gcalUrl || icsUrl) ? `
+    <div style="margin-top:16px;">
+      <p style="margin:0 0 10px;font-size:13px;color:#a8a29e;">Add this workshop to your calendar:</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${gcalUrl ? `<a href="${gcalUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:13px;font-weight:bold;">📅 Google Calendar</a>` : ""}
+        ${icsUrl ? `<a href="${icsUrl}" style="display:inline-block;background:#444039;color:#d6d3d1;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:13px;font-weight:bold;border:1px solid #57534e;">🍎 Apple Calendar (.ics)</a>` : ""}
+      </div>
+    </div>` : "";
 
   const unsubscribeLink = opts?.unsubscribeToken
     ? `<a href="${BASE_URL.replace(/\/kiln$/, "")}/api/unsubscribe/workshop-reminders?token=${encodeURIComponent(opts.unsubscribeToken)}" style="color:#78716c;">Don't remind me for future workshops</a>`
@@ -369,6 +382,7 @@ export function workshopReminderEmail(
       <p style="margin:0 0 8px;">with <strong style="color:#fcd34d;">${escHtml(artistName)}</strong></p>
       <p style="margin:0;color:#78716c;">${escHtml(startDate)}</p>
       ${locationLine}
+      ${calendarLinks}
     `)}
     ${btn(`${BASE_URL}/workshops/book/${escHtml(workshopId)}`, "View Workshop Details")}
     <p style="margin-top:20px;font-size:12px;color:#57534e;">${unsubscribeLink}</p>

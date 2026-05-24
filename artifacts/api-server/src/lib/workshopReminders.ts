@@ -80,6 +80,13 @@ async function sendWorkshopReminders() {
             meetingUrl: workshop.meetingUrl,
             unsubscribeToken,
           },
+          {
+            startDateISO: workshop.startDate?.toISOString() ?? null,
+            endDateISO: workshop.endDate?.toISOString() ?? null,
+            location: workshop.location,
+            isOnline: workshop.isOnline ?? false,
+            workshopId: workshop.id,
+          },
         );
 
         const sent = await sendEmail({
