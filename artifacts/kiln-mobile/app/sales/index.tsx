@@ -215,29 +215,41 @@ export default function SalesScreen() {
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.summaryTitle, { color: colors.foreground }]}>Earnings Summary</Text>
               <View style={styles.summaryRow}>
-                <View style={styles.summaryItem}>
+                <Pressable
+                  style={styles.summaryItem}
+                  onPress={() => router.push("/sales/earnings-breakdown?category=tips" as any)}
+                >
                   <Feather name="heart" size={14} color="#f472b6" style={{ marginBottom: 4 }} />
                   <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
                     {formatPrice(totals.tips)}
                   </Text>
                   <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Tips</Text>
-                </View>
+                  <Feather name="chevron-right" size={10} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+                </Pressable>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.summaryItem}>
+                <Pressable
+                  style={styles.summaryItem}
+                  onPress={() => router.push("/sales/earnings-breakdown?category=patrons" as any)}
+                >
                   <Feather name="star" size={14} color="#a78bfa" style={{ marginBottom: 4 }} />
                   <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
                     {formatPrice(totals.subscriptions)}
                   </Text>
                   <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Patrons</Text>
-                </View>
+                  <Feather name="chevron-right" size={10} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+                </Pressable>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.summaryItem}>
+                <Pressable
+                  style={styles.summaryItem}
+                  onPress={() => router.push("/sales/earnings-breakdown?category=shop" as any)}
+                >
                   <Feather name="shopping-bag" size={14} color="#34d399" style={{ marginBottom: 4 }} />
                   <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
                     {formatPrice(totals.sales)}
                   </Text>
                   <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Shop</Text>
-                </View>
+                  <Feather name="chevron-right" size={10} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+                </Pressable>
               </View>
               <View style={[styles.summaryTotalRow, { borderTopColor: colors.border }]}>
                 <Text style={[styles.summaryTotalLabel, { color: colors.mutedForeground }]}>Total earnings</Text>
