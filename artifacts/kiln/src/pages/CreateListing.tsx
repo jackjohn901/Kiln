@@ -3,6 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon, Sparkles } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
+import { useProfile } from "@/contexts/ProfileContext";
 import ImageEditPanel from "@/components/ImageEditPanel";
 import type { FilterSettings } from "@/components/ImageEditor";
 
@@ -18,6 +19,7 @@ export default function CreateListing() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const { upload, uploading } = useUpload();
+  const { profile } = useProfile();
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [generatingDesc, setGeneratingDesc] = useState(false);
@@ -138,7 +140,17 @@ export default function CreateListing() {
           const r = await upload(fileToUpload);
           imageUrl = r.servingUrl;
         } catch {
-          imageUrl = bgPreview || cropPreview || imagePreview;
+          // Blob URLs are temporary — convert to a data URL so the image persists
+          try {
+            imageUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(fileToUpload);
+            });
+          } catch {
+            imageUrl = bgPreview || cropPreview || imagePreview;
+          }
         }
       }
 
@@ -184,12 +196,17 @@ export default function CreateListing() {
         </div>
         <h2 className="font-serif text-2xl text-amber-100">Listing Live</h2>
         <p className="text-stone-400 max-w-sm">Your piece is now visible in the Kiln shop for collectors to discover.</p>
+        {imagePreview && (
+          <div className="h-32 w-32 overflow-hidden rounded-2xl border border-white/10">
+            <img src={imagePreview} alt="" className="h-full w-full object-cover" />
+          </div>
+        )}
         <div className="flex gap-3">
           <button
-            onClick={() => navigate("/shop")}
+            onClick={() => navigate(profile ? `/artists/${profile.id}?tab=shop` : "/shop")}
             className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
           >
-            View Shop
+            View your shop
           </button>
           <button
             onClick={() => { setDone(false); setForm({ title: "", description: "", medium: "", technique: "", dimensions: "", weight: "", year: new Date().getFullYear().toString(), edition: "", price: "", shipsFrom: "", shipsTo: [], tags: [], imageUrl: "" }); setImagePreview(""); setImageFile(null); }}

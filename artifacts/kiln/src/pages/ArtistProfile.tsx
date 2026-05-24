@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import QABlock from "@/components/QABlock";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link, useLocation, useSearch } from "wouter";
 import {
   ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, BellOff, Bell, MoreHorizontal,
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
@@ -323,10 +323,12 @@ export default function ArtistProfile() {
   const { profile } = useProfile();
   const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
 
+  const search = useSearch();
   const artist = findArtist(id ?? "", profile);
   const isOwn = !!(profile && (profile.id === id || profile.handle === id));
 
-  const [tab, setTab] = useState<Tab>("posts");
+  const initialTab = (new URLSearchParams(search).get("tab") as Tab | null) ?? "posts";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [lightbox, setLightbox] = useState<GridItem | null>(null);
   const [showCommission, setShowCommission] = useState(false);
   const [showTip, setShowTip] = useState(false);
@@ -401,6 +403,15 @@ export default function ArtistProfile() {
       .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
       .catch(() => {});
   }, [id]);
+
+  // When viewing own profile, use the authenticated endpoint so listings always appear
+  useEffect(() => {
+    if (!isOwn) return;
+    fetch("/api/me/listings", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
+      .catch(() => {});
+  }, [isOwn]);
 
   async function handleDbFollow() {
     if (!id) return;
@@ -1071,6 +1082,19 @@ export default function ArtistProfile() {
                 const shopListings = apiListings ?? listings;
                 const hasPinned = shopListings.some(l => (l as { isPinned?: boolean }).isPinned);
                 if (shopListings.length === 0) {
+                  if (isOwn) {
+                    return (
+                      <div className="py-16 text-center space-y-4">
+                        <p className="text-stone-500 text-sm">You haven't listed any works yet.</p>
+                        <Link
+                          href="/create-listing"
+                          className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                        >
+                          <Plus size={14} /> List a piece
+                        </Link>
+                      </div>
+                    );
+                  }
                   return <div className="py-16 text-center text-stone-600 text-sm">No works available in the shop.</div>;
                 }
                 return (
