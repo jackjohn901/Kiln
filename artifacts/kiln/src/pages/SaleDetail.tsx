@@ -413,7 +413,7 @@ export default function SaleDetail() {
               )}
               {sale.buyerId && (
                 <button
-                  onClick={() => navigate(`/messages/${sale.buyerId}`)}
+                  onClick={() => { const ref = ordinalId(sale.id); navigate(`/messages/${sale.buyerId}?prefill=${encodeURIComponent(`Hi! Following up on your order ${ref} — `)}`); }}
                   className="flex items-center gap-1.5 rounded-lg border border-white/8 px-2.5 py-1.5 text-xs text-stone-400 hover:text-amber-300 hover:border-amber-500/30 hover:bg-amber-500/8 transition-colors flex-shrink-0"
                 >
                   <MessageSquare size={12} />

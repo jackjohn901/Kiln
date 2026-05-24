@@ -1396,7 +1396,7 @@ export default function Earnings() {
                                 {sale.buyerId && (
                                   <button
                                     title="Message buyer"
-                                    onClick={e => { e.stopPropagation(); navigate(`/messages/${sale.buyerId}`); }}
+                                    onClick={e => { e.stopPropagation(); const ref = "KLN-" + sale.id.slice(0, 8).toUpperCase(); navigate(`/messages/${sale.buyerId}?prefill=${encodeURIComponent(`Hi! Following up on your order ${ref} — `)}`); }}
                                     className="ml-1 flex items-center justify-center rounded-full p-0.5 text-stone-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors flex-shrink-0"
                                   >
                                     <MessageCircle size={13} />
