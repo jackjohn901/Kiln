@@ -202,6 +202,22 @@ function SetupGate() {
   return null;
 }
 
+function SessionGuard() {
+  const { isAuthenticated, isLoading } = useAuth();
+  useEffect(() => {
+    if (isLoading) return;
+    function handleSessionExpired() {
+      if (isAuthenticated) {
+        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/api/login?returnTo=${returnTo}`;
+      }
+    }
+    window.addEventListener("kiln:session-expired", handleSessionExpired);
+    return () => window.removeEventListener("kiln:session-expired", handleSessionExpired);
+  }, [isAuthenticated, isLoading]);
+  return null;
+}
+
 function RefCapture() {
   useEffect(() => {
     try {
@@ -287,6 +303,7 @@ function Router() {
       <RefCapture />
       <QuizGate />
       <SetupGate />
+      <SessionGuard />
       <Switch>
         <Route path="/" component={RootPage} />
       <Route path="/discover" component={Discover} />
