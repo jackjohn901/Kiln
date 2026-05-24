@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { workshopsTable, workshopBookingsTable, notificationsTable } from "@workspace/db";
-import { eq, and, desc, sql, gte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, isNull } from "drizzle-orm";
 import crypto from "crypto";
+import { sendEmail, workshopReminderEmail } from "../lib/email";
 
 const router = Router();
 
@@ -144,6 +145,65 @@ function formatIcsDate(date: Date): string {
 function escIcs(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,");
 }
+
+// POST /workshops/:id/reminders/send — manually trigger reminders for a workshop (owner only)
+router.post("/workshops/:id/reminders/send", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [workshop] = await db.select().from(workshopsTable).where(eq(workshopsTable.id, req.params.id));
+    if (!workshop) { res.status(404).json({ error: "Workshop not found" }); return; }
+    if (workshop.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const bookings = await db
+      .select()
+      .from(workshopBookingsTable)
+      .where(
+        and(
+          eq(workshopBookingsTable.workshopId, workshop.id),
+          eq(workshopBookingsTable.status, "confirmed"),
+          isNull(workshopBookingsTable.reminderSentAt),
+        )
+      );
+
+    let sent = 0;
+    for (const booking of bookings) {
+      if (!booking.userEmail) continue;
+
+      const startLabel = workshop.startDate
+        ? workshop.startDate.toLocaleString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            timeZoneName: "short",
+          })
+        : "Soon";
+
+      const html = workshopReminderEmail(workshop.title, workshop.artistName, startLabel, workshop.id);
+      const ok = await sendEmail({
+        to: booking.userEmail,
+        subject: `Reminder: "${workshop.title}" is coming up`,
+        html,
+      });
+
+      if (ok) {
+        await db
+          .update(workshopBookingsTable)
+          .set({ reminderSentAt: new Date() })
+          .where(eq(workshopBookingsTable.id, booking.id));
+        sent++;
+        req.log.info({ bookingId: booking.id, workshopId: workshop.id }, "manual reminder sent");
+      }
+    }
+
+    res.json({ sent });
+  } catch (err) {
+    req.log.error({ err }, "sendWorkshopReminders error");
+    res.status(500).json({ error: "Failed to send reminders" });
+  }
+});
 
 // GET /me/workshops — my bookings
 router.get("/me/workshops", async (req, res): Promise<void> => {
