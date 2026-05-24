@@ -41,7 +41,10 @@ export default function SaleBanner({ sale, queueLength, onDismiss }: Props) {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-green-300 text-sm">New Sale!</span>
             {queueLength > 0 && (
-              <span className="rounded-full bg-green-500/20 border border-green-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-green-300 leading-none">
+              <span
+                key={queueLength}
+                className="animate-badge-pop rounded-full bg-green-500/20 border border-green-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-green-300 leading-none"
+              >
                 +{queueLength} more
               </span>
             )}
