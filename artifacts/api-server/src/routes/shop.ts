@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
 import { sendEmailWithRetry, shippingNotificationEmail } from "../lib/email";
 import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
@@ -319,26 +319,49 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       .where(eq(ordersTable.id, req.params.id))
       .returning();
 
-    // Notify the buyer when the seller marks as shipped
-    if (status === "shipped" && existing.status !== "shipped" && updated.buyerId) {
+    // Notify the buyer when the seller marks as shipped or delivered
+    if (updated.buyerId && status !== undefined && status !== existing.status && (status === "shipped" || status === "delivered")) {
       const tracking = updated.trackingNumber ? ` Tracking: ${updated.trackingNumber}.` : "";
-      Promise.all([
-        db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
-        db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, updated.buyerId)),
-        db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
-      ]).then(([[s], [prof], [buyer]]) => {
-        sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", s?.settings as Record<string, unknown> | null, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`);
-        if (buyer?.email) {
-          sendEmailWithRetry(
-            {
-              to: buyer.email,
-              subject: `Your order has shipped: ${updated.title}`,
-              html: shippingNotificationEmail(updated.title ?? "Your order", updated.id, updated.trackingNumber),
-            },
-            { contextId: updated.id, label: "shipping notification" },
-          );
-        }
-      }).catch(() => {});
+      const orderLink = `/orders/${updated.id}`;
+
+      if (status === "shipped") {
+        // In-app notification
+        db.insert(notificationsTable).values({
+          id: crypto.randomUUID(),
+          userId: updated.buyerId,
+          type: "order_shipped",
+          text: `Your order "${updated.title ?? "your order"}" has shipped!${tracking}`,
+          link: orderLink,
+        }).catch(() => {});
+
+        // SMS + email
+        Promise.all([
+          db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
+          db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, updated.buyerId)),
+          db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
+        ]).then(([[s], [prof], [buyer]]) => {
+          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", s?.settings as Record<string, unknown> | null, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`);
+          if (buyer?.email) {
+            sendEmailWithRetry(
+              {
+                to: buyer.email,
+                subject: `Your order has shipped: ${updated.title}`,
+                html: shippingNotificationEmail(updated.title ?? "Your order", updated.id, updated.trackingNumber),
+              },
+              { contextId: updated.id, label: "shipping notification" },
+            );
+          }
+        }).catch(() => {});
+      } else if (status === "delivered") {
+        // In-app notification
+        db.insert(notificationsTable).values({
+          id: crypto.randomUUID(),
+          userId: updated.buyerId,
+          type: "order_delivered",
+          text: `Your order "${updated.title ?? "your order"}" has been delivered!`,
+          link: orderLink,
+        }).catch(() => {});
+      }
     }
 
     let buyerDisplayName: string | null = null;
