@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "expo-router";
 import { useWebSocket, type SaleEvent } from "@/lib/useWebSocket";
 import { SaleBanner } from "@/components/SaleBanner";
 
@@ -31,6 +31,7 @@ const POST_ANIMATION_GAP_MS = 80;
 export function SaleNotificationListener() {
   const [currentSale, setCurrentSale] = useState<SaleEvent | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   // Keep a ref in sync with state so callbacks always read the latest value
   // without needing to be re-created on every render.
@@ -92,6 +93,15 @@ export function SaleNotificationListener() {
   );
 
   useWebSocket({ onSaleNotification: handleSale });
+
+  // Auto-dismiss when the artist is already on the sales list or a sale detail.
+  useEffect(() => {
+    const onSalesRoute =
+      pathname === "/sales" || pathname.startsWith("/sales/");
+    if (onSalesRoute && currentSaleRef.current !== null) {
+      dismiss();
+    }
+  }, [pathname, dismiss]);
 
   const handleDismiss = useCallback(() => {
     dismiss();
