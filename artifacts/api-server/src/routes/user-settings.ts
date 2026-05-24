@@ -69,6 +69,15 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     }
   }
 
+  // Validate contactEmail if provided — empty string is allowed (clears the address)
+  if (typeof contactEmail === "string") {
+    const trimmed = contactEmail.trim();
+    if (trimmed.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      res.status(400).json({ error: "contactEmail must be a valid email address" });
+      return;
+    }
+  }
+
   // Persist contactEmail and phoneNumber to profiles table if provided
   const profileUpdates: Record<string, string | null> = {};
   if (typeof contactEmail === "string") profileUpdates.contactEmail = contactEmail.trim() || null;
