@@ -324,8 +324,10 @@ export default function Create() {
           mediaUrl = result.servingUrl;
         } catch {
           // Fall back to a data URL so the image is stored in the DB and works on every device
-          try { mediaUrl = await fileToDataUrl(imgFile); } catch { /* keep previewUrl */ }
+          try { mediaUrl = await fileToDataUrl(imgFile); } catch { mediaUrl = ""; }
         }
+        // Never send a blob: URL to the server — it's browser-local and will show as black everywhere else
+        if (mediaUrl.startsWith("blob:")) mediaUrl = "";
       }
 
       // Upload "before" image for reveal format
@@ -462,7 +464,7 @@ export default function Create() {
         </div>
 
         {/* Full post preview — phone frame */}
-        <div className="flex-1 flex flex-col items-center px-4 pb-4">
+        <div className="flex-1 flex flex-col items-center px-4 pb-28 md:pb-8">
           <div className="w-full max-w-sm">
             <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl" style={{ aspectRatio: "9/16" }}>
               {previewUrl && (
