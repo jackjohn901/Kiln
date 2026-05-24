@@ -95,6 +95,10 @@ export default function CreateWorkshop() {
         }),
       });
       if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = `/api/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
+          return;
+        }
         const d = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error ?? "Failed to create workshop");
       }

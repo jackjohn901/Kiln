@@ -203,18 +203,16 @@ function SetupGate() {
 }
 
 function SessionGuard() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   useEffect(() => {
     if (isLoading) return;
     function handleSessionExpired() {
-      if (isAuthenticated) {
-        const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
-        window.location.href = `/api/login?returnTo=${returnTo}`;
-      }
+      const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/api/login?returnTo=${returnTo}`;
     }
     window.addEventListener("kiln:session-expired", handleSessionExpired);
     return () => window.removeEventListener("kiln:session-expired", handleSessionExpired);
-  }, [isAuthenticated, isLoading]);
+  }, [isLoading]);
   return null;
 }
 

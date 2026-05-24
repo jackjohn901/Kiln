@@ -58,7 +58,10 @@ export default function ResaleMarket() {
           royaltyPercent: Number(form.royaltyPercent),
         }),
       });
-      if (!res.ok) { const d = await res.json(); setError(d.error ?? "Failed to list"); setSubmitting(false); return; }
+      if (!res.ok) {
+        if (res.status === 401) { window.location.href = `/api/login?returnTo=${encodeURIComponent(window.location.pathname)}`; return; }
+        const d = await res.json(); setError(d.error ?? "Failed to list"); setSubmitting(false); return;
+      }
       const created = await res.json();
       setListings(prev => [created, ...prev]);
       setShowModal(false);
