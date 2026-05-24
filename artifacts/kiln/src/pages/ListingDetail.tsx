@@ -134,54 +134,188 @@ function estimateShipping(listing: Listing, zip: string): { label: string; days:
   ];
 }
 
-function ShippingEstimate({ listing }: { listing: Listing }) {
+const INTL_COUNTRIES = [
+  { code: "CA", name: "Canada", region: "North America" },
+  { code: "MX", name: "Mexico", region: "North America" },
+  { code: "GB", name: "United Kingdom", region: "Europe" },
+  { code: "DE", name: "Germany", region: "Europe" },
+  { code: "FR", name: "France", region: "Europe" },
+  { code: "IT", name: "Italy", region: "Europe" },
+  { code: "ES", name: "Spain", region: "Europe" },
+  { code: "NL", name: "Netherlands", region: "Europe" },
+  { code: "SE", name: "Sweden", region: "Europe" },
+  { code: "NO", name: "Norway", region: "Europe" },
+  { code: "DK", name: "Denmark", region: "Europe" },
+  { code: "CH", name: "Switzerland", region: "Europe" },
+  { code: "AT", name: "Austria", region: "Europe" },
+  { code: "BE", name: "Belgium", region: "Europe" },
+  { code: "PT", name: "Portugal", region: "Europe" },
+  { code: "PL", name: "Poland", region: "Europe" },
+  { code: "AU", name: "Australia", region: "Asia-Pacific" },
+  { code: "NZ", name: "New Zealand", region: "Asia-Pacific" },
+  { code: "JP", name: "Japan", region: "Asia-Pacific" },
+  { code: "KR", name: "South Korea", region: "Asia-Pacific" },
+  { code: "SG", name: "Singapore", region: "Asia-Pacific" },
+  { code: "HK", name: "Hong Kong", region: "Asia-Pacific" },
+  { code: "CN", name: "China", region: "Asia-Pacific" },
+  { code: "IN", name: "India", region: "Asia-Pacific" },
+  { code: "BR", name: "Brazil", region: "South America" },
+  { code: "AR", name: "Argentina", region: "South America" },
+  { code: "CL", name: "Chile", region: "South America" },
+  { code: "ZA", name: "South Africa", region: "Africa" },
+  { code: "AE", name: "UAE", region: "Middle East" },
+  { code: "IL", name: "Israel", region: "Middle East" },
+];
+
+function estimateInternational(
+  listing: Listing,
+  countryCode: string,
+  artistShipping: ArtistShipping | null,
+): { label: string; days: string; price: number }[] | null {
+  if (!countryCode) return null;
+  const country = INTL_COUNTRIES.find((c) => c.code === countryCode);
+  if (!country) return null;
+
+  const base =
+    artistShipping?.internationalRate != null && artistShipping.internationalRate > 0
+      ? artistShipping.internationalRate
+      : listing.price >= 5000 ? 120 : listing.price >= 1500 ? 85 : listing.price >= 500 ? 55 : 38;
+
+  const regionSurcharge: Record<string, number> = {
+    "North America": 0,
+    "Europe": 10,
+    "Asia-Pacific": 20,
+    "South America": 25,
+    "Africa": 30,
+    "Middle East": 20,
+  };
+  const surcharge = regionSurcharge[country.region] ?? 15;
+  const std = base + surcharge;
+  const exp = Math.round(std * 1.6);
+  return [
+    { label: `Standard International (${country.name})`, days: "10–21 business days", price: std },
+    { label: `Priority International (${country.name})`, days: "5–10 business days", price: exp },
+  ];
+}
+
+function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artistShipping: ArtistShipping | null }) {
+  const [mode, setMode] = useState<"domestic" | "international">("domestic");
   const [zip, setZip] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const estimates = submitted ? estimateShipping(listing, zip) : null;
+  const [country, setCountry] = useState("");
+
+  const domesticEstimates = submitted ? estimateShipping(listing, zip) : null;
+  const intlEstimates = country ? estimateInternational(listing, country, artistShipping) : null;
+
+  const hasIntl =
+    !artistShipping ||
+    artistShipping.internationalRate == null ||
+    artistShipping.internationalRate > 0 ||
+    (artistShipping.shipsTo ?? []).length === 0;
 
   return (
     <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Truck size={14} className="text-amber-400" />
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shipping estimate</p>
-        {listing.price >= 3000 && (
+        {listing.price >= 3000 && mode === "domestic" && (
           <span className="ml-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
             Free shipping
           </span>
         )}
       </div>
-      <div className="flex gap-2">
-        <input
-          value={zip}
-          onChange={(e) => { setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setSubmitted(false); }}
-          placeholder="Enter ZIP code"
-          inputMode="numeric"
-          maxLength={5}
-          className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
-        />
+
+      {/* Mode toggle */}
+      <div className="flex rounded-xl border border-white/8 bg-stone-800/60 p-0.5 mb-3 text-[11px] font-semibold">
         <button
-          onClick={() => zip.length === 5 && setSubmitted(true)}
-          disabled={zip.length !== 5}
-          className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+          onClick={() => setMode("domestic")}
+          className={`flex-1 rounded-lg py-1.5 transition-colors ${mode === "domestic" ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-400"}`}
         >
-          Calculate
+          Domestic (US)
+        </button>
+        <button
+          onClick={() => setMode("international")}
+          className={`flex-1 rounded-lg py-1.5 transition-colors ${mode === "international" ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-400"}`}
+        >
+          International
         </button>
       </div>
-      {estimates && (
-        <div className="mt-3 space-y-2">
-          {estimates.map((e) => (
-            <div key={e.label} className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs text-stone-400 truncate">{e.label}</p>
-                <p className="text-[10px] text-stone-600">{e.days}</p>
-              </div>
-              <span className="shrink-0 text-sm font-bold text-amber-300">
-                {e.price === 0 ? "Free" : formatPrice(e.price)}
-              </span>
+
+      {mode === "domestic" ? (
+        <>
+          <div className="flex gap-2">
+            <input
+              value={zip}
+              onChange={(e) => { setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setSubmitted(false); }}
+              placeholder="Enter ZIP code"
+              inputMode="numeric"
+              maxLength={5}
+              className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
+            />
+            <button
+              onClick={() => zip.length === 5 && setSubmitted(true)}
+              disabled={zip.length !== 5}
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+            >
+              Calculate
+            </button>
+          </div>
+          {domesticEstimates && (
+            <div className="mt-3 space-y-2">
+              {domesticEstimates.map((e) => (
+                <div key={e.label} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-stone-400 truncate">{e.label}</p>
+                    <p className="text-[10px] text-stone-600">{e.days}</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold text-amber-300">
+                    {e.price === 0 ? "Free" : formatPrice(e.price)}
+                  </span>
+                </div>
+              ))}
+              <p className="text-[10px] text-stone-700 pt-1">Estimates only — final shipping arranged directly with artist. All works are professionally packed.</p>
             </div>
-          ))}
-          <p className="text-[10px] text-stone-700 pt-1">Estimates only — final shipping arranged directly with artist. All works are professionally packed.</p>
-        </div>
+          )}
+        </>
+      ) : (
+        <>
+          {!hasIntl ? (
+            <p className="text-xs text-stone-500 text-center py-2">This artist does not ship internationally.</p>
+          ) : (
+            <>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 focus:border-amber-500/40 focus:outline-none"
+              >
+                <option value="">Select your country…</option>
+                {(["North America", "Europe", "Asia-Pacific", "South America", "Africa", "Middle East"] as const).map((region) => (
+                  <optgroup key={region} label={region}>
+                    {INTL_COUNTRIES.filter((c) => c.region === region).map((c) => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              {intlEstimates && (
+                <div className="mt-3 space-y-2">
+                  {intlEstimates.map((e) => (
+                    <div key={e.label} className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs text-stone-400 truncate">{e.label}</p>
+                        <p className="text-[10px] text-stone-600">{e.days}</p>
+                      </div>
+                      <span className="shrink-0 text-sm font-bold text-amber-300">
+                        {formatPrice(e.price)}
+                      </span>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-stone-700 pt-1">International estimates only — customs duties and taxes may apply. Final shipping confirmed with artist.</p>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );
@@ -780,7 +914,7 @@ export default function ListingDetail() {
             )}
 
             {/* ── Shipping Estimate ── */}
-            <ShippingEstimate listing={listing} />
+            <ShippingEstimate listing={listing} artistShipping={artistShipping} />
 
             {/* ── Actions ── */}
             {listing.available ? (
