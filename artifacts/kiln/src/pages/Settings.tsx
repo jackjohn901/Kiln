@@ -490,10 +490,12 @@ export default function Settings() {
               </button>
             </div>
             {settings.notif_email_paused && (
-              <div className="flex items-start gap-2 py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-1">
-                <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-300">
-                  Emails are globally paused — no notifications will be sent even if individual types are enabled below. Flip the switch above to resume.
+              <div className={`flex items-start gap-2 py-2.5 px-3 rounded-xl mb-1 ${contactEmail.trim() ? "bg-amber-500/10 border border-amber-500/20" : "bg-stone-800/50 border border-white/8 opacity-50"}`}>
+                <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${contactEmail.trim() ? "text-amber-400" : "text-stone-500"}`} />
+                <p className={`text-xs ${contactEmail.trim() ? "text-amber-300" : "text-stone-500"}`}>
+                  {contactEmail.trim()
+                    ? "Emails are globally paused — no notifications will be sent even if individual types are enabled below. Flip the switch above to resume."
+                    : "No email address saved — add one above before pausing has any effect."}
                 </p>
               </div>
             )}
