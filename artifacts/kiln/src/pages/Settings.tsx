@@ -378,10 +378,17 @@ export default function Settings() {
                   <div className="h-10 w-10 rounded-full overflow-hidden bg-stone-800">
                     {profile.avatarUrl && <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />}
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-stone-200">{profile.name}</p>
                     <p className="text-xs text-stone-500">@{profile.handle}</p>
                   </div>
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors shrink-0"
+                  >
+                    <LogOut size={12} />
+                    Log out
+                  </button>
                 </div>
               ) : (
                 <p className="text-sm text-stone-500">Not signed in</p>
