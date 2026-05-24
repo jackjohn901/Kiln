@@ -692,15 +692,6 @@ export default function Earnings() {
                         : "border-white/8",
                     ].join(" ")}
                   >
-                    {statsFlash && (
-                      <span className="absolute top-2 right-2 flex items-center gap-1">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                        </span>
-                        <span className="text-[9px] font-medium text-emerald-400 uppercase tracking-wide">Updated</span>
-                      </span>
-                    )}
                     {stat.clickable && (
                       <span className="absolute top-2 right-2">
                         {salesBreakdownOpen
@@ -711,6 +702,10 @@ export default function Earnings() {
                     <Icon size={16} className={`mb-2 ${stat.color}`} />
                     <p className="text-xs text-stone-500 mb-0.5">{stat.label}</p>
                     <p className="text-lg font-bold text-stone-100">{stat.value}</p>
+                    <p className={[
+                      "text-[10px] font-medium text-emerald-400 mt-1 transition-opacity duration-700",
+                      statsFlash ? "opacity-100" : "opacity-0",
+                    ].join(" ")}>Updated just now</p>
                   </div>
                 );
               })}
