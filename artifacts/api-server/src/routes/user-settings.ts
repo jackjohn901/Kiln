@@ -51,6 +51,24 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
   const userId = req.user.id;
   const { settings, shippingSettings, paymentSettings, contactEmail, phoneNumber, defaultShippingAddress } = req.body;
 
+  // Detect notif_email_paused transitions to set/clear the timestamp
+  let notifEmailPausedAtUpdate: { notifEmailPausedAt: Date | null } | undefined;
+  if (settings !== undefined && typeof settings === "object" && settings !== null) {
+    const incoming = settings as Record<string, unknown>;
+    if ("notif_email_paused" in incoming) {
+      if (incoming.notif_email_paused === true) {
+        // Check if it was already paused so we don't reset the timestamp on every save
+        const [existing] = await db.select({ notifEmailPausedAt: userSettingsTable.notifEmailPausedAt })
+          .from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
+        if (!existing?.notifEmailPausedAt) {
+          notifEmailPausedAtUpdate = { notifEmailPausedAt: new Date() };
+        }
+      } else if (incoming.notif_email_paused === false) {
+        notifEmailPausedAtUpdate = { notifEmailPausedAt: null };
+      }
+    }
+  }
+
   // Validate processingWindow if provided in paymentSettings
   if (paymentSettings !== undefined && paymentSettings !== null && typeof paymentSettings === "object") {
     const pw = (paymentSettings as Record<string, unknown>).processingWindow;
@@ -97,6 +115,7 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
       ...(shippingSettings !== undefined && { shippingSettings }),
       ...(paymentSettings !== undefined && { paymentSettings }),
       ...(defaultShippingAddress !== undefined && { defaultShippingAddress: defaultShippingAddress ?? null }),
+      ...notifEmailPausedAtUpdate,
     }).where(eq(userSettingsTable.userId, userId)).returning();
     res.json(updated);
   } else {
@@ -106,6 +125,7 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
       shippingSettings: shippingSettings ?? {},
       paymentSettings: paymentSettings ?? {},
       defaultShippingAddress: defaultShippingAddress ?? null,
+      ...(notifEmailPausedAtUpdate?.notifEmailPausedAt !== undefined && { notifEmailPausedAt: notifEmailPausedAtUpdate.notifEmailPausedAt }),
     }).returning();
     res.json(created);
   }

@@ -71,6 +71,7 @@ export default function Settings() {
   const [phoneValidationError, setPhoneValidationError] = useState(false);
   const [address, setAddress] = useState<DefaultShippingAddress>(defaultAddress);
   const [addressSaved, setAddressSaved] = useState(false);
+  const [emailPausedAt, setEmailPausedAt] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -87,7 +88,7 @@ export default function Settings() {
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null; notifEmailPausedAt?: string | null }> : null)
       .then(data => {
         if (!data) return;
         if (data.shippingSettings && Object.keys(data.shippingSettings).length > 0) {
@@ -103,11 +104,20 @@ export default function Settings() {
         if (data.defaultShippingAddress) {
           setAddress({ ...defaultAddress(), ...data.defaultShippingAddress });
         }
+        setEmailPausedAt(data.notifEmailPausedAt ?? null);
       })
       .catch(() => {});
   }, []);
 
   function toggle(key: keyof KilnSettings) {
+    if (key === "notif_email_paused") {
+      const turningOn = !settings.notif_email_paused;
+      if (turningOn) {
+        setEmailPausedAt(new Date().toISOString());
+      } else {
+        setEmailPausedAt(null);
+      }
+    }
     updateSetting(key);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -381,7 +391,7 @@ export default function Settings() {
                 <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${contactEmail.trim() ? "text-amber-400" : "text-stone-500"}`} />
                 <p className={`text-xs ${contactEmail.trim() ? "text-amber-300" : "text-stone-500"}`}>
                   {contactEmail.trim()
-                    ? "Emails are globally paused — no notifications will be sent even if individual types are enabled below. Flip the switch above to resume."
+                    ? `Emails are globally paused${emailPausedAt ? ` since ${new Date(emailPausedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(emailPausedAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })}` : ""} — no notifications will be sent even if individual types are enabled below. Flip the switch above to resume.`
                     : "No email address saved — add one above before pausing has any effect."}
                 </p>
               </div>
