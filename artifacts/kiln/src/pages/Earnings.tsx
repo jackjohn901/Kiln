@@ -418,6 +418,7 @@ export default function Earnings() {
       };
       setTotals(newTotals);
       prevTotalsRef.current = newTotals;
+      setStatsLastRefreshed(new Date());
       return newTotals;
     } catch { /* ignore */ }
     return undefined;
