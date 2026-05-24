@@ -19,6 +19,7 @@ import { getCommunityBeats } from "@/lib/communityBeats";
 import { createBeatLooper } from "@/lib/beatSynth";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import Comments from "@/components/Comments";
 import NotificationPanel from "@/components/NotificationPanel";
@@ -34,7 +35,6 @@ import { ALL_REELS, TECHNIQUE_COLORS, type Reel } from "@/data/reels";
 import { getPosts } from "@/data/posts";
 
 const PREFS_KEY = "kiln_prefs_v1";
-const SETTING_KEY = "kiln_settings_v1";
 const INTERACTIONS_KEY = "kiln_interactions_v1";
 
 interface FeedInteractions {
@@ -56,13 +56,6 @@ function readInteractions(): FeedInteractions {
   }
 }
 
-function readKilnSettings() {
-  try {
-    return JSON.parse(localStorage.getItem(SETTING_KEY) ?? "{}");
-  } catch {
-    return {};
-  }
-}
 
 const FEED_TECHNIQUE_MEDIUM_MAP: Record<string, string> = {
   "Glass Blowing": "glass", "Flameworking": "glass", "Kiln Forming": "glass",
@@ -898,6 +891,7 @@ export default function Feed() {
 
   const { following, unreadCount } = useSocial();
   const { profile } = useProfile();
+  const { settings: kilnSettings } = useSettings();
   const [, navigate] = useLocation(); // used by StreakBadge and other sub-components
   const followedFirings = SEED_KILN_STATUSES.filter((s) => following.includes(s.artistId));
   const [kilnBannerDismissed, setKilnBannerDismissed] = useState(false);
@@ -1052,7 +1046,6 @@ export default function Feed() {
     }
     // Read current interaction data and quiz prefs each time
     const interactions = readInteractions();
-    const settings = readKilnSettings();
     const prefs = (() => {
       try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}"); } catch { return {}; }
     })();
@@ -1063,12 +1056,12 @@ export default function Feed() {
       score: scoreReel(r, interactions, following, quizTechniques),
     }));
     // Respect settings (autoplay / sound etc wired in feed)
-    void settings;
+    void kilnSettings;
     return [
       ...userPostReels,
       ...scored.sort((a, b) => b.score - a.score).map((s) => s.reel),
     ];
-  }, [feedTab, following, userPostReels, followingApiReels]);
+  }, [feedTab, following, userPostReels, followingApiReels, kilnSettings]);
 
   const reels = useMemo(() => {
     const base = techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels;

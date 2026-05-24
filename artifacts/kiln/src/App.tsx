@@ -12,6 +12,7 @@ import { SocialProvider } from "@/contexts/SocialContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { StripeConnectProvider } from "@/contexts/StripeConnectContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import MobileNav from "@/components/MobileNav";
 import NotFound from "@/pages/not-found";
 import Feed from "@/pages/Feed";
@@ -446,17 +447,19 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <ProfileProvider>
-            <SocialProvider>
-              <CartProvider>
-                <StripeConnectProvider>
-                  <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                    <Router />
-                    <MobileNav />
-                  </WouterRouter>
-                  <Toaster />
-                </StripeConnectProvider>
-              </CartProvider>
-            </SocialProvider>
+            <SettingsProvider>
+              <SocialProvider>
+                <CartProvider>
+                  <StripeConnectProvider>
+                    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                      <Router />
+                      <MobileNav />
+                    </WouterRouter>
+                    <Toaster />
+                  </StripeConnectProvider>
+                </CartProvider>
+              </SocialProvider>
+            </SettingsProvider>
           </ProfileProvider>
         </TooltipProvider>
       </AuthProvider>

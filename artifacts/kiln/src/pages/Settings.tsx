@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
 
-const SETTING_KEY = "kiln_settings_v1";
 const SHIPPING_KEY = "kiln_shipping_v1";
 
 const SHIPS_TO_OPTIONS = ["Worldwide", "United States", "Canada", "Europe", "Australia", "United Kingdom"];
@@ -32,81 +32,6 @@ function saveShippingSettings(s: ShippingSettings) {
   try { localStorage.setItem(SHIPPING_KEY, JSON.stringify(s)); } catch {}
 }
 
-interface KilnSettings {
-  notif_likes: boolean;
-  notif_comments: boolean;
-  notif_follows: boolean;
-  notif_commissions: boolean;
-  notif_workshops: boolean;
-  notif_drops: boolean;
-  notif_email_paused: boolean;
-  notif_email_digest: boolean;
-  notif_email_follows: boolean;
-  notif_email_comments: boolean;
-  notif_email_new_sale: boolean;
-  notif_email_new_booking: boolean;
-  notif_email_commission_payment: boolean;
-  notif_email_new_commission: boolean;
-  notif_email_new_patron: boolean;
-  notif_email_outbid: boolean;
-  notif_email_mentions: boolean;
-  notif_sms_paused: boolean;
-  notif_sms_outbid: boolean;
-  notif_sms_drops: boolean;
-  notif_sms_shipped: boolean;
-  privacy_profile_public: boolean;
-  privacy_show_location: boolean;
-  privacy_allow_messages: boolean;
-  display_dark_mode: boolean;
-  display_compact: boolean;
-  display_autoplay: boolean;
-  display_sound: boolean;
-}
-
-function readSettings(): KilnSettings {
-  try {
-    return { ...defaultSettings(), ...JSON.parse(localStorage.getItem(SETTING_KEY) ?? "{}") };
-  } catch {
-    return defaultSettings();
-  }
-}
-
-function defaultSettings(): KilnSettings {
-  return {
-    notif_likes: true,
-    notif_comments: true,
-    notif_follows: true,
-    notif_commissions: true,
-    notif_workshops: true,
-    notif_drops: true,
-    notif_email_paused: false,
-    notif_email_digest: false,
-    notif_email_follows: false,
-    notif_email_comments: false,
-    notif_email_new_sale: true,
-    notif_email_new_booking: true,
-    notif_email_commission_payment: true,
-    notif_email_new_commission: true,
-    notif_email_new_patron: true,
-    notif_email_outbid: true,
-    notif_email_mentions: true,
-    notif_sms_paused: false,
-    notif_sms_outbid: true,
-    notif_sms_drops: true,
-    notif_sms_shipped: true,
-    privacy_profile_public: true,
-    privacy_show_location: true,
-    privacy_allow_messages: true,
-    display_dark_mode: true,
-    display_compact: false,
-    display_autoplay: true,
-    display_sound: false,
-  };
-}
-
-function saveSettings(s: KilnSettings) {
-  try { localStorage.setItem(SETTING_KEY, JSON.stringify(s)); } catch {}
-}
 
 interface DefaultShippingAddress {
   street: string;
@@ -124,8 +49,8 @@ type Section = "notifications" | "privacy" | "display" | "account" | "payments" 
 
 export default function Settings() {
   const { profile, logout } = useProfile();
+  const { settings, settingsLoaded, updateSetting } = useSettings();
   const search = useSearch();
-  const [settings, setSettings] = useState<KilnSettings>(readSettings);
   const [section, setSection] = useState<Section | null>(() => {
     const params = new URLSearchParams(search);
     const s = params.get("section");
@@ -133,8 +58,6 @@ export default function Settings() {
     return (s && (valid as string[]).includes(s)) ? (s as Section) : null;
   });
   const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState(false);
-  const saveErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [payments, setPayments] = useState<ArtistPayments>(readPaymentSettings);
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
@@ -148,8 +71,6 @@ export default function Settings() {
   const [phoneValidationError, setPhoneValidationError] = useState(false);
   const [address, setAddress] = useState<DefaultShippingAddress>(defaultAddress);
   const [addressSaved, setAddressSaved] = useState(false);
-  const [settingsStatus, setSettingsStatus] = useState<"loading" | "loaded" | "error">("loading");
-  const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -166,15 +87,9 @@ export default function Settings() {
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ settings?: KilnSettings; shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null }> : null)
       .then(data => {
-        if (!data) {
-          setSettingsStatus("error");
-          return;
-        }
-        const merged = { ...defaultSettings(), ...(data.settings ?? {}) };
-        setSettings(merged);
-        saveSettings(merged);
+        if (!data) return;
         if (data.shippingSettings && Object.keys(data.shippingSettings).length > 0) {
           setShipping(s => ({ ...s, ...data.shippingSettings }));
           saveShippingSettings({ ...defaultShipping(), ...data.shippingSettings });
@@ -188,44 +103,14 @@ export default function Settings() {
         if (data.defaultShippingAddress) {
           setAddress({ ...defaultAddress(), ...data.defaultShippingAddress });
         }
-        setSettingsStatus("loaded");
       })
-      .catch(() => {
-        setSettingsStatus("error");
-      });
+      .catch(() => {});
   }, []);
 
-  function syncToServer(s: KilnSettings) {
-    if (syncTimeout.current) clearTimeout(syncTimeout.current);
-    syncTimeout.current = setTimeout(() => {
-      fetch("/api/me/settings", {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings: s }),
-      }).then(r => {
-        if (!r.ok) throw new Error("save failed");
-        setSaveError(false);
-      }).catch(() => {
-        setSaveError(true);
-        if (saveErrorTimeout.current) clearTimeout(saveErrorTimeout.current);
-        saveErrorTimeout.current = setTimeout(() => setSaveError(false), 4000);
-      });
-    }, 800);
-  }
-
   function toggle(key: keyof KilnSettings) {
-    setSettings((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      saveSettings(next);
-      syncToServer(next);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
-      if (key === "display_dark_mode") {
-        document.documentElement.classList.toggle("light", !next.display_dark_mode);
-      }
-      return next;
-    });
+    updateSetting(key);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
   }
 
   function savePhoneNumber(phone: string) {
@@ -288,7 +173,7 @@ export default function Settings() {
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
   const emailPaused = settings.notif_email_paused;
-  const notifDesc = settingsStatus !== "loaded"
+  const notifDesc = !settingsLoaded
     ? "—"
     : !contactEmail.trim()
     ? "No email address set"
@@ -298,7 +183,7 @@ export default function Settings() {
     ? "Emails off · push only"
     : `${activeEmailCount} of ${EMAIL_KEYS.length} email types active`;
 
-  const notifDescClass = settingsStatus !== "loaded"
+  const notifDescClass = !settingsLoaded
     ? "text-stone-600"
     : !contactEmail.trim()
     ? "text-amber-400"
@@ -308,10 +193,10 @@ export default function Settings() {
     ? "text-amber-400"
     : "text-emerald-400";
 
-  const notifWarn = settingsStatus === "loaded" && !!contactEmail.trim() && (activeEmailCount === 0 || (emailPaused && activeEmailCount > 0));
+  const notifWarn = settingsLoaded && !!contactEmail.trim() && (activeEmailCount === 0 || (emailPaused && activeEmailCount > 0));
 
   const hasAddress = !!(address.street.trim() || address.city.trim());
-  const addressDesc = settingsStatus !== "loaded"
+  const addressDesc = !settingsLoaded
     ? "—"
     : hasAddress
     ? [address.street.trim(), address.city.trim(), address.state.trim()].filter(Boolean).join(", ")
@@ -392,8 +277,7 @@ export default function Settings() {
           )}
           <div>
             <h1 className="font-serif text-2xl text-amber-100">{section ? sections.find(s => s.key === section)?.label : "Settings"}</h1>
-            {saved && !saveError && <p className="text-xs text-emerald-400 mt-0.5">Saved</p>}
-            {saveError && <p className="text-xs text-red-400 mt-0.5">Couldn't save — check your connection</p>}
+            {saved && <p className="text-xs text-emerald-400 mt-0.5">Saved</p>}
           </div>
         </div>
 
