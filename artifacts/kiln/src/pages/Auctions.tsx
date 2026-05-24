@@ -48,8 +48,10 @@ function getTimeLeft(endDate: string): string {
   if (diff <= 0) return "Ended";
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
   if (h > 24) return `${Math.floor(h / 24)}d ${h % 24}h left`;
   if (h > 0) return `${h}h ${m}m left`;
+  if (diff < 60000) return `${s}s left`;
   return `${m}m left`;
 }
 
@@ -57,8 +59,18 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(auction.endDate));
   const [paying, setPaying] = useState(false);
   useEffect(() => {
-    const iv = setInterval(() => setTimeLeft(getTimeLeft(auction.endDate)), 30000);
-    return () => clearInterval(iv);
+    let handle: ReturnType<typeof setTimeout>;
+    function tick() {
+      setTimeLeft(getTimeLeft(auction.endDate));
+      const diff = new Date(auction.endDate).getTime() - Date.now();
+      if (diff <= 0) return;
+      // 1-second ticks in final minute, 30-second ticks otherwise
+      handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
+    }
+    const diff = new Date(auction.endDate).getTime() - Date.now();
+    if (diff <= 0) return;
+    handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
+    return () => clearTimeout(handle);
   }, [auction.endDate]);
 
   const isLive = auction.status === "live" && new Date(auction.endDate) > new Date();
