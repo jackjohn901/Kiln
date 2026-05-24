@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { X, Heart, Send, CornerDownRight, ChevronDown, ChevronUp } from "lucide-react";
 import { useProfile } from "@/contexts/ProfileContext";
 import { ParsedCaption } from "@/lib/parseCaption";
-import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
+import RelativeTime from "@/components/RelativeTime";
 
 
 interface ApiComment {

@@ -6,7 +6,7 @@ import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
-import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
+import RelativeTime from "@/components/RelativeTime";
 
 const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: string; bg: string }> = {
   follow:              { icon: UserPlus,      color: "text-blue-400",   bg: "bg-blue-500/15" },

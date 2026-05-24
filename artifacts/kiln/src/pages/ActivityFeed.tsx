@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
-import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
+import RelativeTime from "@/components/RelativeTime";
 
 interface ApiNotification {
   id: string;

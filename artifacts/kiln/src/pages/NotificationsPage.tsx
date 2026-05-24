@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Bell, ChevronLeft, Heart, UserPlus, ShoppingBag, MessageCircle, Star, DollarSign, CheckCircle, Zap } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
-import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
+import RelativeTime from "@/components/RelativeTime";
 
 const ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   like: { icon: Heart, color: "text-rose-400" },
