@@ -151,12 +151,19 @@ interface BuyerProfile {
   location: string | null;
 }
 
+interface SellerProfile {
+  displayName: string | null;
+  handle: string | null;
+  avatarUrl: string | null;
+}
+
 export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
   const [order, setOrder] = useState<Order | null>(null);
   const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
   const [buyerProfile, setBuyerProfile] = useState<BuyerProfile | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [buyerEmail, setBuyerEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -182,6 +189,7 @@ export default function OrderDetail() {
         const siblings: Order[] = data.siblingOrders ?? [];
         setSiblingOrders(siblings.length > 1 ? siblings : []);
         if (data.buyerProfile) setBuyerProfile(data.buyerProfile as BuyerProfile);
+        if (data.sellerProfile) setSellerProfile(data.sellerProfile as SellerProfile);
         if (data.buyerEmail) setBuyerEmail(data.buyerEmail as string);
       })
       .catch(() => {})
@@ -652,6 +660,49 @@ export default function OrderDetail() {
             </div>
           )}
         </div>
+
+        {(() => {
+          const sellerLabel = sellerProfile?.displayName?.trim()
+            ? sellerProfile.displayName
+            : sellerProfile?.handle
+              ? `@${sellerProfile.handle}`
+              : null;
+          const sellerInitial = (sellerLabel ?? order.sellerId ?? "?")[0].toUpperCase();
+          const sellerHref = sellerProfile?.handle
+            ? `/artists/${sellerProfile.handle}`
+            : order.sellerId
+              ? `/artists/${order.sellerId}`
+              : null;
+          return (
+            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Artist</p>
+              <div className="flex items-center gap-3">
+                {sellerProfile?.avatarUrl ? (
+                  <img
+                    src={sellerProfile.avatarUrl}
+                    alt={sellerLabel ?? "Artist"}
+                    className="h-8 w-8 flex-shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                  />
+                ) : (
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-stone-700 text-xs font-semibold text-stone-300 ring-1 ring-white/10">
+                    {sellerInitial}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  {sellerHref ? (
+                    <Link href={sellerHref}>
+                      <span className="text-sm text-stone-300 hover:text-amber-300 transition-colors cursor-pointer">
+                        {sellerLabel ?? "View artist profile"}
+                      </span>
+                    </Link>
+                  ) : (
+                    <p className="text-sm text-stone-300">{sellerLabel ?? "Artist"}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>

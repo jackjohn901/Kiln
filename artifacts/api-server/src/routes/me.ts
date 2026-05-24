@@ -142,25 +142,37 @@ router.get("/me/orders/cart/:sessionKey", async (req, res): Promise<void> => {
     // Use the first sibling as the "primary" order for top-level receipt fields.
     const order = siblingOrders[0]!;
 
-    const [buyerProfileRow] = await db
-      .select({ displayName: profilesTable.displayName, location: profilesTable.location })
-      .from(profilesTable)
-      .where(eq(profilesTable.userId, req.user.id))
-      .limit(1);
+    const [buyerProfileRow, sellerProfileRow, buyerUserRow] = await Promise.all([
+      db.select({ displayName: profilesTable.displayName, location: profilesTable.location })
+        .from(profilesTable)
+        .where(eq(profilesTable.userId, req.user.id))
+        .limit(1)
+        .then(r => r[0] ?? null),
+      order.sellerId
+        ? db.select({ displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
+            .from(profilesTable)
+            .where(eq(profilesTable.userId, order.sellerId))
+            .limit(1)
+            .then(r => r[0] ?? null)
+        : Promise.resolve(null),
+      db.select({ email: usersTable.email })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.id))
+        .limit(1)
+        .then(r => r[0] ?? null),
+    ]);
 
     const buyerProfile = buyerProfileRow
       ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
       : { displayName: null, location: null };
 
-    const [buyerUserRow] = await db
-      .select({ email: usersTable.email })
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id))
-      .limit(1);
+    const sellerProfile = sellerProfileRow
+      ? { displayName: sellerProfileRow.displayName ?? null, handle: sellerProfileRow.handle ?? null, avatarUrl: sellerProfileRow.avatarUrl ?? null }
+      : null;
 
     const buyerEmail = buyerUserRow?.email ?? null;
 
-    res.json({ order, siblingOrders, buyerProfile, buyerEmail });
+    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail });
   } catch (err) {
     logger.error({ err }, "me/orders/cart/:sessionKey GET error");
     res.status(500).json({ error: "Failed to load cart receipt" });
@@ -231,25 +243,37 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
         .where(and(eq(ordersTable.notes, order.notes), eq(ordersTable.buyerId, req.user.id)));
     }
 
-    const [buyerProfileRow] = await db
-      .select({ displayName: profilesTable.displayName, location: profilesTable.location })
-      .from(profilesTable)
-      .where(eq(profilesTable.userId, req.user.id))
-      .limit(1);
+    const [buyerProfileRow, sellerProfileRow, buyerUserRow] = await Promise.all([
+      db.select({ displayName: profilesTable.displayName, location: profilesTable.location })
+        .from(profilesTable)
+        .where(eq(profilesTable.userId, req.user.id))
+        .limit(1)
+        .then(r => r[0] ?? null),
+      order.sellerId
+        ? db.select({ displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
+            .from(profilesTable)
+            .where(eq(profilesTable.userId, order.sellerId))
+            .limit(1)
+            .then(r => r[0] ?? null)
+        : Promise.resolve(null),
+      db.select({ email: usersTable.email })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.id))
+        .limit(1)
+        .then(r => r[0] ?? null),
+    ]);
 
     const buyerProfile = buyerProfileRow
       ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
       : { displayName: null, location: null };
 
-    const [buyerUserRow] = await db
-      .select({ email: usersTable.email })
-      .from(usersTable)
-      .where(eq(usersTable.id, req.user.id))
-      .limit(1);
+    const sellerProfile = sellerProfileRow
+      ? { displayName: sellerProfileRow.displayName ?? null, handle: sellerProfileRow.handle ?? null, avatarUrl: sellerProfileRow.avatarUrl ?? null }
+      : null;
 
     const buyerEmail = buyerUserRow?.email ?? null;
 
-    res.json({ order, siblingOrders, buyerProfile, buyerEmail });
+    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });
