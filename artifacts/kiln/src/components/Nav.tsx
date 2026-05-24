@@ -275,15 +275,15 @@ export default function Nav() {
                 </button>
 
                 {showProfileMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl border border-white/10 bg-[#1a1209] shadow-2xl">
+                  <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-white/10 bg-[#1a1209] shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: "calc(100dvh - 5rem)" }}>
                     {/* Profile header */}
-                    <div className="border-b border-white/8 px-4 py-3">
+                    <div className="border-b border-white/8 px-4 py-3 shrink-0">
                       <p className="text-sm font-semibold text-amber-100 truncate">{profile.name}</p>
                       <p className="text-xs text-stone-500">@{profile.handle}</p>
                     </div>
 
                     {/* Menu items */}
-                    <div className="py-1">
+                    <div className="py-1 overflow-y-auto flex-1 overscroll-contain">
                       <Link
                         href={`/artists/${profile.id}`}
                         onClick={() => setShowProfileMenu(false)}
@@ -306,7 +306,7 @@ export default function Nav() {
                     </div>
 
                     {/* Sign out */}
-                    <div className="border-t border-white/8 py-1">
+                    <div className="border-t border-white/8 py-1 shrink-0">
                       <button
                         onClick={() => { logout(); setShowProfileMenu(false); }}
                         className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-rose-400 hover:bg-rose-500/10 transition-colors"
