@@ -189,6 +189,8 @@ export default function Earnings() {
   const [showSaleShare, setShowSaleShare] = useState(false);
   const [statsFlash, setStatsFlash] = useState(false);
   const statsFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [statsLastRefreshed, setStatsLastRefreshed] = useState<Date | null>(null);
+  const [, setStatsTick] = useState(0);
 
   // Payout state
   const [payouts, setPayouts]           = useState<PayoutRecord[]>([]);
@@ -458,6 +460,7 @@ export default function Earnings() {
   const triggerStatsFlash = useCallback(() => {
     if (statsFlashTimerRef.current) clearTimeout(statsFlashTimerRef.current);
     setStatsFlash(true);
+    setStatsLastRefreshed(new Date());
     statsFlashTimerRef.current = setTimeout(() => setStatsFlash(false), 2000);
   }, []);
 
@@ -502,6 +505,12 @@ export default function Earnings() {
     }, POLL_MS);
     return () => clearInterval(timerId);
   }, [fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
+
+  useEffect(() => {
+    if (!statsLastRefreshed) return;
+    const id = setInterval(() => setStatsTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [statsLastRefreshed]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -706,6 +715,17 @@ export default function Earnings() {
                 );
               })}
             </div>
+
+            {/* Last refreshed timestamp */}
+            {statsLastRefreshed && (() => {
+              const secs = Math.floor((Date.now() - statsLastRefreshed.getTime()) / 1000);
+              const label = secs < 5 ? "just now" : secs < 60 ? `${secs}s ago` : `${Math.floor(secs / 60)}m ago`;
+              return (
+                <p className="text-[10px] text-stone-600 text-right -mt-3 mb-4 pr-1">
+                  Updated {label}
+                </p>
+              );
+            })()}
 
             {/* Shop Sales breakdown */}
             {salesBreakdownOpen && (
