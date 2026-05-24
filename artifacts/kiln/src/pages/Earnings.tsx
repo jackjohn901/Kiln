@@ -586,6 +586,32 @@ export default function Earnings() {
           </div>
         ) : (
           <>
+            {/* Earnings Summary Card */}
+            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+              <p className="text-xs uppercase tracking-wider text-stone-500 mb-4">Earnings Summary</p>
+              <div className="grid grid-cols-3 gap-0 divide-x divide-white/8">
+                <div className="flex flex-col items-center px-4 py-1">
+                  <DollarSign size={15} className="mb-2 text-pink-400" />
+                  <p className="text-base font-bold text-stone-100">{formatPrice(totals.tips)}</p>
+                  <p className="text-xs text-stone-500 mt-0.5">Tips</p>
+                </div>
+                <div className="flex flex-col items-center px-4 py-1">
+                  <Star size={15} className="mb-2 text-violet-400" />
+                  <p className="text-base font-bold text-stone-100">{formatPrice(totals.subscriptions)}</p>
+                  <p className="text-xs text-stone-500 mt-0.5">Patrons</p>
+                </div>
+                <div className="flex flex-col items-center px-4 py-1">
+                  <ShoppingBag size={15} className="mb-2 text-emerald-400" />
+                  <p className="text-base font-bold text-stone-100">{formatPrice(totals.shopSales)}</p>
+                  <p className="text-xs text-stone-500 mt-0.5">Shop</p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-white/8 pt-3">
+                <p className="text-xs text-stone-500">Total earnings</p>
+                <p className="text-sm font-bold text-amber-400">{formatPrice(totals.total)}</p>
+              </div>
+            </div>
+
             {/* Stats */}
             <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
