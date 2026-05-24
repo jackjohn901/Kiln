@@ -3,10 +3,17 @@ import { Link, useSearch, useLocation } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
+  ChevronLeft, ChevronRight,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
   ShoppingBag, Clock, Bell, Package, Share2, MessageCircle, Download,
 } from "lucide-react";
+
 import { useWebSocket } from "@/hooks/useWebSocket";
+
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
 
 type RefreshInterval = "30s" | "1m" | "5m" | "manual";
 const REFRESH_MS: Record<RefreshInterval, number | null> = {
@@ -151,6 +158,27 @@ export default function Earnings() {
   const search = useSearch();
   const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
+
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
+
+  const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+
+  function goToPrevMonth() {
+    setSelectedMonth(m => {
+      if (m === 0) { setSelectedYear(y => y - 1); return 11; }
+      return m - 1;
+    });
+  }
+
+  function goToNextMonth() {
+    if (isCurrentMonth) return;
+    setSelectedMonth(m => {
+      if (m === 11) { setSelectedYear(y => y + 1); return 0; }
+      return m + 1;
+    });
+  }
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
   const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, salesByType: { listings: 0, drops: 0, commissions: 0, workshops: 0 }, total: 0 });
@@ -374,7 +402,7 @@ export default function Earnings() {
 
   const fetchEarnings = useCallback(async (): Promise<EarningTotals | undefined> => {
     try {
-      const r = await fetch("/api/me/earnings", { credentials: "include" });
+      const r = await fetch(`/api/me/earnings?month=${selectedMonth + 1}&year=${selectedYear}`, { credentials: "include" });
       if (!r.ok) return undefined;
       const data = await r.json() as { earnings?: EarningLine[]; totals?: { tips?: number; subscriptions?: number; sales?: number; shopSales?: number; salesByType?: SalesByType; total?: number } };
       setEarnings(data.earnings ?? []);
@@ -391,7 +419,7 @@ export default function Earnings() {
       return newTotals;
     } catch { /* ignore */ }
     return undefined;
-  }, []);
+  }, [selectedMonth, selectedYear]);
 
   const fetchSales = useCallback(async () => {
     try {
@@ -588,7 +616,29 @@ export default function Earnings() {
           <>
             {/* Earnings Summary Card */}
             <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
-              <p className="text-xs uppercase tracking-wider text-stone-500 mb-4">Earnings Summary</p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs uppercase tracking-wider text-stone-500">Earnings Summary</p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={goToPrevMonth}
+                    className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors"
+                    aria-label="Previous month"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-xs font-medium text-stone-300 min-w-[110px] text-center tabular-nums">
+                    {MONTH_NAMES[selectedMonth]} {selectedYear}
+                  </span>
+                  <button
+                    onClick={goToNextMonth}
+                    disabled={isCurrentMonth}
+                    className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Next month"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-3 gap-0 divide-x divide-white/8">
                 <div className="flex flex-col items-center px-4 py-1">
                   <DollarSign size={15} className="mb-2 text-pink-400" />

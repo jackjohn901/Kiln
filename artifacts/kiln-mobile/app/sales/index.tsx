@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -93,6 +93,11 @@ const TYPE_ICON: Record<string, string> = {
   inquiry: "message-square",
 };
 
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
 type TabValue = "all" | "active" | "completed";
 
 export default function SalesScreen() {
@@ -104,6 +109,27 @@ export default function SalesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
+  const now = useMemo(() => new Date(), []);
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
+
+  const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+
+  function goToPrevMonth() {
+    setSelectedMonth(m => {
+      if (m === 0) { setSelectedYear(y => y - 1); return 11; }
+      return m - 1;
+    });
+  }
+
+  function goToNextMonth() {
+    if (isCurrentMonth) return;
+    setSelectedMonth(m => {
+      if (m === 11) { setSelectedYear(y => y + 1); return 0; }
+      return m + 1;
+    });
+  }
+
   const params = useLocalSearchParams<{ highlight?: string }>();
   const highlightId = params.highlight;
 
@@ -114,8 +140,8 @@ export default function SalesScreen() {
   });
 
   const { data: earningsData } = useQuery({
-    queryKey: ["me/earnings"],
-    queryFn: () => apiGet<{ totals: EarningsTotals }>("/api/me/earnings"),
+    queryKey: ["me/earnings", selectedMonth, selectedYear],
+    queryFn: () => apiGet<{ totals: EarningsTotals }>(`/api/me/earnings?month=${selectedMonth + 1}&year=${selectedYear}`),
     enabled: isAuthenticated,
   });
 
@@ -125,7 +151,7 @@ export default function SalesScreen() {
     setRefreshing(true);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["me/sales"] }),
-      queryClient.invalidateQueries({ queryKey: ["me/earnings"] }),
+      queryClient.invalidateQueries({ queryKey: ["me/earnings", selectedMonth, selectedYear] }),
     ]);
     setRefreshing(false);
   }
@@ -213,11 +239,33 @@ export default function SalesScreen() {
         >
           {totals && (
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.summaryTitle, { color: colors.foreground }]}>Earnings Summary</Text>
+              <View style={styles.summaryHeader}>
+                <Text style={[styles.summaryTitle, { color: colors.foreground }]}>Earnings Summary</Text>
+                <View style={styles.monthPicker}>
+                  <Pressable
+                    onPress={goToPrevMonth}
+                    hitSlop={8}
+                    style={styles.monthArrow}
+                  >
+                    <Feather name="chevron-left" size={16} color={colors.mutedForeground} />
+                  </Pressable>
+                  <Text style={[styles.monthLabel, { color: colors.foreground }]}>
+                    {MONTH_NAMES[selectedMonth].slice(0, 3)} {selectedYear}
+                  </Text>
+                  <Pressable
+                    onPress={goToNextMonth}
+                    hitSlop={8}
+                    style={[styles.monthArrow, isCurrentMonth && styles.monthArrowDisabled]}
+                    disabled={isCurrentMonth}
+                  >
+                    <Feather name="chevron-right" size={16} color={isCurrentMonth ? colors.border : colors.mutedForeground} />
+                  </Pressable>
+                </View>
+              </View>
               <View style={styles.summaryRow}>
                 <Pressable
                   style={styles.summaryItem}
-                  onPress={() => router.push("/sales/earnings-breakdown?category=tips" as any)}
+                  onPress={() => router.push(`/sales/earnings-breakdown?category=tips&month=${selectedMonth + 1}&year=${selectedYear}` as any)}
                 >
                   <Feather name="heart" size={14} color="#f472b6" style={{ marginBottom: 4 }} />
                   <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
@@ -229,7 +277,7 @@ export default function SalesScreen() {
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <Pressable
                   style={styles.summaryItem}
-                  onPress={() => router.push("/sales/earnings-breakdown?category=patrons" as any)}
+                  onPress={() => router.push(`/sales/earnings-breakdown?category=patrons&month=${selectedMonth + 1}&year=${selectedYear}` as any)}
                 >
                   <Feather name="star" size={14} color="#a78bfa" style={{ marginBottom: 4 }} />
                   <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
@@ -241,7 +289,7 @@ export default function SalesScreen() {
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <Pressable
                   style={styles.summaryItem}
-                  onPress={() => router.push("/sales/earnings-breakdown?category=shop" as any)}
+                  onPress={() => router.push(`/sales/earnings-breakdown?category=shop&month=${selectedMonth + 1}&year=${selectedYear}` as any)}
                 >
                   <Feather name="shopping-bag" size={14} color="#34d399" style={{ marginBottom: 4 }} />
                   <Text style={[styles.summaryAmount, { color: colors.foreground }]}>
@@ -430,7 +478,21 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  summaryTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 14 },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  summaryTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  monthPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  monthArrow: { padding: 2 },
+  monthArrowDisabled: { opacity: 0.3 },
+  monthLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, minWidth: 64, textAlign: "center" },
   summaryRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable, userSettingsTable } from "@workspace/db";
 import { sendEmail, newPatronEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, gte, lt } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
@@ -128,13 +128,46 @@ router.get("/me/patrons", async (req, res): Promise<void> => {
 });
 
 // GET /me/earnings — artist earnings summary (tips + subscriptions + shop sales)
+// Optional query params: ?month=1-12&year=YYYY — filter to a specific calendar month
 router.get("/me/earnings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
+
+  const monthParam = req.query.month !== undefined ? parseInt(req.query.month as string, 10) : null;
+  const yearParam = req.query.year !== undefined ? parseInt(req.query.year as string, 10) : null;
+  let dateRange: { start: Date; end: Date } | null = null;
+  if (monthParam !== null && yearParam !== null && monthParam >= 1 && monthParam <= 12 && yearParam >= 2000 && yearParam <= 2100) {
+    dateRange = {
+      start: new Date(yearParam, monthParam - 1, 1),
+      end: new Date(yearParam, monthParam, 1),
+    };
+  }
+
   const [tips, subs, sales] = await Promise.all([
-    db.select().from(tipsTable).where(and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"))).orderBy(desc(tipsTable.createdAt)),
-    db.select().from(patronSubscriptionsTable).where(and(eq(patronSubscriptionsTable.artistId, userId), eq(patronSubscriptionsTable.status, "active"))).orderBy(desc(patronSubscriptionsTable.startedAt)),
-    db.select().from(ordersTable).where(and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]))).orderBy(desc(ordersTable.createdAt)),
+    db.select().from(tipsTable).where(
+      dateRange
+        ? and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"), gte(tipsTable.createdAt, dateRange.start), lt(tipsTable.createdAt, dateRange.end))
+        : and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"))
+    ).orderBy(desc(tipsTable.createdAt)),
+    // When a date range is given, include subscriptions that were active at any
+    // point during the month: started before month-end AND (not cancelled OR
+    // cancelled on/after month-start). This approximates monthly patron revenue
+    // using available schema data (no separate charge-events table exists yet).
+    db.select().from(patronSubscriptionsTable).where(
+      dateRange
+        ? and(
+            eq(patronSubscriptionsTable.artistId, userId),
+            lt(patronSubscriptionsTable.startedAt, dateRange.end),
+            // not cancelled before the month started
+            sql`(${patronSubscriptionsTable.cancelledAt} IS NULL OR ${patronSubscriptionsTable.cancelledAt} >= ${dateRange.start})`
+          )
+        : and(eq(patronSubscriptionsTable.artistId, userId), eq(patronSubscriptionsTable.status, "active"))
+    ).orderBy(desc(patronSubscriptionsTable.startedAt)),
+    db.select().from(ordersTable).where(
+      dateRange
+        ? and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]), gte(ordersTable.createdAt, dateRange.start), lt(ordersTable.createdAt, dateRange.end))
+        : and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]))
+    ).orderBy(desc(ordersTable.createdAt)),
   ]);
   const tipTotal = tips.reduce((s, t) => s + t.amountCents / 100, 0);
   const subTotal = subs.reduce((s, sub) => s + sub.amount / 100, 0);

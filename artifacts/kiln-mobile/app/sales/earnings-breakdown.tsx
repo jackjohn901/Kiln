@@ -106,13 +106,23 @@ export default function EarningsBreakdownScreen() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const params = useLocalSearchParams<{ category?: string }>();
+  const params = useLocalSearchParams<{ category?: string; month?: string; year?: string }>();
   const category = (params.category ?? "shop") as Category;
   const config = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.shop;
 
+  const monthParam = params.month ? parseInt(params.month, 10) : null;
+  const yearParam = params.year ? parseInt(params.year, 10) : null;
+  const hasDateFilter = monthParam !== null && yearParam !== null;
+  const monthLabel = hasDateFilter
+    ? new Date(yearParam!, monthParam! - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : null;
+
   const { data, isLoading } = useQuery({
-    queryKey: ["me/earnings"],
-    queryFn: () => apiGet<EarningsResponse>("/api/me/earnings"),
+    queryKey: ["me/earnings", monthParam, yearParam],
+    queryFn: () => {
+      const qs = hasDateFilter ? `?month=${monthParam}&year=${yearParam}` : "";
+      return apiGet<EarningsResponse>(`/api/me/earnings${qs}`);
+    },
     enabled: isAuthenticated,
   });
 
@@ -163,6 +173,11 @@ export default function EarningsBreakdownScreen() {
             <Text style={[styles.totalAmount, { color: colors.foreground }]}>
               {formatPrice(total)}
             </Text>
+            {monthLabel && (
+              <Text style={[styles.totalMonth, { color: colors.primary }]}>
+                {monthLabel}
+              </Text>
+            )}
             <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
               {filtered.length} {filtered.length === 1 ? "transaction" : "transactions"}
             </Text>
@@ -252,6 +267,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   totalAmount: { fontFamily: "Inter_700Bold", fontSize: 28, marginBottom: 2 },
+  totalMonth: { fontFamily: "Inter_500Medium", fontSize: 12, marginBottom: 2 },
   totalLabel: { fontFamily: "Inter_400Regular", fontSize: 13 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 8 },
   row: {
