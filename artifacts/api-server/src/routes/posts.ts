@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable,
+  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable,
 } from "@workspace/db";
 import { sendEmail, newCommentEmail, newMentionEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
@@ -58,6 +58,17 @@ router.post("/posts", async (req, res): Promise<void> => {
         { id: post.id, caption: post.caption, videoUrl: post.videoUrl ?? null, thumbnailUrl: post.thumbnailUrl ?? null },
         { updatePostId: post.id },
       ).catch(() => {});
+
+      // Notify followers via WebSocket so Following tab refreshes immediately
+      db.select({ followerId: followsTable.followerId })
+        .from(followsTable)
+        .where(eq(followsTable.followingId, user.id))
+        .then((followers) => {
+          for (const { followerId } of followers) {
+            broadcast(followerId, { type: "new-post", authorId: user.id });
+          }
+        })
+        .catch(() => {});
     }
 
     db.select({ count: sql`COUNT(*)` })
@@ -388,6 +399,18 @@ router.post("/me/drafts/:id/publish", async (req, res): Promise<void> => {
     if (!existing || existing.authorId !== req.user.id) { res.status(404).json({ error: "Draft not found" }); return; }
     const [post] = await db.update(postsTable).set({ isDraft: false, scheduledAt: null })
       .where(eq(postsTable.id, req.params.id)).returning();
+
+    // Notify followers via WebSocket so Following tab refreshes immediately
+    db.select({ followerId: followsTable.followerId })
+      .from(followsTable)
+      .where(eq(followsTable.followingId, req.user.id))
+      .then((followers) => {
+        for (const { followerId } of followers) {
+          broadcast(followerId, { type: "new-post", authorId: req.user.id });
+        }
+      })
+      .catch(() => {});
+
     res.json({ post: { ...post, tags: post.tags ?? [], createdAt: post.createdAt.toISOString() } });
   } catch (err) { req.log.error({ err }, "publishDraft error"); res.status(500).json({ error: "Failed to publish draft" }); }
 });

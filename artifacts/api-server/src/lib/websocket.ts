@@ -11,7 +11,8 @@ export type WsEvent =
   | { type: "message"; threadId: string; senderId: string; recipientId: string }
   | { type: "typing"; threadId: string; userId: string }
   | { type: "bid"; auctionId: string; currentBid: number; bidCount: number; bidderName: string; bidAt?: string }
-  | { type: "firing-viewers"; firingId: string; count: number };
+  | { type: "firing-viewers"; firingId: string; count: number }
+  | { type: "new-post"; authorId: string };
 
 const clients = new Map<string, Set<WebSocket>>();
 
