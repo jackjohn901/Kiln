@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,6 +62,13 @@ interface NotifPreview {
   link: string;
 }
 
+interface HealthResult {
+  db: { ok: boolean; latencyMs: number | null; error: string | null };
+  api: { uptimeSeconds: number };
+  seed: { markerPresent: boolean; markerUserId: string | null; codeMarkerId: string | null };
+  checkedAt: string;
+}
+
 export default function AdminReports() {
   useMeta({ title: "Moderation Queue" });
   const { user } = useAuth();
@@ -94,6 +101,11 @@ export default function AdminReports() {
   const [notifSent, setNotifSent] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
+
+  // System health state
+  const [healthResult, setHealthResult] = useState<HealthResult | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   async function runBackfill(dryRun: boolean) {
     setBackfillLoading(true);
@@ -228,6 +240,31 @@ export default function AdminReports() {
     setNotifError(null);
   }
 
+  async function runHealthCheck() {
+    setHealthLoading(true);
+    setHealthError(null);
+    setHealthResult(null);
+    try {
+      const res = await fetch("/api/admin/health", { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setHealthError(data?.error ?? "Request failed");
+        return;
+      }
+      const data = await res.json() as HealthResult;
+      setHealthResult(data);
+    } catch {
+      setHealthError("Network error — please try again");
+    } finally {
+      setHealthLoading(false);
+    }
+  }
+
+  function resetHealth() {
+    setHealthResult(null);
+    setHealthError(null);
+  }
+
   useEffect(() => {
     setLoading(true);
     fetch(`/api/admin/reports?status=${filter}`, { credentials: "include" })
@@ -310,7 +347,7 @@ export default function AdminReports() {
           <button onClick={() => setSection("verifications")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "verifications" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <BadgeCheck size={13} /> Verify Artists
           </button>
-          <button onClick={() => { setSection("maintenance"); resetBackfill(); resetSeed(); resetNotif(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+          <button onClick={() => { setSection("maintenance"); resetBackfill(); resetSeed(); resetNotif(); resetHealth(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <Wrench size={13} /> Maintenance
           </button>
         </div>
@@ -516,6 +553,111 @@ export default function AdminReports() {
         {/* Maintenance section */}
         {section === "maintenance" && (
           <div className="space-y-4">
+            {/* System health card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <Activity size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-100">System health</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Checks DB connectivity (with query latency), API server uptime, and seed marker status on demand.
+                  </p>
+                </div>
+              </div>
+
+              {healthError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {healthError}
+                </div>
+              )}
+
+              {healthResult && (
+                <div className="rounded-xl border border-white/6 bg-stone-800/60 px-4 py-3 space-y-3">
+                  {/* DB row */}
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 shrink-0 ${healthResult.db.ok ? "text-emerald-400" : "text-rose-400"}`}>
+                      {healthResult.db.ok ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                    </span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-stone-200">Database</p>
+                      {healthResult.db.ok ? (
+                        <p className="text-[11px] text-stone-400">
+                          Connected · <span className="font-mono">{healthResult.db.latencyMs}ms</span> round-trip
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-rose-400 font-mono break-all">{healthResult.db.error}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* API uptime row */}
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 shrink-0 text-emerald-400"><CheckCircle size={13} /></span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-stone-200">API server</p>
+                      <p className="text-[11px] text-stone-400">
+                        Up for{" "}
+                        {healthResult.api.uptimeSeconds < 60
+                          ? `${healthResult.api.uptimeSeconds}s`
+                          : healthResult.api.uptimeSeconds < 3600
+                          ? `${Math.floor(healthResult.api.uptimeSeconds / 60)}m ${healthResult.api.uptimeSeconds % 60}s`
+                          : `${Math.floor(healthResult.api.uptimeSeconds / 3600)}h ${Math.floor((healthResult.api.uptimeSeconds % 3600) / 60)}m`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Seed marker row */}
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 shrink-0 ${healthResult.seed.markerPresent ? "text-emerald-400" : "text-amber-400"}`}>
+                      {healthResult.seed.markerPresent ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+                    </span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-stone-200">Seed marker</p>
+                      <p className="text-[11px] text-stone-400">
+                        DB{" "}
+                        <span className="font-mono bg-stone-700 px-1 py-0.5 rounded text-stone-300">
+                          {healthResult.seed.markerUserId ?? "—"}
+                        </span>{" "}
+                        <span className={healthResult.seed.markerPresent ? "text-emerald-400" : "text-rose-400"}>
+                          {healthResult.seed.markerPresent ? "✓ present" : "✗ missing"}
+                        </span>
+                        {healthResult.seed.markerUserId !== healthResult.seed.codeMarkerId && (
+                          <span className="text-amber-400 ml-1">
+                            · differs from code marker{" "}
+                            <span className="font-mono bg-stone-700 px-1 py-0.5 rounded">{healthResult.seed.codeMarkerId}</span>
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-2 flex items-center justify-between">
+                    <p className="text-[10px] text-stone-600">
+                      Checked at {new Date(healthResult.checkedAt).toLocaleTimeString()}
+                    </p>
+                    <button
+                      onClick={runHealthCheck}
+                      disabled={healthLoading}
+                      className="text-[11px] text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-40"
+                    >
+                      Re-check
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!healthResult && (
+                <button
+                  onClick={runHealthCheck}
+                  disabled={healthLoading}
+                  className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                >
+                  {healthLoading ? <RefreshCw size={13} className="animate-spin" /> : <Activity size={13} />}
+                  {healthLoading ? "Checking…" : "Run health check"}
+                </button>
+              )}
+            </div>
+
             {/* Backfill order grouping card */}
             <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
               <div className="flex items-start gap-3">

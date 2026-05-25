@@ -488,6 +488,47 @@ router.post("/admin/test-notification", async (req, res): Promise<void> => {
   }
 });
 
+// GET /admin/health — DB connectivity, API uptime, and seed marker status
+router.get("/admin/health", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const uptimeSeconds = Math.floor(process.uptime());
+
+  // DB connectivity check — run a trivial query and measure round-trip latency
+  let dbOk = false;
+  let dbLatencyMs: number | null = null;
+  let dbError: string | null = null;
+  try {
+    const t0 = Date.now();
+    await db.execute(sql`SELECT 1`);
+    dbLatencyMs = Date.now() - t0;
+    dbOk = true;
+  } catch (err) {
+    dbError = err instanceof Error ? err.message : "Unknown DB error";
+  }
+
+  // Seed marker status
+  let seedMarkerPresent = false;
+  let seedMarkerUserId: string | null = null;
+  let seedCodeMarkerId: string | null = null;
+  try {
+    const status = await getSeedStatus();
+    seedMarkerPresent = status.markerPresent;
+    seedMarkerUserId = status.markerUserId;
+    seedCodeMarkerId = status.codeMarkerId;
+  } catch {
+    // non-fatal
+  }
+
+  res.json({
+    db: { ok: dbOk, latencyMs: dbLatencyMs, error: dbError },
+    api: { uptimeSeconds },
+    seed: { markerPresent: seedMarkerPresent, markerUserId: seedMarkerUserId, codeMarkerId: seedCodeMarkerId },
+    checkedAt: new Date().toISOString(),
+  });
+});
+
 // PATCH /admin/users/:id/feature  — grant Featured on Kiln status
 router.patch("/admin/users/:id/feature", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
