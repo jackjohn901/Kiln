@@ -548,48 +548,78 @@ export default function ReelStudio() {
   }, []);
 
   // ── Preload image ────────────────────────────────────────────────────────────
+  // Always fetch via XHR and load through an object URL so the canvas is never
+  // tainted. A tainted canvas silently produces an empty captureStream() which
+  // causes MediaRecorder to record 0 bytes — i.e. "Export" appears to do nothing.
   useEffect(() => {
     if (!sourceUrl || sourceType !== "image") return;
     imgRef.current = null;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = sourceUrl;
-    img.onload = () => { imgRef.current = img; };
-    img.onerror = () => {
-      const img2 = new Image();
-      img2.src = sourceUrl;
-      img2.onload = () => { imgRef.current = img2; };
+    setCorsBlocked(false);
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    (async () => {
+      try {
+        const res = await fetch(sourceUrl, { credentials: "include" });
+        if (!res.ok) throw new Error(`fetch ${res.status}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => { if (!cancelled) imgRef.current = img; };
+        img.src = objectUrl;
+      } catch {
+        if (!cancelled) setCorsBlocked(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [sourceUrl, sourceType]);
 
   // ── Load video element ───────────────────────────────────────────────────────
+  // Same canvas-tainting concern as the image path: fetch the video as a blob
+  // and load it via an object URL. Without this, captureStream() from a tainted
+  // canvas yields an unusable stream and export produces an empty file.
   useEffect(() => {
     if (!videoSourceUrl || sourceType !== "video") return;
     setCorsBlocked(false);
     videoRef.current = null;
+    let cancelled = false;
+    let objectUrl: string | null = null;
 
-    function setupVideo(vid: HTMLVideoElement) {
-      vid.muted = true;
-      vid.playsInline = true;
-      vid.src = videoSourceUrl;
-      vid.preload = "auto";
-      vid.onloadedmetadata = () => {
-        videoRef.current = vid;
-        const raw = Math.min(vid.duration * 1000, MAX_VIDEO_MS);
-        const dur = isFinite(raw) && raw > 0 ? raw : DEFAULT_IMAGE_MS;
-        naturalDurRef.current = dur;
-        setClipDurationMs(Math.round(dur / videoSpeed));
-        vid.currentTime = 0;
-      };
-    }
+    (async () => {
+      try {
+        const res = await fetch(videoSourceUrl, { credentials: "include" });
+        if (!res.ok) throw new Error(`fetch ${res.status}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        const vid = document.createElement("video");
+        vid.muted = true;
+        vid.playsInline = true;
+        vid.preload = "auto";
+        vid.onloadedmetadata = () => {
+          if (cancelled) return;
+          videoRef.current = vid;
+          const raw = Math.min(vid.duration * 1000, MAX_VIDEO_MS);
+          const dur = isFinite(raw) && raw > 0 ? raw : DEFAULT_IMAGE_MS;
+          naturalDurRef.current = dur;
+          setClipDurationMs(Math.round(dur / videoSpeed));
+          vid.currentTime = 0;
+        };
+        vid.src = objectUrl;
+      } catch {
+        if (!cancelled) setCorsBlocked(true);
+      }
+    })();
 
-    const vid1 = document.createElement("video");
-    vid1.crossOrigin = "anonymous";
-    vid1.onerror = () => {
-      const vid2 = document.createElement("video");
-      setupVideo(vid2);
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-    setupVideo(vid1);
   }, [videoSourceUrl, sourceType]); // eslint-disable-line
 
   // ── Update clip duration when video speed changes ────────────────────────────

@@ -606,9 +606,9 @@ function ReelCard({
       </div>
 
       {/* ── Right side actions ── */}
-      <div className="absolute bottom-[88px] right-3 z-10 flex flex-col items-center gap-4">
+      <div className="absolute bottom-[88px] right-3 z-10 flex flex-col items-center gap-3">
         {/* Avatar */}
-        <div className="relative">
+        <div className="relative mb-1">
           <Link href={`/artists/${reel.artistId}`}>
             <div className="h-12 w-12 overflow-hidden rounded-full border-2 border-white bg-stone-800 shadow-xl">
               <img
@@ -645,41 +645,53 @@ function ReelCard({
           )}
         </div>
 
-        {/* Like */}
+        {/* More options (algo feedback + report) */}
         <button
-          onClick={() => {
-            toggleReelLike(reel.id);
-            // Record interaction for For You algorithm
-            try {
-              const data = readInteractions();
-              const delta = liked ? -1 : 1;
-              data.likedTechniques[reel.technique] = Math.max(0, (data.likedTechniques[reel.technique] ?? 0) + delta);
-              data.watchedArtists[reel.artistId] = (data.watchedArtists[reel.artistId] ?? 0) + 1;
-              localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
-            } catch {}
-          }}
-          className="flex flex-col items-center gap-1"
+          onClick={() => setShowAlgoMenu(true)}
+          className="flex flex-col items-center gap-1 opacity-40 hover:opacity-70 transition-opacity"
         >
-          <Heart
-            size={28}
-            fill={liked ? "#ef4444" : "none"}
-            className={liked ? "text-red-500" : "text-white"}
-            style={{ transition: "all 0.15s" }}
-          />
-          <span className="text-[11px] font-bold text-white drop-shadow">
-            {fmt(reel.likes + (liked ? 1 : 0))}
-          </span>
+          <MoreHorizontal size={20} className="text-white" />
+          <span className="text-[9px] text-white/60">More</span>
         </button>
 
-        {/* Comment */}
+        {/* Share */}
+        <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
+
+        {/* Tip */}
+        {!isOwnReel && (
+          <button onClick={() => setShowTip(true)} className="flex flex-col items-center gap-1">
+            <DollarSign size={22} className="text-white" />
+            <span className="text-[9px] font-bold text-white drop-shadow">Tip</span>
+          </button>
+        )}
+
+        {/* Stitch */}
+        <Link href={`/stitch/${reel.id}`}>
+          <button className="flex flex-col items-center gap-1">
+            <Scissors size={20} className="text-white" />
+            <span className="text-[9px] font-bold text-white drop-shadow">Stitch</span>
+          </button>
+        </Link>
+
+        {/* Duet */}
+        <Link href={`/duet/${reel.id}`}>
+          <button className="flex flex-col items-center gap-1">
+            <SplitSquareHorizontal size={22} className="text-white" />
+            <span className="text-[9px] font-bold text-white drop-shadow">Duet</span>
+          </button>
+        </Link>
+
+        {/* Repost / Amplify */}
         <button
-          onClick={() => onComment(reel.id, reel.artistName)}
+          onClick={() => toggleReelRepost(reel.id, { artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnail: reel.thumbnail })}
           className="flex flex-col items-center gap-1"
         >
-          <MessageCircle size={26} className="text-white" />
-          <span className="text-[11px] font-bold text-white drop-shadow">
-            {commentCount > 0 ? commentCount : ""}
-          </span>
+          <Repeat2
+            size={24}
+            className={reposted ? "text-emerald-400" : "text-white"}
+            style={{ transition: "all 0.15s" }}
+          />
+          <span className="text-[9px] font-bold text-white drop-shadow">{reposted ? "On" : ""}</span>
         </button>
 
         {/* Save — opens board picker */}
@@ -709,53 +721,41 @@ function ReelCard({
           </span>
         </button>
 
-        {/* Repost / Amplify */}
+        {/* Comment */}
         <button
-          onClick={() => toggleReelRepost(reel.id, { artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnail: reel.thumbnail })}
-          className="flex flex-col items-center gap-1"
+          onClick={() => onComment(reel.id, reel.artistName)}
+          className="flex flex-col items-center gap-1 p-1 -m-1"
         >
-          <Repeat2
-            size={24}
-            className={reposted ? "text-emerald-400" : "text-white"}
-            style={{ transition: "all 0.15s" }}
-          />
-          <span className="text-[9px] font-bold text-white drop-shadow">{reposted ? "On" : ""}</span>
+          <MessageCircle size={30} className="text-white" />
+          <span className="text-[11px] font-bold text-white drop-shadow">
+            {commentCount > 0 ? commentCount : ""}
+          </span>
         </button>
 
-        {/* Duet */}
-        <Link href={`/duet/${reel.id}`}>
-          <button className="flex flex-col items-center gap-1">
-            <SplitSquareHorizontal size={22} className="text-white" />
-            <span className="text-[9px] font-bold text-white drop-shadow">Duet</span>
-          </button>
-        </Link>
-
-        {/* Stitch */}
-        <Link href={`/stitch/${reel.id}`}>
-          <button className="flex flex-col items-center gap-1">
-            <Scissors size={20} className="text-white" />
-            <span className="text-[9px] font-bold text-white drop-shadow">Stitch</span>
-          </button>
-        </Link>
-
-        {/* Tip */}
-        {!isOwnReel && (
-          <button onClick={() => setShowTip(true)} className="flex flex-col items-center gap-1">
-            <DollarSign size={22} className="text-white" />
-            <span className="text-[9px] font-bold text-white drop-shadow">Tip</span>
-          </button>
-        )}
-
-        {/* Share */}
-        <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
-
-        {/* More options (algo feedback + report) */}
+        {/* Like */}
         <button
-          onClick={() => setShowAlgoMenu(true)}
-          className="flex flex-col items-center gap-1 opacity-40 hover:opacity-70 transition-opacity"
+          onClick={() => {
+            toggleReelLike(reel.id);
+            // Record interaction for For You algorithm
+            try {
+              const data = readInteractions();
+              const delta = liked ? -1 : 1;
+              data.likedTechniques[reel.technique] = Math.max(0, (data.likedTechniques[reel.technique] ?? 0) + delta);
+              data.watchedArtists[reel.artistId] = (data.watchedArtists[reel.artistId] ?? 0) + 1;
+              localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
+            } catch {}
+          }}
+          className="flex flex-col items-center gap-1 p-1 -m-1"
         >
-          <MoreHorizontal size={20} className="text-white" />
-          <span className="text-[9px] text-white/60">More</span>
+          <Heart
+            size={32}
+            fill={liked ? "#ef4444" : "none"}
+            className={liked ? "text-red-500" : "text-white"}
+            style={{ transition: "all 0.15s" }}
+          />
+          <span className="text-[11px] font-bold text-white drop-shadow">
+            {fmt(reel.likes + (liked ? 1 : 0))}
+          </span>
         </button>
       </div>
 
