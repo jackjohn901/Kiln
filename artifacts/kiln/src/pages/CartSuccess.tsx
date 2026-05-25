@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer, Download } from "lucide-react";
+import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer, Download, Link2, Copy, Check } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
@@ -26,6 +26,8 @@ export default function CartSuccess() {
   const [loading, setLoading] = useState(true);
   const [orderId, setOrderId] = useState<string>(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
   const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const [perSellerWindows, setPerSellerWindows] = useState<{ sellerName: string; days: number | null; label: string | null }[]>([]);
@@ -40,6 +42,8 @@ export default function CartSuccess() {
       navigate("/cart");
       return;
     }
+
+    setSessionKey(sessionId);
 
     clearCart();
 
@@ -343,12 +347,40 @@ export default function CartSuccess() {
           </p>
         )}
         {session?.amountTotal && (
-          <p className="text-stone-500 mb-8">
+          <p className="text-stone-500 mb-6">
             Total paid:{" "}
             <span className="text-amber-300 font-semibold">
               ${(session.amountTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </span>
           </p>
+        )}
+
+        {sessionKey && (
+          <div className="rounded-2xl border border-white/8 bg-stone-900/50 p-4 text-sm text-left mb-8">
+            <div className="flex items-center gap-2 mb-2.5">
+              <Link2 size={13} className="text-amber-400 shrink-0" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shareable receipt link</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href={`/orders/cart/${sessionKey}`}>
+                <span className="flex-1 font-mono text-xs text-amber-300 hover:text-amber-200 truncate cursor-pointer underline underline-offset-2 decoration-amber-500/40">
+                  {`${window.location.origin}/kiln/orders/cart/${sessionKey}`}
+                </span>
+              </Link>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(`${window.location.origin}/kiln/orders/cart/${sessionKey}`).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  });
+                }}
+                className="shrink-0 flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+              >
+                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
         )}
 
         {orderError && (
