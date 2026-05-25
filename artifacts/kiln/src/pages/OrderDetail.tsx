@@ -178,12 +178,20 @@ export default function OrderDetail() {
 
     if (!fetchUrl) return;
 
-    fetch(fetchUrl, { credentials: "include" })
-      .then(r => {
-        if (r.status === 404) { setNotFound(true); return null; }
-        return r.ok ? r.json() : null;
-      })
-      .then(data => {
+    async function load() {
+      try {
+        let r = await fetch(fetchUrl!, { credentials: "include" });
+
+        // If unauthenticated and this is a cart receipt (has sessionKey),
+        // fall back to the public endpoint so shared/gift links still work.
+        if (r.status === 401 && sessionKey) {
+          r = await fetch(`/api/orders/cart/${encodeURIComponent(sessionKey)}`);
+        }
+
+        if (r.status === 404) { setNotFound(true); return; }
+        if (!r.ok) return;
+
+        const data = await r.json();
         if (!data?.order) return;
         setOrder(data.order as Order);
         const siblings: Order[] = data.siblingOrders ?? [];
@@ -191,9 +199,14 @@ export default function OrderDetail() {
         if (data.buyerProfile) setBuyerProfile(data.buyerProfile as BuyerProfile);
         if (data.sellerProfile) setSellerProfile(data.sellerProfile as SellerProfile);
         if (data.buyerEmail) setBuyerEmail(data.buyerEmail as string);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      } catch {
+        // network error — leave as not found
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void load();
   }, [id, sessionKey]);
 
   const handleCopyLink = useCallback((rawNotes: string | null) => {
