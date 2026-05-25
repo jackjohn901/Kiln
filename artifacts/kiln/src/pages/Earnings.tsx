@@ -1323,10 +1323,37 @@ export default function Earnings() {
                         const tb = new Date(b.createdAt).getTime();
                         return salesSort === "newest" ? tb - ta : ta - tb;
                       });
+                    const filtersActive = !!(salesSearch || salesStatus !== "all" || salesDateFrom || salesDateTo);
+                    const summary = filtersActive ? (() => {
+                      const byCurrency: Record<string, number> = {};
+                      for (const s of filtered) {
+                        const key = (s.currency ?? "usd").toUpperCase();
+                        byCurrency[key] = (byCurrency[key] ?? 0) + s.amount;
+                      }
+                      const totalsStr = Object.entries(byCurrency)
+                        .map(([cur, amt]) =>
+                          amt.toLocaleString("en-US", { style: "currency", currency: cur, maximumFractionDigits: 2 })
+                        )
+                        .join(" + ");
+                      const label = filtered.length === 1 ? "1 sale" : `${filtered.length} sales`;
+                      return totalsStr ? `${label} · ${totalsStr} total` : `${label}`;
+                    })() : null;
                     if (filtered.length === 0) {
-                      return <p className="text-xs text-stone-600 text-center py-4">No sales match your filters.</p>;
+                      return (
+                        <>
+                          {summary && (
+                            <p className="text-[11px] text-stone-500 px-1">{summary}</p>
+                          )}
+                          <p className="text-xs text-stone-600 text-center py-4">No sales match your filters.</p>
+                        </>
+                      );
                     }
-                    return filtered.map(sale => {
+                    return (
+                      <>
+                        {summary && (
+                          <p className="text-[11px] text-stone-500 px-1">{summary}</p>
+                        )}
+                        {filtered.map(sale => {
                       const hasWindow = sale.processingWindowDays !== null || sale.processingWindowLabel !== null;
                       const deliveryEstimateText = sale.processingWindowLabel?.trim()
                         ? sale.processingWindowLabel
@@ -1424,7 +1451,9 @@ export default function Earnings() {
                           )}
                         </div>
                       );
-                    });
+                        })}
+                      </>
+                    );
                   })()}
                   </div>
                 </div>
