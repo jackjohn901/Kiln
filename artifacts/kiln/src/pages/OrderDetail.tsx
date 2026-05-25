@@ -11,6 +11,7 @@ import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 interface Order {
   id: string;
   type: string;
+  refId: string | null;
   title: string;
   description: string | null;
   imageUrl: string | null;
@@ -26,6 +27,14 @@ interface Order {
   manualPayout: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+function itemDetailHref(type: string, refId: string | null): string | null {
+  if (!refId) return null;
+  if (type === "listing") return `/listings/${refId}`;
+  if (type === "drop") return `/drops`;
+  if (type === "workshop") return `/workshops`;
+  return null;
 }
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
@@ -618,28 +627,38 @@ export default function OrderDetail() {
                 {siblingOrders.map((item, idx) => {
                   const itemTypeConf = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.inquiry!;
                   const ItemIcon = itemTypeConf.icon;
+                  const href = itemDetailHref(item.type, item.refId);
+                  const inner = (
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-stone-800">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className={`h-full w-full flex items-center justify-center rounded-lg ${itemTypeConf.color}`}>
+                            <ItemIcon size={14} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm leading-snug truncate ${href ? "text-stone-100 group-hover:text-amber-300 transition-colors" : "text-stone-100"}`}>
+                          {item.title}
+                        </p>
+                        {item.description && (
+                          <p className="text-[11px] text-stone-500 truncate">{item.description}</p>
+                        )}
+                      </div>
+                      <span className="text-sm font-semibold text-amber-300 tabular-nums shrink-0">
+                        {formatPrice(item.amount)}
+                      </span>
+                    </div>
+                  );
                   return (
                     <div key={item.id} className={idx > 0 ? "pt-3 border-t border-white/6" : ""}>
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-stone-800">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <div className={`h-full w-full flex items-center justify-center rounded-lg ${itemTypeConf.color}`}>
-                              <ItemIcon size={14} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-stone-100 leading-snug truncate">{item.title}</p>
-                          {item.description && (
-                            <p className="text-[11px] text-stone-500 truncate">{item.description}</p>
-                          )}
-                        </div>
-                        <span className="text-sm font-semibold text-amber-300 tabular-nums shrink-0">
-                          {formatPrice(item.amount)}
-                        </span>
-                      </div>
+                      {href ? (
+                        <Link href={href} className="group block">
+                          {inner}
+                        </Link>
+                      ) : inner}
                     </div>
                   );
                 })}
