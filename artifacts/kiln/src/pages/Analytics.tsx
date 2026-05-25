@@ -40,8 +40,6 @@ function buildPeriodLabels(period: "30d" | "90d" | "1y"): string[] {
   });
 }
 
-const REVENUE_DATA = [840, 1200, 950, 2400, 1800, 3200, 2900, 4100, 3800, 5200, 4600, 6800];
-const MONTHS = ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May"];
 
 function MiniLineChart({ data, color, height = 60 }: { data: number[]; color: string; height?: number }) {
   const max = Math.max(...data);
@@ -75,16 +73,57 @@ function MiniLineChart({ data, color, height = 60 }: { data: number[]; color: st
   );
 }
 
-function BarChart({ data, color, labels }: { data: number[]; color: string; labels: string[] }) {
-  const max = Math.max(...data);
+interface StreamPoint {
+  label: string;
+  shopSales: number;
+  tips: number;
+  subscriptions: number;
+}
+
+function StackedBarChart({ data }: { data: StreamPoint[] }) {
+  const max = Math.max(...data.map(d => d.shopSales + d.tips + d.subscriptions), 1);
   return (
-    <div className="flex items-end gap-1 h-28">
-      {data.map((v, i) => (
-        <div key={i} className="flex flex-1 flex-col items-center gap-1">
-          <div className="w-full rounded-t-sm" style={{ height: `${(v / max) * 100}%`, backgroundColor: color, opacity: 0.5 + (v / max) * 0.5 }} />
-          <span className="text-[8px] text-stone-600 leading-none hidden sm:block">{labels[i]}</span>
-        </div>
-      ))}
+    <div>
+      <div className="flex items-end gap-1 h-28">
+        {data.map((d, i) => {
+          const total = d.shopSales + d.tips + d.subscriptions;
+          const pct = total / max;
+          const salesH = (d.shopSales / max) * 100;
+          const tipsH = (d.tips / max) * 100;
+          const subsH = (d.subscriptions / max) * 100;
+          return (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1 group relative" title={`$${total.toFixed(2)}\nSales: $${d.shopSales.toFixed(2)}\nTips: $${d.tips.toFixed(2)}\nSubscriptions: $${d.subscriptions.toFixed(2)}`}>
+              <div className="w-full flex flex-col justify-end" style={{ height: "112px" }}>
+                {subsH > 0 && (
+                  <div className="w-full rounded-t-sm" style={{ height: `${subsH}%`, backgroundColor: "#38bdf8", opacity: 0.75 + pct * 0.25 }} />
+                )}
+                {tipsH > 0 && (
+                  <div className="w-full" style={{ height: `${tipsH}%`, backgroundColor: "#f59e0b", opacity: 0.75 + pct * 0.25 }} />
+                )}
+                {salesH > 0 && (
+                  <div className={`w-full ${subsH === 0 && tipsH === 0 ? "rounded-t-sm" : ""}`} style={{ height: `${salesH}%`, backgroundColor: "#34d399", opacity: 0.75 + pct * 0.25 }} />
+                )}
+                {total === 0 && (
+                  <div className="w-full rounded-t-sm" style={{ height: "4px", backgroundColor: "#292524" }} />
+                )}
+              </div>
+              <span className="text-[8px] text-stone-600 leading-none hidden sm:block truncate w-full text-center">{d.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center gap-4 flex-wrap">
+        {[
+          { color: "#34d399", label: "Shop Sales" },
+          { color: "#f59e0b", label: "Tips" },
+          { color: "#38bdf8", label: "Subscriptions" },
+        ].map(({ color, label }) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
+            <span className="text-[10px] text-stone-500">{label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -124,12 +163,28 @@ interface ApiPost {
   createdAt: string;
 }
 
+interface StreamBucketMonth {
+  month: string;
+  tips: number;
+  subscriptions: number;
+  shopSales: number;
+}
+
+interface StreamBucketDay {
+  day: string;
+  tips: number;
+  subscriptions: number;
+  shopSales: number;
+}
+
 interface EarningTotals {
   tips: number;
   subscriptions: number;
   shopSales: number;
   sales?: number;
   total: number;
+  timeSeriesByMonth?: StreamBucketMonth[];
+  timeSeriesByDay?: StreamBucketDay[];
 }
 
 export default function Analytics() {
@@ -164,6 +219,8 @@ export default function Analytics() {
             subscriptions: t.subscriptions ?? 0,
             shopSales: t.shopSales ?? t.sales ?? 0,
             total: t.total ?? 0,
+            timeSeriesByMonth: data.timeSeriesByMonth ?? [],
+            timeSeriesByDay: data.timeSeriesByDay ?? [],
           });
         }
       })
@@ -191,21 +248,35 @@ export default function Analytics() {
   const likeActivityData = useMemo(() => buildDayMap(analyticsData?.likesByDay ?? {}, period), [analyticsData, period]);
   const periodLabels = useMemo(() => buildPeriodLabels(period), [period]);
 
-  const slicedCount = period === "30d" ? 1 : period === "90d" ? 3 : 12;
-  const displayMonths = MONTHS.slice(-slicedCount);
-  const displayRevenue = REVENUE_DATA.slice(-slicedCount);
+  // Build stacked time-series chart data for the current period
+  const streamChartData = useMemo<StreamPoint[]>(() => {
+    if (period === "30d") {
+      const byDay = earningTotals?.timeSeriesByDay ?? [];
+      return byDay.map(b => ({
+        label: new Date(b.day + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        shopSales: b.shopSales,
+        tips: b.tips,
+        subscriptions: b.subscriptions,
+      }));
+    }
+    const byMonth = earningTotals?.timeSeriesByMonth ?? [];
+    const monthCount = period === "90d" ? 3 : 12;
+    const slice = byMonth.slice(-monthCount);
+    return slice.map(b => ({
+      label: new Date(b.month + "-01T00:00:00").toLocaleDateString("en-US", { month: "short" }),
+      shopSales: b.shopSales,
+      tips: b.tips,
+      subscriptions: b.subscriptions,
+    }));
+  }, [earningTotals, period]);
 
-  const lastR = REVENUE_DATA[REVENUE_DATA.length - 1];
-  const prevR = REVENUE_DATA[REVENUE_DATA.length - 2];
-  const revenueChange = Math.round(((lastR - prevR) / prevR) * 100);
+  const streamChartTotal = streamChartData.reduce((s, d) => s + d.shopSales + d.tips + d.subscriptions, 0);
 
   const totalPostActivity = postActivityData.reduce((s, v) => s + v, 0);
   const halfLen = Math.floor(postActivityData.length / 2);
   const firstHalf = postActivityData.slice(0, halfLen).reduce((s, v) => s + v, 0);
   const secondHalf = postActivityData.slice(halfLen).reduce((s, v) => s + v, 0);
   const postChange = firstHalf > 0 ? Math.round(((secondHalf - firstHalf) / firstHalf) * 100) : 0;
-
-  const totalRevenue = earningTotals?.total ?? REVENUE_DATA.reduce((a, b) => a + b, 0);
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -309,18 +380,28 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Revenue chart */}
+        {/* Revenue by stream chart (real data) */}
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-stone-200">Monthly Revenue</h2>
-              <p className="text-xs text-stone-500">Shop + commissions + tips</p>
+              <h2 className="text-sm font-bold text-stone-200">Revenue by Stream</h2>
+              <p className="text-xs text-stone-500">
+                {earningTotals
+                  ? `$${streamChartTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this period`
+                  : "Sales · Tips · Subscriptions over time"}
+              </p>
             </div>
-            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-              <ArrowUp size={9} /> {revenueChange}%
-            </span>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <TrendingUp size={13} />
+            </div>
           </div>
-          <BarChart data={displayRevenue} color="#34d399" labels={displayMonths} />
+          {earningTotals ? (
+            <StackedBarChart data={streamChartData} />
+          ) : (
+            <div className="h-28 flex items-center justify-center">
+              <span className="text-xs text-stone-600">Loading earnings data…</span>
+            </div>
+          )}
         </div>
 
         {/* Likes & Engagement chart (real data) */}

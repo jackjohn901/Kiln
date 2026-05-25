@@ -185,13 +185,62 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
     { listings: 0, drops: 0, commissions: 0, workshops: 0 },
   );
 
+  // Build time-series buckets (only when no specific month/year filter is active)
+  type StreamBucket = { tips: number; subscriptions: number; shopSales: number };
+
+  const timeSeriesByMonth: Record<string, StreamBucket> = {};
+  const timeSeriesByDay: Record<string, StreamBucket> = {};
+  const now = new Date();
+
+  // Initialise last 12 month keys and last 30 day keys
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    timeSeriesByMonth[key] = { tips: 0, subscriptions: 0, shopSales: 0 };
+  }
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    timeSeriesByDay[key] = { tips: 0, subscriptions: 0, shopSales: 0 };
+  }
+
+  if (!dateRange) {
+    for (const t of tips) {
+      const monthKey = t.createdAt.toISOString().slice(0, 7);
+      const dayKey = t.createdAt.toISOString().slice(0, 10);
+      const amt = t.amountCents / 100;
+      if (timeSeriesByMonth[monthKey]) timeSeriesByMonth[monthKey].tips += amt;
+      if (timeSeriesByDay[dayKey]) timeSeriesByDay[dayKey].tips += amt;
+    }
+    for (const s of subs) {
+      const monthKey = s.startedAt.toISOString().slice(0, 7);
+      const dayKey = s.startedAt.toISOString().slice(0, 10);
+      const amt = s.amount / 100;
+      if (timeSeriesByMonth[monthKey]) timeSeriesByMonth[monthKey].subscriptions += amt;
+      if (timeSeriesByDay[dayKey]) timeSeriesByDay[dayKey].subscriptions += amt;
+    }
+    for (const o of sales) {
+      const monthKey = o.createdAt.toISOString().slice(0, 7);
+      const dayKey = o.createdAt.toISOString().slice(0, 10);
+      const amt = o.amount / 100;
+      if (timeSeriesByMonth[monthKey]) timeSeriesByMonth[monthKey].shopSales += amt;
+      if (timeSeriesByDay[dayKey]) timeSeriesByDay[dayKey].shopSales += amt;
+    }
+  }
+
   type EarningType = "tip" | "subscription" | "listing" | "drop" | "commission" | "workshop";
   const earnings = [
     ...tips.map(t => ({ id: t.id, type: "tip" as EarningType, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "via Kiln", amount: t.amountCents / 100, date: t.createdAt.toISOString() })),
     ...subs.map(s => ({ id: s.id, type: "subscription" as EarningType, label: "Patron subscription", sublabel: s.subscriberName ?? "Patron", amount: s.amount / 100, date: s.startedAt.toISOString() })),
     ...sales.map(o => ({ id: o.id, type: (["listing","drop","commission","workshop"].includes(o.type) ? o.type : "listing") as EarningType, label: o.title, sublabel: "Sale", amount: o.amount / 100, date: o.createdAt.toISOString() })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  res.json({ earnings, totals: { tips: tipTotal, subscriptions: subTotal, sales: saleTotal, salesByType, total: tipTotal + subTotal + saleTotal } });
+  res.json({
+    earnings,
+    totals: { tips: tipTotal, subscriptions: subTotal, sales: saleTotal, shopSales: saleTotal, salesByType, total: tipTotal + subTotal + saleTotal },
+    timeSeriesByMonth: Object.entries(timeSeriesByMonth).map(([month, v]) => ({ month, ...v })),
+    timeSeriesByDay: Object.entries(timeSeriesByDay).map(([day, v]) => ({ day, ...v })),
+  });
 });
 
 export default router;
