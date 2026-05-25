@@ -301,6 +301,25 @@ export default function Orders() {
                             ? `${groupOrders.length} items from this checkout`
                             : primary.title}
                         </p>
+                        {isGroup && groupOrders.length > 1 && (() => {
+                          const MAX_SHOWN = 2;
+                          const titles = groupOrders.map(o => o.title);
+                          const shown = titles.slice(0, MAX_SHOWN);
+                          const remaining = titles.length - MAX_SHOWN;
+                          return (
+                            <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">
+                              {shown.map((t, i) => (
+                                <span key={i}>
+                                  <span className="truncate inline-block max-w-[160px] align-bottom">{t}</span>
+                                  {i < shown.length - 1 || remaining > 0 ? ", " : ""}
+                                </span>
+                              ))}
+                              {remaining > 0 && (
+                                <span className="text-stone-500">+{remaining} more</span>
+                              )}
+                            </p>
+                          );
+                        })()}
                         <p className="text-xs text-stone-500 mt-0.5">{formatDate(primary.createdAt)}</p>
                       </div>
                       <span className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium ${statusConf.color}`}>
