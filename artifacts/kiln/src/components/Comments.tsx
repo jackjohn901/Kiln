@@ -123,7 +123,7 @@ export default function Comments({ postId, artistName, onClose }: Props) {
   const totalCount = comments.reduce((acc, c) => acc + 1 + (c.replies?.length ?? 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end" onClick={onClose}>
       <div
         className="relative flex flex-col bg-stone-900 rounded-t-2xl max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}

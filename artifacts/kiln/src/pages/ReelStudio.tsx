@@ -47,6 +47,21 @@ type Style =
   | "documentary"   | "luxury-brand"  | "behind-the-scenes" | "time-lapse-reveal";
 type Step = "source" | "style" | "enhancing" | "studio";
 
+// Route external (cross-origin) media through the server proxy so the fetch
+// succeeds (same-origin) and the canvas stays untainted. Same-origin and
+// blob/data URLs are returned unchanged.
+function proxiedMediaUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("blob:") || url.startsWith("data:")) return url;
+  try {
+    const u = new URL(url, window.location.href);
+    if (u.origin === window.location.origin) return url;
+    return `/api/media-proxy?url=${encodeURIComponent(u.toString())}`;
+  } catch {
+    return url;
+  }
+}
+
 function isVideoUrl(url: string) {
   return /\.(mp4|webm|mov|m4v|ogg)(\?.*)?$/i.test(url);
 }
@@ -560,7 +575,8 @@ export default function ReelStudio() {
 
     (async () => {
       try {
-        const res = await fetch(sourceUrl, { credentials: "include" });
+        const fetchUrl = proxiedMediaUrl(sourceUrl);
+        const res = await fetch(fetchUrl, { credentials: "include" });
         if (!res.ok) throw new Error(`fetch ${res.status}`);
         const blob = await res.blob();
         if (cancelled) return;
@@ -592,7 +608,8 @@ export default function ReelStudio() {
 
     (async () => {
       try {
-        const res = await fetch(videoSourceUrl, { credentials: "include" });
+        const fetchUrl = proxiedMediaUrl(videoSourceUrl);
+        const res = await fetch(fetchUrl, { credentials: "include" });
         if (!res.ok) throw new Error(`fetch ${res.status}`);
         const blob = await res.blob();
         if (cancelled) return;

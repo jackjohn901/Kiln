@@ -22,6 +22,7 @@ import galleryRouter from "./gallery";
 import communityRouter from "./community";
 import pinterestRouter from "./pinterest";
 import featuredBadgeRouter from "./featured-badge";
+import mediaProxyRouter from "./media-proxy";
 import authRouter from "./auth";
 import feedRouter from "./feed";
 import postsRouter from "./posts";
@@ -190,5 +191,6 @@ router.use(galleryRouter);
 router.use(communityRouter);
 router.use(pinterestRouter);
 router.use(featuredBadgeRouter);
+router.use(mediaProxyRouter);
 
 export default router;
