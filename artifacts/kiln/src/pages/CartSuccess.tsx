@@ -29,6 +29,7 @@ export default function CartSuccess() {
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const [perSellerWindows, setPerSellerWindows] = useState<{ sellerName: string; days: number | null; label: string | null }[]>([]);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const orderCreated = useRef(false);
 
   useEffect(() => {
@@ -95,6 +96,15 @@ export default function CartSuccess() {
             if (Array.isArray(d.perSellerWindows) && d.perSellerWindows.length > 0) {
               setPerSellerWindows(d.perSellerWindows);
             }
+          } else {
+            let message = "We couldn't complete your order because one or more items are no longer available. Please contact support.";
+            try {
+              const body = await res.json() as { error?: string };
+              if (typeof body.error === "string" && body.error.trim()) {
+                message = body.error.trim();
+              }
+            } catch {}
+            setOrderError(message);
           }
           // Clean up any stale pre-checkout data from localStorage.
           try { localStorage.removeItem("kiln_pre_checkout"); } catch {}
@@ -339,6 +349,27 @@ export default function CartSuccess() {
               ${(session.amountTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </span>
           </p>
+        )}
+
+        {orderError && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-left mb-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-red-300 font-semibold mb-1">Order could not be recorded</p>
+                <p className="text-stone-400 leading-relaxed">
+                  {orderError}
+                </p>
+                <p className="text-stone-500 text-xs mt-3">
+                  Your payment was processed by Stripe. If you were charged, please{" "}
+                  <Link href="/messages">
+                    <span className="text-amber-400 underline cursor-pointer">contact support</span>
+                  </Link>{" "}
+                  with your session reference and we will make it right.
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Manual payout expanded notice */}
