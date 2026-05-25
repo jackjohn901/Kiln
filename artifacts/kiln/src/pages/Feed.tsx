@@ -645,54 +645,17 @@ function ReelCard({
           )}
         </div>
 
-        {/* More options (algo feedback + report) */}
+        {/* More — opens overflow sheet (Tip / Repost / Duet / Stitch / Report) */}
         <button
           onClick={() => setShowAlgoMenu(true)}
-          className="flex flex-col items-center gap-1 opacity-40 hover:opacity-70 transition-opacity"
+          aria-label="More options"
+          className="flex flex-col items-center gap-1 opacity-60 hover:opacity-100 transition-opacity p-1 -m-1"
         >
-          <MoreHorizontal size={20} className="text-white" />
-          <span className="text-[9px] text-white/60">More</span>
+          <MoreHorizontal size={22} className="text-white" />
         </button>
 
         {/* Share */}
         <ShareButton artistId={reel.artistId} artistName={reel.artistName} />
-
-        {/* Tip */}
-        {!isOwnReel && (
-          <button onClick={() => setShowTip(true)} className="flex flex-col items-center gap-1">
-            <DollarSign size={22} className="text-white" />
-            <span className="text-[9px] font-bold text-white drop-shadow">Tip</span>
-          </button>
-        )}
-
-        {/* Stitch */}
-        <Link href={`/stitch/${reel.id}`}>
-          <button className="flex flex-col items-center gap-1">
-            <Scissors size={20} className="text-white" />
-            <span className="text-[9px] font-bold text-white drop-shadow">Stitch</span>
-          </button>
-        </Link>
-
-        {/* Duet */}
-        <Link href={`/duet/${reel.id}`}>
-          <button className="flex flex-col items-center gap-1">
-            <SplitSquareHorizontal size={22} className="text-white" />
-            <span className="text-[9px] font-bold text-white drop-shadow">Duet</span>
-          </button>
-        </Link>
-
-        {/* Repost / Amplify */}
-        <button
-          onClick={() => toggleReelRepost(reel.id, { artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnail: reel.thumbnail })}
-          className="flex flex-col items-center gap-1"
-        >
-          <Repeat2
-            size={24}
-            className={reposted ? "text-emerald-400" : "text-white"}
-            style={{ transition: "all 0.15s" }}
-          />
-          <span className="text-[9px] font-bold text-white drop-shadow">{reposted ? "On" : ""}</span>
-        </button>
 
         {/* Save — opens board picker */}
         <button
@@ -780,6 +743,53 @@ function ReelCard({
                 </button>
               </div>
               <div className="flex flex-col gap-2">
+                {!isOwnReel && (
+                  <button
+                    onClick={() => { setShowAlgoMenu(false); setShowTip(true); }}
+                    className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                  >
+                    <DollarSign size={16} className="text-amber-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-stone-200">Send a tip</p>
+                      <p className="text-[11px] text-stone-500">Support {reel.artistName} directly</p>
+                    </div>
+                  </button>
+                )}
+                <button
+                  onClick={() => { setShowAlgoMenu(false); toggleReelRepost(reel.id, { artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnail: reel.thumbnail }); }}
+                  className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                >
+                  <Repeat2 size={16} className={reposted ? "text-emerald-400 shrink-0" : "text-stone-400 shrink-0"} />
+                  <div>
+                    <p className="text-sm font-medium text-stone-200">{reposted ? "Unrepost" : "Repost"}</p>
+                    <p className="text-[11px] text-stone-500">Share this to your followers</p>
+                  </div>
+                </button>
+                <Link href={`/duet/${reel.id}`}>
+                  <button
+                    onClick={() => setShowAlgoMenu(false)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                  >
+                    <SplitSquareHorizontal size={16} className="text-stone-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-stone-200">Duet</p>
+                      <p className="text-[11px] text-stone-500">Film alongside this reel</p>
+                    </div>
+                  </button>
+                </Link>
+                <Link href={`/stitch/${reel.id}`}>
+                  <button
+                    onClick={() => setShowAlgoMenu(false)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
+                  >
+                    <Scissors size={16} className="text-stone-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-stone-200">Stitch</p>
+                      <p className="text-[11px] text-stone-500">Cut and respond with your own clip</p>
+                    </div>
+                  </button>
+                </Link>
+                <div className="my-1 h-px bg-stone-800" />
                 <button
                   onClick={() => { setShowAlgoMenu(false); onNotInterested(); }}
                   className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
@@ -1406,8 +1416,8 @@ export default function Feed() {
           <Stories />
         </div>
 
-        {/* Technique filter chips */}
-        <div className="pointer-events-auto flex gap-2 overflow-x-auto px-4 pt-2 pb-1" style={{ scrollbarWidth: "none" }}>
+        {/* Technique filter chips — pr-20 keeps the last chip clear of the right action rail */}
+        <div className="pointer-events-auto flex gap-2 overflow-x-auto pl-4 pr-20 pt-2 pb-1" style={{ scrollbarWidth: "none" }}>
           {techniqueFilter && (
             <button
               onClick={() => setTechniqueFilter(null)}
