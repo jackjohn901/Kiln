@@ -46,6 +46,7 @@ interface SeedPreview {
   seedUserCount: number;
   seedPostCount: number;
   markerUserId: string;
+  codeMarkerId: string;
 }
 
 interface SeedResult {
@@ -85,6 +86,8 @@ export default function AdminReports() {
   const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
+  const [newMarkerInput, setNewMarkerInput] = useState("");
+  const [advanceResult, setAdvanceResult] = useState<{ newMarkerId: string; users: number; posts: number; listings: number; guilds: number } | null>(null);
 
   // Test notification state
   const [notifPreview, setNotifPreview] = useState<NotifPreview | null>(null);
@@ -155,10 +158,40 @@ export default function AdminReports() {
     }
   }
 
+  async function runReseedWithMarker() {
+    const trimmed = newMarkerInput.trim();
+    if (!trimmed) return;
+    setSeedLoading(true);
+    setSeedError(null);
+    try {
+      const res = await fetch("/api/admin/reseed-with-marker", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newMarkerId: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setSeedError(data?.error ?? "Request failed");
+        return;
+      }
+      const data = await res.json() as { newMarkerId: string; users: number; posts: number; listings: number; guilds: number };
+      setAdvanceResult(data);
+      setSeedPreview(null);
+      setSeedResult(null);
+    } catch {
+      setSeedError("Network error — please try again");
+    } finally {
+      setSeedLoading(false);
+    }
+  }
+
   function resetSeed() {
     setSeedPreview(null);
     setSeedResult(null);
     setSeedError(null);
+    setAdvanceResult(null);
+    setNewMarkerInput("");
   }
 
   async function runTestNotification(dryRun: boolean) {
@@ -606,34 +639,88 @@ export default function AdminReports() {
                   <div className="space-y-1">
                     <p className="text-xs text-amber-200 font-medium">Current seed state:</p>
                     <p className="text-[11px] text-stone-400">
-                      Marker <span className="font-mono text-stone-500">{seedPreview.markerUserId}</span>{" "}
+                      DB marker{" "}
+                      <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-stone-300">{seedPreview.markerUserId}</span>{" "}
                       <span className={seedPreview.markerPresent ? "text-emerald-400" : "text-rose-400"}>
                         {seedPreview.markerPresent ? "✓ present" : "✗ missing"}
                       </span>
                     </p>
                     <p className="text-[11px] text-stone-400">
+                      Code marker{" "}
+                      <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-stone-300">{seedPreview.codeMarkerId}</span>
+                    </p>
+                    {seedPreview.markerUserId !== seedPreview.codeMarkerId && (
+                      <p className="text-[11px] text-amber-400">
+                        ⚠ DB marker differs from code — server will re-seed with <span className="font-mono">{seedPreview.codeMarkerId}</span> on next restart
+                      </p>
+                    )}
+                    <p className="text-[11px] text-stone-400">
                       {seedPreview.seedUserCount} seed users · {seedPreview.seedPostCount} seed posts found in DB
                     </p>
                   </div>
-                  <p className="text-xs text-stone-500">
-                    Confirming will delete the marker and re-run the full seed (all tables use upsert, so no data is lost).
-                  </p>
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      onClick={() => runReseed(false)}
-                      disabled={seedLoading}
-                      className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
-                    >
-                      <CheckCircle size={11} /> Confirm reseed
-                    </button>
-                    <button
-                      onClick={resetSeed}
-                      disabled={seedLoading}
-                      className="text-xs text-stone-600 hover:text-stone-400 transition-colors disabled:opacity-40"
-                    >
-                      Cancel
-                    </button>
+
+                  <div className="border-t border-white/5 pt-3 space-y-2">
+                    <p className="text-xs text-stone-400 font-medium">Reseed with same marker</p>
+                    <p className="text-[11px] text-stone-500">
+                      Deletes the marker and re-runs the full seed (all tables use upsert, so no data is lost).
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => runReseed(false)}
+                        disabled={seedLoading}
+                        className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                      >
+                        <CheckCircle size={11} /> Confirm reseed
+                      </button>
+                      <button
+                        onClick={resetSeed}
+                        disabled={seedLoading}
+                        className="text-xs text-stone-600 hover:text-stone-400 transition-colors disabled:opacity-40"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
+
+                  <div className="border-t border-white/5 pt-3 space-y-2">
+                    <p className="text-xs text-stone-400 font-medium">Advance to a new marker version</p>
+                    <p className="text-[11px] text-stone-500">
+                      Enter a new marker ID (e.g. <span className="font-mono text-stone-400">seed-v5-marker</span>) to re-seed and write a different version marker. Use this when updating seed data without changing code.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newMarkerInput}
+                        onChange={(e) => setNewMarkerInput(e.target.value)}
+                        placeholder="seed-v5-marker"
+                        disabled={seedLoading}
+                        className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800 px-3 py-1.5 text-xs text-stone-200 placeholder-stone-600 font-mono focus:outline-none focus:ring-1 focus:ring-amber-500/40 disabled:opacity-40"
+                      />
+                      <button
+                        onClick={runReseedWithMarker}
+                        disabled={seedLoading || !newMarkerInput.trim()}
+                        className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40 shrink-0"
+                      >
+                        <RefreshCw size={11} /> Advance marker
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {advanceResult && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 space-y-2">
+                  <p className="text-xs text-emerald-300 font-medium">Done — seed data applied with new marker.</p>
+                  <p className="text-[11px] text-stone-400">
+                    New marker:{" "}
+                    <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-stone-300">{advanceResult.newMarkerId}</span>
+                  </p>
+                  <p className="text-[11px] text-stone-500">
+                    {advanceResult.users} artists · {advanceResult.posts} posts · {advanceResult.listings} listings · {advanceResult.guilds} guilds
+                  </p>
+                  <button onClick={resetSeed} className="text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                    Reset
+                  </button>
                 </div>
               )}
 
@@ -649,7 +736,7 @@ export default function AdminReports() {
                 </div>
               )}
 
-              {!seedPreview && !seedResult && (
+              {!seedPreview && !seedResult && !advanceResult && (
                 <button
                   onClick={() => runReseed(true)}
                   disabled={seedLoading}

@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { getSeedStatus, forceSeedDatabase } from "../lib/seed";
+import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker } from "../lib/seed";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -407,6 +407,27 @@ router.post("/admin/backfill-order-notes", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.backfillOrderNotes error");
     res.status(500).json({ error: "Failed to backfill order notes" });
+  }
+});
+
+// POST /admin/reseed-with-marker — re-seed and write a new marker ID
+router.post("/admin/reseed-with-marker", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const { newMarkerId } = req.body as { newMarkerId?: string };
+  if (!newMarkerId || typeof newMarkerId !== "string" || !newMarkerId.trim()) {
+    res.status(400).json({ error: "newMarkerId is required" });
+    return;
+  }
+
+  try {
+    const result = await forceSeedDatabaseWithMarker(newMarkerId.trim());
+    req.log.info({ result }, "admin.reseedWithMarker: completed");
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "admin.reseedWithMarker error");
+    res.status(500).json({ error: "Reseed with new marker failed" });
   }
 });
 

@@ -577,12 +577,24 @@ export interface SeedStatus {
   seedUserCount: number;
   seedPostCount: number;
   markerUserId: string;
+  codeMarkerId: string;
+}
+
+async function getCurrentMarkerId(): Promise<string> {
+  const [row] = await db.select({ id: usersTable.id })
+    .from(usersTable)
+    .where(sql`${usersTable.id} LIKE '%-marker'`)
+    .orderBy(sql`${usersTable.id} DESC`)
+    .limit(1);
+  return row?.id ?? SEED_MARKER_ID;
 }
 
 export async function getSeedStatus(): Promise<SeedStatus> {
+  const currentMarkerId = await getCurrentMarkerId();
+
   const [marker] = await db.select({ id: usersTable.id })
     .from(usersTable)
-    .where(eq(usersTable.id, SEED_MARKER_ID));
+    .where(eq(usersTable.id, currentMarkerId));
 
   const seedUserIds = SEED_USERS.map((u) => u.id);
   const existingUsers = await db.select({ id: usersTable.id })
@@ -598,15 +610,71 @@ export async function getSeedStatus(): Promise<SeedStatus> {
     markerPresent: !!marker,
     seedUserCount: existingUsers.length,
     seedPostCount: existingPosts.length,
-    markerUserId: SEED_MARKER_ID,
+    markerUserId: currentMarkerId,
+    codeMarkerId: SEED_MARKER_ID,
   };
 }
 
 export async function forceSeedDatabase(): Promise<{ users: number; posts: number; listings: number; guilds: number }> {
-  await db.delete(usersTable).where(eq(usersTable.id, SEED_MARKER_ID));
-  await seedDatabase();
+  const currentMarkerId = await getCurrentMarkerId();
+  const result = await forceSeedDatabaseWithMarker(currentMarkerId);
   return {
-    users: SEED_USERS.length - 1,
+    users: result.users,
+    posts: result.posts,
+    listings: result.listings,
+    guilds: result.guilds,
+  };
+}
+
+export async function forceSeedDatabaseWithMarker(
+  newMarkerId: string,
+): Promise<{ newMarkerId: string; users: number; posts: number; listings: number; guilds: number }> {
+  const trimmed = newMarkerId.trim();
+  if (!trimmed) throw new Error("newMarkerId must not be empty");
+
+  await db.delete(usersTable).where(sql`${usersTable.id} LIKE '%-marker'`);
+
+  const markerUser = {
+    id: trimmed,
+    email: `${trimmed}@kiln.internal`,
+    firstName: "Seed",
+    lastName: "Marker",
+  };
+  const artistUsers = SEED_USERS.filter((u) => u.id !== SEED_MARKER_ID);
+  await db.insert(usersTable).values([markerUser, ...artistUsers]).onConflictDoNothing();
+
+  await db.insert(profilesTable).values(SEED_PROFILES).onConflictDoUpdate({
+    target: profilesTable.userId,
+    set: {
+      avatarUrl: sql`EXCLUDED.avatar_url`,
+      followerCount: sql`EXCLUDED.follower_count`,
+      postCount: sql`EXCLUDED.post_count`,
+    },
+  });
+
+  await db.insert(postsTable).values(SEED_POSTS).onConflictDoUpdate({
+    target: postsTable.id,
+    set: {
+      caption: sql`EXCLUDED.caption`,
+      videoUrl: sql`EXCLUDED.video_url`,
+      authorAvatarUrl: sql`EXCLUDED.author_avatar_url`,
+    },
+  });
+
+  await db.insert(listingsTable).values(SEED_LISTINGS).onConflictDoNothing();
+  await db.insert(dropsTable).values(SEED_DROPS).onConflictDoNothing();
+  await db.insert(auctionsTable).values(SEED_AUCTIONS).onConflictDoNothing();
+  await db.insert(auctionBidsTable).values(SEED_AUCTION_BIDS).onConflictDoNothing();
+  await db.insert(workshopsTable).values(SEED_WORKSHOPS).onConflictDoNothing();
+  await db.insert(guildsTable).values(SEED_GUILDS).onConflictDoNothing();
+  await db.insert(guildMembersTable).values(SEED_GUILD_MEMBERS).onConflictDoNothing();
+  await db.insert(patronTiersTable).values(SEED_PATRON_TIERS).onConflictDoNothing();
+
+  logger.info({ newMarkerId: trimmed }, "Seed data re-applied with new marker");
+
+  return {
+    newMarkerId: trimmed,
+    users: artistUsers.length,
     posts: SEED_POSTS.length,
     listings: SEED_LISTINGS.length,
     guilds: SEED_GUILDS.length,
