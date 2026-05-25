@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -280,9 +280,10 @@ function MusicDisc({ trackId, spinning }: { trackId: string; spinning: boolean }
 
 // ─── Reel Card ────────────────────────────────────────────────────────────────
 
-function ReelCard({
+const ReelCard = memo(function ReelCard({
   reel,
   isActive,
+  isNearby,
   musicMuted,
   onToggleMusic,
   videoAudioOn,
@@ -294,14 +295,15 @@ function ReelCard({
 }: {
   reel: Reel;
   isActive: boolean;
+  isNearby: boolean;
   musicMuted: boolean;
   onToggleMusic: () => void;
   videoAudioOn: boolean;
   onToggleVideoAudio: () => void;
   musicUnlocked: boolean;
   onComment: (reelId: string, artistName: string) => void;
-  onNotInterested: () => void;
-  onMoreLikeThis: () => void;
+  onNotInterested: (reelId: string) => void;
+  onMoreLikeThis: (technique: string) => void;
 }) {
   const [showReport, setShowReport] = useState(false);
   const [showBoardPicker, setShowBoardPicker] = useState(false);
@@ -395,8 +397,8 @@ function ReelCard({
         .kb-active { animation: kenBurns 10s ease-in-out infinite; }
       `}</style>
 
-      {reel.muxPlaybackId ? (
-        /* ── Mux player for transcoded uploads ── */
+      {reel.muxPlaybackId && isNearby ? (
+        /* ── Mux player for transcoded uploads (only mounted for active ± 1 reel) ── */
         <MuxPlayer
           playbackId={reel.muxPlaybackId}
           streamType="on-demand"
@@ -407,8 +409,8 @@ function ReelCard({
           paused={!isActive}
           className="absolute inset-0 h-full w-full object-cover"
         />
-      ) : resolvedVideoUrl ? (
-        /* ── HTML5 video for user-uploaded content ── */
+      ) : resolvedVideoUrl && isNearby ? (
+        /* ── HTML5 video for user-uploaded content (only mounted for active ± 1 reel) ── */
         <video
           ref={videoRef}
           key={resolvedVideoUrl}
@@ -416,7 +418,15 @@ function ReelCard({
           muted
           loop
           playsInline
+          preload={isActive ? "auto" : "metadata"}
           poster={reel.thumbnail}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : reel.muxPlaybackId || resolvedVideoUrl ? (
+        /* ── Off-screen reel: just the poster, no video element fetched yet ── */
+        <img
+          src={reel.thumbnail}
+          alt={reel.caption}
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
@@ -791,7 +801,7 @@ function ReelCard({
                 </Link>
                 <div className="my-1 h-px bg-stone-800" />
                 <button
-                  onClick={() => { setShowAlgoMenu(false); onNotInterested(); }}
+                  onClick={() => { setShowAlgoMenu(false); onNotInterested(reel.id); }}
                   className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
                 >
                   <ThumbsDown size={16} className="text-stone-500 shrink-0" />
@@ -801,7 +811,7 @@ function ReelCard({
                   </div>
                 </button>
                 <button
-                  onClick={() => { setShowAlgoMenu(false); onMoreLikeThis(); }}
+                  onClick={() => { setShowAlgoMenu(false); onMoreLikeThis(reel.technique); }}
                   className="flex items-center gap-3 rounded-xl bg-stone-800/60 px-4 py-3 text-left hover:bg-stone-700/60 transition-colors"
                 >
                   <ThumbsUp size={16} className="text-amber-500 shrink-0" />
@@ -853,7 +863,7 @@ function ReelCard({
       )}
     </div>
   );
-}
+});
 
 // ─── Main Feed ────────────────────────────────────────────────────────────────
 
@@ -886,22 +896,30 @@ export default function Feed() {
     } catch { return new Set<string>(); }
   });
 
-  function handleNotInterested(reelId: string) {
+  const handleNotInterested = useCallback((reelId: string) => {
     setNotInterested((prev) => {
       const next = new Set(prev);
       next.add(reelId);
       localStorage.setItem(NOT_INTERESTED_KEY, JSON.stringify([...next]));
       return next;
     });
-  }
+  }, []);
 
-  function handleMoreLikeThis(technique: string) {
+  const handleMoreLikeThis = useCallback((technique: string) => {
     try {
       const data = readInteractions();
       data.likedTechniques[technique] = (data.likedTechniques[technique] ?? 0) + 15;
       localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(data));
     } catch {}
-  }
+  }, []);
+
+  // Stable callbacks so memoized ReelCards don't re-render on every parent state change
+  const handleComment = useCallback((id: string, name: string) => {
+    setCommentReel({ id, artistName: name });
+  }, []);
+  const handleToggleVideoAudio = useCallback(() => {
+    setVideoAudioOn((v) => !v);
+  }, []);
 
   const { following, unreadCount } = useSocial();
   const { profile } = useProfile();
@@ -1595,14 +1613,15 @@ export default function Feed() {
               key={reel.id}
               reel={reel}
               isActive={i === activeIndex}
+              isNearby={Math.abs(i - activeIndex) <= 1}
               musicMuted={musicMuted}
               onToggleMusic={handleToggleMusic}
               videoAudioOn={videoAudioOn}
-              onToggleVideoAudio={() => setVideoAudioOn((v) => !v)}
+              onToggleVideoAudio={handleToggleVideoAudio}
               musicUnlocked={musicUnlocked}
-              onComment={(id, name) => setCommentReel({ id, artistName: name })}
-              onNotInterested={() => handleNotInterested(reel.id)}
-              onMoreLikeThis={() => handleMoreLikeThis(reel.technique)}
+              onComment={handleComment}
+              onNotInterested={handleNotInterested}
+              onMoreLikeThis={handleMoreLikeThis}
             />
           ))}
         </div>
