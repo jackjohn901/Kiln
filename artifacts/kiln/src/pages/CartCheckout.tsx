@@ -109,7 +109,7 @@ function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDo
 
 export default function CartCheckout() {
   const [, navigate] = useLocation();
-  const { items, subtotal, itemCount, clearCart } = useCart();
+  const { items, subtotal, itemCount, clearCart, removeItem } = useCart();
   const [step, setStep] = useState<Step>("address");
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDR);
   const [orderId] = useState(() => "KLN-" + Math.random().toString(36).slice(2, 8).toUpperCase());
@@ -119,6 +119,7 @@ export default function CartCheckout() {
   const [giftMessage, setGiftMessage] = useState("");
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [unavailableItems, setUnavailableItems] = useState<Array<{ id: string; title: string }>>([]);
   const [noPayoutMethod, setNoPayoutMethod] = useState(false);
   const [noPayoutMethodCount, setNoPayoutMethodCount] = useState(1);
   const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
@@ -342,6 +343,9 @@ export default function CartCheckout() {
         if (data.code === "no_payout_method") {
           setNoPayoutMethod(true);
           setNoPayoutMethodCount(typeof data.affectedArtistCount === "number" ? data.affectedArtistCount : 1);
+          setCheckingOut(false);
+        } else if (data.code === "items_unavailable" && Array.isArray(data.unavailableListings)) {
+          setUnavailableItems(data.unavailableListings as Array<{ id: string; title: string }>);
           setCheckingOut(false);
         } else {
           throw new Error(data.error ?? "Checkout failed");
@@ -582,6 +586,50 @@ export default function CartCheckout() {
                             className="flex-1 flex items-center justify-center gap-2 rounded-full bg-stone-700 py-2.5 text-sm font-bold text-stone-200 hover:bg-stone-600 transition-colors"
                           >
                             <MessageCircle size={14} /> Contact {noPayoutMethodCount > 1 ? "artists" : "artist"}
+                          </button>
+                        </div>
+                      </motion.div>
+                    ) : unavailableItems.length > 0 ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-2 space-y-3"
+                      >
+                        <div className="rounded-xl border border-rose-500/30 bg-rose-500/8 px-4 py-3 flex items-start gap-2.5">
+                          <AlertTriangle size={14} className="text-rose-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-rose-300 mb-1">
+                              {unavailableItems.length === 1
+                                ? "An item in your cart is no longer available"
+                                : `${unavailableItems.length} items in your cart are no longer available`}
+                            </p>
+                            <ul className="space-y-0.5">
+                              {unavailableItems.map((item) => (
+                                <li key={item.id} className="text-xs text-rose-200/70">
+                                  {item.title === "This item" ? "A deleted listing" : `"${item.title}"`}
+                                </li>
+                              ))}
+                            </ul>
+                            <p className="text-xs text-rose-200/50 mt-1.5">
+                              Remove {unavailableItems.length === 1 ? "it" : "them"} from your cart to continue.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setUnavailableItems([])}
+                            className="flex-1 rounded-full border border-white/10 py-2.5 text-sm text-stone-400 hover:text-stone-300 hover:border-white/20 transition-colors"
+                          >
+                            Go back
+                          </button>
+                          <button
+                            onClick={() => {
+                              unavailableItems.forEach((item) => removeItem(item.id));
+                              setUnavailableItems([]);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 rounded-full bg-rose-600 py-2.5 text-sm font-bold text-white hover:bg-rose-500 transition-colors"
+                          >
+                            Remove unavailable {unavailableItems.length === 1 ? "item" : "items"}
                           </button>
                         </div>
                       </motion.div>

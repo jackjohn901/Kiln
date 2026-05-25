@@ -215,16 +215,38 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         })
         .from(listingsTable)
         .where(inArray(listingsTable.id, listingIds));
+
+      // Collect every unavailable or deleted listing before returning so the
+      // client can surface all problem items in one pass (not just the first).
+      const unavailableListings: Array<{ id: string; title: string }> = [];
+
+      const foundIds = new Set(rows.map((r) => r.id));
       for (const row of rows) {
         if (row.isSold || !row.isAvailable) {
-          res.status(400).json({ error: `Listing "${row.id}" is no longer available.` }); return;
+          unavailableListings.push({ id: row.id, title: row.title });
+        } else {
+          listingPriceMap.set(row.id, {
+            price: row.price,
+            artistId: row.artistId,
+            title: row.title,
+            imageUrl: row.imageUrl,
+          });
         }
-        listingPriceMap.set(row.id, {
-          price: row.price,
-          artistId: row.artistId,
-          title: row.title,
-          imageUrl: row.imageUrl,
+      }
+      // IDs not returned by the query have been deleted from the catalogue.
+      for (const id of listingIds) {
+        if (!foundIds.has(id)) {
+          unavailableListings.push({ id, title: "This item" });
+        }
+      }
+
+      if (unavailableListings.length > 0) {
+        res.status(400).json({
+          error: "Some items in your cart are no longer available.",
+          code: "items_unavailable",
+          unavailableListings,
         });
+        return;
       }
     }
 
