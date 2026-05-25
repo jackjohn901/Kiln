@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { enqueueFailedEmail } from "./emailQueue";
 
 async function getResendApiKey(): Promise<string | null> {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -68,8 +69,9 @@ export async function sendEmailWithRetry(
   }
   logger.error(
     { to: payload.to, subject: payload.subject, attempts: maxAttempts, contextId: ctx?.contextId, label: ctx?.label },
-    "Email send failed after all retry attempts — buyer may not receive receipt",
+    "Email send failed after all retry attempts — queuing for persistent retry",
   );
+  void enqueueFailedEmail(payload, ctx?.contextId, ctx?.label);
   return false;
 }
 

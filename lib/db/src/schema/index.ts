@@ -71,3 +71,4 @@ export * from "./studio-events";
 export * from "./press_releases";
 export * from "./onboarding";
 export * from "./platform_tokens";
+export * from "./failed_emails";

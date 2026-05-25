@@ -7,6 +7,7 @@ import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./webhookHandlers";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import { runOnboardingCron, runWeeklyDigest } from "./lib/onboarding";
+import { drainEmailQueue } from "./lib/emailQueue";
 
 const app: Express = express();
 
@@ -60,6 +61,7 @@ app.use("/api", router);
 // ── Onboarding & digest crons ─────────────────────────────────────────────────
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
+const EMAIL_QUEUE_INTERVAL_MS = 5 * 60_000;
 // Run onboarding check once a day (first run after 5min so rapid restarts don't flood Resend)
 setTimeout(() => {
   void runOnboardingCron();
@@ -70,5 +72,10 @@ setTimeout(() => {
   void runWeeklyDigest();
   setInterval(() => void runWeeklyDigest(), WEEK_MS);
 }, 6 * 60_000);
+// Drain failed email queue on startup (after 30s) and every 5 minutes
+setTimeout(() => {
+  void drainEmailQueue();
+  setInterval(() => void drainEmailQueue(), EMAIL_QUEUE_INTERVAL_MS);
+}, 30_000);
 
 export default app;
