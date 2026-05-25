@@ -6,8 +6,9 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, or, ilike, inArray, desc, isNull, lte } from "drizzle-orm";
 import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
-import { sendEmail, newFollowerEmail } from "../lib/email";
+import { sendEmailWithRetry, newFollowerEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
+import { logger } from "../lib/logger";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
 import { awardBadge } from "./badges";
@@ -106,16 +107,19 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
     broadcast(followingId, { type: "follow", followerId, followingId });
     broadcast(followingId, { type: "notification", userId: followingId, text: "Someone started following you", link: `/profile/${followerId}` });
 
-    // Email notification (fire-and-forget — skipped if Resend not configured or no contactEmail)
+    // Email notification
     const followerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "Someone";
-    Promise.all([
-      db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, followingId)).limit(1),
-      db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, followingId)).limit(1),
-    ]).then(([[p], [s]]) => {
+    try {
+      const [[p], [s]] = await Promise.all([
+        db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, followingId)).limit(1),
+        db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, followingId)).limit(1),
+      ]);
       const emailSettings = s?.settings as Record<string, unknown> | null;
       const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_follows !== false;
-      if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }).catch(() => {});
-    }).catch(() => {});
+      if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }, { label: "new follower notification" });
+    } catch (err) {
+      logger.warn({ err, followingId }, "Failed to send new-follower notification email");
+    }
 
     res.json({ following: true, followerCount: newCount });
   } catch (err) {

@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable, userSettingsTable } from "@workspace/db";
-import { sendEmail, newPatronEmail } from "../lib/email";
+import { sendEmailWithRetry, newPatronEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, sql, inArray, gte, lt } from "drizzle-orm";
+import { logger } from "../lib/logger";
 import crypto from "crypto";
 
 const router = Router();
@@ -67,15 +68,18 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
   await db.update(patronTiersTable).set({ subscriberCount: sql`${patronTiersTable.subscriberCount} + 1` }).where(eq(patronTiersTable.id, tier.id));
   await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: tier.artistId, type: "subscription", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `subscribed to your ${tier.name} tier`, link: `/patrons` });
 
-  // Email notification (fire-and-forget)
-  Promise.all([
-    db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1),
-    db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
-  ]).then(([[p], [s]]) => {
+  // Email notification
+  try {
+    const [[p], [s]] = await Promise.all([
+      db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, tier.artistId)).limit(1),
+      db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
+    ]);
     const emailSettings = (s?.settings as Record<string, unknown> | null);
     const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_new_patron !== false;
-    if (wantsEmail && p?.contactEmail) sendEmail({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }).catch(() => {});
-  }).catch(() => {});
+    if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }, { label: "new patron notification" });
+  } catch (err) {
+    logger.warn({ err, artistId: tier.artistId }, "Failed to send new-patron notification email");
+  }
 
   res.json({ subscribed: true });
 });

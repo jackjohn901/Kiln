@@ -175,11 +175,11 @@ async function activatePatronSubscription(tierId: string, userId: string): Promi
     .where(eq(profilesTable.userId, userId));
 
   if (artistProfile?.contactEmail) {
-    sendEmail({
+    await sendEmailWithRetry({
       to: artistProfile.contactEmail,
       subject: `New patron: ${patronProfile?.displayName ?? 'Someone'} joined your ${tier.name} tier`,
       html: newPatronEmail(patronProfile?.displayName ?? 'A fan', tier.name),
-    }).catch(() => {});
+    }, { label: "new patron notification (webhook)" });
   }
 }
 
@@ -316,14 +316,14 @@ export class WebhookHandlers {
             return max == null ? o.processingWindowDays : Math.max(max, o.processingWindowDays);
           }, null);
 
-          sendEmailWithRetry(
+          await sendEmailWithRetry(
             {
               to: email,
               subject: `Your Kiln order #${orderId} is confirmed`,
               html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined),
             },
             { contextId: session.id, label: 'order confirmation' },
-          ).catch((err) => logger.error({ err, sessionId: session.id, to: email }, 'Unexpected error in sendEmailWithRetry for order confirmation'));
+          );
         }
 
         if (session.mode === 'subscription' && meta.platform === 'kiln' && meta.tierId && meta.userId) {

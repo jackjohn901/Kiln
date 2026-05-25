@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { commissionsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
 import { eq, or, desc } from "drizzle-orm";
 import crypto from "crypto";
-import { sendEmail, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
+import { sendEmailWithRetry, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 
 const router = Router();
@@ -30,7 +30,7 @@ router.post("/commissions", async (req, res): Promise<void> => {
     const emailSettings = (artistSettings?.settings as Record<string, unknown> | null);
     const wantsEmail = !isEmailPaused(emailSettings, artistSettings?.notifEmailResumeAt) && emailSettings?.notif_email_new_commission !== false;
     if (wantsEmail && artistUser?.email) {
-      sendEmail({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }).catch(() => {});
+      await sendEmailWithRetry({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }, { label: "new commission notification" });
     }
     res.status(201).json({ ...commission, createdAt: commission.createdAt.toISOString(), updatedAt: commission.updatedAt.toISOString() });
   } catch (err) { req.log.error({ err }, "createCommission error"); res.status(500).json({ error: "Failed to submit commission" }); }
@@ -127,7 +127,7 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: notifText, link: `/commissions` });
     const clientEmail = commission.clientEmail ?? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, commission.clientId)).then(r => r[0]?.email));
     if (clientEmail) {
-      sendEmail({ to: clientEmail, subject: `Commission update from ${commission.artistName}`, html: commissionUpdateEmail(commission.artistName, status, commission.workType ?? "") }).catch(() => {});
+      await sendEmailWithRetry({ to: clientEmail, subject: `Commission update from ${commission.artistName}`, html: commissionUpdateEmail(commission.artistName, status, commission.workType ?? "") }, { label: "commission update notification" });
     }
   }
   res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), estimatedDelivery: updated.estimatedDelivery?.toISOString() ?? null });

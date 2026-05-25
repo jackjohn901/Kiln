@@ -5,7 +5,7 @@ import { sendSmsIfOptedIn } from "../lib/sms";
 import { eq, desc, and, gt, max } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
-import { sendEmail, outbidEmail } from "../lib/email";
+import { sendEmailWithRetry, outbidEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
@@ -75,16 +75,19 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   if (auction.currentBidderId && auction.currentBidderId !== user.id) {
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: auction.currentBidderId, type: "follow", fromId: user.id, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `outbid you on ${auction.title} with $${bidAmount.toLocaleString()}`, link: `/auctions/${auction.id}` });
     const prevBidderId = auction.currentBidderId;
-    Promise.all([
-      db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, prevBidderId)),
-      db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
-      db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, prevBidderId)),
-    ]).then(([[prev], [s], [prof]]) => {
+    try {
+      const [[prev], [s], [prof]] = await Promise.all([
+        db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, prevBidderId)),
+        db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
+        db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, prevBidderId)),
+      ]);
       const emailSettings = (s?.settings as Record<string, unknown> | null);
       const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_outbid !== false;
-      if (wantsEmail && prev?.email) sendEmail({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }).catch(() => {});
+      if (wantsEmail && prev?.email) await sendEmailWithRetry({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }, { label: "outbid notification", contextId: auction.id });
       sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilnfire.replit.app/kiln/auctions/${auction.id}`);
-    }).catch(() => {});
+    } catch (err) {
+      logger.warn({ err, prevBidderId, auctionId: auction.id }, "Failed to send outbid notification email");
+    }
   }
   broadcastAll({ type: "bid", auctionId: auction.id, currentBid: bidAmount, bidCount: auction.bidCount + 1, bidderName: name, bidAt: bid.createdAt.toISOString() });
   res.json({ bid: { ...bid, createdAt: bid.createdAt.toISOString() }, auction: { ...updated, startDate: updated.startDate.toISOString(), endDate: updated.endDate.toISOString(), createdAt: updated.createdAt.toISOString() } });
