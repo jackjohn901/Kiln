@@ -66,19 +66,25 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 (async () => {
-  await initStripe();
-  await seedDatabase();
-  backfillProcessingWindow().catch((err) => logger.error({ err }, "backfillProcessingWindow error"));
-  startScheduledPostsPublisher();
-  startStoryExpiry();
-  startDropCountdownScheduler();
-  startWorkshopReminders();
-
+  // Bind the port FIRST so the deploy platform's health check passes
+  // immediately. Slow / potentially-hanging init work (Stripe schema
+  // migrations, seed, scheduled jobs) runs asynchronously after listen so
+  // a misconfigured integration can never block server startup.
   const server = createServer(app);
   setupWebSocket(server);
 
   server.listen(port, () => {
     logger.info({ port }, "Server listening");
+
+    // Fire-and-forget background init. Each task swallows its own errors
+    // so one failure can't take down the others or crash the process.
+    initStripe().catch((err) => logger.error({ err }, "initStripe failed"));
+    seedDatabase().catch((err) => logger.error({ err }, "seedDatabase failed"));
+    backfillProcessingWindow().catch((err) => logger.error({ err }, "backfillProcessingWindow error"));
+    try { startScheduledPostsPublisher(); } catch (err) { logger.error({ err }, "startScheduledPostsPublisher failed"); }
+    try { startStoryExpiry(); } catch (err) { logger.error({ err }, "startStoryExpiry failed"); }
+    try { startDropCountdownScheduler(); } catch (err) { logger.error({ err }, "startDropCountdownScheduler failed"); }
+    try { startWorkshopReminders(); } catch (err) { logger.error({ err }, "startWorkshopReminders failed"); }
   });
 
   server.on("error", (err) => {
