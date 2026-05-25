@@ -117,7 +117,7 @@ export default function ShopScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}
-              onPress={() => router.push(`/listing/${item.id}` as any)}
+              onPress={() => router.push(`/shop/${item.id}` as any)}
             >
               <View style={styles.imageWrap}>
                 {item.imageUrl ? (
