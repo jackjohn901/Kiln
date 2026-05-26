@@ -80,6 +80,16 @@ export default function Settings() {
   const [snoozePickerOpen, setSnoozePickerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("All");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  function setTimedError(setter: (v: string | null) => void, msg: string) {
+    setter(msg);
+    setTimeout(() => setter(null), 4000);
+  }
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -201,7 +211,7 @@ export default function Settings() {
       return;
     }
     setPhoneValidationError(false);
-    setSaveError(null);
+    setPhoneError(null);
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
@@ -211,9 +221,10 @@ export default function Settings() {
       .then((r) => {
         if (!r.ok) throw new Error();
         setPhoneSaved(true);
+        setPhoneError(null);
         setTimeout(() => setPhoneSaved(false), 2000);
       })
-      .catch(() => { setSaveError("Couldn\u2019t save phone number."); });
+      .catch(() => { setTimedError(setPhoneError, "Couldn\u2019t save phone number. Please try again."); });
   }
 
   function saveContactEmail(email: string) {
@@ -223,7 +234,7 @@ export default function Settings() {
       return;
     }
     setEmailValidationError(false);
-    setSaveError(null);
+    setEmailError(null);
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
@@ -233,15 +244,16 @@ export default function Settings() {
       .then((r) => {
         if (!r.ok) throw new Error();
         setEmailSaved(true);
+        setEmailError(null);
         setTimeout(() => setEmailSaved(false), 2000);
       })
-      .catch(() => { setSaveError("Couldn\u2019t save email address."); });
+      .catch(() => { setTimedError(setEmailError, "Couldn\u2019t save email address. Please try again."); });
   }
 
   function saveShipping(next: ShippingSettings) {
     setShipping(next);
     saveShippingSettings(next);
-    setSaveError(null);
+    setShippingError(null);
     fetch("/api/me/settings", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -250,9 +262,10 @@ export default function Settings() {
       .then((r) => {
         if (!r.ok) throw new Error();
         setShippingSaved(true);
+        setShippingError(null);
         setTimeout(() => setShippingSaved(false), 1800);
       })
-      .catch(() => { setSaveError("Couldn\u2019t save shipping settings."); });
+      .catch(() => { setTimedError(setShippingError, "Couldn\u2019t save shipping settings. Please try again."); });
   }
 
   const EMAIL_KEYS: (keyof KilnSettings)[] = [
@@ -316,7 +329,7 @@ export default function Settings() {
   function savePayments(next: ArtistPayments) {
     setPayments(next);
     savePaymentSettings(next);
-    setSaveError(null);
+    setPaymentsError(null);
     fetch("/api/me/settings", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -325,9 +338,10 @@ export default function Settings() {
       .then((r) => {
         if (!r.ok) throw new Error();
         setPaymentSaved(true);
+        setPaymentsError(null);
         setTimeout(() => setPaymentSaved(false), 1800);
       })
-      .catch(() => { setSaveError("Couldn\u2019t save payment settings."); });
+      .catch(() => { setTimedError(setPaymentsError, "Couldn\u2019t save payment settings. Please try again."); });
   }
 
   function saveAddress(next: DefaultShippingAddress) {
@@ -339,7 +353,7 @@ export default function Settings() {
       country: next.country.trim(),
     };
     setAddress(next);
-    setSaveError(null);
+    setAddressError(null);
     fetch("/api/me/settings", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -348,9 +362,10 @@ export default function Settings() {
       .then((r) => {
         if (!r.ok) throw new Error();
         setAddressSaved(true);
+        setAddressError(null);
         setTimeout(() => setAddressSaved(false), 1800);
       })
-      .catch(() => { setSaveError("Couldn\u2019t save address. Please try again."); });
+      .catch(() => { setTimedError(setAddressError, "Couldn\u2019t save address. Please try again."); });
   }
 
   function Toggle({ settingKey, label, desc }: { settingKey: keyof KilnSettings; label: string; desc?: string }) {
@@ -590,6 +605,9 @@ export default function Settings() {
               {emailValidationError && (
                 <p className="text-xs text-red-400 mt-1.5">Please enter a valid email address.</p>
               )}
+              {emailError && !emailValidationError && (
+                <p className="text-xs text-red-400 mt-1.5">{emailError}</p>
+              )}
             </div>
 
             {/* SMS Notifications */}
@@ -636,6 +654,9 @@ export default function Settings() {
                 </div>
                 {phoneValidationError && (
                   <p className="text-xs text-red-400 mt-1.5">Please enter a valid phone number with country code.</p>
+                )}
+                {phoneError && !phoneValidationError && (
+                  <p className="text-xs text-red-400 mt-1.5">{phoneError}</p>
                 )}
                 {!phoneNumber.trim() && !settings.notif_sms_paused && (
                   <p className="text-xs text-amber-500/70 mt-1.5">Add a phone number above to receive SMS alerts.</p>
@@ -753,6 +774,9 @@ export default function Settings() {
               >
                 {addressSaved ? <><Check size={14} /> Saved!</> : "Save delivery address"}
               </button>
+              {addressError && (
+                <p className="text-xs text-red-400 text-center mt-2">{addressError}</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-white/8 bg-stone-900/40 px-5 py-4">
@@ -888,6 +912,9 @@ export default function Settings() {
               >
                 {paymentSaved ? <><Check size={14} /> Saved!</> : "Save payment methods"}
               </button>
+              {paymentsError && (
+                <p className="text-xs text-red-400 text-center mt-2">{paymentsError}</p>
+              )}
             </div>
           </div>
         )}
@@ -1106,6 +1133,9 @@ export default function Settings() {
               >
                 {shippingSaved ? <><Check size={14} /> Saved!</> : "Save shipping rates"}
               </button>
+              {shippingError && (
+                <p className="text-xs text-red-400 text-center mt-2">{shippingError}</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-white/8 bg-stone-900/40 px-5 py-4">
