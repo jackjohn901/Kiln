@@ -132,6 +132,7 @@ export default function Discover() {
         const res = await fetch("/api/ai/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           signal: controller.signal,
           body: JSON.stringify({ query: query.trim() }),
         });

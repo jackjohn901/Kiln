@@ -208,6 +208,7 @@ export default function Create() {
       const res = await fetch("/api/ai/hashtags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ technique, caption, tags, medium: undefined }),
       });
       const data = await res.json() as { hashtags?: string[] };
