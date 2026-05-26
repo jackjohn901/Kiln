@@ -52,7 +52,7 @@ const PRODUCTS: DigitalProduct[] = [
     title: "The Reduction Firing Handbook",
     author: "Maya Chen",
     authorId: "maya-chen",
-    authorAvatar: "https://picsum.photos/seed/maya-chen/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=maya-chen",
     price: 18,
     category: "ebook",
     medium: "Ceramics",
@@ -63,14 +63,14 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.9,
     reviewCount: 312,
     tags: ["reduction", "gas kiln", "glazes", "ceramics"],
-    previewUrl: "https://picsum.photos/seed/reduction/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=reduction",
   },
   {
     id: "dp-002",
     title: "30 Production Pottery Templates",
     author: "Sarah Thornton",
     authorId: "sarah-thornton",
-    authorAvatar: "https://picsum.photos/seed/sarah-thornton/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=sarah-thornton",
     price: 24,
     category: "template",
     medium: "Ceramics",
@@ -81,14 +81,14 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.7,
     reviewCount: 184,
     tags: ["templates", "slab", "production", "pottery"],
-    previewUrl: "https://picsum.photos/seed/pottery-templates/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=pottery-templates",
   },
   {
     id: "dp-003",
     title: "Iron Red Glaze — 5 Tested Recipes",
     author: "Marcus Williams",
     authorId: "marcus-williams",
-    authorAvatar: "https://picsum.photos/seed/marcus-williams/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=marcus-williams",
     price: 8,
     category: "recipe",
     medium: "Ceramics",
@@ -99,14 +99,14 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.8,
     reviewCount: 891,
     tags: ["iron red", "glaze recipe", "cone 10", "reduction"],
-    previewUrl: "https://picsum.photos/seed/iron-red/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=iron-red",
   },
   {
     id: "dp-004",
     title: "Studio Glass Photography — Complete Workflow",
     author: "Alex Bernstein",
     authorId: "alex-bernstein",
-    authorAvatar: "https://picsum.photos/seed/alex-bernstein/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=alex-bernstein",
     price: 32,
     category: "guide",
     medium: "Glass",
@@ -117,14 +117,14 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.9,
     reviewCount: 456,
     tags: ["photography", "glass", "studio lighting", "Lightroom"],
-    previewUrl: "https://picsum.photos/seed/glass-photo/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=glass-photo",
   },
   {
     id: "dp-005",
     title: "Raku Firing Safety & Setup Guide",
     author: "James Okafor",
     authorId: "james-okafor",
-    authorAvatar: "https://picsum.photos/seed/james-okafor/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=james-okafor",
     price: 0,
     category: "guide",
     medium: "Ceramics",
@@ -136,14 +136,14 @@ const PRODUCTS: DigitalProduct[] = [
     reviewCount: 734,
     tags: ["raku", "safety", "outdoor firing", "free"],
     isFree: true,
-    previewUrl: "https://picsum.photos/seed/raku-safety/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=raku-safety",
   },
   {
     id: "dp-006",
     title: "Pricing Your Craft: A Working Artist's Spreadsheet",
     author: "Elena Vasquez",
     authorId: "elena-vasquez",
-    authorAvatar: "https://picsum.photos/seed/elena-vasquez/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=elena-vasquez",
     price: 15,
     category: "template",
     medium: "All media",
@@ -154,14 +154,14 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.8,
     reviewCount: 1203,
     tags: ["pricing", "business", "spreadsheet", "income"],
-    previewUrl: "https://picsum.photos/seed/pricing/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=pricing",
   },
   {
     id: "dp-007",
     title: "Shino Glaze Variations — Historical & Contemporary",
     author: "Takeshi Mori",
     authorId: "takeshi-mori",
-    authorAvatar: "https://picsum.photos/seed/takeshi-mori/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=takeshi-mori",
     price: 22,
     category: "recipe",
     medium: "Ceramics",
@@ -172,14 +172,14 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.9,
     reviewCount: 267,
     tags: ["shino", "wood fire", "carbon trap", "Japanese ceramics"],
-    previewUrl: "https://picsum.photos/seed/shino/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=shino",
   },
   {
     id: "dp-008",
     title: "Artist Statement Masterclass — 8 Frameworks",
     author: "Ingrid Larsson",
     authorId: "ingrid-larsson",
-    authorAvatar: "https://picsum.photos/seed/ingrid-larsson/80/80",
+    authorAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=ingrid-larsson",
     price: 12,
     category: "guide",
     medium: "All media",
@@ -190,7 +190,7 @@ const PRODUCTS: DigitalProduct[] = [
     rating: 4.7,
     reviewCount: 623,
     tags: ["writing", "grants", "artist statement", "career"],
-    previewUrl: "https://picsum.photos/seed/artist-statement/400/560",
+    previewUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=560&fit=crop&seed=artist-statement",
   },
 ];
 
@@ -347,7 +347,7 @@ export default function DigitalDownloads() {
                     src={product.previewUrl}
                     alt={product.title}
                     className="h-full w-full object-cover opacity-40 group-hover:opacity-50 transition-opacity"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${product.id}/400/240`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=240&fit=crop&seed=${product.id}`; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 to-transparent" />
                   <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -428,7 +428,7 @@ export default function DigitalDownloads() {
                   src={selectedProduct.previewUrl}
                   alt={selectedProduct.title}
                   className="h-full w-full object-cover opacity-50"
-                  onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${selectedProduct.id}/600/300`; }}
+                  onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=300&fit=crop&seed=${selectedProduct.id}`; }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1a1714] to-transparent" />
                 <div className="absolute bottom-4 left-5 right-5">
@@ -444,7 +444,7 @@ export default function DigitalDownloads() {
 
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/8">
-                  <img src={selectedProduct.authorAvatar} alt={selectedProduct.author} className="h-8 w-8 rounded-full object-cover border border-white/10" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${selectedProduct.authorId}/80/80`; }} />
+                  <img src={selectedProduct.authorAvatar} alt={selectedProduct.author} className="h-8 w-8 rounded-full object-cover border border-white/10" onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${selectedProduct.authorId}`; }} />
                   <div className="flex-1">
                     <Link href={`/artists/${selectedProduct.authorId}`} onClick={() => setSelectedProduct(null)}>
                       <p className="text-sm font-medium text-stone-300 hover:text-amber-300 transition-colors">{selectedProduct.author}</p>

@@ -462,7 +462,7 @@ export default function ArtistProfile() {
     }
 
     const name = dbProfile.displayName ?? "Artist";
-    const avatar = dbProfile.avatarUrl ?? `https://picsum.photos/seed/${dbProfile.userId}/200/200`;
+    const avatar = dbProfile.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${dbProfile.userId}`;
 
     return (
       <div className="min-h-screen bg-[#12100e]">
@@ -628,7 +628,7 @@ export default function ArtistProfile() {
 
   const avatarImg = (isOwn && profile?.avatarUrl)
     ? profile.avatarUrl
-    : (artist.images[0]?.url ?? `https://picsum.photos/seed/${artist.id}/200/200`);
+    : (artist.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artist.id}`);
 
   const tabItems = tab === "posts" ? allGridItems : tab === "process" ? processItems : [];
 
@@ -873,10 +873,16 @@ export default function ArtistProfile() {
             </a>
           )}
           {displayInstagram && (
-            <a href={`https://instagram.com/${displayInstagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+            <a href={`https://instagram.com/${(() => {
+              const raw = displayInstagram;
+              if (raw.startsWith("http")) {
+                return raw.split("instagram.com/")[1]?.split("/")[0]?.split("?")[0] ?? raw;
+              }
+              return raw.replace("@", "").split("/").pop() ?? raw;
+            })()}`} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1 text-pink-500/70 hover:text-pink-400 transition-colors"
             >
-              @{displayInstagram.replace("@", "")}
+              @{displayInstagram.replace("@", "").replace(/^https?:\/\/.*instagram\.com\//, "").split("/")[0]?.split("?")[0] ?? displayInstagram}
             </a>
           )}
         </div>
@@ -1065,7 +1071,7 @@ export default function ArtistProfile() {
                     // Pad with picsum for visual richness
                     ...Array.from({ length: Math.max(0, 9 - artist.images.length - Math.min(artist.videos.length, 6)) }, (_, i) => ({
                       key: `gen-${i}`,
-                      src: `https://picsum.photos/seed/${artist.id}-portfolio-${i}/600/${400 + i * 60}`,
+                      src: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=${400 + i * 60}&fit=crop&seed=${artist.id}-portfolio-${i}`,
                       caption: artist.medium,
                       isVideo: false,
                     })),
@@ -1076,7 +1082,7 @@ export default function ArtistProfile() {
                         alt={item.caption}
                         className="w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist.id}${item.key}/600/400`; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=${artist.id}${item.key}`; }}
                       />
                       {item.isVideo && (
                         <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60">
@@ -1268,7 +1274,7 @@ export default function ArtistProfile() {
                   ...Array.from({ length: Math.max(0, 4 - artist.images.length) }, (_, i) => ({
                     id: `sold-gen-${i}`,
                     title: `${artist.medium} Piece, ${2022 + i}`,
-                    imageUrl: `https://picsum.photos/seed/${artist.id}-sold-${i}/600/400`,
+                    imageUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=${artist.id}-sold-${i}`,
                     collectorRegion: ["San Francisco, CA", "Miami, FL", "Seattle, WA", "Boston, MA"][i % 4]!,
                     soldDate: ["Feb 2024", "Jun 2023", "Oct 2023", "Dec 2023"][i % 4]!,
                     salePrice: [4500, 6200, 3800, 5100][i % 4]!,
@@ -1283,7 +1289,7 @@ export default function ArtistProfile() {
                             src={item.imageUrl}
                             alt={item.title}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 brightness-75"
-                            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/600/400`; }}
+                            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=${item.id}`; }}
                           />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                             <span className="rounded-full border border-white/30 bg-black/50 px-4 py-1.5 text-xs font-bold tracking-widest text-white/80 uppercase">Sold</span>
@@ -1731,7 +1737,7 @@ export default function ArtistProfile() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-stone-600 mb-3">Similar artists</p>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
                 {similar.map((a) => {
-                  const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/160/160`;
+                  const avatar = a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=160&h=160&fit=crop&seed=${a.id}`;
                   const followed = isFollowing(a.id);
                   return (
                     <div key={a.id} className="shrink-0 w-32 flex flex-col items-center gap-1.5">
@@ -1740,7 +1746,7 @@ export default function ArtistProfile() {
                           src={avatar}
                           alt={a.name}
                           className="h-16 w-16 rounded-full object-cover border-2 border-white/10 hover:border-amber-500/40 transition-colors"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${a.id}/160/160`; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=160&h=160&fit=crop&seed=${a.id}`; }}
                         />
                       </Link>
                       <Link href={`/artists/${a.id}`}>
@@ -1908,9 +1914,9 @@ function ReviewSection({ artistId }: { artistId: string }) {
   const { profile } = useProfile();
   const contextReviews = getReviews(artistId);
   const seedRevs = SEED_REVIEWS[artistId] ?? [
-    { id: `seed-r1-${artistId}`, listingId: artistId, fromName: "Margaret T.", fromAvatarUrl: `https://picsum.photos/seed/${artistId}-r1/60/60`, rating: 5, text: "Absolutely stunning work. The piece arrived beautifully packed and exceeded every expectation. I've already commissioned a second piece.", createdAt: "2026-03-18" },
-    { id: `seed-r2-${artistId}`, listingId: artistId, fromName: "James K.", fromAvatarUrl: `https://picsum.photos/seed/${artistId}-r2/60/60`, rating: 5, text: "Working with this artist was a pleasure from start to finish. Clear communication, exquisite craftsmanship, and delivered on time.", createdAt: "2026-01-22" },
-    { id: `seed-r3-${artistId}`, listingId: artistId, fromName: "Priya M.", fromAvatarUrl: `https://picsum.photos/seed/${artistId}-r3/60/60`, rating: 4, text: "The technique is extraordinary — you can see the years of practice in every detail. Highly recommend.", createdAt: "2025-12-05" },
+    { id: `seed-r1-${artistId}`, listingId: artistId, fromName: "Margaret T.", fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${artistId}-r1`, rating: 5, text: "Absolutely stunning work. The piece arrived beautifully packed and exceeded every expectation. I've already commissioned a second piece.", createdAt: "2026-03-18" },
+    { id: `seed-r2-${artistId}`, listingId: artistId, fromName: "James K.", fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${artistId}-r2`, rating: 5, text: "Working with this artist was a pleasure from start to finish. Clear communication, exquisite craftsmanship, and delivered on time.", createdAt: "2026-01-22" },
+    { id: `seed-r3-${artistId}`, listingId: artistId, fromName: "Priya M.", fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${artistId}-r3`, rating: 4, text: "The technique is extraordinary — you can see the years of practice in every detail. Highly recommend.", createdAt: "2025-12-05" },
   ];
 
   const allReviews = [...contextReviews, ...seedRevs];
@@ -1925,7 +1931,7 @@ function ReviewSection({ artistId }: { artistId: string }) {
     addReview({
       listingId: artistId,
       fromName: profile?.name ?? "Anonymous",
-      fromAvatarUrl: `https://picsum.photos/seed/${profile?.id ?? "anon"}/60/60`,
+      fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${profile?.id ?? "anon"}`,
       rating: form.rating,
       text: form.text,
     });
@@ -1992,7 +1998,7 @@ function ReviewSection({ artistId }: { artistId: string }) {
       {allReviews.map((r, i) => (
         <div key={i} className="rounded-xl border border-white/8 bg-stone-900/40 p-4">
           <div className="flex items-start gap-3">
-            <img src={r.fromAvatarUrl} alt={r.fromName} className="h-8 w-8 rounded-full object-cover border border-white/10" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${i}/60/60`; }} />
+            <img src={r.fromAvatarUrl} alt={r.fromName} className="h-8 w-8 rounded-full object-cover border border-white/10" onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${i}`; }} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-stone-200">{r.fromName}</span>

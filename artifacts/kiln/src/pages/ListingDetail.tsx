@@ -581,7 +581,7 @@ export default function ListingDetail() {
   }
 
   const artist = getArtistById(listing.artistId) ?? ALL_ARTISTS.find((a) => a.id === listing.artistId);
-  const avatar = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${listing.artistId}/200/200`;
+  const avatar = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${listing.artistId}`;
   const related = getRelated(listing);
   const inCart = isInCart(listing.id);
   const reviews = apiReviews;
@@ -696,7 +696,7 @@ export default function ListingDetail() {
                 <div className="flex items-center gap-2.5 mb-4 group w-fit">
                   <img src={avatar} alt={artist.name}
                     className="h-8 w-8 rounded-full object-cover border border-white/10 group-hover:border-amber-500/40 transition-colors"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${listing.artistId}/80/80`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${listing.artistId}`; }}
                   />
                   <div>
                     <p className="text-xs text-amber-400 group-hover:text-amber-300 transition-colors font-semibold">{artist.name}</p>
@@ -1024,7 +1024,7 @@ export default function ListingDetail() {
                 <div className="flex items-start gap-3">
                   <img src={avatar} alt={artist.name}
                     className="h-12 w-12 rounded-full object-cover border border-white/10 shrink-0"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${listing.artistId}/80/80`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${listing.artistId}`; }}
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-stone-200 mb-1">{artist.name}</p>
@@ -1191,9 +1191,9 @@ export default function ListingDetail() {
                 <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                   className="rounded-2xl border border-white/8 bg-stone-900/40 p-5">
                   <div className="flex items-start gap-3">
-                    <img src={r.reviewerAvatarUrl ?? `https://picsum.photos/seed/${r.id}/60/60`} alt={r.reviewerName}
+                    <img src={r.reviewerAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${r.id}`} alt={r.reviewerName}
                       className="h-9 w-9 rounded-full object-cover border border-white/10 shrink-0"
-                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/60/60`; }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${r.id}`; }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">

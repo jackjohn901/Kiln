@@ -249,7 +249,7 @@ export default function CreatorHome() {
               {reels.length > 0 ? reels.map((r, i) => (
                 <div key={r.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="h-10 w-10 rounded-lg overflow-hidden bg-stone-800 shrink-0">
-                    <img src={r.thumbnail} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/80/80`; }} />
+                    <img src={r.thumbnail} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${r.id}`; }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-stone-300 line-clamp-1">{r.caption}</p>

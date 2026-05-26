@@ -374,7 +374,7 @@ export default function CollectorJourney() {
             <div className="flex flex-wrap gap-3">
               {followedArtists.map((a) => {
                 if (!a) return null;
-                const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`;
+                const avatar = a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`;
                 return (
                   <Link key={a.id} href={`/artists/${a.id}`}>
                     <div className="flex flex-col items-center gap-1.5 cursor-pointer group">

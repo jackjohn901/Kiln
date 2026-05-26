@@ -119,7 +119,7 @@ export default function AdminFoundingArtists() {
                   onClick={() => setExpanded(expanded === app.userId ? null : app.userId)}
                 >
                   <img
-                    src={app.avatarUrl ?? `https://picsum.photos/seed/${app.userId}/40/40`}
+                    src={app.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${app.userId}`}
                     alt={app.displayName ?? app.handle ?? ""}
                     className="h-10 w-10 rounded-full object-cover shrink-0"
                   />
@@ -144,7 +144,7 @@ export default function AdminFoundingArtists() {
                       {app.instagram && (
                         <div>
                           <p className="text-xs text-stone-500 mb-0.5">Instagram</p>
-                          <a href={`https://instagram.com/${app.instagram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">{app.instagram}</a>
+                          <a href={app.instagram.startsWith("http") ? app.instagram : `https://instagram.com/${app.instagram.replace("@", "").replace(/^\//, "").split("/").pop() ?? ""}`} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">{app.instagram.replace("@", "").replace(/^https?:\/\/.*instagram\.com\//, "").split("/").pop() ?? ""}</a>
                         </div>
                       )}
                       {app.website && (

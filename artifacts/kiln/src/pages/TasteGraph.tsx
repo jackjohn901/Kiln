@@ -8,10 +8,10 @@ import { seedArtists } from "@/data/seedArtists";
 import { Link } from "wouter";
 
 const TASTE_TWINS = [
-  { id: "tw-1", name: "Priya N.", avatarUrl: "https://picsum.photos/seed/priya/60/60", interests: ["Glass", "Experimental"], discovers: "Underground enamel & neon artists", weights: { glass: 88, ceramics: 25, metal: 40, fiber: 20, enamel: 60, experimental: 85, sculptural: 75, functional: 30, traditional: 20, intimate: 65, monumental: 50, colorful: 70 } },
-  { id: "tw-2", name: "Kenji W.", avatarUrl: "https://picsum.photos/seed/kenji/60/60", interests: ["Ceramics", "Traditional"], discovers: "Japanese wood-fired revival work", weights: { glass: 30, ceramics: 90, metal: 25, fiber: 35, enamel: 45, experimental: 30, sculptural: 55, functional: 80, traditional: 90, intimate: 70, monumental: 30, colorful: 40 } },
-  { id: "tw-3", name: "Amara L.", avatarUrl: "https://picsum.photos/seed/amara/60/60", interests: ["Fiber", "Sculptural"], discovers: "Large-scale textile installations", weights: { glass: 35, ceramics: 45, metal: 30, fiber: 95, enamel: 20, experimental: 75, sculptural: 90, functional: 25, traditional: 35, intimate: 40, monumental: 85, colorful: 80 } },
-  { id: "tw-4", name: "Felix R.", avatarUrl: "https://picsum.photos/seed/felix/60/60", interests: ["Metal", "Experimental"], discovers: "Industrial & raw material artists", weights: { glass: 45, ceramics: 30, metal: 92, fiber: 20, enamel: 35, experimental: 88, sculptural: 65, functional: 45, traditional: 15, intimate: 30, monumental: 70, colorful: 25 } },
+  { id: "tw-1", name: "Priya N.", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=priya", interests: ["Glass", "Experimental"], discovers: "Underground enamel & neon artists", weights: { glass: 88, ceramics: 25, metal: 40, fiber: 20, enamel: 60, experimental: 85, sculptural: 75, functional: 30, traditional: 20, intimate: 65, monumental: 50, colorful: 70 } },
+  { id: "tw-2", name: "Kenji W.", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=kenji", interests: ["Ceramics", "Traditional"], discovers: "Japanese wood-fired revival work", weights: { glass: 30, ceramics: 90, metal: 25, fiber: 35, enamel: 45, experimental: 30, sculptural: 55, functional: 80, traditional: 90, intimate: 70, monumental: 30, colorful: 40 } },
+  { id: "tw-3", name: "Amara L.", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=amara", interests: ["Fiber", "Sculptural"], discovers: "Large-scale textile installations", weights: { glass: 35, ceramics: 45, metal: 30, fiber: 95, enamel: 20, experimental: 75, sculptural: 90, functional: 25, traditional: 35, intimate: 40, monumental: 85, colorful: 80 } },
+  { id: "tw-4", name: "Felix R.", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=felix", interests: ["Metal", "Experimental"], discovers: "Industrial & raw material artists", weights: { glass: 45, ceramics: 30, metal: 92, fiber: 20, enamel: 35, experimental: 88, sculptural: 65, functional: 45, traditional: 15, intimate: 30, monumental: 70, colorful: 25 } },
 ];
 
 function computeTwinSimilarity(w1: TasteWeights, w2: Record<string, number>): number {
@@ -300,7 +300,7 @@ export default function TasteGraph() {
             <p className="text-xs text-stone-500 mb-4">Artists ranked by how closely they match your Taste Graph. Adjust sliders to see rankings change in real-time.</p>
             <div className="space-y-2.5">
               {topMatches.map((artist, i) => {
-                const avatarUrl = "avatarUrl" in artist ? String(artist.avatarUrl) : "https://picsum.photos/seed/" + artist.id + "/60/60";
+                const avatarUrl = "avatarUrl" in artist ? String(artist.avatarUrl) : "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=" + artist.id;
                 const matchColor = artist.match >= 80 ? "text-emerald-400" : artist.match >= 60 ? "text-amber-400" : "text-stone-400";
                 return (
                   <Link key={artist.id} href={`/artists/${artist.id}`}>

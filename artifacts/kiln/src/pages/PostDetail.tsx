@@ -276,7 +276,7 @@ export default function PostDetail() {
                 <div className="flex items-center gap-3 mb-4">
                   <Link href={`/artists/${dbPost.authorId}`}>
                     <img
-                      src={dbPost.authorAvatarUrl ?? `https://picsum.photos/seed/${dbPost.authorId}/80/80`}
+                      src={dbPost.authorAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${dbPost.authorId}`}
                       alt={dbPost.authorName}
                       className="h-14 w-14 rounded-full object-cover border-2 border-amber-500/30 hover:border-amber-400/60 transition-colors"
                     />
@@ -435,7 +435,7 @@ export default function PostDetail() {
                           src={r.thumbnail}
                           alt={r.caption}
                           className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/300/300`; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=300&h=300&fit=crop&seed=${r.id}`; }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -522,7 +522,7 @@ export default function PostDetail() {
                             src={r.thumbnail}
                             alt={r.caption}
                             className="h-12 w-12 rounded-lg object-cover shrink-0 bg-stone-800"
-                            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/100/100`; }}
+                            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&h=100&fit=crop&seed=${r.id}`; }}
                           />
                           <div className="min-w-0">
                             <p className="text-sm text-stone-200 truncate">{r.caption}</p>

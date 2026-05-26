@@ -155,7 +155,7 @@ export default function WorkshopCheckout() {
               src={workshop.imageUrl}
               alt={workshop.title}
               className="w-full h-32 object-cover rounded-xl mb-4"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${workshop.id}/400/200`; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=200&fit=crop&seed=${workshop.id}`; }}
             />
             <p className="font-semibold text-stone-100 mb-1">{workshop.title}</p>
             <p className="text-xs text-amber-400 mb-3">with {workshop.artistName}</p>
@@ -281,7 +281,7 @@ export default function WorkshopCheckout() {
               src={workshop.imageUrl}
               alt={workshop.title}
               className="w-full h-36 object-cover rounded-xl mb-4"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${workshop.id}/400/200`; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=200&fit=crop&seed=${workshop.id}`; }}
             />
             <p className="font-semibold text-stone-100 mb-1 leading-snug">{workshop.title}</p>
             <div className="flex items-center gap-2 mb-3">

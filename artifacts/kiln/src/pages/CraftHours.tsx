@@ -39,10 +39,10 @@ const SEED_STATE: CraftHoursState = {
 
 const COMMUNITY_BOARD = [
   { name: "Maya Chen", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&q=80", hoursThisWeek: 28, technique: "Ceramics", badge: "🔥" },
-  { name: "James Okafor", avatarUrl: "https://picsum.photos/seed/james/60/60", hoursThisWeek: 22, technique: "Metal Forging", badge: "⚒️" },
-  { name: "Elena Vasquez", avatarUrl: "https://picsum.photos/seed/elena/60/60", hoursThisWeek: 18, technique: "Fiber Arts", badge: "🧵" },
+  { name: "James Okafor", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=james", hoursThisWeek: 22, technique: "Metal Forging", badge: "⚒️" },
+  { name: "Elena Vasquez", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=elena", hoursThisWeek: 18, technique: "Fiber Arts", badge: "🧵" },
   { name: "Alex Bernstein", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80", hoursThisWeek: 15, technique: "Glass", badge: "💎" },
-  { name: "Takeshi Mori", avatarUrl: "https://picsum.photos/seed/takeshi/60/60", hoursThisWeek: 14, technique: "Raku", badge: "🏺" },
+  { name: "Takeshi Mori", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=takeshi", hoursThisWeek: 14, technique: "Raku", badge: "🏺" },
 ];
 
 const TECHNIQUES = ["Glass Blowing", "Flameworking", "Kiln Forming", "Cold Working", "Ceramics", "Raku", "Porcelain", "Wood-Fired", "Metal Forging", "Bronze Casting", "Blacksmithing", "Enamel", "Fiber Arts", "Textile", "Design / Sketching", "Teaching", "Studio Admin"];

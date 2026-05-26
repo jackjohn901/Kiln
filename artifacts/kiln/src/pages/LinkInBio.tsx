@@ -191,7 +191,7 @@ export default function LinkInBio() {
             <p className="text-xs text-stone-500 mb-3 uppercase tracking-wider font-medium">Preview</p>
             <div className={`rounded-2xl overflow-hidden border border-white/8 min-h-96 ${THEMES.find(t => t.id === page.theme)?.bg ?? "bg-stone-950"} p-8`}>
               <div className="max-w-xs mx-auto text-center space-y-4">
-                <img src={profile.avatarUrl ?? `https://picsum.photos/seed/${profile.id}/80/80`} alt="" className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-white/20" />
+                <img src={profile.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${profile.id}`} alt="" className="w-20 h-20 rounded-full object-cover mx-auto border-2 border-white/20" />
                 <div>
                   <h2 className={`font-bold text-lg ${page.theme === "light" ? "text-stone-900" : "text-white"}`}>{page.pageTitle || "Your Name"}</h2>
                   {page.bio && <p className={`text-xs mt-1 ${page.theme === "light" ? "text-stone-600" : "text-white/60"}`}>{page.bio}</p>}

@@ -36,8 +36,8 @@ const SEED_POSTS: CritiquePost[] = [
     id: "c-001",
     artistId: "maya-chen",
     artistName: "Maya Chen",
-    avatarUrl: "https://picsum.photos/seed/maya-chen/80/80",
-    imageUrl: "https://picsum.photos/seed/raku1/600/500",
+    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=maya-chen",
+    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=raku1",
     caption: "New raku bowl — copper matte glaze. [critique welcome] I'm struggling with the balance between the raw clay body and the metallic areas. Is the contrast too harsh?",
     medium: "Ceramics / Raku",
     postedAt: "2026-05-13T10:00:00Z",
@@ -47,7 +47,7 @@ const SEED_POSTS: CritiquePost[] = [
       {
         id: "cr-001-a",
         fromName: "Elena Vasquez",
-        fromAvatar: "https://picsum.photos/seed/elena/80/80",
+        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=elena",
         technique: 4,
         concept: 5,
         finish: 4,
@@ -59,7 +59,7 @@ const SEED_POSTS: CritiquePost[] = [
       {
         id: "cr-001-b",
         fromName: "Takeshi Mori",
-        fromAvatar: "https://picsum.photos/seed/takeshi/80/80",
+        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=takeshi",
         technique: 5,
         concept: 4,
         finish: 4,
@@ -74,8 +74,8 @@ const SEED_POSTS: CritiquePost[] = [
     id: "c-002",
     artistId: "james-okafor",
     artistName: "James Okafor",
-    avatarUrl: "https://picsum.photos/seed/james/80/80",
-    imageUrl: "https://picsum.photos/seed/forge1/600/500",
+    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=james",
+    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=forge1",
     caption: "First attempt at a Japanese-style gyuto. [critique welcome] The bevel grind is inconsistent behind the heel — I can see the grind angle shifting. Looking for feedback on the overall profile and any tips on maintaining bevel consistency.",
     medium: "Metal Forging / Bladesmithing",
     postedAt: "2026-05-12T16:00:00Z",
@@ -85,7 +85,7 @@ const SEED_POSTS: CritiquePost[] = [
       {
         id: "cr-002-a",
         fromName: "Felix Braun",
-        fromAvatar: "https://picsum.photos/seed/felix/80/80",
+        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=felix",
         technique: 3,
         concept: 5,
         finish: 3,
@@ -100,8 +100,8 @@ const SEED_POSTS: CritiquePost[] = [
     id: "c-003",
     artistId: "caleb-siemon",
     artistName: "Caleb Siemon",
-    avatarUrl: "https://picsum.photos/seed/caleb/80/80",
-    imageUrl: "https://picsum.photos/seed/glass-vessel/600/500",
+    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=caleb",
+    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=glass-vessel",
     caption: "Color experiment — trying to push the aquamarine-to-clear gradient further without losing the internal luminosity. [critique welcome] Does the vessel form support the color work, or is the shape too simple?",
     medium: "Glass Blowing",
     postedAt: "2026-05-11T12:00:00Z",
@@ -111,7 +111,7 @@ const SEED_POSTS: CritiquePost[] = [
       {
         id: "cr-003-a",
         fromName: "Dante Marioni",
-        fromAvatar: "https://picsum.photos/seed/dante/80/80",
+        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=dante",
         technique: 5,
         concept: 4,
         finish: 5,
@@ -126,8 +126,8 @@ const SEED_POSTS: CritiquePost[] = [
     id: "c-004",
     artistId: "ingrid-larsson",
     artistName: "Ingrid Larsson",
-    avatarUrl: "https://picsum.photos/seed/ingrid/80/80",
-    imageUrl: "https://picsum.photos/seed/fiber1/600/500",
+    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=ingrid",
+    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=fiber1",
     caption: "Weld and indigo-dyed tapestry — first piece for the autumn collection. [critique welcome] I'm unsure whether the composition reads as two distinct color areas or as a continuous gradient. Viewing it at distance vs close up gives me different answers.",
     medium: "Fiber Arts / Natural Dye",
     postedAt: "2026-05-10T09:00:00Z",
@@ -137,7 +137,7 @@ const SEED_POSTS: CritiquePost[] = [
       {
         id: "cr-004-a",
         fromName: "Freya Lindqvist",
-        fromAvatar: "https://picsum.photos/seed/freya/80/80",
+        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=freya",
         technique: 5,
         concept: 5,
         finish: 4,
@@ -198,7 +198,7 @@ export default function CritiqueFeed() {
     const tempCritique = {
       id: `cr-new-${Date.now()}`,
       fromName: profile.name,
-      fromAvatar: `https://picsum.photos/seed/${profile.id}/80/80`,
+      fromAvatar: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${profile.id}`,
       ...critiqueForm.ratings,
       text: critiqueForm.text,
       helpful: 0,
@@ -265,7 +265,7 @@ export default function CritiqueFeed() {
               {/* Artist header */}
               <div className="flex items-center gap-3 px-4 pt-4 pb-3">
                 <img src={post.avatarUrl} alt={post.artistName} className="h-9 w-9 rounded-full object-cover border border-white/10"
-                  onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${post.artistId}/80/80`; }} />
+                  onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${post.artistId}`; }} />
                 <div className="flex-1 min-w-0">
                   <Link href={`/artists/${post.artistId}`} className="text-sm font-semibold text-stone-200 hover:text-amber-300 transition-colors">{post.artistName}</Link>
                   <p className="text-[11px] text-stone-600">{post.medium} · <RelativeTime since={post.postedAt} className="" /></p>
@@ -277,7 +277,7 @@ export default function CritiqueFeed() {
 
               {/* Image */}
               <img src={post.imageUrl} alt="" className="w-full aspect-video object-cover"
-                onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${post.id}/600/400`; }} />
+                onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=${post.id}`; }} />
 
               {/* Caption */}
               <div className="px-4 pt-3 pb-2">
@@ -362,7 +362,7 @@ export default function CritiqueFeed() {
                         <div key={c.id} className="border-b border-white/5 last:border-b-0 px-4 py-4">
                           <div className="flex items-center gap-2 mb-3">
                             <img src={c.fromAvatar} alt={c.fromName} className="h-7 w-7 rounded-full object-cover border border-white/10"
-                              onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${c.id}/60/60`; }} />
+                              onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${c.id}`; }} />
                             <div>
                               <span className="text-xs font-semibold text-stone-200">{c.fromName}</span>
                               <RelativeTime since={c.postedAt} className="ml-2 text-[11px] text-stone-600" />

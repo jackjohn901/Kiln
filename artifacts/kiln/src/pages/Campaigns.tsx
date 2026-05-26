@@ -105,7 +105,7 @@ export default function Campaigns() {
                     </div>
                     <div className="p-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <img src={c.artistAvatarUrl ?? `https://picsum.photos/seed/${c.artistId}/40/40`} alt={c.artistName} className="w-6 h-6 rounded-full object-cover" />
+                        <img src={c.artistAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${c.artistId}`} alt={c.artistName} className="w-6 h-6 rounded-full object-cover" />
                         <span className="text-xs text-stone-400">{c.artistName}</span>
                       </div>
                       <h3 className="font-semibold text-stone-100 mb-1 line-clamp-2 leading-tight">{c.title}</h3>

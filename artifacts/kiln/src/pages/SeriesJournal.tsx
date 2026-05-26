@@ -18,7 +18,7 @@ function SeriesCard({ series }: { series: ProcessSeries }) {
             src={series.coverImageUrl}
             alt={series.title}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${series.id}/600/340`; }}
+            onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=340&fit=crop&seed=${series.id}`; }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-stone-950/20 to-transparent" />
 
@@ -48,7 +48,7 @@ function SeriesCard({ series }: { series: ProcessSeries }) {
               src={series.avatarUrl}
               alt={series.artistName}
               className="h-6 w-6 rounded-full object-cover border border-white/20"
-              onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${series.artistId}/60/60`; }}
+              onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${series.artistId}`; }}
             />
             <span className="text-xs font-semibold text-stone-200">{series.artistName}</span>
           </div>

@@ -155,7 +155,7 @@ export default function CollectorProfile() {
                     src={work.imageUrl}
                     alt={work.title}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${work.id}/400/300`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=300&fit=crop&seed=${work.id}`; }}
                   />
                 </div>
                 <div className="p-4">
@@ -238,7 +238,7 @@ export default function CollectorProfile() {
                 >
                   <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-stone-800">
                     <img
-                      src={`https://picsum.photos/seed/${artistId}/100/100`}
+                      src={`https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&h=100&fit=crop&seed=${artistId}`}
                       alt={artistId}
                       className="h-full w-full object-cover"
                     />

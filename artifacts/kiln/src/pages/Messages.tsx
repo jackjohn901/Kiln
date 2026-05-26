@@ -60,7 +60,7 @@ function ThreadItem({ thread, active, onClick }: { thread: MessageThread; active
     >
       <div className="relative shrink-0">
         <img
-          src={thread.participantAvatar || `https://picsum.photos/seed/${thread.participantId}/60/60`}
+          src={thread.participantAvatar || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${thread.participantId}`}
           alt={thread.participantName}
           className="h-10 w-10 rounded-full object-cover"
         />
@@ -625,7 +625,7 @@ export default function Messages() {
                     .filter((a) => !composeSearch || a.name.toLowerCase().includes(composeSearch.toLowerCase()))
                     .slice(0, 12)
                     .map((a) => {
-                      const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`;
+                      const avatar = a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`;
                       return (
                         <button
                           key={a.id}
@@ -672,7 +672,7 @@ export default function Messages() {
               >
                 <div className="relative shrink-0">
                   <img
-                    src={t.otherUserAvatar ?? `https://picsum.photos/seed/${t.otherUserId}/60/60`}
+                    src={t.otherUserAvatar ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${t.otherUserId}`}
                     alt={t.otherUserName}
                     className="h-10 w-10 rounded-full object-cover"
                   />
@@ -731,7 +731,7 @@ export default function Messages() {
                   <ArrowLeft size={18} />
                 </button>
                 <img
-                  src={pendingRecipient.avatar ?? `https://picsum.photos/seed/${pendingRecipient.id}/60/60`}
+                  src={pendingRecipient.avatar ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${pendingRecipient.id}`}
                   alt={pendingRecipient.name}
                   className="h-8 w-8 rounded-full object-cover"
                 />
@@ -782,7 +782,7 @@ export default function Messages() {
                   <ArrowLeft size={18} />
                 </button>
                 <img
-                  src={activeApiThread.otherUserAvatar ?? `https://picsum.photos/seed/${activeApiThread.otherUserId}/60/60`}
+                  src={activeApiThread.otherUserAvatar ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${activeApiThread.otherUserId}`}
                   alt={activeApiThread.otherUserName}
                   className="h-8 w-8 rounded-full object-cover"
                 />
@@ -816,7 +816,7 @@ export default function Messages() {
                         <div className={`flex ${isMe ? "justify-end" : "justify-start"} w-full`}>
                           {!isMe && (
                             <img
-                              src={msg.senderAvatarUrl ?? `https://picsum.photos/seed/${msg.senderId}/60/60`}
+                              src={msg.senderAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${msg.senderId}`}
                               alt={msg.senderName}
                               className="h-7 w-7 rounded-full object-cover mr-2 mt-1 shrink-0"
                             />
@@ -844,7 +844,7 @@ export default function Messages() {
                 {otherUserTyping && (
                   <div className="flex items-end gap-2">
                     <img
-                      src={activeApiThread.otherUserAvatar ?? `https://picsum.photos/seed/${activeApiThread.otherUserId}/60/60`}
+                      src={activeApiThread.otherUserAvatar ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${activeApiThread.otherUserId}`}
                       alt={activeApiThread.otherUserName}
                       className="h-7 w-7 rounded-full object-cover shrink-0"
                     />
@@ -884,7 +884,7 @@ export default function Messages() {
                   <ArrowLeft size={18} />
                 </button>
                 <img
-                  src={activeThread!.participantAvatar || `https://picsum.photos/seed/${activeThread!.participantId}/60/60`}
+                  src={activeThread!.participantAvatar || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${activeThread!.participantId}`}
                   alt={activeThread!.participantName}
                   className="h-8 w-8 rounded-full object-cover"
                 />
@@ -918,7 +918,7 @@ export default function Messages() {
                     <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                       {!isMe && (
                         <img
-                          src={msg.senderAvatar || `https://picsum.photos/seed/${msg.senderId}/60/60`}
+                          src={msg.senderAvatar || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${msg.senderId}`}
                           alt={msg.senderName}
                           className="h-7 w-7 rounded-full object-cover mr-2 mt-1 shrink-0"
                         />

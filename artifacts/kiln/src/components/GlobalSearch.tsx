@@ -236,7 +236,7 @@ export default function GlobalSearch({ onClose }: Props) {
                     className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
                   >
                     <img
-                      src={p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/80/80`}
+                      src={p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${p.userId}`}
                       alt={p.displayName ?? "Artist"}
                       className="h-10 w-10 rounded-full object-cover shrink-0 border border-amber-500/30"
                     />
@@ -257,7 +257,7 @@ export default function GlobalSearch({ onClose }: Props) {
               <div className="border-b border-white/5">
                 <p className="px-5 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-600">Artists</p>
                 {artistHits.map((a) => {
-                  const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`;
+                  const avatar = a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`;
                   return (
                     <button key={a.id} onClick={() => go(`/artists/${a.id}`)}
                       className="flex w-full items-center gap-3 px-5 py-3 hover:bg-white/5 transition-colors text-left"
@@ -328,7 +328,7 @@ export default function GlobalSearch({ onClose }: Props) {
                       src={r.thumbnail}
                       alt={r.caption}
                       className="h-10 w-10 rounded-lg object-cover shrink-0 bg-stone-800"
-                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/100/100`; }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&h=100&fit=crop&seed=${r.id}`; }}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-stone-200 truncate">{r.caption}</p>

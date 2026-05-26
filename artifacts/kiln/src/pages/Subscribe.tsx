@@ -84,7 +84,7 @@ export default function Subscribe() {
 
   const artistId = artist.id as string;
   const artistName = artist.name;
-  const avatarUrl = (artist as { images?: { url: string }[] }).images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/200/200`;
+  const avatarUrl = (artist as { images?: { url: string }[] }).images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artistId}`;
   const alreadySubscribed = isSubscribed(artistId);
   const tier = TIERS.find((t) => t.id === selectedTier)!;
 

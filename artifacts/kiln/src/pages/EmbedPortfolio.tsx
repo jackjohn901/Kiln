@@ -55,7 +55,7 @@ function GridThumbnail({ item }: { item: GridItem }) {
         src={item.thumbnailUrl}
         alt={item.caption}
         className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/400/400`; }}
+        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=400&fit=crop&seed=${item.id}`; }}
       />
       {item.type !== "image" && (
         <div className="absolute top-1.5 right-1.5">
@@ -114,10 +114,10 @@ export default function EmbedPortfolio() {
       <div className="px-4 py-5 flex items-center gap-4 border-b border-white/8">
         <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-amber-500/30 bg-stone-800 shrink-0">
           <img
-            src={artist.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/150/150`}
+            src={artist.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=150&h=150&fit=crop&seed=${artistId}`}
             alt={artist.name}
             className="h-full w-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artistId}/150/150`; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=150&h=150&fit=crop&seed=${artistId}`; }}
           />
         </div>
         <div className="flex-1 min-w-0">

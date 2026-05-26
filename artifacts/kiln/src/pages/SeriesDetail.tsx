@@ -40,7 +40,7 @@ export default function SeriesDetail() {
           src={series.coverImageUrl}
           alt={series.title}
           className="h-full w-full object-cover"
-          onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${series.id}/800/400`; }}
+          onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&h=400&fit=crop&seed=${series.id}`; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#12100e] via-[#12100e]/50 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 px-4 pb-6">
@@ -71,7 +71,7 @@ export default function SeriesDetail() {
           <Link href={`/artists/${series.artistId}`}>
             <img src={series.avatarUrl} alt={series.artistName}
               className="h-10 w-10 rounded-full object-cover border border-white/10 hover:border-amber-500/30 transition-colors"
-              onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${series.artistId}/80/80`; }} />
+              onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${series.artistId}`; }} />
           </Link>
           <div className="flex-1 min-w-0">
             <Link href={`/artists/${series.artistId}`} className="text-sm font-semibold text-stone-200 hover:text-amber-300 transition-colors">
@@ -176,7 +176,7 @@ export default function SeriesDetail() {
                             src={step.imageUrl}
                             alt={step.title}
                             className="h-full w-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${step.id}/600/340`; }}
+                            onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=340&fit=crop&seed=${step.id}`; }}
                           />
                         </div>
 

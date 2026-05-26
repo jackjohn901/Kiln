@@ -25,7 +25,7 @@ function OrderSummary({ listing }: { listing: Listing }) {
             src={listing.imageUrl}
             alt={listing.title}
             className="h-20 w-20 rounded-xl object-cover shrink-0 bg-stone-800"
-            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${listing.id}/200/200`; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${listing.id}`; }}
           />
         )}
         <div className="min-w-0">
@@ -195,7 +195,7 @@ export default function Checkout() {
               src={listing.imageUrl}
               alt={listing.title}
               className="mx-auto h-48 w-48 rounded-2xl object-cover mb-6 border border-white/10"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${listing.id}/300/300`; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=300&h=300&fit=crop&seed=${listing.id}`; }}
             />
           )}
           <p className="text-lg font-medium text-stone-100 mb-1">{listing.title}</p>

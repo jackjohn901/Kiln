@@ -68,7 +68,7 @@ export default function LiveStudio() {
     images: profile!.avatarUrl ? [{ url: profile!.avatarUrl }] : [] as { url: string }[],
   } : null)) as typeof staticArtist | null;
 
-  const avatarUrl = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/200/200`;
+  const avatarUrl = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artistId}`;
 
   const [viewers, setViewers] = useState(() => 800 + (hash(artistId ?? "") % 3000));
   const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([]);

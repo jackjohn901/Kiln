@@ -62,7 +62,7 @@ const PINS: ArtistPin[] = ALL_ARTISTS.map((a) => ({
   name: a.name,
   medium: a.medium.split(",")[0].trim(),
   location: a.location,
-  avatarUrl: a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`,
+  avatarUrl: a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`,
   coords: getCoords(a.location),
   mediumCategory: getMedium(a.medium),
 }));
@@ -91,7 +91,7 @@ export default function StudioMap() {
             name: a.displayName,
             medium: (a.medium ?? "Other").split(",")[0].trim(),
             location: a.location!,
-            avatarUrl: a.avatarUrl ?? `https://picsum.photos/seed/${a.userId}/80/80`,
+            avatarUrl: a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.userId}`,
             coords: getCoords(a.location!),
             mediumCategory: getMedium(a.medium ?? "Other"),
           }));
@@ -206,7 +206,7 @@ export default function StudioMap() {
                       {/* Pin avatar */}
                       <div className={`h-9 w-9 rounded-full overflow-hidden border-2 shadow-lg shadow-black/50 ${isSelected ? "border-amber-400" : "border-white/60 group-hover:border-amber-300"} transition-colors`}>
                         <img src={pin.avatarUrl} alt={pin.name} className="h-full w-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${pin.id}/80/80`; }} />
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${pin.id}`; }} />
                       </div>
                       {/* Medium dot */}
                       <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${pinColor} border border-stone-950`} />

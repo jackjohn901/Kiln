@@ -170,7 +170,7 @@ export default function GuildDetail() {
         <Nav />
         <div className="relative h-48 overflow-hidden">
           <img src={staticGuild.bannerUrl} alt={staticGuild.name} className="h-full w-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${staticGuild.id}/1200/400`; }} />
+            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1200&h=400&fit=crop&seed=${staticGuild.id}`; }} />
           <div className="absolute inset-0 bg-gradient-to-t from-[#12100e] via-black/40 to-black/20" />
           <button onClick={() => navigate("/guilds")}
             className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 transition-colors">
@@ -213,14 +213,14 @@ export default function GuildDetail() {
 
   const guild = apiGuild!;
   const emoji = TECHNIQUE_EMOJI[guild.technique ?? ""] ?? "🔨";
-  const bannerUrl = guild.bannerUrl ?? `https://picsum.photos/seed/${guild.id}-banner/1200/400`;
+  const bannerUrl = guild.bannerUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1200&h=400&fit=crop&seed=${guild.id}-banner`;
 
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="relative h-48 overflow-hidden">
         <img src={bannerUrl} alt={guild.name} className="h-full w-full object-cover"
-          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${guild.id}/1200/400`; }} />
+          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1200&h=400&fit=crop&seed=${guild.id}`; }} />
         <div className="absolute inset-0 bg-gradient-to-t from-[#12100e] via-black/40 to-black/20" />
         <button onClick={() => navigate("/guilds")}
           className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 transition-colors">
@@ -318,7 +318,7 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                   <div key={post.id} className="overflow-hidden rounded-2xl border border-white/8 bg-stone-900/60">
                     <div className="flex items-center gap-3 px-4 pt-4 pb-3">
                       <img src={post.avatarUrl} alt={post.artistName} className="h-9 w-9 rounded-full object-cover border border-white/10"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${post.artistId}/80/80`; }} />
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${post.artistId}`; }} />
                       <div className="flex-1 min-w-0">
                         <Link href={`/artists/${post.artistId}`} className="text-sm font-semibold text-stone-200 hover:text-amber-300 transition-colors">
                           {post.artistName}
@@ -327,7 +327,7 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                       </div>
                     </div>
                     <img src={post.imageUrl} alt={post.caption} className="w-full aspect-video object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${post.id}/600/400`; }} />
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=${post.id}`; }} />
                     <div className="px-4 py-3">
                       <p className="text-sm text-stone-300 leading-relaxed">{post.caption}</p>
                       <div className="mt-3 flex items-center gap-4">
@@ -396,12 +396,12 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                 const badge = ROLE_BADGES[role];
                 const Icon = badge?.icon;
                 const name = member.displayName ?? member.userId;
-                const avatar = member.avatarUrl ?? `https://picsum.photos/seed/${member.userId}/80/80`;
+                const avatar = member.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${member.userId}`;
                 return (
                   <Link key={member.userId} href={`/artists/${member.userId}`}>
                     <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3 hover:border-white/16 transition-colors">
                       <img src={avatar} alt={name} className="h-10 w-10 rounded-full object-cover border border-white/10"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${member.userId}/80/80`; }} />
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${member.userId}`; }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-semibold text-stone-200">{name}</span>

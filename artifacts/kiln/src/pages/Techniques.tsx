@@ -151,7 +151,7 @@ function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: 
                 className="flex items-center gap-2 rounded-full border border-white/10 bg-stone-800 px-4 py-2 text-sm text-stone-300 hover:border-amber-500/30 hover:text-amber-200 transition-all"
               >
                 <img
-                  src={`https://picsum.photos/seed/${id}/40/40`}
+                  src={`https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${id}`}
                   alt={id}
                   className="h-5 w-5 rounded-full object-cover"
                 />
@@ -171,14 +171,14 @@ function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: 
           </h2>
           <div className="grid grid-cols-3 gap-2">
             {techniqueReels.slice(0, 6).map((r) => (
-              <button key={r.id} onClick={() => navigate("/feed")}
+              <button key={r.id} onClick={() => navigate("/")}
                 className="relative aspect-[9/16] overflow-hidden rounded-xl bg-stone-900 group hover:ring-2 hover:ring-amber-500/40 transition-all">
                 <img
                   src={r.thumbnail}
                   alt=""
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/200/360`;
+                    (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=360&fit=crop&seed=${r.id}`;
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
@@ -189,7 +189,7 @@ function TechniqueDetail({ technique, onBack }: { technique: Technique; onBack: 
             ))}
           </div>
           {techniqueReels.length > 6 && (
-            <button onClick={() => navigate("/feed")} className="text-xs text-amber-500/70 hover:text-amber-400 transition-colors mt-2">
+            <button onClick={() => navigate("/")} className="text-xs text-amber-500/70 hover:text-amber-400 transition-colors mt-2">
               +{techniqueReels.length - 6} more — watch on Kiln →
             </button>
           )}

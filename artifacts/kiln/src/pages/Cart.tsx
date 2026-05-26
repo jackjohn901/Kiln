@@ -113,7 +113,7 @@ export default function Cart() {
           <div className="flex flex-col gap-4">
             <AnimatePresence>
               {items.map(({ listing, quantity }) => {
-                const imageUrl = listing.imageUrl ?? `https://picsum.photos/seed/${listing.id}/200/200`;
+                const imageUrl = listing.imageUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${listing.id}`;
                 const price = typeof listing.price === "number" ? listing.price : 0;
                 return (
                   <motion.div

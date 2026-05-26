@@ -165,7 +165,7 @@ function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setAppl
             src={mentor.avatarUrl}
             alt={mentor.name}
             className="h-14 w-14 shrink-0 rounded-full object-cover border-2 border-stone-800"
-            onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${mentor.artistId}/80/80`; }}
+            onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${mentor.artistId}`; }}
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">

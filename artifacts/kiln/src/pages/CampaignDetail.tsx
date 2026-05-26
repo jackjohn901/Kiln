@@ -77,7 +77,7 @@ export default function CampaignDetail() {
             {campaign.imageUrl && <img src={campaign.imageUrl} alt={campaign.title} className="w-full rounded-2xl object-cover max-h-72" />}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <img src={campaign.artistAvatarUrl ?? `https://picsum.photos/seed/${campaign.artistId}/40/40`} alt={campaign.artistName} className="w-8 h-8 rounded-full object-cover" />
+                <img src={campaign.artistAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${campaign.artistId}`} alt={campaign.artistName} className="w-8 h-8 rounded-full object-cover" />
                 <Link href={`/artists/${campaign.artistId}`} className="text-sm text-amber-400 hover:text-amber-300">{campaign.artistName}</Link>
               </div>
               <h1 className="text-2xl font-bold text-amber-100 font-serif mb-3">{campaign.title}</h1>

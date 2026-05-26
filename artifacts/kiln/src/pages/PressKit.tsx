@@ -20,7 +20,7 @@ export default function PressKit() {
     );
   }
 
-  const avatarUrl = artist.images[0]?.url ?? `https://picsum.photos/seed/${artist.id}/400/400`;
+  const avatarUrl = artist.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=400&fit=crop&seed=${artist.id}`;
   const selectedImages = artist.images.slice(0, 6);
 
   function handlePrint() {
@@ -103,7 +103,7 @@ function PressKitDocument({ artist, avatarUrl, selectedImages, currentYear }: {
           src={avatarUrl}
           alt={artist.name}
           className="h-24 w-24 rounded-full object-cover border-2 border-stone-700 shrink-0"
-          onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist.id}/200/200`; }}
+          onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artist.id}`; }}
         />
         <div className="flex-1">
           <p className="text-stone-500 text-xs tracking-widest uppercase mb-1">Press Kit · {currentYear}</p>
@@ -144,7 +144,7 @@ function PressKitDocument({ artist, avatarUrl, selectedImages, currentYear }: {
                     src={img.url}
                     alt={img.caption ?? `Work ${i + 1}`}
                     className="h-full w-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist!.id}-pk-${i}/400/400`; }}
+                    onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=400&fit=crop&seed=${artist!.id}-pk-${i}`; }}
                   />
                 </div>
               ))}

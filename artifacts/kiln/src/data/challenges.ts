@@ -37,9 +37,9 @@ export const challenges: Challenge[] = [
     status: "active",
     sponsoredBy: "Bullseye Glass",
     leaderboard: [
-      { artistId: "lino-tagliapietra", artistName: "Lino Tagliapietra", avatarUrl: "https://picsum.photos/seed/lino/80/80", likes: 4821, thumbnail: "https://img.youtube.com/vi/dQhKVFbpZoQ/maxresdefault.jpg" },
-      { artistId: "dante-marioni", artistName: "Dante Marioni", avatarUrl: "https://picsum.photos/seed/dante/80/80", likes: 3104, thumbnail: "https://img.youtube.com/vi/kOd0r6FWMOY/maxresdefault.jpg" },
-      { artistId: "caleb-siemon", artistName: "Caleb Siemon", avatarUrl: "https://picsum.photos/seed/caleb/80/80", likes: 2587, thumbnail: "https://img.youtube.com/vi/RVZ7HFOP7VY/maxresdefault.jpg" },
+      { artistId: "lino-tagliapietra", artistName: "Lino Tagliapietra", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=lino", likes: 4821, thumbnail: "https://img.youtube.com/vi/dQhKVFbpZoQ/maxresdefault.jpg" },
+      { artistId: "dante-marioni", artistName: "Dante Marioni", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=dante", likes: 3104, thumbnail: "https://img.youtube.com/vi/kOd0r6FWMOY/maxresdefault.jpg" },
+      { artistId: "caleb-siemon", artistName: "Caleb Siemon", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=caleb", likes: 2587, thumbnail: "https://img.youtube.com/vi/RVZ7HFOP7VY/maxresdefault.jpg" },
     ],
   },
   {
@@ -55,9 +55,9 @@ export const challenges: Challenge[] = [
     tag: "imperfectperfect",
     status: "active",
     leaderboard: [
-      { artistId: "maya-chen", artistName: "Maya Chen", avatarUrl: "https://picsum.photos/seed/maya-chen/80/80", likes: 2943, thumbnail: "https://picsum.photos/seed/raku1/600/400" },
-      { artistId: "elena-vasquez", artistName: "Elena Vasquez", avatarUrl: "https://picsum.photos/seed/elena/80/80", likes: 1876, thumbnail: "https://picsum.photos/seed/raku2/600/400" },
-      { artistId: "hana-kim", artistName: "Hana Kim", avatarUrl: "https://picsum.photos/seed/hana/80/80", likes: 1204, thumbnail: "https://picsum.photos/seed/raku3/600/400" },
+      { artistId: "maya-chen", artistName: "Maya Chen", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=maya-chen", likes: 2943, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=raku1" },
+      { artistId: "elena-vasquez", artistName: "Elena Vasquez", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=elena", likes: 1876, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=raku2" },
+      { artistId: "hana-kim", artistName: "Hana Kim", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=hana", likes: 1204, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=raku3" },
     ],
   },
   {
@@ -74,9 +74,9 @@ export const challenges: Challenge[] = [
     status: "active",
     sponsoredBy: "Wentworth Metalworks",
     leaderboard: [
-      { artistId: "james-okafor", artistName: "James Okafor", avatarUrl: "https://picsum.photos/seed/james/80/80", likes: 5102, thumbnail: "https://picsum.photos/seed/forge1/600/400" },
-      { artistId: "marcus-williams", artistName: "Marcus Williams", avatarUrl: "https://picsum.photos/seed/marcus/80/80", likes: 3841, thumbnail: "https://picsum.photos/seed/forge2/600/400" },
-      { artistId: "felix-braun", artistName: "Felix Braun", avatarUrl: "https://picsum.photos/seed/felix/80/80", likes: 2918, thumbnail: "https://picsum.photos/seed/forge3/600/400" },
+      { artistId: "james-okafor", artistName: "James Okafor", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=james", likes: 5102, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=forge1" },
+      { artistId: "marcus-williams", artistName: "Marcus Williams", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=marcus", likes: 3841, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=forge2" },
+      { artistId: "felix-braun", artistName: "Felix Braun", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=felix", likes: 2918, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=forge3" },
     ],
   },
   {
@@ -92,9 +92,9 @@ export const challenges: Challenge[] = [
     tag: "kilncolortheory",
     status: "active",
     leaderboard: [
-      { artistId: "alex-bernstein", artistName: "Alex Bernstein", avatarUrl: "https://picsum.photos/seed/alex/80/80", likes: 3201, thumbnail: "https://img.youtube.com/vi/7xZfRTsNBos/maxresdefault.jpg" },
-      { artistId: "priya-patel", artistName: "Priya Patel", avatarUrl: "https://picsum.photos/seed/priya/80/80", likes: 1987, thumbnail: "https://picsum.photos/seed/color1/600/400" },
-      { artistId: "ingrid-larsson", artistName: "Ingrid Larsson", avatarUrl: "https://picsum.photos/seed/ingrid/80/80", likes: 1543, thumbnail: "https://picsum.photos/seed/color2/600/400" },
+      { artistId: "alex-bernstein", artistName: "Alex Bernstein", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=alex", likes: 3201, thumbnail: "https://img.youtube.com/vi/7xZfRTsNBos/maxresdefault.jpg" },
+      { artistId: "priya-patel", artistName: "Priya Patel", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=priya", likes: 1987, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=color1" },
+      { artistId: "ingrid-larsson", artistName: "Ingrid Larsson", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=ingrid", likes: 1543, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=color2" },
     ],
   },
   {
@@ -125,9 +125,9 @@ export const challenges: Challenge[] = [
     status: "ended",
     sponsoredBy: "Miller Electric",
     leaderboard: [
-      { artistId: "james-okafor", artistName: "James Okafor", avatarUrl: "https://picsum.photos/seed/james/80/80", likes: 7241, thumbnail: "https://picsum.photos/seed/weld1/600/400" },
-      { artistId: "marcus-williams", artistName: "Marcus Williams", avatarUrl: "https://picsum.photos/seed/marcus/80/80", likes: 5103, thumbnail: "https://picsum.photos/seed/weld2/600/400" },
-      { artistId: "tomas-novak", artistName: "Tomas Novak", avatarUrl: "https://picsum.photos/seed/tomas/80/80", likes: 4027, thumbnail: "https://picsum.photos/seed/weld3/600/400" },
+      { artistId: "james-okafor", artistName: "James Okafor", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=james", likes: 7241, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=weld1" },
+      { artistId: "marcus-williams", artistName: "Marcus Williams", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=marcus", likes: 5103, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=weld2" },
+      { artistId: "tomas-novak", artistName: "Tomas Novak", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=tomas", likes: 4027, thumbnail: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&seed=weld3" },
     ],
   },
 ];

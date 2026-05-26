@@ -170,7 +170,7 @@ export default function Leaderboard() {
                       </div>
                       <Link href={`/profile/${p.userId}`}>
                         <img
-                          src={p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/80/80`}
+                          src={p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${p.userId}`}
                           alt={p.displayName ?? ""}
                           className="w-10 h-10 rounded-full object-cover border border-white/10 cursor-pointer hover:opacity-80"
                         />
@@ -221,7 +221,7 @@ export default function Leaderboard() {
                     >
                       <span className="w-7 text-center text-sm font-bold text-stone-500">#{i + 1}</span>
                       <img
-                        src={p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/80/80`}
+                        src={p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${p.userId}`}
                         alt=""
                         className="w-10 h-10 rounded-full object-cover border border-white/10"
                       />
@@ -270,7 +270,7 @@ export default function Leaderboard() {
                       {g.topArtists.slice(0, 5).map(a => (
                         <Link key={a.userId} href={`/profile/${a.userId}`}>
                           <img
-                            src={a.avatarUrl ?? `https://picsum.photos/seed/${a.userId}/80/80`}
+                            src={a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.userId}`}
                             alt={a.displayName ?? ""}
                             className="w-8 h-8 rounded-full border-2 border-stone-950 object-cover hover:opacity-80 cursor-pointer"
                             title={a.displayName ?? ""}

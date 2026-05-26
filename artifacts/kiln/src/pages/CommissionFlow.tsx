@@ -44,7 +44,7 @@ export default function CommissionFlow() {
   const { sendCommissionInquiry, getArtistCommissionStatus } = useSocial();
 
   const artist = ALL_ARTISTS.find((a) => a.id === artistId);
-  const avatarUrl = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/200/200`;
+  const avatarUrl = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artistId}`;
   const commissionStatus = getArtistCommissionStatus(artistId ?? "");
 
   const [step, setStep] = useState<Step>("brief");

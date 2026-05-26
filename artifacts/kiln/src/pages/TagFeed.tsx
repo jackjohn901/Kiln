@@ -116,7 +116,7 @@ export default function TagFeed() {
                     </div>
                   )}
                   <div className="absolute top-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <img src={post.authorAvatarUrl ?? `https://picsum.photos/seed/${post.authorId}/40/40`} alt="" className="h-5 w-5 rounded-full object-cover border border-white/20" />
+                    <img src={post.authorAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${post.authorId}`} alt="" className="h-5 w-5 rounded-full object-cover border border-white/20" />
                     <span className="text-[10px] text-white/80 font-medium drop-shadow">{post.authorName.split(" ")[0]}</span>
                   </div>
                 </div>

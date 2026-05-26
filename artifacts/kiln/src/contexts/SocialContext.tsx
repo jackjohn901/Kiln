@@ -361,11 +361,11 @@ const SEED_STATUSES: Record<string, CommissionStatus> = {
 
 const SEED_COMMENTS: Record<string, KilnComment[]> = {
   "maya-chen-dQhKVFbpZoQ": [
-    { id: "sc1", postId: "maya-chen-dQhKVFbpZoQ", authorId: "visitor1", authorName: "Clara H.", authorAvatarUrl: "https://picsum.photos/seed/clara/60/60", text: "The way the celadon pools in those textures — absolutely stunning.", likes: 7, createdAt: "2026-05-10T14:22:00Z" },
-    { id: "sc2", postId: "maya-chen-dQhKVFbpZoQ", authorId: "visitor2", authorName: "Erik L.", authorAvatarUrl: "https://picsum.photos/seed/erik/60/60", text: "How long does the reduction firing take?", likes: 2, createdAt: "2026-05-11T09:40:00Z" },
+    { id: "sc1", postId: "maya-chen-dQhKVFbpZoQ", authorId: "visitor1", authorName: "Clara H.", authorAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=clara", text: "The way the celadon pools in those textures — absolutely stunning.", likes: 7, createdAt: "2026-05-10T14:22:00Z" },
+    { id: "sc2", postId: "maya-chen-dQhKVFbpZoQ", authorId: "visitor2", authorName: "Erik L.", authorAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=erik", text: "How long does the reduction firing take?", likes: 2, createdAt: "2026-05-11T09:40:00Z" },
   ],
   "james-okafor-8P8U8PzFHV8": [
-    { id: "sc3", postId: "james-okafor-8P8U8PzFHV8", authorId: "visitor3", authorName: "Mia T.", authorAvatarUrl: "https://picsum.photos/seed/mia/60/60", text: "I want this in my living room. Is this available?", likes: 4, createdAt: "2026-05-09T18:00:00Z" },
+    { id: "sc3", postId: "james-okafor-8P8U8PzFHV8", authorId: "visitor3", authorName: "Mia T.", authorAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=mia", text: "I want this in my living room. Is this available?", likes: 4, createdAt: "2026-05-09T18:00:00Z" },
   ],
 };
 
@@ -378,7 +378,7 @@ function defaultState(): SocialState {
         type: "follow",
         fromId: "system",
         fromName: "Kiln",
-        fromAvatarUrl: "https://picsum.photos/seed/kiln/60/60",
+        fromAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=kiln",
         text: "Welcome to Kiln — the home for craft artists. Start by following artists you love.",
         read: false,
         createdAt: new Date().toISOString(),

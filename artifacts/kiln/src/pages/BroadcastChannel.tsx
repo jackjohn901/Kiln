@@ -56,7 +56,7 @@ export default function BroadcastChannel() {
   }
 
   const artistName = artist?.name ?? broadcasts[0]?.artistName ?? "Artist";
-  const artistAvatar = artist?.images?.[0]?.url ?? broadcasts[0]?.artistAvatarUrl ?? `https://picsum.photos/seed/${artistId}/80/80`;
+  const artistAvatar = artist?.images?.[0]?.url ?? broadcasts[0]?.artistAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`;
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">

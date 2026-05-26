@@ -52,7 +52,7 @@ function notificationToActivity(n: ApiNotification): ActivityItem {
     type: (["like","save","follow","repost","tip","commission","subscription","comment","bid","mention"].includes(n.type) ? n.type : "mention") as ActivityItem["type"],
     actorId: n.fromId ?? "unknown",
     actorName: n.fromName ?? "Someone",
-    actorAvatar: n.fromAvatarUrl ?? `https://picsum.photos/seed/${n.fromId ?? "x"}/80/80`,
+    actorAvatar: n.fromAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${n.fromId ?? "x"}`,
     text: n.text,
     link: n.link ?? "/",
     createdAt: n.createdAt,
@@ -138,7 +138,7 @@ export default function ActivityFeed() {
                         src={item.actorAvatar}
                         alt={item.actorName}
                         className="h-10 w-10 rounded-full object-cover border border-white/10"
-                        onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.actorId}/80/80`; }}
+                        onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${item.actorId}`; }}
                       />
                       <span className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ${cfg.bg}`}>
                         <Icon size={10} className={cfg.color} />

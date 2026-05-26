@@ -17,7 +17,7 @@ const ALL_ARTISTS = [...artists, ...seedArtists];
 
 function getAvatar(artistId: string) {
   const a = getArtistById(artistId) ?? ALL_ARTISTS.find((x) => x.id === artistId);
-  return a?.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/80/80`;
+  return a?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`;
 }
 
 const FEATURED_DIALOGUES = [
@@ -27,11 +27,11 @@ const FEATURED_DIALOGUES = [
     originalArtistId: ALL_REELS[0]?.artistId ?? "alex-bernstein",
     originalArtistName: ALL_REELS[0]?.artistName ?? "Alex Bernstein",
     originalCaption: ALL_REELS[0]?.caption ?? "Optical glass series",
-    originalThumb: ALL_REELS[0]?.thumbnail ?? "https://picsum.photos/seed/dial1/400/700",
+    originalThumb: ALL_REELS[0]?.thumbnail ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=dial1",
     responseArtistId: "maya-chen",
     responseArtistName: "Maya Chen",
     responseCaption: "Responding to Alex's optical series — trying a similar optical approach in ceramic. The way light refracts through glazed surfaces has always fascinated me.",
-    responseThumb: `https://picsum.photos/seed/maya-response/400/700`,
+    responseThumb: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=maya-response`,
     responseVideoId: "dQhKVFbpZoQ",
     views: 4821,
     replies: 23,
@@ -43,11 +43,11 @@ const FEATURED_DIALOGUES = [
     originalArtistId: ALL_REELS[2]?.artistId ?? "lino-tagliapietra",
     originalArtistName: ALL_REELS[2]?.artistName ?? "Lino Tagliapietra",
     originalCaption: ALL_REELS[2]?.caption ?? "Murrine technique",
-    originalThumb: ALL_REELS[2]?.thumbnail ?? "https://picsum.photos/seed/dial2/400/700",
+    originalThumb: ALL_REELS[2]?.thumbnail ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=dial2",
     responseArtistId: "dante-marioni",
     responseArtistName: "Dante Marioni",
     responseCaption: "Lino's murrine cane technique is the foundation of everything I do. Here's how I've adapted it for blown vessels — the key difference is timing the gather.",
-    responseThumb: `https://picsum.photos/seed/dante-response/400/700`,
+    responseThumb: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=dante-response`,
     responseVideoId: "7xZfRTsNBos",
     views: 12400,
     replies: 61,
@@ -121,14 +121,14 @@ export default function StudioDialogue() {
                 <div className="relative flex-1 aspect-[9/14] overflow-hidden bg-stone-800">
                   <img src={d.originalThumb} alt={d.originalCaption}
                     className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${d.id}-orig/400/700`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${d.id}-orig`; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                   <div className="absolute bottom-2 left-2 right-2">
                     <div className="flex items-center gap-1.5 mb-1">
                       <img src={getAvatar(d.originalArtistId)} alt={d.originalArtistName}
                         className="h-5 w-5 rounded-full border border-white/30 object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${d.originalArtistId}/60/60`; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${d.originalArtistId}`; }}
                       />
                       <span className="text-[10px] text-white/80 font-medium">{d.originalArtistName}</span>
                     </div>
@@ -157,7 +157,7 @@ export default function StudioDialogue() {
                     <>
                       <img src={d.responseThumb} alt={d.responseCaption}
                         className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${d.id}-resp/400/700`; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${d.id}-resp`; }}
                       />
                       <button
                         onClick={() => setPlayingId(playingId === d.id ? null : d.id)}
@@ -174,7 +174,7 @@ export default function StudioDialogue() {
                     <div className="flex items-center gap-1.5 mb-1">
                       <img src={getAvatar(d.responseArtistId)} alt={d.responseArtistName}
                         className="h-5 w-5 rounded-full border border-amber-400/50 object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${d.responseArtistId}/60/60`; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${d.responseArtistId}`; }}
                       />
                       <span className="text-[10px] text-amber-300 font-medium">{d.responseArtistName}</span>
                     </div>
@@ -245,7 +245,7 @@ export default function StudioDialogue() {
                         >
                           <img src={r.thumbnail} alt={r.caption}
                             className="w-full h-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${r.id}/200/350`; }}
+                            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=350&fit=crop&seed=${r.id}`; }}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                           <div className="absolute bottom-1 left-1 right-1">

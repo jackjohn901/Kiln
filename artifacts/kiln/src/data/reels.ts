@@ -91,7 +91,7 @@ function buildReels(): Reel[] {
       likes: statVal(a.id + v.id, 800, 28000),
       saves: statVal(a.id + v.id + "s", 200, 7500),
       thumbnail: `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`,
-      avatarUrl: a.images[0]?.url ?? `https://picsum.photos/seed/${a.id}-avatar/150/150`,
+      avatarUrl: a.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=150&h=150&fit=crop&seed=${a.id}-avatar`,
       musicTrackId: musicTracks[hash(a.id + v.id) % musicTracks.length].id,
       available: isAvailable(a.id + v.id),
       streak: statVal(a.id + "streak", 1, 120),

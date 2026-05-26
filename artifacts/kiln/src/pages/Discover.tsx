@@ -81,10 +81,10 @@ export default function Discover() {
           handle: (p.handle as string | null) ?? (p.userId as string),
           medium: (p.medium as string | null) ?? "",
           location: (p.location as string | null) ?? "",
-          avatarUrl: (p.avatarUrl as string | null) ?? `https://picsum.photos/seed/${p.userId}/200/200`,
+          avatarUrl: (p.avatarUrl as string | null) ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${p.userId}`,
           followerCount: (p.followerCount as number | null) ?? 0,
           keywords: [],
-          images: [{ url: (p.avatarUrl as string | null) ?? `https://picsum.photos/seed/${p.userId}/200/200` }],
+          images: [{ url: (p.avatarUrl as string | null) ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${p.userId}` }],
         })));
       })
       .catch(() => {});
@@ -173,7 +173,7 @@ export default function Discover() {
       handle: a.id,
       medium: a.medium,
       location: a.location ?? "",
-      avatarUrl: a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/200/200`,
+      avatarUrl: a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${a.id}`,
       followerCount: 0,
       keywords: a.keywords ?? [],
       images: a.images,
@@ -288,7 +288,7 @@ export default function Discover() {
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
                   {recommended.map((a) => {
-                    const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/200/200`;
+                    const avatar = a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${a.id}`;
                     const alreadyFollowing = isFollowing(a.id);
                     return (
                       <div key={a.id} className="shrink-0 flex flex-col items-center gap-1.5 w-20">
@@ -318,7 +318,7 @@ export default function Discover() {
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
               {combinedArtists.slice(0, 8).map((a) => {
-                const avatar = a.avatarUrl ?? `https://picsum.photos/seed/${a.id}/200/200`;
+                const avatar = a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${a.id}`;
                 return (
                   <Link key={a.id} href={`/artists/${a.id}`}>
                     <div className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer group">
@@ -382,7 +382,7 @@ export default function Discover() {
                 },
               ].map((pick) => {
                 const artist = ALL_ARTISTS.find((a) => a.id === pick.artistId);
-                const avatarUrl = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${pick.artistId}/200/200`;
+                const avatarUrl = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${pick.artistId}`;
                 return (
                   <Link key={pick.artistId} href={`/artists/${pick.artistId}`}>
                     <div className="group relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-stone-900 to-stone-950 p-4 hover:border-amber-500/40 hover:from-amber-500/5 transition-all cursor-pointer h-full">
@@ -416,7 +416,7 @@ export default function Discover() {
                 {communityProfiles.map((p) => {
                   const following = communityFollowing.has(p.userId) || p.isFollowing;
                   const displayName = p.displayName ?? p.handle ?? "Artist";
-                  const avatarUrl = p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/200/200`;
+                  const avatarUrl = p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${p.userId}`;
                   return (
                     <div key={p.userId} className="flex flex-col items-center gap-2.5 rounded-2xl border border-white/8 bg-stone-900/60 p-4 hover:border-amber-500/30 hover:bg-stone-900 transition-all">
                       <img src={avatarUrl} alt={displayName} className="h-12 w-12 rounded-full object-cover border border-white/10" />
@@ -476,7 +476,7 @@ export default function Discover() {
                   <div className="p-2">
                     <p className="px-3 pb-1 text-[10px] font-bold tracking-widest text-stone-600">ARTISTS</p>
                     {suggestions.artists.map((a) => {
-                      const avatar = a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/80/80`;
+                      const avatar = a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`;
                       return (
                         <button
                           key={a.id}
@@ -619,7 +619,7 @@ export default function Discover() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 {apiSearchResults.map((p) => {
-                  const avatarUrl = p.avatarUrl ?? `https://picsum.photos/seed/${p.id}/200/200`;
+                  const avatarUrl = p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${p.id}`;
                   const name = p.displayName ?? p.handle ?? "Artist";
                   return (
                     <div key={p.id} className="flex flex-col items-center gap-2.5 rounded-2xl border border-amber-500/20 bg-stone-900/60 p-4 hover:border-amber-500/40 hover:bg-stone-900 transition-all cursor-pointer"
@@ -646,7 +646,7 @@ export default function Discover() {
               const statusInfo = STATUS_UI[status];
               const workshops = getWorkshopsByArtist(artist.id);
               const following = isFollowing(artist.id);
-              const avatar = artist.images?.[0]?.url ?? `https://picsum.photos/seed/${artist.id}/200/200`;
+              const avatar = artist.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artist.id}`;
 
               return (
                 <div

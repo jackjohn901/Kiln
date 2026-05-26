@@ -180,7 +180,7 @@ export default function Notifications() {
                         {/* Avatar + type icon */}
                         <div className="relative flex-shrink-0">
                           <img
-                            src={n.fromAvatarUrl || `https://picsum.photos/seed/${n.fromId}/40/40`}
+                            src={n.fromAvatarUrl || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${n.fromId}`}
                             alt=""
                             className="h-10 w-10 rounded-full object-cover"
                           />

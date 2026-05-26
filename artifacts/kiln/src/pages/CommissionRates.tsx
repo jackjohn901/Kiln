@@ -73,7 +73,7 @@ export default function CommissionRates() {
   const { getArtistCommissionStatus } = useSocial();
 
   const artist = getArtistById(artistId ?? "") ?? ALL_ARTISTS.find((a) => a.id === artistId);
-  const avatar = artist?.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}/200/200`;
+  const avatar = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artistId}`;
   const rates = getRates(artistId ?? "anon");
   const status = getArtistCommissionStatus(artistId ?? "");
 
@@ -109,7 +109,7 @@ export default function CommissionRates() {
         <div className="flex items-center gap-4 mb-7">
           <img src={avatar} alt={artist.name}
             className="h-16 w-16 rounded-full object-cover border-2 border-amber-500/30 shrink-0"
-            onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artistId}/80/80`; }}
+            onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`; }}
           />
           <div>
             <h1 className="font-serif text-2xl text-amber-100">{artist.name}</h1>

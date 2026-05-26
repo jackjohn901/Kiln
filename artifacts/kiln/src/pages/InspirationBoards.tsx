@@ -72,7 +72,7 @@ const SEED_BOARDS: Board[] = [
     name: "Earthy Tones",
     description: "Wood-fired, shino, and reduction pieces in warm brown and amber glazes.",
     isPrivate: false,
-    coverUrl: listings[0]?.imageUrl ?? "https://picsum.photos/seed/earthy/400/300",
+    coverUrl: listings[0]?.imageUrl ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=300&fit=crop&seed=earthy",
     items: buildSeedItems().slice(0, 6),
     createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
   },
@@ -81,7 +81,7 @@ const SEED_BOARDS: Board[] = [
     name: "Studio Glass Wishlist",
     description: "Glass work I dream about owning one day.",
     isPrivate: true,
-    coverUrl: listings[3]?.imageUrl ?? "https://picsum.photos/seed/glass-wish/400/300",
+    coverUrl: listings[3]?.imageUrl ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=300&fit=crop&seed=glass-wish",
     items: buildSeedItems().slice(4, 9),
     createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
   },
@@ -129,7 +129,7 @@ export default function InspirationBoards() {
       name: newBoardName.trim(),
       description: newBoardDesc.trim(),
       isPrivate: newBoardPrivate,
-      coverUrl: "https://picsum.photos/seed/" + tempId + "/400/300",
+      coverUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=300&fit=crop&seed=" + tempId,
       items: [],
       createdAt: new Date().toISOString(),
     };
@@ -256,7 +256,7 @@ export default function InspirationBoards() {
                           <div className="grid grid-cols-2 h-full gap-0.5">
                             {board.items.slice(0, 4).map((item, i) => (
                               <div key={item.id} className={`overflow-hidden ${board.items.length === 1 || (i === 0 && board.items.length === 3) ? "col-span-2" : ""}`}>
-                                <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/200/200`; }} />
+                                <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${item.id}`; }} />
                               </div>
                             ))}
                           </div>
@@ -302,7 +302,7 @@ export default function InspirationBoards() {
                     src={item.imageUrl}
                     alt={item.title}
                     className="w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/300/400`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=300&h=400&fit=crop&seed=${item.id}`; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -334,7 +334,7 @@ export default function InspirationBoards() {
               <div className="columns-2 sm:columns-3 gap-3 space-y-3">
                 {activeBoard.items.map((item) => (
                   <div key={item.id} className="group relative break-inside-avoid rounded-xl overflow-hidden bg-stone-900">
-                    <img src={item.imageUrl} alt={item.title} className="w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${item.id}/300/400`; }} />
+                    <img src={item.imageUrl} alt={item.title} className="w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=300&h=400&fit=crop&seed=${item.id}`; }} />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <p className="text-[11px] font-semibold text-white truncate">{item.title}</p>
@@ -439,7 +439,7 @@ export default function InspirationBoards() {
                     >
                       <div className="h-8 w-8 rounded-lg overflow-hidden bg-stone-800 shrink-0">
                         {board.items[0] ? (
-                          <img src={board.items[0].imageUrl} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "https://picsum.photos/seed/board/40/40"; }} />
+                          <img src={board.items[0].imageUrl} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=board"; }} />
                         ) : <Grid3x3 size={14} className="m-auto mt-1.5 text-stone-700" />}
                       </div>
                       <div className="flex-1 min-w-0">

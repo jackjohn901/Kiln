@@ -28,7 +28,7 @@ export const SEED_KILN_STATUSES: KilnFiringStatus[] = [
   {
     artistId: "maya-chen",
     artistName: "Maya Chen",
-    avatarUrl: "https://picsum.photos/seed/maya-chen/200/200",
+    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=maya-chen",
     cone: "Cone 6",
     fuel: "Electric",
     pieces: 35,
@@ -39,7 +39,7 @@ export const SEED_KILN_STATUSES: KilnFiringStatus[] = [
   {
     artistId: "james-okafor",
     artistName: "James Okafor",
-    avatarUrl: "https://picsum.photos/seed/james-okafor/200/200",
+    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=james-okafor",
     cone: "Anagama Wood",
     fuel: "Wood",
     pieces: 60,

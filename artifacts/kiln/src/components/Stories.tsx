@@ -63,7 +63,7 @@ function getStoryText(artistId: string, medium: string): string {
 }
 
 function getStoryImage(artistId: string, a: typeof ALL_ARTISTS[0]): string {
-  return a.images?.[0]?.url ?? `https://picsum.photos/seed/${artistId}-story/800/1400`;
+  return a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&h=1400&fit=crop&seed=${artistId}-story`;
 }
 
 const STORY_ARTISTS = ALL_ARTISTS
@@ -82,7 +82,7 @@ interface StoryItem {
 const STORIES: StoryItem[] = STORY_ARTISTS.map((a) => ({
   artistId: a.id,
   artistName: a.name,
-  avatarUrl: a.images?.[0]?.url ?? `https://picsum.photos/seed/${a.id}/150/150`,
+  avatarUrl: a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=150&h=150&fit=crop&seed=${a.id}`,
   imageUrl: getStoryImage(a.id, a),
   text: getStoryText(a.id, a.medium),
   medium: a.medium,
@@ -149,7 +149,7 @@ function StoryViewer({ stories, startIndex, onClose }: {
           src={story.imageUrl}
           alt={story.text}
           className="absolute inset-0 w-full h-full object-cover"
-          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${story.artistId}/400/700`; }}
+          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${story.artistId}`; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/70" />
 
@@ -220,8 +220,8 @@ export default function Stories() {
           .map(g => ({
             artistId: g.authorId,
             artistName: g.authorName,
-            avatarUrl: g.authorAvatarUrl ?? `https://picsum.photos/seed/${g.authorId}/80/80`,
-            imageUrl: g.stories[0]?.mediaUrl ?? `https://picsum.photos/seed/${g.authorId}/800/1400`,
+            avatarUrl: g.authorAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${g.authorId}`,
+            imageUrl: g.stories[0]?.mediaUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&h=1400&fit=crop&seed=${g.authorId}`,
             text: g.stories[0]?.caption ?? "Studio update",
             medium: "Craft",
           }));
@@ -274,7 +274,7 @@ export default function Stories() {
                     src={story.avatarUrl}
                     alt={story.artistName}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${story.artistId}/80/80`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${story.artistId}`; }}
                   />
                 </div>
               </div>

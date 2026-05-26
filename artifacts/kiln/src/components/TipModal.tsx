@@ -54,7 +54,7 @@ export default function TipModal({ artistId, artistName, artistAvatarUrl, postId
 
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800">
           <div className="flex items-center gap-3">
-            <img src={artistAvatarUrl || `https://picsum.photos/seed/${artistId}/80/80`} alt={artistName} className="w-9 h-9 rounded-full object-cover" />
+            <img src={artistAvatarUrl || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`} alt={artistName} className="w-9 h-9 rounded-full object-cover" />
             <div>
               <p className="text-sm font-semibold text-stone-100">Support {artistName}</p>
               <p className="text-xs text-stone-500">100% goes to the artist · Powered by Stripe</p>

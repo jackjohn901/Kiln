@@ -101,7 +101,7 @@ export default function FollowerList() {
             const handle = user.handle ?? user.userId.slice(0, 8);
             return (
               <div key={user.userId} className="flex items-center gap-3 rounded-xl p-3 hover:bg-white/3 transition-colors">
-                <img src={user.avatarUrl ?? `https://picsum.photos/seed/${user.userId}/80/80`} alt=""
+                <img src={user.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${user.userId}`} alt=""
                   className="h-10 w-10 flex-shrink-0 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
                   <Link href={`/artists/${user.userId}`}>

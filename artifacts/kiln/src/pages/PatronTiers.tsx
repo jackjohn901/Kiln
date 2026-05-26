@@ -136,7 +136,7 @@ export default function PatronTiers() {
   const currentTier = tiers.find(t => t.isSubscribed);
   const artistName = localArtist?.name ?? apiProfile?.displayName ?? "this artist";
   const artistMedium = localArtist?.medium ?? apiProfile?.medium;
-  const avatarUrl = localArtist?.images?.[0]?.url ?? apiProfile?.avatarUrl ?? `https://picsum.photos/seed/${artistId}/80/80`;
+  const avatarUrl = localArtist?.images?.[0]?.url ?? apiProfile?.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`;
 
   const displayTiers = tiers.length > 0 ? tiers : FALLBACK_TIERS.map((t, i) => ({
     id: `fallback-${i}`, artistId: artistId ?? "", name: t.name, description: t.description,
@@ -152,7 +152,7 @@ export default function PatronTiers() {
             <ChevronLeft size={16} />
           </Link>
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <img src={avatarUrl} alt={artistName} className="h-10 w-10 rounded-full object-cover border border-white/10" onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artistId}/80/80`; }} />
+            <img src={avatarUrl} alt={artistName} className="h-10 w-10 rounded-full object-cover border border-white/10" onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`; }} />
             <div>
               <h1 className="font-serif text-xl text-amber-100">Support {artistName.split(" ")[0]}</h1>
               {artistMedium && <p className="text-xs text-stone-500">{artistMedium}</p>}

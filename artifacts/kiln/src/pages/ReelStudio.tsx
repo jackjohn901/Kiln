@@ -902,7 +902,7 @@ export default function ReelStudio() {
   async function publishReel() {
     if (!downloadUrl || !plan) return;
     setPublished(true);
-    setTimeout(() => navigate("/feed"), 1500);
+    setTimeout(() => navigate("/"), 1500);
   }
 
   // ── Source helpers ───────────────────────────────────────────────────────────
@@ -948,7 +948,7 @@ export default function ReelStudio() {
     return (
       <div className="min-h-screen bg-black text-white pb-28 md:pb-8">
         <div className="sticky top-0 z-10 bg-black/90 backdrop-blur border-b border-white/10 px-4 py-3 flex items-center gap-3">
-          <Link href="/feed"><ArrowLeft size={20} className="text-amber-400" /></Link>
+          <Link href="/"><ArrowLeft size={20} className="text-amber-400" /></Link>
           <div>
             <h1 className="font-bold text-lg leading-tight">AI Reel Studio</h1>
             <p className="text-xs text-white/40">Step 1 of 3 — Choose source</p>

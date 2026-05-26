@@ -108,7 +108,7 @@ export default function Saved() {
             caption: v.title,
             likes: statVal(a.id + v.id, 800, 28000),
             thumbnail: `https://img.youtube.com/vi/${v.id}/hqdefault.jpg`,
-            avatarUrl: a.images[0]?.url ?? `https://picsum.photos/seed/${a.id}-avatar/80/80`,
+            avatarUrl: a.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}-avatar`,
           });
         }
       }
@@ -243,7 +243,7 @@ export default function Saved() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-3">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <img src={post.authorAvatarUrl ?? `https://picsum.photos/seed/${post.id}/80/80`} alt="" className="h-6 w-6 rounded-full object-cover border border-white/20" />
+                          <img src={post.authorAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${post.id}`} alt="" className="h-6 w-6 rounded-full object-cover border border-white/20" />
                           <span className="text-xs font-medium text-white truncate">{post.authorName}</span>
                         </div>
                         <p className="text-xs text-stone-300 line-clamp-2 leading-tight">{post.caption}</p>

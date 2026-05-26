@@ -437,7 +437,7 @@ const ReelCard = memo(function ReelCard({
             className={`absolute inset-0 h-full w-full object-cover ${isActive ? "kb-active" : ""}`}
             loading="lazy"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.id}/800/1200`;
+              (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&h=1200&fit=crop&seed=${reel.id}`;
             }}
           />
           {/* Vimeo background player — cleaner than YouTube in embedded contexts */}
@@ -626,7 +626,7 @@ const ReelCard = memo(function ReelCard({
                 alt={reel.artistName}
                 className="h-full w-full object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.artistId}/150/150`;
+                  (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=150&h=150&fit=crop&seed=${reel.artistId}`;
                 }}
               />
             </div>
@@ -857,7 +857,7 @@ const ReelCard = memo(function ReelCard({
         <TipModal
           artistId={reel.artistId}
           artistName={reel.artistName}
-          artistAvatarUrl={reel.avatarUrl ?? `https://picsum.photos/seed/${reel.artistId}/80/80`}
+          artistAvatarUrl={reel.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${reel.artistId}`}
           onClose={() => setShowTip(false)}
         />
       )}
@@ -1286,7 +1286,7 @@ export default function Feed() {
         // Fade in over 250ms to hide the switch gap
         const start = performance.now();
         const fade = (now: number) => {
-          const t = Math.min(1, (now - start) / 250);
+          const t = Math.max(0, Math.min(1, (now - start) / 250));
           el.volume = 0.65 * t;
           if (t < 1) requestAnimationFrame(fade);
         };
@@ -1302,7 +1302,7 @@ export default function Feed() {
       // Fade out old track, then swap src and fade in
       const start = performance.now();
       const fadeOut = (now: number) => {
-        const t = Math.min(1, (now - start) / 200);
+        const t = Math.max(0, Math.min(1, (now - start) / 200));
         el.volume = 0.65 * (1 - t);
         if (t < 1) {
           requestAnimationFrame(fadeOut);

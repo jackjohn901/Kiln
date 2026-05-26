@@ -61,7 +61,7 @@ export default function Artists() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {staticArtists.map((artist, i) => {
-            const img = artist.images[0]?.url ?? `https://picsum.photos/seed/${artist.id}-cover/600/800`;
+            const img = artist.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${artist.id}-cover`;
             const score = getCraftScore(artist.id);
             const followers = formatFollowers(3000 + (hash(artist.id) % 47000));
             return (
@@ -73,7 +73,7 @@ export default function Artists() {
                     <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-card mb-3">
                       <img src={img} alt={artist.name}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist.id}/600/800`; }} />
+                        onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${artist.id}`; }} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                       <div className="absolute top-3 right-3">
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}>
@@ -101,7 +101,7 @@ export default function Artists() {
 
           {uniqueDbProfiles.map((p, i) => {
             const name = p.displayName ?? p.handle ?? "Artist";
-            const img = p.avatarUrl ?? `https://picsum.photos/seed/${p.userId}/600/800`;
+            const img = p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${p.userId}`;
             const score = getCraftScore(p.userId, p.craftScore);
             const followers = formatFollowers(p.followerCount);
             return (
@@ -113,7 +113,7 @@ export default function Artists() {
                     <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-card mb-3">
                       <img src={img} alt={name}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${p.userId}/600/800`; }} />
+                        onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${p.userId}`; }} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                       <div className="absolute top-3 right-3">
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}>

@@ -33,8 +33,8 @@ const EXISTING_DUETS = ALL_REELS.slice(0, 6).map((r, i) => ({
   id: `duet-${r.id}-${i}`,
   responderName: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].name,
   responderId: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].id,
-  responderAvatar: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].images[0]?.url ?? `https://picsum.photos/seed/${r.id}-duet-${i}/80/80`,
-  thumbnail: `https://picsum.photos/seed/${r.id}-duet-${i}/400/700`,
+  responderAvatar: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${r.id}-duet-${i}`,
+  thumbnail: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${r.id}-duet-${i}`,
   caption: DUET_RESPONSES[(hash(r.id) + i) % DUET_RESPONSES.length],
   likes: 400 + (hash(r.id + i) % 8000),
   originalReel: r,
@@ -123,7 +123,7 @@ export default function DuetStudio() {
                 src={reel.thumbnail}
                 alt={reel.caption}
                 className="w-full h-full object-cover opacity-80"
-                onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${reel.id}/600/340`; }}
+                onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=340&fit=crop&seed=${reel.id}`; }}
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
@@ -251,14 +251,14 @@ export default function DuetStudio() {
                         src={duet.originalReel.thumbnail}
                         alt="original"
                         className="w-1/2 h-full object-cover opacity-80"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${duet.id}-orig/200/350`; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=350&fit=crop&seed=${duet.id}-orig`; }}
                       />
                       <div className="w-px bg-white/20" />
                       <img
                         src={duet.thumbnail}
                         alt="response"
                         className="w-1/2 h-full object-cover opacity-80"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${duet.id}-resp/200/350`; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=350&fit=crop&seed=${duet.id}-resp`; }}
                       />
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
@@ -276,7 +276,7 @@ export default function DuetStudio() {
                           src={duet.responderAvatar}
                           alt={duet.responderName}
                           className="h-4 w-4 rounded-full object-cover border border-white/20"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${duet.responderId}/40/40`; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${duet.responderId}`; }}
                         />
                         <span className="text-[10px] text-stone-300 truncate">{duet.responderName}</span>
                       </div>

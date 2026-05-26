@@ -147,7 +147,7 @@ export default function StitchStudio() {
                     src={sourceReel.thumbnail}
                     alt={sourceReel.caption}
                     className="absolute inset-0 h-full w-full object-cover opacity-70"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${sourceReel.id}/400/200`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=200&fit=crop&seed=${sourceReel.id}`; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-transparent" />
                   <div className="absolute bottom-3 left-3">
@@ -269,7 +269,7 @@ export default function StitchStudio() {
                     src={s.thumbnail}
                     alt={s.sourceArtist}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${s.sourceReelId}/100/100`; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&h=100&fit=crop&seed=${s.sourceReelId}`; }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                     <Scissors size={14} className="text-amber-400" />

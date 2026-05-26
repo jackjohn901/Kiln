@@ -156,7 +156,7 @@ function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (worksh
       <div className="p-4">
         <h3 className="text-sm font-semibold text-stone-100 mb-1 leading-snug">{w.title}</h3>
         <button onClick={() => navigate(`/artists/${w.artistId}`)} className="flex items-center gap-2 mb-3 hover:opacity-80 transition-opacity">
-          <img src={w.artistAvatarUrl ?? `https://picsum.photos/seed/${w.artistId}/80/80`} alt={w.artistName} className="w-5 h-5 rounded-full object-cover" />
+          <img src={w.artistAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${w.artistId}`} alt={w.artistName} className="w-5 h-5 rounded-full object-cover" />
           <span className="text-xs text-amber-400">{w.artistName}</span>
         </button>
         {w.description && <p className="text-xs text-stone-400 line-clamp-2 leading-relaxed mb-3">{w.description}</p>}

@@ -60,7 +60,7 @@ export default function Audience() {
           type: "patron" as ContactType,
           spend: s.amount / 100,
           lastActive: s.startedAt,
-          avatar: s.subscriberAvatarUrl ?? `https://picsum.photos/seed/${s.subscriberId}/80/80`,
+          avatar: s.subscriberAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${s.subscriberId}`,
           note: `${s.tierName ?? "Supporter"} · $${(s.amount / 100).toFixed(0)}/mo`,
         })));
       }
@@ -77,7 +77,7 @@ export default function Audience() {
             type: "commission" as ContactType,
             spend: c.quotedPrice ?? 0,
             lastActive: c.createdAt,
-            avatar: `https://picsum.photos/seed/${c.clientId}/80/80`,
+            avatar: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${c.clientId}`,
             note: c.workType ?? c.description?.slice(0, 60),
           });
         }
@@ -91,7 +91,7 @@ export default function Audience() {
           type: "follower" as ContactType,
           spend: 0,
           lastActive: f.createdAt,
-          avatar: f.followerAvatarUrl ?? `https://picsum.photos/seed/${f.followerId}/80/80`,
+          avatar: f.followerAvatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${f.followerId}`,
           note: "",
         })));
       }
@@ -198,7 +198,7 @@ export default function Audience() {
                 className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/3 ${i < display.length - 1 ? "border-b border-white/5" : ""}`}>
                 <img src={contact.avatar} alt={contact.name}
                   className="h-10 w-10 rounded-full object-cover border border-white/10 shrink-0"
-                  onError={e => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${contact.id}/80/80`; }} />
+                  onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${contact.id}`; }} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium text-stone-200">{contact.name}</p>
