@@ -435,6 +435,7 @@ export function manualPayoutReceiptEmail(
   items: ManualPayoutReceiptItem[],
   processingWindowDays?: number | null,
   orderId?: string | null,
+  shippingAddress?: string | null,
 ): string {
   const itemRows = items
     .map(
@@ -471,6 +472,10 @@ export function manualPayoutReceiptEmail(
         Total: <strong style="color:#fcd34d;">$${(amountTotalCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
       </p>
     `)}
+    ${shippingAddress ? card(`
+      <p style="margin:0 0 10px;font-size:14px;color:#fcd34d;font-weight:bold;">Shipping address</p>
+      <p style="margin:0;color:#d6d3d1;white-space:pre-line;line-height:1.6;">${escHtml(shippingAddress)}</p>
+    `) : ''}
     ${card(`
       <p style="margin:0 0 8px;color:#fcd34d;font-weight:bold;">What happens next?</p>
       <p style="margin:0;color:#d6d3d1;">This order is fulfilled directly by the artist. They will contact you with shipping details and a tracking number once your item is on its way.</p>

@@ -296,6 +296,7 @@ export class WebhookHandlers {
                   amount: ordersTable.amount,
                   quantity: ordersTable.quantity,
                   processingWindowDays: ordersTable.processingWindowDays,
+                  shippingAddress: ordersTable.shippingAddress,
                   displayName: profilesTable.displayName,
                 })
                 .from(ordersTable)
@@ -323,11 +324,13 @@ export class WebhookHandlers {
             return max == null ? o.processingWindowDays : Math.max(max, o.processingWindowDays);
           }, null);
 
+          const shippingAddress = sessionOrders[0]?.shippingAddress ?? null;
+
           await sendEmailWithRetry(
             {
               to: email,
               subject: `Your Kiln order #${orderId} is confirmed`,
-              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined),
+              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined, shippingAddress),
             },
             { contextId: session.id, label: 'order confirmation' },
           );
