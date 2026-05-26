@@ -237,6 +237,9 @@ export default function Messages() {
   const activeApiThreadIdRef = useRef<string | null>(null);
   useEffect(() => { activeApiThreadIdRef.current = activeApiThreadId; }, [activeApiThreadId]);
 
+  // Ref for the scrollable messages container — used by IntersectionObserver
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   // Tell SocialContext which thread is currently open so it can suppress pings for it
   useEffect(() => {
     setActiveMessageThreadId(activeApiThreadId);
@@ -382,6 +385,45 @@ export default function Messages() {
       body: JSON.stringify({ threadId }),
     }).catch(() => {});
   }, []);
+
+  // IntersectionObserver: call /read as soon as any unread message from the other
+  // user scrolls into the viewport — gives instant badge clearance instead of
+  // waiting for the next 5-second poll tick.
+  useEffect(() => {
+    if (!activeApiThreadId || !profile) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const unreadEls = Array.from(container.querySelectorAll<HTMLElement>("[data-unread-msg]"));
+    if (unreadEls.length === 0) return;
+
+    const threadId = activeApiThreadId;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        observer.disconnect();
+
+        // Optimistically clear the thread badge only — do NOT touch
+        // apiMessages.read here because that field also drives the "Seen"
+        // receipt on sent messages.  The poll will update read states once the
+        // server confirms them.
+        setApiThreads((prev) =>
+          prev.map((t) => (t.id === threadId ? { ...t, unreadCount: 0 } : t))
+        );
+
+        fetch(`/api/messages/threads/${threadId}/read`, {
+          method: "POST",
+          credentials: "include",
+        })
+          .then(() => refreshUnreadMessageCount())
+          .catch(() => {});
+      },
+      { threshold: 0.1, root: container }
+    );
+
+    unreadEls.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [activeApiThreadId, apiMessages, profile, refreshUnreadMessageCount]);
 
   useEffect(() => {
     if (!activeApiThreadId) return;
@@ -801,7 +843,7 @@ export default function Messages() {
               )}
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
                 {apiMessages.length === 0 && (
                   <p className="text-center text-sm text-stone-600 py-8">No messages yet — say hello!</p>
                 )}
@@ -811,8 +853,13 @@ export default function Messages() {
                   )?.id ?? null;
                   return apiMessages.map((msg) => {
                     const isMe = msg.senderId === profile.id;
+                    const isUnread = !isMe && !msg.read;
                     return (
-                      <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                        {...(isUnread ? { "data-unread-msg": "" } : {})}
+                      >
                         <div className={`flex ${isMe ? "justify-end" : "justify-start"} w-full`}>
                           {!isMe && (
                             <img
