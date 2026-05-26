@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { FileText, Download, Printer, CheckCircle, ChevronDown, ChevronUp } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -60,10 +61,29 @@ function getBalance(total: string, pct: string) {
 }
 
 export default function CommissionContract() {
+  const search = useSearch();
   const [fields, setFields] = useState<ContractFields>(EMPTY);
   const [generated, setGenerated] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const contractRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const next: Partial<ContractFields> = {};
+    const artistName = params.get("artistName");
+    const clientName = params.get("clientName");
+    const projectDescription = params.get("projectDescription");
+    const totalPrice = params.get("totalPrice");
+    const medium = params.get("medium");
+    if (artistName) next.artistName = artistName;
+    if (clientName) next.clientName = clientName;
+    if (projectDescription) next.projectDescription = projectDescription;
+    if (totalPrice) next.totalPrice = totalPrice;
+    if (medium) next.medium = medium;
+    if (Object.keys(next).length > 0) {
+      setFields(f => ({ ...f, ...next }));
+    }
+  }, [search]);
 
   function set(k: keyof ContractFields, v: string) {
     setFields((f) => ({ ...f, [k]: v }));

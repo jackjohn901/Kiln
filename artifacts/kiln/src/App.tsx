@@ -309,6 +309,7 @@ function Router() {
       <Route path="/community" component={Community} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:id" component={ArtistProfile} />
+      <Route path="/profile/:id" component={ArtistProfile} />
       <Route path="/artists/:id/followers" component={FollowerList} />
       <Route path="/artists/:id/following" component={FollowerList} />
       <Route path="/shop" component={Shop} />
@@ -367,6 +368,8 @@ function Router() {
       <Route path="/grants" component={GrantWriter} />
       <Route path="/collector" component={CollectorPortal} />
       <Route path="/scheduler" component={PostScheduler} />
+      <Route path="/feed" component={Feed} />
+      <Route path="/commissions" component={CommissionTracker} />
       <Route path="/creator-home" component={CreatorHome} />
       <Route path="/newsletter" component={Newsletter} />
       <Route path="/inventory" component={InventoryManager} />

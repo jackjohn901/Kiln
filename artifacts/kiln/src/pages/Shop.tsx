@@ -252,12 +252,23 @@ export default function Shop() {
                 <div className="relative aspect-[4/3] overflow-hidden bg-muted cursor-pointer">
                   <Link href={`/listings/${listing.id}`}>
                     {listing.imageUrl && (
-                      <img src={listing.imageUrl} alt={listing.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <img
+                        src={listing.imageUrl}
+                        alt={listing.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          const seed = encodeURIComponent(listing.artistName + listing.id);
+                          img.src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=450&fit=crop&seed=${seed}`;
+                          img.onerror = () => {
+                            img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='450'%3E%3Crect width='600' height='450' fill='%23292421'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23665544' font-size='14' font-family='system-ui'%3EWork%3C/text%3E%3C/svg%3E";
+                          };
+                        }}
+                      />
                     )}
                     {!listing.imageUrl && (
-                      <div className="w-full h-full bg-stone-800 flex items-center justify-center">
-                        <span className="text-stone-600 text-xs">No image</span>
+                      <div className="w-full h-full bg-stone-900 flex items-center justify-center border border-white/5">
+                        <span className="text-stone-500 text-xs font-medium">No image</span>
                       </div>
                     )}
                     {listing.isSold && (

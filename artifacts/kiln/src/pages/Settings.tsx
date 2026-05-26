@@ -47,6 +47,7 @@ function defaultAddress(): DefaultShippingAddress {
 }
 
 type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping" | "address";
+type MobileTab = "All" | "Profile" | "Selling" | "Preferences";
 
 export default function Settings() {
   const { profile, logout } = useProfile();
@@ -76,6 +77,7 @@ export default function Settings() {
   const [emailPausedAt, setEmailPausedAt] = useState<string | null>(null);
   const [emailResumeAt, setEmailResumeAt] = useState<string | null>(null);
   const [snoozePickerOpen, setSnoozePickerOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("All");
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -272,15 +274,17 @@ export default function Settings() {
     ? [address.street.trim(), address.city.trim(), address.state.trim()].filter(Boolean).join(", ")
     : "No default address saved";
 
-  const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string; warn?: boolean }[] = [
-    { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass, warn: notifWarn },
-    { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you" },
-    { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings" },
-    { key: "address", icon: MapPin, label: "Delivery Address", desc: addressDesc },
-    { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly" },
-    { key: "shipping", icon: Truck, label: "Shipping Rates", desc: "Your domestic and international rates" },
-    { key: "account", icon: User, label: "Account", desc: "Profile, security, and data" },
+  const sections: { key: Section; icon: React.ElementType; label: string; desc: string; descClass?: string; warn?: boolean; group: MobileTab }[] = [
+    { key: "notifications", icon: Bell, label: "Notifications", desc: notifDesc, descClass: notifDescClass, warn: notifWarn, group: "Preferences" },
+    { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you", group: "Preferences" },
+    { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings", group: "Preferences" },
+    { key: "address", icon: MapPin, label: "Delivery Address", desc: addressDesc, group: "Profile" },
+    { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly", group: "Selling" },
+    { key: "shipping", icon: Truck, label: "Shipping Rates", desc: "Your domestic and international rates", group: "Selling" },
+    { key: "account", icon: User, label: "Account", desc: "Profile, security, and data", group: "Profile" },
   ];
+
+  const filteredSections = mobileTab === "All" ? sections : sections.filter(s => s.group === mobileTab);
 
   function savePayments(next: ArtistPayments) {
     setPayments(next);
@@ -353,7 +357,20 @@ export default function Settings() {
 
         {!section && (
           <div className="space-y-2">
-            {sections.map(({ key, icon: Icon, label, desc, descClass, warn }) => (
+            {/* Mobile-only tab grouping */}
+            <div className="md:hidden mb-4 flex gap-1 rounded-xl bg-stone-900/50 p-1 border border-white/5">
+              {(["All", "Profile", "Selling", "Preferences"] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setMobileTab(t)}
+                  className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${mobileTab === t ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {filteredSections.map(({ key, icon: Icon, label, desc, descClass, warn }) => (
               <button
                 key={key}
                 onClick={() => setSection(key)}

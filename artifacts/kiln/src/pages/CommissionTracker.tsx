@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import {
   ChevronLeft, CheckCircle, Circle, Clock, MessageCircle, DollarSign,
   Image, Truck, Package, Star, Loader2, ChevronRight, Paperclip, X, Send,
+  FileText,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
@@ -534,10 +535,18 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
           )}
 
           {isArtist && commission.status === "accepted" && (
-            <button onClick={() => updateCommission({ status: "in_progress", milestone: "production" })} disabled={updating}
-              className="w-full rounded-full bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300 py-2 hover:bg-amber-500/30 transition-colors disabled:opacity-50">
-              {updating ? "..." : "Mark as In Progress"}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => updateCommission({ status: "in_progress", milestone: "production" })} disabled={updating}
+                className="flex-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300 py-2 hover:bg-amber-500/30 transition-colors disabled:opacity-50">
+                {updating ? "..." : "Mark as In Progress"}
+              </button>
+              <Link
+                href={`/commission-contract?artistName=${encodeURIComponent(commission.artistName)}&clientName=${encodeURIComponent(commission.clientName)}&projectDescription=${encodeURIComponent(commission.description)}&totalPrice=${encodeURIComponent(String(commission.quotedPrice ?? ""))}&medium=${encodeURIComponent(commission.workType ?? "")}`}
+                className="rounded-full border border-white/10 px-3 py-2 text-xs text-stone-400 hover:text-stone-200 transition-colors inline-flex items-center gap-1"
+              >
+                <FileText size={12} /> Contract
+              </Link>
+            </div>
           )}
 
           {isArtist && commission.status === "in_progress" && !commission.depositPaid && (

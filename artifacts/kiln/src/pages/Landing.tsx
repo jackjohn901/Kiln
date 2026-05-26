@@ -75,9 +75,6 @@ export default function Landing() {
             <span className="font-serif text-xl font-bold tracking-tight text-amber-100">Kiln</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/" className="text-sm text-stone-400 hover:text-stone-200 transition-colors">
-              Browse the feed
-            </Link>
             <Link
               href="/setup"
               className="rounded-full bg-amber-500 px-4 py-1.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
@@ -112,7 +109,7 @@ export default function Landing() {
             href="/?skipLanding=true"
             className="rounded-full border border-white/15 px-6 py-3 text-base font-medium text-stone-400 hover:border-amber-500/40 hover:text-stone-200 transition-colors"
           >
-            Browse the feed
+            Explore works
           </Link>
         </div>
         <p className="mt-4 text-xs text-stone-600">Free to join · No listing fees · Cancel anytime</p>

@@ -75,16 +75,18 @@ export default function Inbox() {
     setApiReceived(prev => prev.map(i => i.id === id ? { ...i, status: "declined" as const } : i));
   }
 
+  const isArtistProfile = !!(profile?.bio && profile.bio.length > 0);
+
   if (!profile) {
     return (
       <div className="min-h-screen bg-[#12100e]">
         <Nav />
         <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
           <InboxIcon size={36} className="text-stone-600" />
-          <h2 className="font-serif text-2xl text-amber-100">Commission Inbox</h2>
-          <p className="text-stone-500 max-w-xs">Set up your artist profile to see your commission inquiries.</p>
+          <h2 className="font-serif text-2xl text-amber-100">Inbox</h2>
+          <p className="text-stone-500 max-w-xs">Sign in to see your commission messages and requests.</p>
           <button onClick={() => navigate("/setup")} className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
-            Create Profile
+            Sign In
           </button>
         </div>
       </div>
@@ -98,8 +100,10 @@ export default function Inbox() {
       <Nav />
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6">
-          <h1 className="font-serif text-2xl text-amber-100">Commission Inbox</h1>
-          <p className="text-sm text-stone-500 mt-1">Manage your incoming commission requests</p>
+          <h1 className="font-serif text-2xl text-amber-100">Inbox</h1>
+          <p className="text-sm text-stone-500 mt-1">
+            {isArtistProfile ? "Manage your incoming commission requests" : "Track your commission requests with artists"}
+          </p>
         </div>
 
         {/* Tabs */}
@@ -134,7 +138,11 @@ export default function Inbox() {
             {receivedInquiries.length === 0 && (
               <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-12 text-center">
                 <InboxIcon size={28} className="mx-auto mb-3 text-stone-600" />
-                <p className="text-stone-500">No inquiries yet. Share your work and set commissions to open.</p>
+                <p className="text-stone-500">
+                  {isArtistProfile
+                    ? "No inquiries yet. Share your work and set commissions to open."
+                    : "No incoming requests. Commission inquiries you receive will appear here."}
+                </p>
               </div>
             )}
             {receivedInquiries.map((inquiry) => (

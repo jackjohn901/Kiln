@@ -154,7 +154,7 @@ function formatDate(iso: string) {
 
 export default function Earnings() {
   const { profile } = useProfile();
-  const { bannerDismissed, resetDismissal } = useStripeConnect();
+  const { bannerDismissed, dismissBanner, resetDismissal } = useStripeConnect();
   const search = useSearch();
   const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
@@ -591,6 +591,32 @@ export default function Earnings() {
             <Banknote size={13} /> Request Payout
           </button>
         </div>
+
+        {/* Payment setup prompt */}
+        {!connectLoading && (!stripeConnect?.connected || !stripeConnect?.chargesEnabled) && !bannerDismissed && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={16} className="shrink-0 text-amber-400 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-300">Complete your payment setup</p>
+                <p className="text-xs text-amber-400/70 mt-0.5">Connect Stripe so buyers can pay you directly. Without it, you can’t receive earnings.</p>
+              </div>
+              <button
+                onClick={handleConnectStripe}
+                disabled={connectingStripe}
+                className="shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-50"
+              >
+                {connectingStripe ? "Connecting…" : "Connect Stripe"}
+              </button>
+              <button
+                onClick={dismissBanner}
+                className="shrink-0 rounded-full p-1 text-amber-500/40 hover:text-amber-400 transition-colors"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* New-sale notification banner */}
         {saleBanner && (
