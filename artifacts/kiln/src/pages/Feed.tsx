@@ -934,6 +934,7 @@ export default function Feed() {
   const [discoveryShown, setDiscoveryShown] = useState(false);
 
   const [justPublishedCount, setJustPublishedCount] = useState(0);
+  const [justPosted, setJustPosted] = useState(false);
 
   // Feature discovery: show a card after the 5th reel, once per session per feature
   useEffect(() => {
@@ -955,6 +956,20 @@ export default function Feed() {
       window.removeEventListener("focus", reload);
       window.removeEventListener("kiln:post-added", reload);
     };
+  }, []);
+
+  // When arriving from a fresh post creation, jump to top and show a toast
+  useEffect(() => {
+    if (typeof sessionStorage === "undefined") return;
+    if (sessionStorage.getItem("kiln_just_posted") === "true") {
+      sessionStorage.removeItem("kiln_just_posted");
+      setFeedTab("foryou");
+      setActiveIndex(0);
+      setUserPostReels(userPostsToReels());
+      setJustPosted(true);
+      setTimeout(() => setJustPosted(false), 3500);
+      setTimeout(() => containerRef.current?.scrollTo({ top: 0, behavior: "smooth" }), 50);
+    }
   }, []);
 
   // Fetch posts from users I follow — extracted so polling and WS can reuse it
@@ -1509,6 +1524,21 @@ export default function Feed() {
               <span className="text-xs font-semibold text-stone-950">
                 {justPublishedCount === 1 ? "1 scheduled post went live" : `${justPublishedCount} scheduled posts went live`}
               </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Fresh post toast */}
+      <AnimatePresence>
+        {justPosted && (
+          <motion.div
+            className="pointer-events-none fixed bottom-24 left-1/2 z-40 -translate-x-1/2"
+            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
+          >
+            <div className="flex items-center gap-2 rounded-full bg-amber-500/90 backdrop-blur-sm px-5 py-2.5 shadow-lg shadow-amber-900/40">
+              <Check size={14} className="text-stone-950" />
+              <span className="text-xs font-semibold text-stone-950">Posted</span>
             </div>
           </motion.div>
         )}

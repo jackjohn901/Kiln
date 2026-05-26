@@ -435,7 +435,8 @@ export default function Create() {
       }
 
       recordPost();
-      setStep("done");
+      sessionStorage.setItem("kiln_just_posted", "true");
+      navigate("/");
     } catch (err) {
       console.error("Publish flow failed", err);
       setPublishError(err instanceof Error ? err.message : "Something went wrong while publishing. Please try again.");
