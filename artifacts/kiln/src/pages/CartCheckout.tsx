@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Check, Package, ArrowRight, Truck, ShieldCheck,
   ExternalLink, MessageCircle, Info, CreditCard, Gift, AlertTriangle, Clock,
+  MapPin,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
@@ -128,6 +129,7 @@ export default function CartCheckout() {
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
   const [redirectingToStripe, setRedirectingToStripe] = useState(false);
+  const [savedAddress, setSavedAddress] = useState<{ street?: string; city?: string; state?: string; zip?: string; country?: string } | null | undefined>(undefined);
 
   const isDomestic = addr.country === "US";
 
@@ -158,7 +160,10 @@ export default function CartCheckout() {
       .then(r => r.ok ? r.json() as Promise<{ defaultShippingAddress?: { street?: string; city?: string; state?: string; zip?: string; country?: string } | null }> : null)
       .then(data => {
         const saved = data?.defaultShippingAddress;
-        if (!saved) return;
+        if (!saved) {
+          setSavedAddress(null);
+          return;
+        }
         const street = typeof saved.street === "string" ? saved.street.trim() : "";
         const city = typeof saved.city === "string" ? saved.city.trim() : "";
         const state = typeof saved.state === "string" ? saved.state.trim() : "";
@@ -167,6 +172,7 @@ export default function CartCheckout() {
           ? normalizeCountryCode(saved.country)
           : "US";
         if (street || city || zip) {
+          setSavedAddress({ street, city, state, zip, country });
           setAddr(prev => ({
             ...prev,
             address: prev.address || street,
@@ -175,9 +181,11 @@ export default function CartCheckout() {
             zip: prev.zip || zip,
             country: prev.country === "US" ? country : prev.country,
           }));
+        } else {
+          setSavedAddress(null);
         }
       })
-      .catch(() => {});
+      .catch(() => { setSavedAddress(null); });
   }, []);
 
   // Fetch shipping rates for each unique artist in the cart
@@ -444,6 +452,33 @@ export default function CartCheckout() {
                 <motion.div key="address" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                   <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Your shipping address</p>
+
+                    {/* Saved address summary card */}
+                    {savedAddress === undefined ? null : savedAddress ? (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
+                        <MapPin size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-amber-300 mb-0.5">Shipping to your saved address</p>
+                          <p className="text-xs text-stone-400 leading-relaxed">
+                            {[savedAddress.street, savedAddress.city, savedAddress.state && savedAddress.zip ? `${savedAddress.state} ${savedAddress.zip}` : savedAddress.state || savedAddress.zip, savedAddress.country !== "US" ? savedAddress.country : undefined].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                        <Link href="/settings?section=address">
+                          <span className="text-xs text-amber-400 hover:text-amber-300 transition-colors shrink-0 font-medium">Change</span>
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-white/8 bg-stone-800/40 px-4 py-3 flex items-start gap-3">
+                        <MapPin size={14} className="text-stone-500 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-stone-400">No saved address — fill in the form below or</p>
+                        </div>
+                        <Link href="/settings?section=address">
+                          <span className="text-xs text-amber-400 hover:text-amber-300 transition-colors shrink-0 font-medium">Save one</span>
+                        </Link>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
                         <Field label="Full name" value={addr.name} onChange={(v) => setAddr({ ...addr, name: v })} />
