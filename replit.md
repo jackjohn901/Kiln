@@ -73,6 +73,8 @@ All seed data uses IDs prefixed `seed-`:
 - All authenticated API calls need `credentials: "include"` in fetch options.
 - `pnpm run dev` at workspace root has no script — run individual packages via workflows.
 - Static guild/artist data files in `src/data/` are for reference/demo data; DB is source of truth for real users.
+- **Do not use `.catch(() => {})` on user-initiated mutation fetches** (Setup, ReelStudio, StitchStudio, etc.). It silently fails and leaves users stuck without feedback. Always handle errors: show toast / inline error / retry UI.
+- **Framer Motion `animate` values must be clamped** when computed from unbounded inputs (timestamps, scroll positions). E.g. `Math.max(0, Math.min(1, (now - start) / duration))` for volume fades. Negative values crash React updates silently.
 
 ## User preferences
 

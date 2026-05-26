@@ -119,39 +119,56 @@ export default function Setup() {
     return null;
   }
 
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   async function handlePublish() {
-    if (!form.name || !form.handle) return;
+    if (!form.name || !form.handle || savingProfile) return;
     const handle = form.handle.replace(/^@/, "");
     const displayName =
       accountType === "gallery" ? (form.galleryName || form.name) :
       accountType === "museum" ? (form.institutionName || form.name) :
       form.name;
 
-    setProfile({
-      id: handle, name: displayName, handle, bio: form.bio,
-      location: form.location, website: form.website, instagram: "",
-      avatarUrl: avatarPreview || "", coverUrl: avatarPreview || "",
-      isCustom: true, accountType,
-      mediums:
-        accountType === "artist" ? form.mediums :
-        accountType === "collector" ? form.collectingInterests :
-        accountType === "enthusiast" ? form.enthusiastInterests : [],
-    });
+    setSavingProfile(true);
+    setSaveError(null);
 
-    fetch("/api/me/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        handle, displayName, bio: form.bio,
-        medium: deriveMedium(),
-        location: form.location, website: form.website,
-        avatarUrl: avatarPreview || null,
-        accountType,
-      }),
-    }).catch(() => {});
+    try {
+      const res = await fetch("/api/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          handle, displayName, bio: form.bio,
+          medium: deriveMedium(),
+          location: form.location, website: form.website,
+          avatarUrl: avatarPreview || null,
+          accountType,
+        }),
+      });
 
-    setStep("done");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to save your profile. Please try again.");
+      }
+
+      setProfile({
+        id: handle, name: displayName, handle, bio: form.bio,
+        location: form.location, website: form.website, instagram: "",
+        avatarUrl: avatarPreview || "", coverUrl: avatarPreview || "",
+        isCustom: true, accountType,
+        mediums:
+          accountType === "artist" ? form.mediums :
+          accountType === "collector" ? form.collectingInterests :
+          accountType === "enthusiast" ? form.enthusiastInterests : [],
+      });
+
+      setStep("done");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   // ── Account type picker ───────────────────────────────────────────────────────
@@ -559,12 +576,25 @@ export default function Setup() {
             </div>
           )}
 
+          {saveError && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {saveError}
+            </div>
+          )}
+
           <button
             onClick={handlePublish}
-            disabled={!form.name || !form.handle}
-            className="w-full rounded-full bg-amber-500 py-3.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!form.name || !form.handle || savingProfile}
+            className="w-full rounded-full bg-amber-500 py-3.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Create profile
+            {savingProfile ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-800 border-t-transparent" />
+                Saving...
+              </>
+            ) : (
+              "Create profile"
+            )}
           </button>
         </div>
       </div>
