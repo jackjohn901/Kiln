@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail, Link2, Check, Download,
+  Printer, Star, Mail, Link2, Check, Download, Pencil, X,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
@@ -178,6 +178,10 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState("");
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUrl = sessionKey
@@ -264,8 +268,36 @@ export default function OrderDetail() {
   const shipsWithinText = `Ships ${deliveryEstimateText}`;
 
   const isActive = !["delivered", "cancelled"].includes(order.status);
+  const canEditAddress = ["pending", "in_progress", "confirmed"].includes(order.status) && !sessionKey;
 
   const isCartOrder = siblingOrders.length > 1;
+
+  async function handleSaveAddress() {
+    if (!order || !id) return;
+    const trimmed = addressDraft.trim();
+    if (!trimmed) { setAddressError("Address cannot be empty."); return; }
+    setAddressSaving(true);
+    setAddressError(null);
+    try {
+      const r = await fetch(`/api/me/orders/${encodeURIComponent(id)}/shipping-address`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ address: trimmed }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({})) as { error?: string };
+        setAddressError(data.error ?? "Failed to save address.");
+      } else {
+        setOrder((prev) => prev ? { ...prev, shippingAddress: trimmed } : prev);
+        setEditingAddress(false);
+      }
+    } catch {
+      setAddressError("Network error — please try again.");
+    } finally {
+      setAddressSaving(false);
+    }
+  }
   const cartTotal = isCartOrder ? siblingOrders.reduce((sum, o) => sum + o.amount, 0) : order.amount;
 
   function handlePrint() {
@@ -843,13 +875,63 @@ export default function OrderDetail() {
           );
         })()}
 
-        {order.shippingAddress && (
+        {(order.shippingAddress || canEditAddress) && (
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Ship to</p>
-            <div className="flex items-start gap-2">
-              <MapPin size={14} className="text-stone-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-stone-400 whitespace-pre-line">{order.shippingAddress}</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Ship to</p>
+              {canEditAddress && !editingAddress && (
+                <button
+                  onClick={() => {
+                    setAddressDraft(order.shippingAddress ?? "");
+                    setAddressError(null);
+                    setEditingAddress(true);
+                  }}
+                  className="flex items-center gap-1 text-xs text-stone-500 hover:text-amber-300 transition-colors"
+                >
+                  <Pencil size={11} />
+                  Edit
+                </button>
+              )}
             </div>
+            {editingAddress ? (
+              <div className="space-y-2">
+                <textarea
+                  rows={3}
+                  value={addressDraft}
+                  onChange={(e) => setAddressDraft(e.target.value)}
+                  placeholder={"123 Main St\nPortland, OR 97201\nUS"}
+                  className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none resize-none"
+                />
+                {addressError && (
+                  <p className="text-xs text-rose-400">{addressError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveAddress}
+                    disabled={addressSaving}
+                    className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-1.5 text-xs font-semibold text-stone-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                  >
+                    {addressSaving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => { setEditingAddress(false); setAddressError(null); }}
+                    disabled={addressSaving}
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-1.5 text-xs text-stone-400 hover:text-stone-200 transition-colors"
+                  >
+                    <X size={11} />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : order.shippingAddress ? (
+              <div className="flex items-start gap-2">
+                <MapPin size={14} className="text-stone-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-stone-400 whitespace-pre-line">{order.shippingAddress}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-stone-600 italic">No address on file — click Edit to add one.</p>
+            )}
           </div>
         )}
 

@@ -283,6 +283,47 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
   }
 });
 
+// PATCH /me/orders/:id/shipping-address — let the buyer correct the shipping address
+// while the order is still in a pre-shipment state (pending, in_progress, confirmed).
+// Buyers cannot update addresses once the seller has marked the item shipped or delivered.
+router.patch("/me/orders/:id/shipping-address", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { address } = req.body as { address?: unknown };
+  if (typeof address !== "string" || address.trim().length === 0) {
+    res.status(400).json({ error: "address must be a non-empty string" }); return;
+  }
+  const trimmed = address.trim();
+  if (trimmed.length > 1000) {
+    res.status(400).json({ error: "address is too long (max 1000 characters)" }); return;
+  }
+
+  try {
+    const rows = await db
+      .select({ id: ordersTable.id, buyerId: ordersTable.buyerId, status: ordersTable.status })
+      .from(ordersTable)
+      .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.buyerId, req.user.id)))
+      .limit(1);
+
+    if (rows.length === 0) { res.status(404).json({ error: "Order not found" }); return; }
+
+    const order = rows[0]!;
+    const EDITABLE_STATUSES = ["pending", "in_progress", "confirmed"];
+    if (!EDITABLE_STATUSES.includes(order.status)) {
+      res.status(409).json({ error: "Shipping address cannot be changed once the order has shipped" }); return;
+    }
+
+    await db
+      .update(ordersTable)
+      .set({ shippingAddress: trimmed })
+      .where(eq(ordersTable.id, order.id));
+
+    res.json({ ok: true, shippingAddress: trimmed });
+  } catch (err) {
+    logger.error({ err }, "me/orders/:id/shipping-address PATCH error");
+    res.status(500).json({ error: "Failed to update shipping address" });
+  }
+});
+
 /**
  * Look up the buyer's stored default shipping address and format it as a
  * multi-line string suitable for stamping onto an order record.
