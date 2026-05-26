@@ -645,7 +645,7 @@ export default function Settings() {
                   <input
                     type="tel"
                     value={phoneNumber}
-                    onChange={(e) => { setPhoneNumber(e.target.value); if (phoneValidationError) setPhoneValidationError(false); }}
+                    onChange={(e) => { setPhoneNumber(e.target.value); if (phoneValidationError && /^\+?[\d\s\-().]{7,20}$/.test(e.target.value.trim())) setPhoneValidationError(false); }}
                     onBlur={(e) => savePhoneNumber(e.target.value)}
                     placeholder="+1 555 123 4567"
                     className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${phoneValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-sky-500/50"}`}
