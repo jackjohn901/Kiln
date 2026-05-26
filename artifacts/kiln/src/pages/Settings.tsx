@@ -5,6 +5,7 @@ import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
 import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
+import { useStripeConnect } from "@/contexts/StripeConnectContext";
 
 const SHIPPING_KEY = "kiln_shipping_v1";
 
@@ -50,6 +51,7 @@ type Section = "notifications" | "privacy" | "display" | "account" | "payments" 
 export default function Settings() {
   const { profile, logout } = useProfile();
   const { settings, settingsLoaded, updateSetting, patchSettings } = useSettings();
+  const { bannerDismissed, resetDismissal } = useStripeConnect();
   const search = useSearch();
   const [section, setSection] = useState<Section | null>(() => {
     const params = new URLSearchParams(search);
@@ -708,6 +710,20 @@ export default function Settings() {
         {section === "payments" && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={14} className="text-indigo-400" />
+                  <span className="text-sm font-medium text-stone-200">Stripe Payouts</span>
+                </div>
+                {bannerDismissed && (
+                  <button
+                    onClick={resetDismissal}
+                    className="text-[11px] text-stone-500 hover:text-indigo-400 transition-colors"
+                  >
+                    Show account status
+                  </button>
+                )}
+              </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-1">How it works</p>
                 <p className="text-xs text-stone-500 leading-relaxed">
