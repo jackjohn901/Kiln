@@ -4,6 +4,7 @@ import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft, ShoppingBag,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
   Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark, Images,
+  Play, Pause,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { type FilterSettings } from "@/components/ImageEditor";
@@ -13,6 +14,8 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
+import { createBeatLooper } from "@/lib/beatSynth";
+import { getCommunityBeats } from "@/lib/communityBeats";
 import { useUpload } from "@/hooks/useUpload";
 import { storeBlob } from "@/lib/videoDB";
 
@@ -124,10 +127,54 @@ export default function Create() {
   const [isReveal, setIsReveal] = useState(false);
   const [beforeFile, setBeforeFile] = useState<File | null>(null);
   const [beforePreview, setBeforePreview] = useState("");
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const beatLooperRef = useRef<{ stop: () => void } | null>(null);
   const [collaboratorName, setCollaboratorName] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const additionalInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Music preview playback (preview step) ───────────────────────────────────
+  function stopPreviewAudio() {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    beatLooperRef.current?.stop();
+    beatLooperRef.current = null;
+    setPreviewPlaying(false);
+  }
+
+  function togglePreviewAudio() {
+    if (!selectedTrack) return;
+    if (previewPlaying) { stopPreviewAudio(); return; }
+
+    // Community beats use the synthesizer
+    if (selectedTrack.id.startsWith("beat-")) {
+      const beatId = selectedTrack.id.replace("beat-", "");
+      const beat = getCommunityBeats().find((b) => b.id === beatId);
+      if (beat) {
+        beatLooperRef.current = createBeatLooper(beat);
+        setPreviewPlaying(true);
+        // Auto-stop after 8 seconds like MusicPicker does
+        setTimeout(() => { stopPreviewAudio(); }, 8000);
+      }
+      return;
+    }
+
+    // Library tracks and custom uploads use HTMLAudioElement
+    const audio = new Audio(selectedTrack.url);
+    audio.volume = 0.7;
+    audioRef.current = audio;
+    audio.play()
+      .then(() => setPreviewPlaying(true))
+      .catch(() => setPreviewPlaying(false));
+    audio.addEventListener("ended", () => setPreviewPlaying(false));
+  }
+
+  // Stop preview audio when track changes, step changes away from preview, or component unmounts
+  useEffect(() => { stopPreviewAudio(); }, [selectedTrack?.id]);
+  useEffect(() => { if (step !== "preview" && step !== "details") stopPreviewAudio(); }, [step]);
+  useEffect(() => () => { stopPreviewAudio(); }, []);
   const beforeInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_VIDEO_SECONDS = 60;
@@ -551,10 +598,15 @@ export default function Create() {
                   <p className="text-xs text-white/60">{technique}</p>
                 ) : null}
                 {selectedTrack && (
-                  <div className="flex items-center gap-1.5">
-                    <Music size={11} className="text-amber-300 shrink-0" />
+                  <button
+                    onClick={togglePreviewAudio}
+                    className="flex items-center gap-1.5 group"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 group-hover:bg-amber-500/30 transition-colors">
+                      {previewPlaying ? <Pause size={9} /> : <Play size={9} className="ml-[1px]" />}
+                    </span>
                     <p className="text-[10px] text-white/60 truncate">{selectedTrack.title} — {selectedTrack.artist}</p>
-                  </div>
+                  </button>
                 )}
               </div>
             </div>
@@ -957,10 +1009,15 @@ export default function Create() {
                   )}
                   {/* Music bar */}
                   {selectedTrack && (
-                    <div className="flex items-center gap-1.5">
-                      <Music size={11} className="text-amber-300 shrink-0" />
+                    <button
+                      onClick={togglePreviewAudio}
+                      className="flex items-center gap-1.5 group"
+                    >
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 group-hover:bg-amber-500/30 transition-colors">
+                        {previewPlaying ? <Pause size={9} /> : <Play size={9} className="ml-[1px]" />}
+                      </span>
                       <p className="text-[10px] text-white/60 truncate">{selectedTrack.title} — {selectedTrack.artist}</p>
-                    </div>
+                    </button>
                   )}
                 </div>
 
