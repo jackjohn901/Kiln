@@ -48,7 +48,7 @@ router.post("/subscription-boxes/:id/subscribe", async (req, res): Promise<void>
     const baseUrl = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : `http://localhost:${process.env.PORT}`;
     const basePath = process.env.BASE_PATH ?? "";
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
+      payment_method_types: ['card', 'link'],
       customer_email: user.email ?? undefined,
       line_items: [{
         price_data: {

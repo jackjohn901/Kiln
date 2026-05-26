@@ -272,7 +272,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
     }
 
     const sessionParams: import('stripe').Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       customer_email: customerEmail,
       line_items: items.map((item) => {
         let unitAmountCents: number;
@@ -380,7 +380,7 @@ router.post('/stripe/subscription-checkout', async (req, res): Promise<void> => 
     const basePath = process.env.BASE_PATH ?? '';
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       customer_email: customerEmail,
       line_items: [{
         price_data: {
@@ -432,7 +432,7 @@ router.post('/stripe/gift-card-checkout', async (req, res): Promise<void> => {
     const basePath = process.env.BASE_PATH ?? '';
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       customer_email: req.user.email ?? undefined,
       line_items: [{
         price_data: {
@@ -494,7 +494,7 @@ router.post('/stripe/payment-plan-checkout', async (req, res): Promise<void> => 
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'link'],
       line_items: [{
         price_data: {
           currency: 'usd',

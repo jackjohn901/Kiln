@@ -27,7 +27,7 @@ router.post("/boosts", async (req, res): Promise<void> => {
     const baseUrl = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : `http://localhost:${process.env.PORT}`;
     const basePath = process.env.BASE_PATH ?? "";
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
+      payment_method_types: ['card', 'link'],
       customer_email: user.email ?? undefined,
       line_items: [{ price_data: { currency: "usd", unit_amount: budgetCents, product_data: { name: `Boost post for ${durationDays ?? 7} days` } }, quantity: 1 }],
       mode: "payment",

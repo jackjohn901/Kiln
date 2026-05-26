@@ -108,7 +108,7 @@ router.post("/auctions/:id/checkout", async (req, res): Promise<void> => {
       : `http://localhost:${process.env.PORT ?? 5000}`;
     const basePath = process.env.BASE_PATH ?? "";
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
+      payment_method_types: ['card', 'link'],
       customer_email: req.user.email ?? undefined,
       line_items: [{
         price_data: {
