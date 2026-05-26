@@ -320,6 +320,7 @@ ${items}
 });
 
 router.post("/press/generate", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { topic } = req.body as { topic?: string };
   try {
     const generated = await generatePressRelease(topic);

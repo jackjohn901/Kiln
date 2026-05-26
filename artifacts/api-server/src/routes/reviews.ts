@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { reviewsTable, listingsTable, notificationsTable } from "@workspace/db";
+import { reviewsTable, listingsTable, notificationsTable, reviewVotesTable } from "@workspace/db";
 import { eq, desc, avg, count, and, sql } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -56,11 +56,36 @@ router.post("/reviews/:id/respond", async (req, res): Promise<void> => {
   res.json({ ok: true });
 });
 
-// POST /reviews/:id/helpful — mark a review as helpful (auth required, one per user implied by client behavior)
+// POST /reviews/:id/helpful — toggle helpful vote (auth required, one per user)
 router.post("/reviews/:id/helpful", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  await db.update(reviewsTable).set({ helpfulCount: sql`${reviewsTable.helpfulCount} + 1` }).where(eq(reviewsTable.id, req.params.id));
-  res.json({ ok: true });
+  const reviewId = req.params.id;
+  const userId = req.user.id;
+
+  const [existing] = await db.select().from(reviewVotesTable)
+    .where(and(eq(reviewVotesTable.reviewId, reviewId), eq(reviewVotesTable.userId, userId)));
+
+  if (existing) {
+    // Already voted — remove vote (toggle off)
+    await db.delete(reviewVotesTable)
+      .where(and(eq(reviewVotesTable.reviewId, reviewId), eq(reviewVotesTable.userId, userId)));
+    await db.update(reviewsTable)
+      .set({ helpfulCount: sql`GREATEST(0, ${reviewsTable.helpfulCount} - 1)` })
+      .where(eq(reviewsTable.id, reviewId));
+    res.json({ ok: true, helpful: false });
+    return;
+  }
+
+  // Add vote
+  await db.insert(reviewVotesTable).values({
+    id: crypto.randomUUID(),
+    reviewId,
+    userId,
+  });
+  await db.update(reviewsTable)
+    .set({ helpfulCount: sql`${reviewsTable.helpfulCount} + 1` })
+    .where(eq(reviewsTable.id, reviewId));
+  res.json({ ok: true, helpful: true });
 });
 
 export default router;
