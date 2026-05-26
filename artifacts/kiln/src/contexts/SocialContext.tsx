@@ -15,13 +15,14 @@ export interface KilnComment {
 
 export interface KilnNotification {
   id: string;
-  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription" | "sale" | "workshop_booking" | "commission_payment";
+  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription" | "sale" | "workshop_booking" | "commission_payment" | "message";
   fromId: string;
   fromName: string;
   fromAvatarUrl: string;
   text: string;
   link?: string;
   commissionId?: string;
+  imageUrl?: string;
   read: boolean;
   createdAt: string;
 }
@@ -550,7 +551,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
     fetch("/api/notifications", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; read: boolean; createdAt: string }> } | null) => {
+      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; imageUrl?: string | null; read: boolean; createdAt: string }> } | null) => {
         if (!data?.notifications?.length) return;
         const apiNotifs: KilnNotification[] = data.notifications.map((n) => {
           const link = n.link ?? undefined;
@@ -564,6 +565,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
             text: n.text,
             link,
             commissionId: commissionMatch?.[1],
+            imageUrl: n.imageUrl ?? undefined,
             read: n.read,
             createdAt: n.createdAt,
           };

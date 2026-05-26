@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -20,6 +20,7 @@ const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: 
   sale:                { icon: ShoppingBag,   color: "text-green-400",  bg: "bg-green-500/15" },
   workshop_booking:    { icon: Calendar,      color: "text-sky-400",    bg: "bg-sky-500/15" },
   commission_payment:  { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
+  message:             { icon: Mail,          color: "text-violet-400", bg: "bg-violet-500/15" },
 };
 
 
@@ -91,6 +92,7 @@ export default function Notifications() {
             text: (n.text as string) ?? "You have a new notification",
             link,
             commissionId: extractCommissionId(link),
+            imageUrl: (n.imageUrl as string | undefined) ?? undefined,
             read: (n.read as boolean) ?? false,
             createdAt: n.createdAt as string,
           };
@@ -197,14 +199,34 @@ export default function Notifications() {
                           }}>
                             {n.link ? (
                               <Link href={n.link} className="block">
-                                <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                                <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
+                                <div className="flex items-start gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                                    <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
+                                  </div>
+                                  {n.imageUrl && (
+                                    <img
+                                      src={n.imageUrl}
+                                      alt=""
+                                      className="h-12 w-12 flex-shrink-0 rounded-lg object-cover border border-white/10"
+                                    />
+                                  )}
+                                </div>
                               </Link>
                             ) : (
-                              <>
-                                <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                                <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
-                              </>
+                              <div className="flex items-start gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+                                  <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
+                                </div>
+                                {n.imageUrl && (
+                                  <img
+                                    src={n.imageUrl}
+                                    alt=""
+                                    className="h-12 w-12 flex-shrink-0 rounded-lg object-cover border border-white/10"
+                                  />
+                                )}
+                              </div>
                             )}
                           </div>
                           {isCommission && (

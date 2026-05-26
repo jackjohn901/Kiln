@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { messageThreadsTable, messagesTable, profilesTable } from "@workspace/db";
+import { messageThreadsTable, messagesTable, profilesTable, notificationsTable } from "@workspace/db";
 import { eq, or, desc, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
@@ -254,6 +254,20 @@ router.post("/messages/send", async (req, res): Promise<void> => {
       recipientId,
       senderName: message.senderName,
       senderAvatarUrl: message.senderAvatarUrl,
+      attachmentUrl: message.attachmentUrl ?? undefined,
+    });
+
+    const notifText = trimmedText || "📎 Image";
+    await db.insert(notificationsTable).values({
+      id: crypto.randomUUID(),
+      userId: recipientId,
+      type: "message",
+      fromId: senderId,
+      fromName: message.senderName,
+      fromAvatarUrl: message.senderAvatarUrl ?? null,
+      text: notifText,
+      link: `/messages`,
+      imageUrl: attachmentUrl ?? null,
     });
 
     res.status(201).json({

@@ -11,6 +11,7 @@ export const notificationsTable = pgTable("notifications", {
   fromAvatarUrl: text("from_avatar_url"),
   text: text("text").notNull(),
   link: text("link"),
+  imageUrl: text("image_url"),
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
