@@ -46,8 +46,9 @@ router.post("/reviews/:id/respond", async (req, res): Promise<void> => {
   res.json({ ok: true });
 });
 
-// POST /reviews/:id/helpful
+// POST /reviews/:id/helpful — mark a review as helpful (auth required, one per user implied by client behavior)
 router.post("/reviews/:id/helpful", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   await db.update(reviewsTable).set({ helpfulCount: sql`${reviewsTable.helpfulCount} + 1` }).where(eq(reviewsTable.id, req.params.id));
   res.json({ ok: true });
 });

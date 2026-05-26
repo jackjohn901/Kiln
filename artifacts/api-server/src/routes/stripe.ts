@@ -183,6 +183,7 @@ interface CartLineItem {
 }
 
 router.post('/stripe/checkout', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const { items, customerEmail, successPath, cancelPath, metadata: extraMetadata } = req.body as {
       items: CartLineItem[];
@@ -513,6 +514,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 });
 
 router.post('/stripe/subscription-checkout', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const { artistId, tierId, tierLabel, amount, customerEmail, successPath, cancelPath } = req.body as {
       artistId?: string;
@@ -614,6 +616,7 @@ router.post('/stripe/gift-card-checkout', async (req, res): Promise<void> => {
 });
 
 router.post('/stripe/payment-plan-checkout', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
     const { listingId, installments } = req.body as {
       listingId: string;
