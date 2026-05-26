@@ -78,7 +78,7 @@ function ThreadItem({ thread, active, onClick }: { thread: MessageThread; active
           <span className="text-[10px] text-stone-600 shrink-0 ml-2">{timeShort(thread.lastMessageAt)}</span>
         </div>
         <p className={`text-xs truncate ${unread > 0 ? "text-stone-400" : "text-stone-600"}`}>
-          {lastMsg?.senderId === "__current_user__" ? "You: " : ""}{lastMsg?.text}
+          {lastMsg?.senderId === "__current_user__" ? "You: " : ""}{lastMsg?.text || (lastMsg?.attachmentUrl ? "📎 Image" : "")}
         </p>
       </div>
     </button>
