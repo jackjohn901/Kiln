@@ -127,6 +127,7 @@ export default function CartCheckout() {
   const [manualPayoutWarning, setManualPayoutWarning] = useState(false);
   const [processingWindowDays, setProcessingWindowDays] = useState<number | null>(null);
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
+  const [processingWindows, setProcessingWindows] = useState<Map<string, { days: number | null; label: string | null; artistName: string }>>(new Map());
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
   const [redirectingToStripe, setRedirectingToStripe] = useState(false);
   const [savedAddress, setSavedAddress] = useState<{ street?: string; city?: string; state?: string; zip?: string; country?: string } | null | undefined>(undefined);
@@ -208,20 +209,30 @@ export default function CartCheckout() {
         fetch(`/api/users/${aid}/payment-settings`, { credentials: "include" })
           .then(r => r.ok ? r.json() as Promise<Record<string, unknown>> : null)
           .catch(() => null)
+          .then(ps => ({ aid, ps }))
       )
     ).then(results => {
       let maxDays: number | null = null;
       let firstLabel: string | null = null;
-      for (const ps of results) {
-        if (!ps) continue;
-        const w = typeof ps.processingWindow === "number" ? ps.processingWindow : null;
-        if (w !== null) {
-          maxDays = maxDays === null ? w : Math.max(maxDays, w);
-        }
-        if (!firstLabel && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()) {
-          firstLabel = (ps.processingWindowLabel as string).trim();
+      const perArtist = new Map<string, { days: number | null; label: string | null; artistName: string }>();
+      for (const { aid, ps } of results) {
+        const artist = ALL_ARTISTS.find(a => a.id === aid);
+        const artistName = artist?.name ?? aid;
+        const days = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+        const label = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+          ? (ps.processingWindowLabel as string).trim()
+          : null;
+        if (days !== null || label !== null) {
+          perArtist.set(aid, { days, label, artistName });
+          if (days !== null) {
+            maxDays = maxDays === null ? days : Math.max(maxDays, days);
+          }
+          if (!firstLabel && label) {
+            firstLabel = label;
+          }
         }
       }
+      setProcessingWindows(perArtist);
       setProcessingWindowDays(maxDays);
       setProcessingWindowLabel(firstLabel);
     }).catch(() => {});
@@ -1008,7 +1019,26 @@ export default function CartCheckout() {
                     <span>Total</span><span>${total.toFixed(2)}</span>
                   </div>
                 </div>
-                {(processingWindowLabel !== null || processingWindowDays !== null) && (
+                {processingWindows.size > 1 ? (
+                  <div className="border-t border-white/8 pt-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                      <Clock size={10} className="text-amber-400 shrink-0" />
+                      <span>Processing time</span>
+                    </div>
+                    {Array.from(processingWindows.entries()).map(([aid, { days, label, artistName }]) => (
+                      <div key={aid} className="flex justify-between pl-3 text-xs">
+                        <span className="text-stone-600 truncate max-w-[130px]">{artistName}</span>
+                        <span className="text-amber-300">
+                          {label
+                            ? label
+                            : days === 1
+                              ? "1 business day"
+                              : `${days} business days`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (processingWindowLabel !== null || processingWindowDays !== null) ? (
                   <div className="border-t border-white/8 pt-3 flex items-start gap-2">
                     <Clock size={12} className="text-amber-400 mt-0.5 shrink-0" />
                     <div>
@@ -1022,7 +1052,7 @@ export default function CartCheckout() {
                       </p>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           )}
