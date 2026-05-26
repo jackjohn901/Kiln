@@ -330,9 +330,18 @@ export default function Messages() {
             if (Array.isArray(d?.messages)) {
               setApiMessages([...d.messages].reverse());
             }
-            // Zero out unread count for this thread in the sidebar and update nav badge
+            // Zero out unread count and sync preview (text + attachment thumbnail) from the latest message
+            const newest = d?.messages?.[0];
             setApiThreads(prev =>
-              prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t)
+              prev.map(t => t.id === threadId ? {
+                ...t,
+                unreadCount: 0,
+                ...(newest && {
+                  lastMessageText: newest.text ?? null,
+                  lastMessageAttachmentUrl: newest.attachmentUrl ?? null,
+                  lastMessageAt: newest.createdAt,
+                }),
+              } : t)
             );
             refreshUnreadMessageCount();
           })
