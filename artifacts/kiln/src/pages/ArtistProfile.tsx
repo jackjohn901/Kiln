@@ -35,6 +35,7 @@ interface ArtistShipping {
   internationalRate: number | null;
   freeThreshold: number | null;
   offerLocalPickup: boolean;
+  perItemRate: number | null;
 }
 
 function ShippingBadge({ shipping }: { shipping: ArtistShipping | null }) {
@@ -59,7 +60,10 @@ function ShippingBadge({ shipping }: { shipping: ArtistShipping | null }) {
         )}
         {hasDomestic && (
           <span className="flex items-center gap-1 text-xs text-stone-400">
-            <Truck size={12} />US ${shipping.domesticRate}
+            <Truck size={12} />US from ${shipping.domesticRate}
+            {shipping.perItemRate != null && shipping.perItemRate > 0 && (
+              <> + ${shipping.perItemRate} per additional item</>
+            )}
           </span>
         )}
         {hasInternational && (
