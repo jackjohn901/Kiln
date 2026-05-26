@@ -15,6 +15,23 @@ import { awardBadge } from "./badges";
 
 const router = Router();
 
+const MAX_PROFILES_PER_EMAIL = 10;
+const MAX_PROFILES_PER_NAME = 10;
+
+async function countProfilesByEmail(email: string): Promise<number> {
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+    .from(profilesTable)
+    .where(eq(profilesTable.contactEmail, email));
+  return count;
+}
+
+async function countProfilesByName(name: string): Promise<number> {
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+    .from(profilesTable)
+    .where(eq(profilesTable.displayName, name));
+  return count;
+}
+
 /**
  * When a new profile is created, automatically follow the platform creator.
  * Controlled by the CREATOR_USER_ID env var — no-ops if unset.
@@ -248,9 +265,26 @@ router.get("/me/profile", async (req, res): Promise<void> => {
     const [profile] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!profile) {
       const user = req.user;
+      const derivedName = [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+
+      if (user.email) {
+        const emailCount = await countProfilesByEmail(user.email);
+        if (emailCount >= MAX_PROFILES_PER_EMAIL) {
+          res.status(429).json({ error: "This email is already associated with the maximum number of profiles." });
+          return;
+        }
+      }
+      if (derivedName) {
+        const nameCount = await countProfilesByName(derivedName);
+        if (nameCount >= MAX_PROFILES_PER_NAME) {
+          res.status(429).json({ error: "This display name is already associated with the maximum number of profiles." });
+          return;
+        }
+      }
+
       const [created] = await db.insert(profilesTable).values({
         userId,
-        displayName: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
+        displayName: derivedName,
         avatarUrl: user.profileImageUrl ?? null,
         contactEmail: user.email ?? null,
       }).returning();
@@ -273,10 +307,27 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
   try {
     const [existing] = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId));
     if (!existing) {
+      if (displayName) {
+        const nameCount = await countProfilesByName(displayName);
+        if (nameCount >= MAX_PROFILES_PER_NAME) {
+          res.status(429).json({ error: "This display name is already associated with the maximum number of profiles." });
+          return;
+        }
+      }
       const [created] = await db.insert(profilesTable).values({ userId, handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, accountType: accountType ?? "artist", whyICreate, inspirations, artistStatement, collectorStory }).returning();
       void autoFollowCreator(userId);
       res.json({ ...created, isFollowing: false, createdAt: created.createdAt.toISOString() }); return;
     }
+
+    // Prevent updating displayName to one that's already at the max count (unless it's their own current name)
+    if (displayName && displayName !== existing.displayName) {
+      const nameCount = await countProfilesByName(displayName);
+      if (nameCount >= MAX_PROFILES_PER_NAME) {
+        res.status(429).json({ error: "This display name is already associated with the maximum number of profiles." });
+        return;
+      }
+    }
+
     const [updated] = await db.update(profilesTable)
       .set({ handle, displayName, bio, medium, location, website, avatarUrl, bannerUrl, kilnStatus, ...(accountType ? { accountType } : {}), whyICreate: whyICreate ?? null, inspirations: inspirations ?? null, artistStatement: artistStatement ?? null, collectorStory: collectorStory ?? null })
       .where(eq(profilesTable.userId, userId))
