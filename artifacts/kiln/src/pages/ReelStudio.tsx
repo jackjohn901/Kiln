@@ -518,9 +518,14 @@ export default function ReelStudio() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
 
-  const [step, setStep]                     = useState<Step>("source");
+  // Restore an image passed from the lightbox "AI Studio" button via sessionStorage
+  const storedSource = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("kiln_reel_source") : null;
+  const initialSource = storedSource ?? "";
+  if (storedSource && typeof sessionStorage !== "undefined") sessionStorage.removeItem("kiln_reel_source");
+
+  const [step, setStep]                     = useState<Step>(initialSource ? "style" : "source");
   const [sourceType, setSourceType]         = useState<SourceType>("image");
-  const [sourceUrl, setSourceUrl]           = useState("");
+  const [sourceUrl, setSourceUrl]           = useState(initialSource);
   const [videoSourceUrl, setVideoSourceUrl] = useState("");
   const [pasteUrl, setPasteUrl]             = useState("");
   const [selectedPost, setSelectedPost]     = useState<FeedPost | null>(null);
@@ -554,11 +559,21 @@ export default function ReelStudio() {
   // ── Derived active color filter ──────────────────────────────────────────────
   const activeFilter = gradeOverride ? gradeFilter(gradeOverride) : (plan?.colorFilter ?? "none");
 
-  // ── Load recent posts ────────────────────────────────────────────────────────
+  // ── Load recent posts (own posts only, so Mux/idb videos are selectable) ──
   useEffect(() => {
-    fetch("/api/feed?limit=18")
-      .then(r => r.json())
-      .then(d => setFeedPosts(d.posts ?? []))
+    fetch("/api/me/posts", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { posts?: Array<{ id: string; thumbnailUrl: string | null; videoUrl: string | null; muxPlaybackId?: string | null; caption: string; technique: string | null; authorName: string }> } | null) => {
+        const posts = (d?.posts ?? []).map((p) => ({
+          id: p.id,
+          thumbnailUrl: p.thumbnailUrl,
+          videoUrl: p.videoUrl || (p.muxPlaybackId ? `https://stream.mux.com/${p.muxPlaybackId}.m3u8` : null),
+          caption: p.caption,
+          technique: p.technique,
+          authorName: p.authorName,
+        }));
+        setFeedPosts(posts);
+      })
       .catch(() => {});
   }, []);
 
@@ -942,46 +957,54 @@ export default function ReelStudio() {
 
         <div className="max-w-2xl mx-auto px-4 pt-6 space-y-6">
           <div>
-            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Recent Posts</h2>
-            <div className="grid grid-cols-3 gap-2">
-              {feedPosts.map(p => {
-                const isVideo = !!p.videoUrl;
-                const displaySrc = p.thumbnailUrl ?? undefined;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => selectPost(p)}
-                    className={`relative aspect-[9/16] rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedPost?.id === p.id ? "border-amber-400 scale-[0.97]" : "border-transparent hover:border-white/30"
-                    }`}
-                  >
-                    {displaySrc ? (
-                      <img src={displaySrc} alt="" className="w-full h-full object-cover" />
-                    ) : isVideo ? (
-                      <div className="w-full h-full bg-stone-900 flex items-center justify-center">
-                        <Film size={24} className="text-white/30" />
+            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Your Posts</h2>
+            {feedPosts.length === 0 ? (
+              <div className="text-center py-8 text-stone-500 text-sm">
+                <Film size={24} className="mx-auto mb-2 text-stone-700" />
+                <p>No posts yet.</p>
+                <Link href="/create" className="text-amber-400 hover:text-amber-300 text-xs mt-1 inline-block">Create your first post →</Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-[50vh]" style={{ scrollbarWidth: "none" }}>
+                {feedPosts.map(p => {
+                  const isVideo = !!p.videoUrl;
+                  const displaySrc = p.thumbnailUrl ?? undefined;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => selectPost(p)}
+                      className={`relative aspect-[9/16] rounded-lg overflow-hidden border-2 transition-all ${
+                        selectedPost?.id === p.id ? "border-amber-400 scale-[0.97]" : "border-transparent hover:border-white/30"
+                      }`}
+                    >
+                      {displaySrc ? (
+                        <img src={displaySrc} alt="" className="w-full h-full object-cover" />
+                      ) : isVideo ? (
+                        <div className="w-full h-full bg-stone-900 flex items-center justify-center">
+                          <Film size={24} className="text-white/30" />
+                        </div>
+                      ) : (
+                        <div className="w-full h-full bg-stone-900" />
+                      )}
+                      {isVideo && (
+                        <div className="absolute top-1.5 left-1.5 bg-black/70 rounded-md px-1.5 py-0.5 flex items-center gap-1">
+                          <Video size={9} className="text-amber-400" />
+                          <span className="text-[9px] text-amber-400 font-semibold">VIDEO</span>
+                        </div>
+                      )}
+                      {selectedPost?.id === p.id && (
+                        <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
+                          <div className="bg-amber-400 rounded-full p-1"><Check size={14} className="text-black" /></div>
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-1.5">
+                        <p className="text-[10px] text-white/80 truncate">{p.caption || "Untitled"}</p>
                       </div>
-                    ) : (
-                      <div className="w-full h-full bg-stone-900" />
-                    )}
-                    {isVideo && (
-                      <div className="absolute top-1.5 left-1.5 bg-black/70 rounded-md px-1.5 py-0.5 flex items-center gap-1">
-                        <Video size={9} className="text-amber-400" />
-                        <span className="text-[9px] text-amber-400 font-semibold">VIDEO</span>
-                      </div>
-                    )}
-                    {selectedPost?.id === p.id && (
-                      <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
-                        <div className="bg-amber-400 rounded-full p-1"><Check size={14} className="text-black" /></div>
-                      </div>
-                    )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-1.5">
-                      <p className="text-[10px] text-white/80 truncate">{p.authorName}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -1014,7 +1037,7 @@ export default function ReelStudio() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">{sourceType === "video" ? "Video source selected" : "Image source selected"}</p>
-                <p className="text-xs text-white/40 truncate">{sourceType === "video" ? (videoSourceUrl || "from feed") : sourceUrl}</p>
+                <p className="text-xs text-white/40 truncate">{sourceType === "video" ? (videoSourceUrl || "your video") : sourceUrl}</p>
               </div>
               <Check size={18} className="text-amber-400 shrink-0" />
             </div>

@@ -7,7 +7,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2, Truck,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2, Truck, Sparkles,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -177,11 +177,11 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
+      className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4 overflow-y-auto"
       onClick={onClose}
     >
-      <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute -top-10 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">
+      <div className="relative max-w-3xl w-full mx-auto py-10" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="sticky top-0 z-10 ml-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">
           <X size={15} />
         </button>
         {item.isVideo && item.videoId ? (
@@ -209,12 +209,24 @@ function Lightbox({ item, onClose }: { item: GridItem; onClose: () => void }) {
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl bg-stone-900">
-            <img src={item.imageUrl} alt={item.caption} className="max-h-[75vh] w-full object-contain" />
+            <img src={item.imageUrl} alt={item.caption} className="w-full object-contain" />
           </div>
         )}
-        <div className="mt-4 flex items-center justify-between px-1">
+        <div className="mt-4 flex items-center justify-between px-1 gap-3">
           <p className="text-sm text-stone-300 line-clamp-2 flex-1">{item.caption}</p>
-          <div className="flex items-center gap-3 ml-4 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
+            {!item.isVideo && (
+              <button
+                onClick={() => {
+                  sessionStorage.setItem("kiln_reel_source", item.imageUrl);
+                  window.location.href = "/reel-studio";
+                }}
+                className="flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/30 transition-colors"
+                title="Send to AI Reel Studio"
+              >
+                <Sparkles size={12} /> AI Studio
+              </button>
+            )}
             <button onClick={toggleLike} title={liked ? "Unlike" : "Like"}
               className={`transition-colors ${liked ? "text-red-400" : "text-stone-400 hover:text-red-400"}`}>
               <Heart size={18} fill={liked ? "currentColor" : "none"} />
