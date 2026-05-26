@@ -79,12 +79,15 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { threadId, orderRef } = useLocalSearchParams<{ threadId: string; orderRef?: string }>();
   const { user } = useAuth();
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [contextRef, setContextRef] = useState<string | undefined>(
+    orderRef ? String(orderRef) : undefined
+  );
   const flatRef = useRef<FlatList>(null);
   const typingDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
@@ -144,19 +147,22 @@ export default function ChatScreen() {
 
   const handleSend = useCallback(async () => {
     if (!draft.trim() || !thread?.otherUserId || sending) return;
-    const text = draft.trim();
+    const rawText = draft.trim();
+    const text = contextRef ? `Re: ${contextRef}\n\n${rawText}` : rawText;
     setDraft("");
+    setContextRef(undefined);
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await apiPost("/api/messages/send", { recipientId: thread.otherUserId, text });
       await refetch();
     } catch {
-      setDraft(text);
+      setDraft(rawText);
+      setContextRef(contextRef);
     } finally {
       setSending(false);
     }
-  }, [draft, thread, sending, refetch]);
+  }, [draft, thread, sending, refetch, contextRef]);
 
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 84 : 0);
 
@@ -247,37 +253,64 @@ export default function ChatScreen() {
 
       <View
         style={[
-          styles.composer,
+          styles.composerArea,
           { borderTopColor: colors.border, paddingBottom: bottomPad, backgroundColor: colors.background },
         ]}
       >
-        <TextInput
-          style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border, fontFamily: "Inter_400Regular" }]}
-          placeholder="Message…"
-          placeholderTextColor={colors.mutedForeground}
-          value={draft}
-          onChangeText={handleDraftChange}
-          multiline
-          returnKeyType="send"
-          onSubmitEditing={handleSend}
-          blurOnSubmit={false}
-        />
-        <Pressable
-          style={[
-            styles.sendBtn,
-            {
-              backgroundColor: draft.trim() ? colors.primary : colors.secondary,
-            },
-          ]}
-          onPress={handleSend}
-          disabled={!draft.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
-          ) : (
-            <Feather name="send" size={18} color={draft.trim() ? colors.primaryForeground : colors.mutedForeground} />
-          )}
-        </Pressable>
+        {contextRef ? (
+          <View
+            style={[
+              styles.contextChip,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="tag" size={13} color={colors.primary} />
+            <Text
+              style={[styles.contextChipText, { color: colors.foreground }]}
+              numberOfLines={1}
+            >
+              Re: {contextRef}
+            </Text>
+            <Pressable
+              onPress={() => setContextRef(undefined)}
+              hitSlop={8}
+              style={styles.contextChipDismiss}
+            >
+              <Feather name="x" size={13} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.composer}>
+          <TextInput
+            style={[styles.input, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border, fontFamily: "Inter_400Regular" }]}
+            placeholder="Message…"
+            placeholderTextColor={colors.mutedForeground}
+            value={draft}
+            onChangeText={handleDraftChange}
+            multiline
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            blurOnSubmit={false}
+            autoFocus={!!orderRef}
+          />
+          <Pressable
+            style={[
+              styles.sendBtn,
+              {
+                backgroundColor: draft.trim() ? colors.primary : colors.secondary,
+              },
+            ]}
+            onPress={handleSend}
+            disabled={!draft.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : (
+              <Feather name="send" size={18} color={draft.trim() ? colors.primaryForeground : colors.mutedForeground} />
+            )}
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -311,13 +344,36 @@ const styles = StyleSheet.create({
   bubbleThem: { borderWidth: 1, borderBottomLeftRadius: 4 },
   bubbleText: { fontFamily: "Inter_400Regular", fontSize: 15, lineHeight: 21 },
   msgTime: { fontFamily: "Inter_400Regular", fontSize: 11, paddingHorizontal: 4 },
+  composerArea: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 10,
+    paddingHorizontal: 16,
+  },
+  contextChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+    maxWidth: "90%",
+  },
+  contextChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    flex: 1,
+  },
+  contextChipDismiss: {
+    marginLeft: 2,
+  },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingBottom: 0,
   },
   input: {
     flex: 1,
