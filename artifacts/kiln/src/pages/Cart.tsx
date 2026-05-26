@@ -37,13 +37,22 @@ export default function Cart() {
   const [bundleApplied, setBundleApplied] = useState(false);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
 
+  // Stable key: only changes when the SET of artists changes, not on qty updates.
+  // Shipping rate info (domestic rate, free threshold, etc.) is per-artist and
+  // doesn't vary with quantity, so we don't need to refetch on every qty bump.
+  const artistIds = [...new Set(items.map(i => i.listing.artistId as string))];
+  const artistIdsKey = [...artistIds].sort().join(",");
+
   useEffect(() => {
-    if (items.length === 0) return;
-    const artistIds = [...new Set(items.map(i => i.listing.artistId as string))];
+    if (artistIds.length === 0) {
+      setShippingRates(new Map());
+      return;
+    }
     Promise.all(artistIds.map(aid => fetchArtistShipping(aid).then(info => ({ aid, info }))))
       .then(results => setShippingRates(new Map(results.map(r => [r.aid, r.info]))))
       .catch(() => {});
-  }, [items]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistIdsKey]);
 
   const bundleDiscount = bundleApplied ? Math.round(subtotal * 0.10) : 0;
 
