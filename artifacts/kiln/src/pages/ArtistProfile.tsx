@@ -587,7 +587,17 @@ export default function ArtistProfile() {
     isVideo: p.type === "video",
     isProcess: p.type === "video",
   }));
-  const allGridItems = [...ownLocalGridItems, ...buildGrid(artist)];
+  // Merge server posts (dbPosts / collabPosts) into the same grid so they appear
+  // alongside localStorage posts and static artist data.
+  const dbGridItems: GridItem[] = allDbPosts.map((p) => ({
+    id: `db-${p.id}`,
+    imageUrl: p.thumbnailUrl ?? ``,
+    mediaUrl: p.videoUrl ?? p.thumbnailUrl ?? ``,
+    caption: p.caption,
+    isVideo: !!p.videoUrl,
+    isProcess: !!p.videoUrl,
+  }));
+  const allGridItems = [...dbGridItems, ...ownLocalGridItems, ...buildGrid(artist)];
   const processItems = allGridItems.filter((g) => g.isVideo);
   const artworkItems = allGridItems.filter((g) => !g.isVideo);
   const listings = getListingsByArtist(artist.id);

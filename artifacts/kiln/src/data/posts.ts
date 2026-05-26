@@ -65,12 +65,15 @@ export function getPosts(): Post[] {
 }
 
 export function addPost(post: Post): void {
-  // Strip large data URIs from mediaUrl before storing to avoid quota blow-up
+  // For images, mediaUrl IS the display image — keep it even if it's a data URI
+  // so the profile grid doesn't render blank. For videos, strip data URIs from
+  // mediaUrl (the video file) since we rely on thumbnailUrl for the grid.
+  const isImage = post.type === "image";
   const storable: Post = {
     ...post,
-    mediaUrl: post.mediaUrl.startsWith("data:") ? "" : post.mediaUrl,
+    mediaUrl: post.mediaUrl.startsWith("data:") && !isImage ? "" : post.mediaUrl,
     thumbnailUrl: post.thumbnailUrl?.startsWith("data:") ? undefined : post.thumbnailUrl,
-    mediaUrls: post.mediaUrls?.map((u) => (u.startsWith("data:") ? "" : u)),
+    mediaUrls: post.mediaUrls?.map((u) => (u.startsWith("data:") && !isImage ? "" : u)),
   };
   const posts = getPosts();
   posts.unshift(storable);
