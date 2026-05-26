@@ -496,18 +496,25 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     if (id !== null) setLastNewMessagePing(prev => (prev?.threadId === id ? null : prev));
   }, []);
 
-  // Refresh unread message count when an incoming message WebSocket event arrives
-  // and set a ping so Nav can show a toast (skipped for the actively viewed thread)
+  // Update unread message count when an incoming message WebSocket event arrives,
+  // and set a ping so Nav can show a toast.
+  // Skip both when the message belongs to the thread the user is currently viewing —
+  // Messages.tsx handles marking it read and refreshing the count for that case.
   useEffect(() => {
     const unsub = wsSubscribe("message", (evt) => {
       const e = evt as { threadId?: string; senderId?: string; senderName?: string; senderAvatarUrl?: string | null };
-      fetchUnreadMessageCount();
-      if (e.threadId && e.senderName && e.threadId !== activeMessageThreadIdRef.current) {
-        setLastNewMessagePing({
-          senderName: e.senderName,
-          senderAvatarUrl: e.senderAvatarUrl ?? null,
-          threadId: e.threadId,
-        });
+      if (e.threadId && e.threadId !== activeMessageThreadIdRef.current) {
+        // Optimistically increment so the badge updates instantly, then reconcile
+        // with the server count (handles rapid multi-message bursts correctly).
+        setApiUnreadMessageCount((prev) => (prev ?? 0) + 1);
+        fetchUnreadMessageCount();
+        if (e.senderName) {
+          setLastNewMessagePing({
+            senderName: e.senderName,
+            senderAvatarUrl: e.senderAvatarUrl ?? null,
+            threadId: e.threadId,
+          });
+        }
       }
     });
     return unsub;
