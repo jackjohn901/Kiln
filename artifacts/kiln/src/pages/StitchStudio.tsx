@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   ChevronLeft, Scissors, Video, Upload, Play, CheckCircle,
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getReelById, ALL_REELS } from "@/data/reels";
+import { useUpload } from "@/hooks/useUpload";
 
 const STITCH_LENGTHS = [
   { value: 3, label: "3 sec" },
@@ -32,13 +33,16 @@ const RECENT_STITCHES = ALL_REELS.slice(0, 6).map((r, i) => ({
 
 export default function StitchStudio() {
   const { reelId } = useParams<{ reelId?: string }>();
+  const [, navigate] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { upload } = useUpload();
 
   const [stitchLength, setStitchLength] = useState(5);
   const [caption, setCaption] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [step, setStep] = useState<"configure" | "record" | "done">("configure");
+  const [publishing, setPublishing] = useState(false);
 
   const sourceReel = reelId ? getReelById(reelId) : null;
 
@@ -50,21 +54,43 @@ export default function StitchStudio() {
   }
 
   async function handlePublish() {
+    if (!videoFile) return;
+    setPublishing(true);
     try {
-      await fetch("/api/posts", {
+      // 1. Upload video to Object Storage
+      let videoUrl: string | null = null;
+      try {
+        const result = await upload(videoFile);
+        videoUrl = result.servingUrl;
+      } catch (err) {
+        console.error("Video upload failed", err);
+      }
+
+      // 2. Create post with uploaded URL
+      const postRes = await fetch("/api/posts", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           caption,
-          mediaType: videoFile ? "video" : "image",
+          videoUrl,
           tags: ["stitch"],
-          stitchLength,
-          stitchOfId: sourceReel?.id ?? null,
         }),
       });
-    } catch { /* show done regardless */ }
+
+      if (!postRes.ok) {
+        setStep("done");
+        return;
+      }
+
+      const createdPost = await postRes.json().catch(() => null);
+      if (createdPost?.id) {
+        navigate(`/posts/db-${createdPost.id}`);
+        return;
+      }
+    } catch { /* fall through */ }
     setStep("done");
+    setPublishing(false);
   }
 
   return (
@@ -211,10 +237,17 @@ export default function StitchStudio() {
 
             <button
               onClick={handlePublish}
-              disabled={!previewUrl || !caption.trim()}
-              className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+              disabled={!previewUrl || !caption.trim() || publishing}
+              className="w-full rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
             >
-              Publish Stitch
+              {publishing ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-stone-950 border-t-transparent" />
+                  Publishing…
+                </>
+              ) : (
+                "Publish Stitch"
+              )}
             </button>
           </div>
         )}

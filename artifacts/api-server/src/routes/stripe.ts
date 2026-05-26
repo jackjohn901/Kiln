@@ -178,6 +178,8 @@ interface CartLineItem {
   artistName?: string;
   /** Server uses this to look up the authoritative price from the listings table. */
   listingId?: string;
+  /** Fallback unit price (in dollars) when no DB listing is available — e.g. drops, workshops. */
+  price?: number;
 }
 
 router.post('/stripe/checkout', async (req, res): Promise<void> => {
@@ -197,6 +199,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
     // Resolve authoritative prices server-side.
     // For listing items: look up from the DB by listingId.
     // For digital download items: look up from the server-side product registry.
+    // For items with a fallback price (drops, workshops): no DB lookup needed.
     const listingIds = items
       .map((item) => item.listingId)
       .filter((id): id is string => !!id);
@@ -294,8 +297,10 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         }
       } else if (isDigital && digitalPriceCents !== null) {
         // Price will be set from registry below — OK.
+      } else if (typeof item.price === "number" && item.price > 0) {
+        // Fallback price provided (drops, workshops, etc.) — OK.
       } else {
-        res.status(400).json({ error: 'Each checkout item must include a valid listingId.' }); return;
+        res.status(400).json({ error: 'Each checkout item must include a valid listingId or a price.' }); return;
       }
     }
 
@@ -337,7 +342,10 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       if (item.listingId) {
         return Math.round(listingPriceMap.get(item.listingId)!.price * 100) * item.quantity;
       }
-      return (digitalPriceCents ?? 0) * item.quantity;
+      if (isDigital && digitalPriceCents !== null) {
+        return digitalPriceCents * item.quantity;
+      }
+      return Math.round((item.price ?? 0) * 100) * item.quantity;
     });
     const totalAmountCents = lineItemsCents.reduce((sum, c) => sum + c, 0);
 
@@ -429,8 +437,10 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         if (item.listingId) {
           const dbListing = listingPriceMap.get(item.listingId)!;
           unitAmountCents = Math.round(dbListing.price * 100);
+        } else if (isDigital && digitalPriceCents !== null) {
+          unitAmountCents = digitalPriceCents;
         } else {
-          unitAmountCents = digitalPriceCents!;
+          unitAmountCents = Math.round((item.price ?? 0) * 100);
         }
 
         return {
