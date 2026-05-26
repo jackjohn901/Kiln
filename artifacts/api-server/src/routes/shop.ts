@@ -255,28 +255,7 @@ router.get("/me/sales/:id", async (req, res): Promise<void> => {
 
     if (rows.length === 0) { res.status(404).json({ error: "Sale not found" }); return; }
 
-    let sale = rows[0];
-
-    // If both processing window fields are NULL on the stamped order row, fall back to
-    // the seller's current payment settings so sellers see an estimate even when the
-    // order predates the backfill or the stamp was never written.
-    if (sale.processingWindowDays === null && sale.processingWindowLabel === null) {
-      const [settingsRow] = await db
-        .select({ paymentSettings: userSettingsTable.paymentSettings })
-        .from(userSettingsTable)
-        .where(eq(userSettingsTable.userId, req.user.id))
-        .limit(1);
-      if (settingsRow) {
-        const ps = settingsRow.paymentSettings as Record<string, unknown> | null;
-        const liveDays = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
-        const liveLabel = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
-          ? (ps.processingWindowLabel as string).trim()
-          : null;
-        if (liveDays !== null || liveLabel !== null) {
-          sale = { ...sale, processingWindowDays: liveDays, processingWindowLabel: liveLabel };
-        }
-      }
-    }
+    const sale = rows[0];
 
     res.json({
       sale: {
@@ -446,42 +425,12 @@ router.get("/me/sales", async (req, res): Promise<void> => {
     .where(eq(ordersTable.sellerId, req.user.id))
     .orderBy(desc(ordersTable.createdAt));
 
-  // For rows where both processing window fields are NULL, fall back to the
-  // seller's current payment settings — same logic as the detail endpoint.
-  const needsFallback = rows.some(r => r.processingWindowDays === null && r.processingWindowLabel === null);
-  let liveDays: number | null = null;
-  let liveLabel: string | null = null;
-  if (needsFallback) {
-    const [settingsRow] = await db
-      .select({ paymentSettings: userSettingsTable.paymentSettings })
-      .from(userSettingsTable)
-      .where(eq(userSettingsTable.userId, req.user.id))
-      .limit(1);
-    if (settingsRow) {
-      const ps = settingsRow.paymentSettings as Record<string, unknown> | null;
-      liveDays = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
-      liveLabel = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
-        ? (ps.processingWindowLabel as string).trim()
-        : null;
-    }
-  }
-
   res.json({
-    orders: rows.map(o => {
-      let processingWindowDays = o.processingWindowDays;
-      let processingWindowLabel = o.processingWindowLabel;
-      if (processingWindowDays === null && processingWindowLabel === null && (liveDays !== null || liveLabel !== null)) {
-        processingWindowDays = liveDays;
-        processingWindowLabel = liveLabel;
-      }
-      return {
-        ...o,
-        processingWindowDays,
-        processingWindowLabel,
-        createdAt: o.createdAt.toISOString(),
-        updatedAt: o.updatedAt.toISOString(),
-      };
-    }),
+    orders: rows.map(o => ({
+      ...o,
+      createdAt: o.createdAt.toISOString(),
+      updatedAt: o.updatedAt.toISOString(),
+    })),
   });
 });
 
