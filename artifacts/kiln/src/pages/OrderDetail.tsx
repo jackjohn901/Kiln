@@ -178,6 +178,7 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [editingAddress, setEditingAddress] = useState(false);
   const [addressDraft, setAddressDraft] = useState("");
   const [addressSaving, setAddressSaving] = useState(false);
@@ -441,140 +442,30 @@ export default function OrderDetail() {
     openReceiptWindow(html, `Receipt_${refNum}`, false);
   }
 
-  function handleDownloadPDF() {
+  async function handleDownloadPDF() {
     if (!order) return;
-
-    function esc(text: string | null | undefined): string {
-      if (text == null) return "";
-      return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    setPdfLoading(true);
+    try {
+      const url = sessionKey
+        ? `/api/me/orders/cart/${encodeURIComponent(sessionKey)}/receipt.pdf`
+        : `/api/me/orders/${encodeURIComponent(order.id)}/receipt.pdf`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("PDF generation failed");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      const refNum = isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id);
+      a.download = `Kiln_Receipt_${refNum}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(href);
+    } catch {
+      // silently ignore — the print fallback still works via handlePrint
+    } finally {
+      setPdfLoading(false);
     }
-
-    const items = isCartOrder ? siblingOrders : [order];
-    const total = isCartOrder ? cartTotal : order.amount;
-
-    const lineItems = items.map(item => {
-      const qty = (item as Order).quantity ?? 1;
-      const unitPrice = qty > 1 ? item.amount / qty : item.amount;
-      const qtyNote = qty > 1 ? `<br><span style="font-size:11px;color:#8a7e74;">Qty: ${qty} &times; ${formatPrice(unitPrice)}</span>` : "";
-      return `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.title)}${item.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(item.description)}</span>` : ""}${qtyNote}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(item.amount)}</td>
-      </tr>
-    `;
-    }).join("");
-
-    const buyerName = buyerProfile?.displayName ?? null;
-    const addressText = order.shippingAddress ?? buyerProfile?.location ?? null;
-
-    const buyerRow = (buyerName || addressText) ? `
-      <div style="margin-top:24px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Billed to</p>
-        ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
-        ${addressText ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(addressText)}</p>` : ""}
-      </div>
-    ` : "";
-
-    const trackingRow = order.trackingNumber ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Tracking</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;font-family:monospace;">${esc(order.trackingNumber)}</p>
-      </div>
-    ` : "";
-
-    const notesRow = order.notes && !order.notes.startsWith("stripe:") ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Notes</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(order.notes)}</p>
-      </div>
-    ` : "";
-
-    const processingWindowRow = hasDeliveryEstimate ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Processing time</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(shipsWithinText)}</p>
-      </div>
-    ` : "";
-
-    const statusLabel = esc(STATUS_CONFIG[order.status]?.label ?? order.status);
-    const typeLabel = esc(TYPE_CONFIG[order.type]?.label ?? order.type);
-    const refNum = esc(isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id));
-    const receiptTitle = isCartOrder ? "Cart Receipt" : "Order Receipt";
-    const dateStr = esc(formatDate(order.createdAt));
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kiln_Receipt_${refNum}.pdf</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fff; color: #2c2621; padding: 48px; max-width: 600px; margin: 0 auto; }
-    @media print { body { padding: 24px; } .no-print { display: none !important; } }
-  </style>
-</head>
-<body>
-  <div class="no-print" style="background:#1e3a5f;color:#fff;padding:12px 20px;font-size:13px;text-align:center;margin:-48px -48px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-    In the print dialog, set <strong>Destination → Save as PDF</strong>, then click <strong>Save</strong>.
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
-    <div>
-      <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
-    </div>
-    <div style="text-align:right;">
-      <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">${receiptTitle}</p>
-    </div>
-  </div>
-
-  <div style="display:flex;justify-content:space-between;margin-bottom:28px;gap:24px;">
-    <div>
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Date</p>
-      <p style="font-size:13px;">${dateStr}</p>
-    </div>
-    <div>
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Status</p>
-      <p style="font-size:13px;">${statusLabel}</p>
-    </div>
-    <div style="text-align:right;">
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Order type</p>
-      <p style="font-size:13px;">${typeLabel}</p>
-    </div>
-  </div>
-
-  <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
-    <thead>
-      <tr>
-        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
-        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
-      </tr>
-    </thead>
-    <tbody>${lineItems}</tbody>
-  </table>
-
-  <div style="display:flex;justify-content:flex-end;padding-top:12px;border-top:2px solid #2c2621;margin-top:4px;">
-    <div style="text-align:right;">
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Total</p>
-      <p style="font-size:20px;font-weight:700;">${formatPrice(total)}</p>
-    </div>
-  </div>
-
-  ${buyerRow}${processingWindowRow}${trackingRow}${notesRow}
-
-  <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
-    <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages</p>
-  </div>
-</body>
-</html>`;
-
-    openReceiptWindow(html, `Kiln_Receipt_${refNum}.pdf`, true);
   }
 
   function openReceiptWindow(html: string, title: string, autoPrint: boolean) {
@@ -968,11 +859,12 @@ export default function OrderDetail() {
               Print receipt
             </button>
             <button
-              onClick={handleDownloadPDF}
-              className="flex-1 flex items-center justify-center gap-2 rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
+              onClick={() => { void handleDownloadPDF(); }}
+              disabled={pdfLoading}
+              className="flex-1 flex items-center justify-center gap-2 rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 hover:text-amber-200 transition-colors disabled:opacity-60"
             >
-              <Download size={15} />
-              Download PDF
+              {pdfLoading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              {pdfLoading ? "Generating…" : "Download PDF"}
             </button>
           </div>
           <div className="flex gap-3">
