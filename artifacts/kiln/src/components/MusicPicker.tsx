@@ -111,13 +111,13 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
           Browse the Sound Market for beats from other creators, or make your own in Music Studio.
         </p>
         <div className="flex gap-2 mt-1">
-          <button
+          <button type="button"
             onClick={() => setLocation("/sound-market")}
             className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
           >
             <ShoppingBag size={11} /> Sound Market
           </button>
-          <button
+          <button type="button"
             onClick={() => setLocation("/music-studio")}
             className="flex items-center gap-1.5 rounded-full border border-stone-700 px-4 py-2 text-xs font-semibold text-stone-400 hover:border-amber-500/30 hover:text-amber-300 transition-colors"
           >
@@ -134,14 +134,14 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
       <div className="flex items-center justify-between">
         <p className="text-xs text-stone-600">{beats.length} beat{beats.length !== 1 ? "s" : ""} from Kiln creators</p>
         <div className="flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={() => setLocation("/sound-market")}
             className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-300 transition-colors"
           >
             <ShoppingBag size={9} /> Sound Market
           </button>
           <span className="text-stone-700">·</span>
-          <button
+          <button type="button"
             onClick={() => setLocation("/music-studio")}
             className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 transition-colors"
           >
@@ -165,7 +165,7 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
               className={`rounded-xl border p-3 transition-colors ${isSelected ? "border-amber-500/30 bg-amber-500/10" : "border-stone-700/60 bg-stone-900/60 hover:border-stone-600"}`}
             >
               <div className="flex items-start gap-3">
-                <button
+                <button type="button"
                   onClick={() => togglePreview(beat)}
                   className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
                     isPreviewing ? "border-amber-400 bg-amber-400/20 text-amber-400" : "border-stone-700 bg-stone-800 text-stone-400 hover:border-amber-500/50 hover:text-amber-300"
@@ -196,7 +196,7 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
                 </div>
 
                 {canUse ? (
-                  <button
+                  <button type="button"
                     onClick={() => selectBeat(beat)}
                     className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
                       isSelected ? "border-amber-400 bg-amber-400 text-stone-950" : "border-stone-600 text-stone-500 hover:border-amber-500/60 hover:text-amber-400"
@@ -205,7 +205,7 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
                     <Check size={12} />
                   </button>
                 ) : (
-                  <button
+                  <button type="button"
                     onClick={() => setLocation(`/sound-market`)}
                     title={`License this beat for ${beat.license === "community" ? "$1" : "$5"} in Sound Market`}
                     className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
@@ -220,7 +220,7 @@ function CommunityTab({ selectedTrackId, onSelect }: CommunityTabProps) {
       </div>
 
       <p className="text-center text-[10px] text-stone-700">
-        Beats are synthesized live · <button className="text-amber-600 hover:text-amber-400 transition-colors" onClick={() => setLocation("/sound-market")}>Browse Sound Market</button>
+        Beats are synthesized live · <button type="button" className="text-amber-600 hover:text-amber-400 transition-colors" onClick={() => setLocation("/sound-market")}>Browse Sound Market</button>
       </p>
     </div>
   );
@@ -304,7 +304,7 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
             <p className="text-sm font-medium text-stone-300">Drop your audio file here</p>
             <p className="mt-1 text-xs text-stone-600">MP3, WAV, M4A, AAC, FLAC</p>
           </div>
-          <button className="rounded-full bg-stone-800 px-4 py-1.5 text-xs font-medium text-stone-300 hover:bg-stone-700 transition-colors">
+          <button type="button" className="rounded-full bg-stone-800 px-4 py-1.5 text-xs font-medium text-stone-300 hover:bg-stone-700 transition-colors">
             <Upload size={11} className="mr-1.5 inline" /> Choose file
           </button>
           <input ref={fileRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
@@ -316,7 +316,7 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
       {customTrack && (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-xl border border-stone-700 bg-stone-900 px-4 py-3">
-            <button onClick={togglePlay} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600 bg-stone-800 text-stone-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors">
+            <button type="button" onClick={togglePlay} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-stone-600 bg-stone-800 text-stone-300 hover:border-amber-500/50 hover:text-amber-300 transition-colors">
               {playing ? <Waveform playing={true} /> : <Play size={15} />}
             </button>
             <div className="flex-1 min-w-0">
@@ -326,10 +326,10 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
                 <div className="h-full rounded-full bg-amber-400 transition-all duration-200" style={{ width: `${progress}%` }} />
               </div>
             </div>
-            <button onClick={removeTrack} className="text-stone-600 hover:text-red-400 transition-colors"><X size={15} /></button>
+            <button type="button" onClick={removeTrack} className="text-stone-600 hover:text-red-400 transition-colors"><X size={15} /></button>
           </div>
           <div className="flex gap-2">
-            <button
+            <button type="button"
               onClick={() => { stopAudio(); onSelect(customTrack); }}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold transition-colors ${
                 isCustomSelected ? "bg-amber-500/20 border border-amber-500/40 text-amber-300" : "bg-amber-500 text-stone-950 hover:bg-amber-400"
@@ -337,7 +337,7 @@ function UploadTab({ selectedTrackId, onSelect }: UploadTabProps) {
             >
               {isCustomSelected ? <><Check size={14} /> Using this track</> : "Use this track"}
             </button>
-            <button onClick={() => fileRef.current?.click()} className="rounded-full border border-stone-700 px-4 py-2.5 text-xs text-stone-400 hover:border-amber-500/30 transition-colors">
+            <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-stone-700 px-4 py-2.5 text-xs text-stone-400 hover:border-amber-500/30 transition-colors">
               Change
             </button>
           </div>
@@ -409,19 +409,19 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
             <p className="text-sm font-medium text-amber-200 truncate">{displayTrack.title}</p>
             <p className="text-xs text-stone-400 truncate">{displayTrack.artist}</p>
           </div>
-          <button onClick={() => onSelect(null)} className="text-xs text-stone-500 hover:text-red-400 transition-colors">Remove</button>
+          <button type="button" onClick={() => onSelect(null)} className="text-xs text-stone-500 hover:text-red-400 transition-colors">Remove</button>
         </div>
       )}
 
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl bg-stone-900 p-1">
-        <button
+        <button type="button"
           onClick={() => setTab("library")}
           className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${tab === "library" ? "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"}`}
         >
           Library
         </button>
-        <button
+        <button type="button"
           onClick={() => setTab("community")}
           className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${
             tab === "community" ? isBeatSelected ? "bg-amber-500/20 text-amber-300" : "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"
@@ -430,7 +430,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
           Community
           {isBeatSelected && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
         </button>
-        <button
+        <button type="button"
           onClick={() => setTab("upload")}
           className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors ${
             tab === "upload" ? isCustomSelected ? "bg-amber-500/20 text-amber-300" : "bg-stone-700 text-stone-100" : "text-stone-500 hover:text-stone-300"
@@ -459,14 +459,14 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
           <div>
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-600">Craft Mood</p>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-              <button
+              <button type="button"
                 onClick={() => setCraftMood("All")}
                 className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${craftMood === "All" ? "bg-stone-600 text-stone-100" : "bg-stone-800 text-stone-500 hover:text-stone-300"}`}
               >
                 All
               </button>
               {CRAFT_MOODS.map((m) => (
-                <button
+                <button type="button"
                   key={m.id}
                   onClick={() => { setCraftMood(craftMood === m.id ? "All" : m.id); setGenre("All"); }}
                   className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
@@ -484,7 +484,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-600">Genre</p>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5">
               {GENRES.map((g) => (
-                <button
+                <button type="button"
                   key={g}
                   onClick={() => { setGenre(g); if (g !== "All") setCraftMood("All"); }}
                   className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
@@ -518,7 +518,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
                     const isPreviewing = previewId === track.id;
                     const moodEmoji = CRAFT_MOODS.find(m => m.id === track.craftMood)?.emoji ?? "🎵";
                     return (
-                      <button
+                      <button type="button"
                         key={track.id}
                         onClick={() => onSelect(isSelected ? null : track)}
                         className={`shrink-0 flex flex-col gap-1.5 rounded-xl border p-3 w-28 text-left transition-all ${
@@ -533,7 +533,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
                         <p className={`text-[11px] font-semibold leading-tight line-clamp-2 ${isSelected ? "text-amber-200" : "text-stone-200"}`}>{track.title}</p>
                         <div className="flex items-center justify-between mt-auto">
                           <span className="text-[9px] text-stone-600">{track.bpm} BPM</span>
-                          <button
+                          <button type="button"
                             onClick={(e) => { e.stopPropagation(); togglePreview(track); }}
                             className="text-stone-500 hover:text-amber-400 transition-colors"
                           >
@@ -564,7 +564,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
                   key={track.id}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${isSelected ? "bg-amber-500/15 border border-amber-500/30" : "border border-transparent hover:bg-stone-800/60"}`}
                 >
-                  <button
+                  <button type="button"
                     onClick={() => togglePreview(track)}
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
                       isPreviewing ? "border-amber-400 bg-amber-400/20 text-amber-400" : "border-stone-700 bg-stone-800 text-stone-400 hover:border-amber-500/50 hover:text-amber-300"
@@ -590,7 +590,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
 
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs tabular-nums text-stone-600">{formatDuration(track.duration)}</span>
-                    <button
+                    <button type="button"
                       onClick={() => onSelect(isSelected ? null : track)}
                       className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
                         isSelected ? "border-amber-400 bg-amber-400 text-stone-950" : "border-stone-600 text-stone-500 hover:border-amber-500/60 hover:text-amber-400"
