@@ -237,6 +237,7 @@ router.get("/me/sales/:id", async (req, res): Promise<void> => {
         status: ordersTable.status,
         shippingAddress: ordersTable.shippingAddress,
         trackingNumber: ordersTable.trackingNumber,
+        carrier: ordersTable.carrier,
         notes: ordersTable.notes,
         processingWindowDays: ordersTable.processingWindowDays,
         processingWindowLabel: ordersTable.processingWindowLabel,
@@ -302,7 +303,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
 
     if (!existing) { res.status(404).json({ error: "Sale not found" }); return; }
 
-    const { status, trackingNumber } = req.body as { status?: string; trackingNumber?: string };
+    const { status, trackingNumber, carrier } = req.body as { status?: string; trackingNumber?: string; carrier?: string };
 
     const ALLOWED_STATUSES = ["in_progress", "shipped", "delivered", "cancelled"];
     if (status !== undefined && !ALLOWED_STATUSES.includes(status)) {
@@ -310,9 +311,16 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       return;
     }
 
+    const ALLOWED_CARRIERS = ["usps", "ups", "fedex", "dhl", ""];
+    if (carrier !== undefined && !ALLOWED_CARRIERS.includes(carrier.toLowerCase().trim())) {
+      res.status(400).json({ error: `carrier must be one of: usps, ups, fedex, dhl` });
+      return;
+    }
+
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (status !== undefined) updates.status = status;
     if (trackingNumber !== undefined) updates.trackingNumber = trackingNumber.trim() || null;
+    if (carrier !== undefined) updates.carrier = carrier.toLowerCase().trim() || null;
 
     const [updated] = await db
       .update(ordersTable)
@@ -349,7 +357,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
               {
                 to: buyer.email,
                 subject: `Your order has shipped: ${updated.title}`,
-                html: shippingNotificationEmail(updated.title ?? "Your order", updated.id, updated.trackingNumber),
+                html: shippingNotificationEmail(updated.title ?? "Your order", updated.id, updated.trackingNumber, updated.carrier),
               },
               { contextId: updated.id, label: "shipping notification" },
             );

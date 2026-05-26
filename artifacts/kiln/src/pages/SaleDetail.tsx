@@ -19,6 +19,7 @@ interface Sale {
   status: string;
   shippingAddress: string | null;
   trackingNumber: string | null;
+  carrier: string | null;
   notes: string | null;
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
@@ -29,6 +30,14 @@ interface Sale {
   buyerHandle: string | null;
   buyerAvatarUrl: string | null;
 }
+
+const CARRIERS = [
+  { value: "", label: "Unknown carrier" },
+  { value: "usps",  label: "USPS" },
+  { value: "ups",   label: "UPS" },
+  { value: "fedex", label: "FedEx" },
+  { value: "dhl",   label: "DHL" },
+];
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   drop:       { icon: Zap,           label: "Drop",       color: "text-amber-400 bg-amber-500/10" },
@@ -67,7 +76,7 @@ function ordinalId(id: string) {
   return "KLN-" + id.slice(0, 8).toUpperCase();
 }
 
-async function patchSale(id: string, body: { status?: string; trackingNumber?: string }) {
+async function patchSale(id: string, body: { status?: string; trackingNumber?: string; carrier?: string }) {
   const res = await fetch(`/api/me/sales/${encodeURIComponent(id)}`, {
     method: "PATCH",
     credentials: "include",
@@ -91,6 +100,7 @@ export default function SaleDetail() {
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [trackingInput, setTrackingInput] = useState("");
+  const [carrierInput, setCarrierInput] = useState("");
   const [showTrackingInput, setShowTrackingInput] = useState(false);
 
   useEffect(() => {
@@ -108,19 +118,21 @@ export default function SaleDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function handleStatusUpdate(newStatus: string, trackingNumber?: string) {
+  async function handleStatusUpdate(newStatus: string, trackingNumber?: string, carrier?: string) {
     if (!sale) return;
     setUpdateError(null);
     setUpdating(true);
     const prevSale = sale;
-    setSale(s => s ? { ...s, status: newStatus, trackingNumber: trackingNumber ?? s.trackingNumber } : s);
+    setSale(s => s ? { ...s, status: newStatus, trackingNumber: trackingNumber ?? s.trackingNumber, carrier: carrier ?? s.carrier } : s);
     try {
-      const body: { status: string; trackingNumber?: string } = { status: newStatus };
+      const body: { status: string; trackingNumber?: string; carrier?: string } = { status: newStatus };
       if (trackingNumber !== undefined) body.trackingNumber = trackingNumber;
+      if (carrier !== undefined) body.carrier = carrier;
       const { sale: updated } = await patchSale(sale.id, body);
       setSale(updated);
       setShowTrackingInput(false);
       setTrackingInput("");
+      setCarrierInput("");
     } catch (err) {
       setSale(prevSale);
       setUpdateError(err instanceof Error ? err.message : "Something went wrong");
@@ -135,12 +147,14 @@ export default function SaleDetail() {
     setUpdating(true);
     const prevSale = sale;
     const newTracking = trackingInput.trim();
-    setSale(s => s ? { ...s, trackingNumber: newTracking || null } : s);
+    const newCarrier = carrierInput;
+    setSale(s => s ? { ...s, trackingNumber: newTracking || null, carrier: newCarrier || null } : s);
     try {
-      const { sale: updated } = await patchSale(sale.id, { trackingNumber: newTracking });
+      const { sale: updated } = await patchSale(sale.id, { trackingNumber: newTracking, carrier: newCarrier });
       setSale(updated);
       setShowTrackingInput(false);
       setTrackingInput("");
+      setCarrierInput("");
     } catch (err) {
       setSale(prevSale);
       setUpdateError(err instanceof Error ? err.message : "Something went wrong");
@@ -460,17 +474,26 @@ export default function SaleDetail() {
 
               {canMarkShipped && showTrackingInput && (
                 <div className="rounded-xl bg-blue-500/8 border border-blue-500/15 p-3 space-y-2">
-                  <p className="text-xs text-stone-400">Add a tracking number (optional)</p>
+                  <p className="text-xs text-stone-400">Add shipping details (optional)</p>
+                  <select
+                    value={carrierInput}
+                    onChange={e => setCarrierInput(e.target.value)}
+                    className="w-full rounded-lg bg-stone-800/80 border border-white/8 px-3 py-2 text-sm text-stone-100 focus:outline-none focus:border-blue-500/40"
+                  >
+                    {CARRIERS.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     value={trackingInput}
                     onChange={e => setTrackingInput(e.target.value)}
-                    placeholder="e.g. 1Z999AA10123456784"
+                    placeholder="Tracking number (e.g. 1Z999AA10123456784)"
                     className="w-full rounded-lg bg-stone-800/80 border border-white/8 px-3 py-2 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-blue-500/40"
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleStatusUpdate("shipped", trackingInput.trim() || undefined)}
+                      onClick={() => handleStatusUpdate("shipped", trackingInput.trim() || undefined, carrierInput || undefined)}
                       disabled={updating}
                       className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-500/15 border border-blue-500/25 px-3 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                     >
@@ -478,7 +501,7 @@ export default function SaleDetail() {
                       Confirm Shipped
                     </button>
                     <button
-                      onClick={() => { setShowTrackingInput(false); setTrackingInput(""); }}
+                      onClick={() => { setShowTrackingInput(false); setTrackingInput(""); setCarrierInput(""); }}
                       disabled={updating}
                       className="px-3 py-2 rounded-lg border border-white/8 text-sm text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-50"
                     >
@@ -501,23 +524,32 @@ export default function SaleDetail() {
 
               {canUpdateTracking && !showTrackingInput && (
                 <button
-                  onClick={() => { setTrackingInput(sale.trackingNumber ?? ""); setShowTrackingInput(true); }}
+                  onClick={() => { setTrackingInput(sale.trackingNumber ?? ""); setCarrierInput(sale.carrier ?? ""); setShowTrackingInput(true); }}
                   disabled={updating}
                   className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/8 px-4 py-2.5 text-sm text-stone-400 hover:text-stone-200 hover:border-white/15 transition-colors disabled:opacity-50"
                 >
                   <Truck size={14} />
-                  {sale.trackingNumber ? "Update tracking number" : "Add tracking number"}
+                  {sale.trackingNumber ? "Update tracking" : "Add tracking"}
                 </button>
               )}
 
               {canUpdateTracking && showTrackingInput && !canMarkShipped && (
                 <div className="rounded-xl bg-stone-800/50 border border-white/8 p-3 space-y-2">
-                  <p className="text-xs text-stone-400">Tracking number</p>
+                  <p className="text-xs text-stone-400">Shipping details</p>
+                  <select
+                    value={carrierInput}
+                    onChange={e => setCarrierInput(e.target.value)}
+                    className="w-full rounded-lg bg-stone-900/80 border border-white/8 px-3 py-2 text-sm text-stone-100 focus:outline-none focus:border-amber-500/40"
+                  >
+                    {CARRIERS.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     value={trackingInput}
                     onChange={e => setTrackingInput(e.target.value)}
-                    placeholder="e.g. 1Z999AA10123456784"
+                    placeholder="Tracking number (e.g. 1Z999AA10123456784)"
                     className="w-full rounded-lg bg-stone-900/80 border border-white/8 px-3 py-2 text-sm text-stone-100 placeholder-stone-600 focus:outline-none focus:border-amber-500/40"
                   />
                   <div className="flex gap-2">
@@ -530,7 +562,7 @@ export default function SaleDetail() {
                       Save Tracking
                     </button>
                     <button
-                      onClick={() => { setShowTrackingInput(false); setTrackingInput(""); }}
+                      onClick={() => { setShowTrackingInput(false); setTrackingInput(""); setCarrierInput(""); }}
                       disabled={updating}
                       className="px-3 py-2 rounded-lg border border-white/8 text-sm text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-50"
                     >
@@ -586,12 +618,18 @@ export default function SaleDetail() {
         {sale.trackingNumber && (
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Tracking</p>
-            <div className="flex items-center gap-2">
-              <Truck size={14} className="text-blue-400 shrink-0" />
-              <p className="text-sm text-stone-300">
-                Tracking number:{" "}
-                <span className="font-mono text-stone-100">{sale.trackingNumber}</span>
-              </p>
+            <div className="flex items-start gap-2">
+              <Truck size={14} className="text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                {sale.carrier && (
+                  <p className="text-xs text-stone-500">
+                    Carrier: <span className="text-stone-300 font-medium">{CARRIERS.find(c => c.value === sale.carrier)?.label ?? sale.carrier.toUpperCase()}</span>
+                  </p>
+                )}
+                <p className="text-sm text-stone-300">
+                  <span className="font-mono text-stone-100">{sale.trackingNumber}</span>
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -142,21 +142,52 @@ const btn = (href: string, label: string) =>
 const card = (content: string) =>
   `<div style="background:#292524;border-radius:12px;padding:20px;margin:16px 0;">${content}</div>`;
 
+const CARRIER_TRACKING_URLS: Record<string, (tracking: string) => string> = {
+  usps:  (t) => `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(t)}`,
+  ups:   (t) => `https://www.ups.com/track?tracknum=${encodeURIComponent(t)}`,
+  fedex: (t) => `https://www.fedex.com/fedextrack/?tracknumbers=${encodeURIComponent(t)}`,
+  dhl:   (t) => `https://www.dhl.com/us-en/home/tracking.html?tracking-id=${encodeURIComponent(t)}`,
+};
+
+const CARRIER_LABELS: Record<string, string> = {
+  usps:  "USPS",
+  ups:   "UPS",
+  fedex: "FedEx",
+  dhl:   "DHL",
+};
+
 export function shippingNotificationEmail(
   orderTitle: string,
   orderId: string,
   trackingNumber?: string | null,
+  carrier?: string | null,
 ): string {
   const receiptUrl = `${BASE_URL}/orders/${orderId}`;
+
+  let trackingHtml = `<p style="margin:0;color:#78716c;font-size:13px;">The artist will send you tracking details as soon as they're available.</p>`;
+  if (trackingNumber) {
+    const carrierKey = carrier?.toLowerCase().trim() ?? "";
+    const buildUrl = CARRIER_TRACKING_URLS[carrierKey];
+    const carrierLabel = CARRIER_LABELS[carrierKey] ?? carrier ?? null;
+    const trackingUrl = buildUrl ? buildUrl(trackingNumber) : null;
+
+    const numberHtml = trackingUrl
+      ? `<a href="${trackingUrl}" style="color:#f59e0b;text-decoration:none;font-family:monospace;">${escHtml(trackingNumber)}</a>`
+      : `<strong style="color:#d6d3d1;font-family:monospace;">${escHtml(trackingNumber)}</strong>`;
+
+    trackingHtml = `
+      ${carrierLabel ? `<p style="margin:0 0 6px;color:#a8a29e;font-size:13px;">Carrier: <strong style="color:#d6d3d1;">${escHtml(carrierLabel)}</strong></p>` : ""}
+      <p style="margin:0 0 6px;color:#a8a29e;font-size:13px;">Tracking: ${numberHtml}</p>
+      ${trackingUrl ? `<p style="margin:8px 0 0;"><a href="${trackingUrl}" style="display:inline-block;background:#1c4f8a;color:#93c5fd;padding:7px 16px;border-radius:16px;text-decoration:none;font-size:12px;font-weight:bold;">Track your package →</a></p>` : ""}
+    `;
+  }
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your order has shipped! 📦</h1>
     <p style="color:#78716c;margin-bottom:0;">Great news — the artist has marked your order as shipped.</p>
     ${card(`
       <p style="margin:0 0 8px;font-size:15px;"><strong>${escHtml(orderTitle)}</strong></p>
-      ${trackingNumber
-        ? `<p style="margin:0;color:#a8a29e;font-size:13px;">Tracking number: <strong style="color:#d6d3d1;">${escHtml(trackingNumber)}</strong></p>`
-        : `<p style="margin:0;color:#78716c;font-size:13px;">The artist will send you tracking details as soon as they're available.</p>`
-      }
+      ${trackingHtml}
     `)}
     ${btn(receiptUrl, "View receipt")}
   `);
