@@ -4,7 +4,7 @@ import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, Chevro
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
-import { readPaymentSettings, savePaymentSettings, type ArtistPayments } from "@/utils/paymentSettings";
+import { readPaymentSettings, savePaymentSettings, formatProcessingWindowLabel, type ArtistPayments } from "@/utils/paymentSettings";
 import { useStripeConnect } from "@/contexts/StripeConnectContext";
 
 const SHIPPING_KEY = "kiln_shipping_v1";
@@ -799,25 +799,19 @@ export default function Settings() {
                     <p className="text-xs text-stone-600 mt-1">Custom label shown to buyers at checkout. Leave blank to auto-generate from the day count above.</p>
                   </div>
 
-                  {(payments.processingWindow != null || (payments.processingWindowLabel && payments.processingWindowLabel.trim())) && (
-                    <div>
-                      <p className="text-xs text-stone-500 mb-1.5">Buyer preview</p>
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 flex items-start gap-2.5">
-                        <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
-                          <p className="text-xs text-amber-200/70">
-                            This artist manages payouts manually. Your order will be processed within{" "}
-                            {payments.processingWindowLabel?.trim()
-                              ? payments.processingWindowLabel.trim()
-                              : payments.processingWindow != null
-                              ? `${payments.processingWindow} business day${payments.processingWindow === 1 ? "" : "s"}`
-                              : "3–5 business days"}.
-                          </p>
-                        </div>
-                      </div>
+                  <div>
+                    <p className="text-xs text-stone-500 mb-1.5">Buyer preview</p>
+                    <div className="rounded-xl border border-white/10 bg-stone-800/40 px-4 py-3">
+                      <p className="text-[11px] text-stone-500 mb-1">How your delivery estimate appears at checkout</p>
+                      <p className="text-sm text-stone-200">
+                        Ships{" "}
+                        {formatProcessingWindowLabel(payments.processingWindow, payments.processingWindowLabel) ?? "within 3 business days"}
+                      </p>
+                      {!payments.processingWindow && !(payments.processingWindowLabel?.trim()) && (
+                        <p className="text-[11px] text-stone-600 mt-1">Using platform default — set a window or label above to customise this.</p>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-stone-500 mb-1 block">Note to buyers (optional)</label>
