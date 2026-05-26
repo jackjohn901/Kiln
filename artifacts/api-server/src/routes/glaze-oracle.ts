@@ -26,6 +26,7 @@ When answering:
 Community attribution: when a user shares their own formula, acknowledge that the community knowledge grows with every contribution.`;
 
 router.post("/glaze-oracle", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { messages } = req.body as { messages: { role: "user" | "assistant"; content: string }[] };
 
   if (!Array.isArray(messages) || messages.length === 0) {

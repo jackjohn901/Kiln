@@ -12,6 +12,7 @@ const KILN_CONTEXT = `Kiln is a creator marketplace and social platform built ex
 
 // POST /api/ai/marketing/bio
 router.post("/ai/marketing/bio", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { name, medium, location, styleNotes, yearsActive } = req.body as {
     name?: string;
     medium?: string;
@@ -69,6 +70,7 @@ Return ONLY the bio text, no labels or explanation.`,
 
 // POST /api/ai/marketing/pitch
 router.post("/ai/marketing/pitch", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { name, medium, location, targetType, styleNotes, achievements } = req.body as {
     name?: string;
     medium?: string;
@@ -139,6 +141,7 @@ Return ONLY the subject line and email body, no extra labels.`,
 
 // POST /api/ai/marketing/hashtags
 router.post("/ai/marketing/hashtags", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { medium, platform, style } = req.body as {
     medium?: string;
     platform?: string;
@@ -183,6 +186,7 @@ Only return valid JSON. No markdown, no explanation.`,
 
 // POST /api/ai/marketing/social-caption
 router.post("/ai/marketing/social-caption", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { description, platform, tone } = req.body as {
     description?: string;
     platform?: string;
@@ -252,6 +256,7 @@ router.post("/ai/marketing/social-caption", async (req, res) => {
 
 // POST /api/ai/marketing/email-subject
 router.post("/ai/marketing/email-subject", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { topic, audience } = req.body as { topic?: string; audience?: string };
   if (!topic) { res.status(400).json({ error: "topic required" }); return; }
   try {

@@ -19,6 +19,7 @@ interface ParsedFilters {
 }
 
 router.post("/ai/search", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { query } = req.body as { query?: string };
 
   if (!query || query.trim().length < 3) {

@@ -9,6 +9,7 @@ const client = new OpenAI({
 });
 
 router.post("/grant-writer", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { prompt } = req.body as { prompt: string };
 
   if (!prompt || typeof prompt !== "string") {

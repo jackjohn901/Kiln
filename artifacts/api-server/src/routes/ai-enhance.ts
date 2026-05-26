@@ -36,6 +36,7 @@ const STYLE_GUIDES: Record<string, string> = {
 };
 
 router.post("/ai/enhance-reel", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { imageUrl, caption, technique, style, artistName, clipDurationMs } = req.body as {
     imageUrl?: string;
     caption?: string;

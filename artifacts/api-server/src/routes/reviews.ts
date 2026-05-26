@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { reviewsTable, notificationsTable } from "@workspace/db";
+import { reviewsTable, listingsTable, notificationsTable } from "@workspace/db";
 import { eq, desc, avg, count, and, sql } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -37,11 +37,21 @@ router.post("/reviews", async (req, res): Promise<void> => {
   res.status(201).json({ review: { ...review, createdAt: review.createdAt.toISOString(), updatedAt: review.updatedAt.toISOString() } });
 });
 
-// POST /reviews/:id/respond — artist responds to review
+// POST /reviews/:id/respond — artist responds to review (only the listing/workshop owner)
 router.post("/reviews/:id/respond", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { response } = req.body;
   if (!response) { res.status(400).json({ error: "response required" }); return; }
+  const [review] = await db.select().from(reviewsTable).where(eq(reviewsTable.id, req.params.id));
+  if (!review) { res.status(404).json({ error: "Review not found" }); return; }
+  // Ownership check: for listings, verify the reviewer is the listing artist
+  if (review.targetType === "listing") {
+    const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, review.targetId));
+    if (!listing || listing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+  } else {
+    // Ownership checks for other target types not yet implemented — deny by default
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
   await db.update(reviewsTable).set({ artistResponse: response }).where(eq(reviewsTable.id, req.params.id));
   res.json({ ok: true });
 });

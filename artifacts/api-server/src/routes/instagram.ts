@@ -38,6 +38,7 @@ router.get("/feed", async (req, res) => {
 });
 
 router.post("/post", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const token = process.env.INSTAGRAM_ACCESS_TOKEN;
   const igUserId = process.env.INSTAGRAM_USER_ID;
 

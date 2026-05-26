@@ -9,6 +9,7 @@ const client = new OpenAI({
 });
 
 router.post("/ai/caption", async (req, res) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { technique, stage, tags } = req.body as {
     technique?: string;
     stage?: string;
