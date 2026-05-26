@@ -27,3 +27,17 @@ export const commissionsTable = pgTable("commissions", {
 
 export type Commission = typeof commissionsTable.$inferSelect;
 export type InsertCommission = typeof commissionsTable.$inferInsert;
+
+export const commissionUpdatesTable = pgTable("commission_updates", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  commissionId: varchar("commission_id", { length: 36 }).notNull(),
+  authorId: varchar("author_id", { length: 255 }).notNull(),
+  authorName: varchar("author_name", { length: 255 }).notNull(),
+  text: text("text"),
+  attachmentUrl: text("attachment_url"),
+  milestone: varchar("milestone", { length: 100 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type CommissionUpdate = typeof commissionUpdatesTable.$inferSelect;
+export type InsertCommissionUpdate = typeof commissionUpdatesTable.$inferInsert;

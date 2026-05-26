@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { commissionsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
-import { eq, or, desc } from "drizzle-orm";
+import { commissionsTable, commissionUpdatesTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
+import { eq, or, desc, asc } from "drizzle-orm";
 import crypto from "crypto";
 import { sendEmailWithRetry, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
+
+const STORAGE_PATH_RE = /^\/api\/storage\/objects\/[a-zA-Z0-9_\-/.]+$/;
 
 const router = Router();
 
@@ -62,6 +64,72 @@ router.get("/commissions/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Forbidden" }); return;
   }
   res.json({ ...commission, createdAt: commission.createdAt.toISOString(), updatedAt: commission.updatedAt.toISOString(), estimatedDelivery: commission.estimatedDelivery?.toISOString() ?? null });
+});
+
+// GET /commissions/:id/updates — fetch the update thread for a commission
+router.get("/commissions/:id/updates", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [commission] = await db.select({ artistId: commissionsTable.artistId, clientId: commissionsTable.clientId })
+    .from(commissionsTable).where(eq(commissionsTable.id, req.params.id));
+  if (!commission) { res.status(404).json({ error: "Not found" }); return; }
+  if (commission.artistId !== req.user.id && commission.clientId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const updates = await db.select().from(commissionUpdatesTable)
+    .where(eq(commissionUpdatesTable.commissionId, req.params.id))
+    .orderBy(asc(commissionUpdatesTable.createdAt));
+  res.json({ updates: updates.map(u => ({ ...u, createdAt: u.createdAt.toISOString() })) });
+});
+
+// POST /commissions/:id/updates — post a new update to a commission thread
+router.post("/commissions/:id/updates", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [commission] = await db.select().from(commissionsTable).where(eq(commissionsTable.id, req.params.id));
+  if (!commission) { res.status(404).json({ error: "Not found" }); return; }
+
+  const isArtist = commission.artistId === req.user.id;
+  const isClient = commission.clientId === req.user.id;
+  if (!isArtist && !isClient) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const { text, attachmentUrl, milestone } = req.body;
+  if (!text && !attachmentUrl) {
+    res.status(400).json({ error: "text or attachmentUrl is required" }); return;
+  }
+
+  if (attachmentUrl !== undefined && attachmentUrl !== null && !STORAGE_PATH_RE.test(attachmentUrl)) {
+    res.status(400).json({ error: "Invalid attachmentUrl — must be a storage object path" }); return;
+  }
+
+  // Only artists may set milestone labels on their updates
+  if (milestone !== undefined && !isArtist) {
+    res.status(403).json({ error: "Only artists may set a milestone on updates" }); return;
+  }
+
+  const user = req.user;
+  const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+
+  const [update] = await db.insert(commissionUpdatesTable).values({
+    id: crypto.randomUUID(),
+    commissionId: commission.id,
+    authorId: user.id,
+    authorName,
+    text: text ?? null,
+    attachmentUrl: attachmentUrl ?? null,
+    milestone: milestone ?? null,
+  }).returning();
+
+  // Notify the other party
+  const recipientId = isArtist ? commission.clientId : commission.artistId;
+  const notifText = attachmentUrl && !text
+    ? `shared a photo on your commission`
+    : `sent an update on your commission`;
+  await db.insert(notificationsTable).values({
+    id: crypto.randomUUID(), userId: recipientId, type: "commission",
+    fromId: user.id, fromName: authorName, fromAvatarUrl: user.profileImageUrl ?? null,
+    text: notifText, link: `/commission-tracker`,
+  });
+
+  res.status(201).json({ ...update, createdAt: update.createdAt.toISOString() });
 });
 
 // PATCH /commissions/:id — update commission state with per-role field authorization.
