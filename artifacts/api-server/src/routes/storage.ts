@@ -4,10 +4,21 @@ import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 const RequestUploadUrlBody = z.object({
   name: z.string().min(1),
-  size: z.number().int().positive(),
-  contentType: z.string().min(1),
+  size: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_IMAGE_SIZE, "File size must not exceed 10 MB"),
+  contentType: z
+    .string()
+    .min(1)
+    .refine((ct) => ct.startsWith("image/"), {
+      message: "Only image files are allowed",
+    }),
 });
 const RequestUploadUrlResponse = z.object({
   uploadURL: z.string().url(),
@@ -33,7 +44,8 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
 
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Missing or invalid required fields" });
+    const message = parsed.error.errors[0]?.message ?? "Missing or invalid required fields";
+    res.status(400).json({ error: message });
     return;
   }
 
