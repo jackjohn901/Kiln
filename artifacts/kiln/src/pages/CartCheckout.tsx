@@ -133,6 +133,7 @@ export default function CartCheckout() {
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
   const [redirectingToStripe, setRedirectingToStripe] = useState(false);
   const [savedAddress, setSavedAddress] = useState<{ street?: string; city?: string; state?: string; zip?: string; country?: string } | null | undefined>(undefined);
+  const [saveAddress, setSaveAddress] = useState(true);
 
   const isDomestic = addr.country === "US";
 
@@ -176,6 +177,7 @@ export default function CartCheckout() {
           : "US";
         if (street || city || zip) {
           setSavedAddress({ street, city, state, zip, country });
+          setSaveAddress(false);
           setAddr(prev => ({
             ...prev,
             address: prev.address || street,
@@ -186,6 +188,7 @@ export default function CartCheckout() {
           }));
         } else {
           setSavedAddress(null);
+          setSaveAddress(true);
         }
       })
       .catch(() => { setSavedAddress(null); });
@@ -317,6 +320,24 @@ export default function CartCheckout() {
     }
     setCheckingOut(true);
     setCheckoutError("");
+
+    // Save address in the background — fire-and-forget, never block checkout on it
+    if (saveAddress && addr.address && addr.city) {
+      fetch("/api/me/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          defaultShippingAddress: {
+            street: addr.address,
+            city: addr.city,
+            state: addr.state,
+            zip: addr.zip,
+            country: addr.country,
+          },
+        }),
+      }).catch(() => {});
+    }
     setNoPayoutMethod(false);
     try {
       const cartItems = items.map(({ listing, quantity }) => ({
@@ -553,6 +574,30 @@ export default function CartCheckout() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Save address checkbox */}
+                    {savedAddress !== undefined && isAuthenticated && (
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+                        <span
+                          onClick={() => setSaveAddress(v => !v)}
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                            saveAddress
+                              ? "border-amber-500 bg-amber-500"
+                              : "border-white/20 bg-stone-800/60 group-hover:border-white/40"
+                          }`}
+                        >
+                          {saveAddress && <Check size={10} className="text-stone-950" strokeWidth={3} />}
+                        </span>
+                        <span
+                          onClick={() => setSaveAddress(v => !v)}
+                          className="text-xs text-stone-400 group-hover:text-stone-300 transition-colors"
+                        >
+                          {savedAddress
+                            ? "Update my saved address to this one"
+                            : "Save this address for future orders"}
+                        </span>
+                      </label>
+                    )}
 
                     {/* Gift toggle */}
                     <div className="rounded-xl border border-white/8 bg-stone-800/40 p-4 space-y-3">
