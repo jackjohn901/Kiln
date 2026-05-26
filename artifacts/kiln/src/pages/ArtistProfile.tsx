@@ -7,7 +7,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2, Truck, Sparkles,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Activity, Music2, Truck, Sparkles, ShoppingCart,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -15,7 +15,8 @@ import Nav from "@/components/Nav";
 import ShareModal from "@/components/ShareModal";
 import { getArtistById, artists, type Artist } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
-import { getListingsByArtist, formatPrice } from "@/data/listings";
+import { getListingsByArtist, formatPrice, type Listing } from "@/data/listings";
+import { useCart } from "@/contexts/CartContext";
 import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
 import { useSocial, CommissionStatus, type ShopReview } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
@@ -339,6 +340,7 @@ export default function ArtistProfile() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { profile } = useProfile();
+  const { addItem, isInCart } = useCart();
   const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
 
   const search = useSearch();
@@ -1157,17 +1159,26 @@ export default function ArtistProfile() {
                         </p>
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 mb-6">
                           {shopListings.filter(l => (l as { isPinned?: boolean }).isPinned).map((l) => (
-                            <Link key={l.id} href={`/listings/${l.id}`} className="group overflow-hidden rounded-xl border border-amber-500/20 bg-stone-900/60 ring-1 ring-amber-500/10">
-                              <div className="aspect-square overflow-hidden">
-                                <img src={l.imageUrl ?? undefined} alt={l.title}
-                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                              </div>
-                              <div className="p-3">
-                                <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
-                                <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
-                                <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
-                              </div>
-                            </Link>
+                            <div key={l.id} className="group relative overflow-hidden rounded-xl border border-amber-500/20 bg-stone-900/60 ring-1 ring-amber-500/10">
+                              <Link href={`/listings/${l.id}`} className="block">
+                                <div className="aspect-square overflow-hidden">
+                                  <img src={l.imageUrl ?? undefined} alt={l.title}
+                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                </div>
+                                <div className="p-3">
+                                  <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
+                                  <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
+                                  <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                                </div>
+                              </Link>
+                              <button
+                                onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
+                                className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
+                                title={isInCart(l.id) ? "In cart" : "Add to cart"}
+                              >
+                                <ShoppingCart size={13} />
+                              </button>
+                            </div>
                           ))}
                         </div>
                         {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).length > 0 && (
@@ -1177,17 +1188,26 @@ export default function ArtistProfile() {
                     )}
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                       {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).map((l) => (
-                        <Link key={l.id} href={`/listings/${l.id}`} className="group overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
-                          <div className="aspect-square overflow-hidden">
-                            <img src={l.imageUrl ?? undefined} alt={l.title}
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                          </div>
-                          <div className="p-3">
-                            <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
-                            <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
-                            <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
-                          </div>
-                        </Link>
+                        <div key={l.id} className="group relative overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
+                          <Link href={`/listings/${l.id}`} className="block">
+                            <div className="aspect-square overflow-hidden">
+                              <img src={l.imageUrl ?? undefined} alt={l.title}
+                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                            </div>
+                            <div className="p-3">
+                              <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
+                              <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
+                              <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                            </div>
+                          </Link>
+                          <button
+                            onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
+                            className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
+                            title={isInCart(l.id) ? "In cart" : "Add to cart"}
+                          >
+                            <ShoppingCart size={13} />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </>
