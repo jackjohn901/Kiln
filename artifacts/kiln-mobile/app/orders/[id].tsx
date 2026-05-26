@@ -99,6 +99,7 @@ export default function OrderDetailScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const [sellerWindow, setSellerWindow] = useState<SellerProcessingWindow | null>(null);
+  const [siblingWindows, setSiblingWindows] = useState<Record<string, SellerProcessingWindow>>({});
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["me/orders", id],
@@ -108,23 +109,60 @@ export default function OrderDetailScreen() {
 
   useEffect(() => {
     const order = data?.order;
+    const siblings = data?.siblingOrders;
     if (!order) return;
-    if (order.processingWindowDays !== null || order.processingWindowLabel !== null) return;
-    if (!order.sellerId) return;
-    apiGet<{ processingWindow?: unknown; processingWindowLabel?: unknown }>(
-      `/api/users/${order.sellerId}/payment-settings`
-    )
-      .then(ps => {
-        setSellerWindow({
-          processingWindowDays: typeof ps.processingWindow === "number" ? ps.processingWindow : null,
-          processingWindowLabel:
-            typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
-              ? (ps.processingWindowLabel as string).trim()
-              : null,
-        });
-      })
-      .catch(() => {});
-  }, [data?.order]);
+
+    function parseWindow(ps: { processingWindow?: unknown; processingWindowLabel?: unknown }): SellerProcessingWindow {
+      return {
+        processingWindowDays: typeof ps.processingWindow === "number" ? ps.processingWindow : null,
+        processingWindowLabel:
+          typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+            ? (ps.processingWindowLabel as string).trim()
+            : null,
+      };
+    }
+
+    // Backfill for the primary order (used in the single-order FULFILLMENT section)
+    if (order.processingWindowDays === null && order.processingWindowLabel === null && order.sellerId) {
+      apiGet<{ processingWindow?: unknown; processingWindowLabel?: unknown }>(
+        `/api/users/${order.sellerId}/payment-settings`
+      )
+        .then(ps => { setSellerWindow(parseWindow(ps)); })
+        .catch(() => {});
+    }
+
+    // Backfill for every unique seller present in sibling orders
+    if (siblings && siblings.length > 1) {
+      const seen = new Set<string>();
+      for (const sibling of siblings) {
+        if (!sibling.sellerId || seen.has(sibling.sellerId)) continue;
+        seen.add(sibling.sellerId);
+
+        // If the order record already has a window for this seller, use it directly
+        const siblingWithData = siblings.find(
+          s => s.sellerId === sibling.sellerId &&
+            (s.processingWindowDays !== null || s.processingWindowLabel !== null)
+        );
+        if (siblingWithData) {
+          setSiblingWindows(prev => ({
+            ...prev,
+            [sibling.sellerId]: {
+              processingWindowDays: siblingWithData.processingWindowDays,
+              processingWindowLabel: siblingWithData.processingWindowLabel,
+            },
+          }));
+        } else {
+          apiGet<{ processingWindow?: unknown; processingWindowLabel?: unknown }>(
+            `/api/users/${sibling.sellerId}/payment-settings`
+          )
+            .then(ps => {
+              setSiblingWindows(prev => ({ ...prev, [sibling.sellerId]: parseWindow(ps) }));
+            })
+            .catch(() => {});
+        }
+      }
+    }
+  }, [data?.order, data?.siblingOrders]);
 
   if (isLoading) {
     return (
@@ -197,6 +235,15 @@ export default function OrderDetailScreen() {
               </Text>
               {siblings.map((item, idx) => {
                 const itemIconName = (TYPE_ICON[item.type] ?? "shopping-bag") as any;
+                const itemWindow = siblingWindows[item.sellerId];
+                const itemWindowLabel = item.processingWindowLabel ?? itemWindow?.processingWindowLabel ?? null;
+                const itemWindowDays = item.processingWindowDays ?? itemWindow?.processingWindowDays ?? null;
+                const hasItemWindow = itemWindowLabel !== null || itemWindowDays !== null;
+                const itemWindowText = itemWindowLabel
+                  ? itemWindowLabel
+                  : itemWindowDays === 1
+                    ? "1 business day"
+                    : `${itemWindowDays} business days`;
                 return (
                   <View key={item.id} style={[styles.lineItem, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 12 }]}>
                     <View style={[styles.lineThumb, { backgroundColor: colors.secondary }]}>
@@ -210,6 +257,14 @@ export default function OrderDetailScreen() {
                       <Text style={[styles.lineTitle, { color: colors.foreground }]} numberOfLines={2}>{item.title}</Text>
                       {item.description ? (
                         <Text style={[styles.lineDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
+                      ) : null}
+                      {hasItemWindow ? (
+                        <View style={styles.itemWindowRow}>
+                          <Feather name="clock" size={11} color={colors.primary} />
+                          <Text style={[styles.itemWindowText, { color: colors.primary }]}>
+                            {itemWindowText}
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                     <Text style={[styles.linePrice, { color: colors.primary }]}>{formatPrice(item.amount)}</Text>
@@ -241,10 +296,10 @@ export default function OrderDetailScreen() {
           )}
         </View>
 
-        {(isActive || hasDeliveryEstimate) && (
+        {(isActive || (!isCartOrder && hasDeliveryEstimate)) && (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>FULFILLMENT</Text>
-            {hasDeliveryEstimate && (
+            {!isCartOrder && hasDeliveryEstimate && (
               <View style={styles.infoRow}>
                 <Feather name="clock" size={14} color={colors.primary} />
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
@@ -255,7 +310,7 @@ export default function OrderDetailScreen() {
                 </Text>
               </View>
             )}
-            {!hasDeliveryEstimate && isActive && (
+            {!isCartOrder && !hasDeliveryEstimate && isActive && (
               <View style={styles.infoRow}>
                 <Feather name="clock" size={14} color={colors.mutedForeground} />
                 <Text style={[styles.infoText, { color: colors.mutedForeground }]}>No delivery estimate provided.</Text>
@@ -451,4 +506,6 @@ const styles = StyleSheet.create({
   },
   actionBtnOutline: { borderWidth: 1 },
   actionBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  itemWindowRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  itemWindowText: { fontFamily: "Inter_500Medium", fontSize: 11 },
 });
