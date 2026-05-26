@@ -266,6 +266,7 @@ export default function NotificationSettingsScreen() {
   };
 
   const emailSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAttemptedEmailRef = useRef<string>("");
 
   const saveNotifEmail = useCallback((email: string) => {
     const trimmed = email.trim();
@@ -274,6 +275,7 @@ export default function NotificationSettingsScreen() {
       return;
     }
     setEmailValidationError(false);
+    lastAttemptedEmailRef.current = trimmed;
     apiPatch("/api/me/settings", { contactEmail: trimmed })
       .then(() => {
         if (!mountedRef.current) return;
@@ -295,6 +297,15 @@ export default function NotificationSettingsScreen() {
         }, 3000);
       });
   }, []);
+
+  const handleEmailRetry = useCallback(() => {
+    if (emailErrorTimerRef.current) {
+      clearTimeout(emailErrorTimerRef.current);
+      emailErrorTimerRef.current = null;
+    }
+    setEmailError(false);
+    saveNotifEmail(lastAttemptedEmailRef.current);
+  }, [saveNotifEmail]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -465,11 +476,14 @@ export default function NotificationSettingsScreen() {
                   >
                     Saved ✓
                   </Animated.Text>
-                  <Animated.Text
-                    style={[styles.savedLabel, styles.emailStatusAbsolute, { color: "#ef4444", opacity: emailErrorOpacity, transform: [{ scale: emailErrorScale }] }]}
+                  <Animated.View
+                    style={[styles.emailStatusAbsolute, { opacity: emailErrorOpacity, transform: [{ scale: emailErrorScale }], flexDirection: "row", alignItems: "center", gap: 3 }]}
                   >
-                    Couldn't save
-                  </Animated.Text>
+                    <Text style={[styles.savedLabel, { color: "#ef4444" }]}>Couldn't save</Text>
+                    <Pressable onPress={handleEmailRetry} hitSlop={8}>
+                      <Text style={[styles.savedLabel, { color: colors.primary }]}>Retry</Text>
+                    </Pressable>
+                  </Animated.View>
                 </View>
               </View>
               <Text style={[styles.toggleDesc, { color: colors.mutedForeground, marginBottom: 8 }]}>
@@ -559,7 +573,7 @@ const styles = StyleSheet.create({
   emailStatusContainer: {
     position: "relative",
     height: 18,
-    minWidth: 80,
+    minWidth: 120,
     alignItems: "flex-end",
   },
   emailStatusAbsolute: {
