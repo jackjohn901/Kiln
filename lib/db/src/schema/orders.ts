@@ -16,6 +16,7 @@ export const ordersTable = pgTable("orders", {
   trackingNumber: varchar("tracking_number", { length: 100 }),
   carrier: varchar("carrier", { length: 50 }),
   notes: text("notes"),
+  quantity: integer("quantity").notNull().default(1),
   processingWindowDays: integer("processing_window_days"),
   processingWindowLabel: text("processing_window_label"),
   manualPayout: boolean("manual_payout").notNull().default(false),

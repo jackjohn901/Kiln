@@ -16,6 +16,7 @@ interface Order {
   description: string | null;
   imageUrl: string | null;
   amount: number;
+  quantity: number;
   currency: string;
   status: string;
   sellerId: string;
@@ -283,12 +284,17 @@ export default function OrderDetail() {
     const items = isCartOrder ? siblingOrders : [order];
     const total = isCartOrder ? cartTotal : order.amount;
 
-    const lineItems = items.map(item => `
+    const lineItems = items.map(item => {
+      const qty = (item as Order).quantity ?? 1;
+      const unitPrice = qty > 1 ? item.amount / qty : item.amount;
+      const qtyNote = qty > 1 ? `<br><span style="font-size:11px;color:#8a7e74;">Qty: ${qty} &times; ${formatPrice(unitPrice)}</span>` : "";
+      return `
       <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.title)}${item.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(item.description)}</span>` : ""}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.title)}${item.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(item.description)}</span>` : ""}${qtyNote}</td>
         <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(item.amount)}</td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
 
     const buyerName = buyerProfile?.displayName ?? null;
     const addressText = order.shippingAddress ?? buyerProfile?.location ?? null;
@@ -419,12 +425,17 @@ export default function OrderDetail() {
     const items = isCartOrder ? siblingOrders : [order];
     const total = isCartOrder ? cartTotal : order.amount;
 
-    const lineItems = items.map(item => `
+    const lineItems = items.map(item => {
+      const qty = (item as Order).quantity ?? 1;
+      const unitPrice = qty > 1 ? item.amount / qty : item.amount;
+      const qtyNote = qty > 1 ? `<br><span style="font-size:11px;color:#8a7e74;">Qty: ${qty} &times; ${formatPrice(unitPrice)}</span>` : "";
+      return `
       <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.title)}${item.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(item.description)}</span>` : ""}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.title)}${item.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(item.description)}</span>` : ""}${qtyNote}</td>
         <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(item.amount)}</td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
 
     const buyerName = buyerProfile?.displayName ?? null;
     const addressText = order.shippingAddress ?? buyerProfile?.location ?? null;
@@ -646,6 +657,11 @@ export default function OrderDetail() {
                         {item.description && (
                           <p className="text-[11px] text-stone-500 truncate">{item.description}</p>
                         )}
+                        {(item.quantity ?? 1) > 1 && (
+                          <p className="text-[11px] text-stone-500">
+                            Qty: {item.quantity} &times; {formatPrice(item.amount / item.quantity)}
+                          </p>
+                        )}
                       </div>
                       <span className="text-sm font-semibold text-amber-300 tabular-nums shrink-0">
                         {formatPrice(item.amount)}
@@ -683,6 +699,11 @@ export default function OrderDetail() {
                 <p className="font-semibold text-stone-100 leading-snug">{order.title}</p>
                 {order.description && (
                   <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">{order.description}</p>
+                )}
+                {(order.quantity ?? 1) > 1 && (
+                  <p className="mt-0.5 text-xs text-stone-500">
+                    Qty: {order.quantity} &times; {formatPrice(order.amount / order.quantity)}
+                  </p>
                 )}
                 <div className="mt-2 flex items-center justify-between">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>

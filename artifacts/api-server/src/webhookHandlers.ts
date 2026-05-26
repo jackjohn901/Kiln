@@ -121,6 +121,7 @@ async function createOrdersForSession(params: {
       description: null,
       imageUrl: listing.imageUrl ?? null,
       amount: listing.price * qty,
+      quantity: qty,
       currency: 'USD',
       status: 'confirmed',
       shippingAddress: buyerShippingAddress,
@@ -293,6 +294,7 @@ export class WebhookHandlers {
                 .select({
                   title: ordersTable.title,
                   amount: ordersTable.amount,
+                  quantity: ordersTable.quantity,
                   processingWindowDays: ordersTable.processingWindowDays,
                   displayName: profilesTable.displayName,
                 })
@@ -303,12 +305,17 @@ export class WebhookHandlers {
             : [];
 
           const items: ManualPayoutReceiptItem[] = sessionOrders.length > 0
-            ? sessionOrders.map((o) => ({
-                title: o.title ?? 'Item',
-                quantity: 1,
-                priceCents: o.amount ?? undefined,
-                artistName: o.displayName ?? undefined,
-              }))
+            ? sessionOrders.map((o) => {
+                const qty = o.quantity ?? 1;
+                const totalCents = Math.round((o.amount ?? 0) * 100);
+                const unitCents = qty > 1 ? Math.round(totalCents / qty) : totalCents;
+                return {
+                  title: o.title ?? 'Item',
+                  quantity: qty,
+                  priceCents: unitCents,
+                  artistName: o.displayName ?? undefined,
+                };
+              })
             : [];
 
           const processingWindowDays = sessionOrders.reduce<number | null>((max, o) => {
