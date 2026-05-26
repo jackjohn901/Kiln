@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import QABlock from "@/components/QABlock";
 import { useParams, Link, useLocation, useSearch } from "wouter";
 import {
-  ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, BellOff, Bell, MoreHorizontal,
+  ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, Trash2, BellOff, Bell, MoreHorizontal,
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
@@ -23,7 +23,7 @@ import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
 import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
-import { getPosts } from "@/data/posts";
+import { getPosts, deletePost } from "@/data/posts";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 import { getCommunityBeats, type CommunityBeat, LICENSE_LABELS, LICENSE_COLORS } from "@/lib/communityBeats";
 import { useMeta } from "@/hooks/useMeta";
@@ -995,6 +995,21 @@ export default function ArtistProfile() {
                           {item.isVideo && <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />}
                         </div>
                         {item.isVideo && <div className="absolute right-1.5 top-1.5"><Video size={11} className="text-white drop-shadow" /></div>}
+                        {isOwn && item.id.startsWith("post-") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm("Delete this post?")) {
+                                deletePost(item.id);
+                                setLocalPosts((prev) => prev.filter((p) => p.id !== item.id));
+                              }
+                            }}
+                            className="absolute left-1 top-1 z-10 rounded-full bg-black/60 p-1 opacity-60 group-hover:opacity-100 transition-opacity"
+                            aria-label="Delete post"
+                          >
+                            <Trash2 size={12} className="text-white" />
+                          </button>
+                        )}
                       </div>
                     );
                     if (item.isVideo && item.videoId) {
