@@ -11,6 +11,38 @@ import { startStoryExpiry } from "./lib/storyExpiry";
 import { startDropCountdownScheduler } from "./lib/dropCountdown";
 import { startWorkshopReminders } from "./lib/workshopReminders";
 
+const WEBHOOK_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+let webhookRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelWebhookRetry() {
+  if (webhookRetryTimer !== null) {
+    clearTimeout(webhookRetryTimer);
+    webhookRetryTimer = null;
+  }
+}
+
+function scheduleWebhookRetry(
+  stripeSync: Awaited<ReturnType<typeof getStripeSync>>,
+  webhookUrl: string,
+) {
+  cancelWebhookRetry();
+  webhookRetryTimer = setTimeout(async () => {
+    webhookRetryTimer = null;
+    try {
+      await stripeSync.findOrCreateManagedWebhook(webhookUrl);
+      logger.info("Stripe webhook configured (retry succeeded)");
+    } catch (err: any) {
+      logger.warn(
+        { err: err.message },
+        "Stripe webhook retry failed — will try again in 5 minutes",
+      );
+      scheduleWebhookRetry(stripeSync, webhookUrl);
+    }
+  }, WEBHOOK_RETRY_INTERVAL_MS);
+  webhookRetryTimer?.unref();
+}
+
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -35,19 +67,21 @@ async function initStripe() {
     return;
   }
 
-  try {
-    const webhookBase = process.env.REPLIT_DOMAINS
-      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
-      : "";
-    if (webhookBase) {
+  const webhookBase = process.env.REPLIT_DOMAINS
+    ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+    : "";
+
+  if (webhookBase) {
+    try {
       await stripeSync.findOrCreateManagedWebhook(`${webhookBase}/api/stripe/webhook`);
       logger.info("Stripe webhook configured");
+    } catch (err: any) {
+      logger.warn(
+        { err: err.message },
+        "Stripe webhook registration failed — will retry every 5 minutes",
+      );
+      scheduleWebhookRetry(stripeSync, `${webhookBase}/api/stripe/webhook`);
     }
-  } catch (err: any) {
-    logger.warn(
-      { err: err.message },
-      "Stripe webhook registration failed — payments will still work if the webhook was previously registered",
-    );
   }
 
   stripeSync.syncBackfill().catch((err) => logger.error({ err }, "Stripe backfill error"));
@@ -94,6 +128,7 @@ if (Number.isNaN(port) || port <= 0) {
 
   function shutdown(signal: string) {
     logger.info({ signal }, "Shutting down gracefully…");
+    cancelWebhookRetry();
     server.close(() => {
       logger.info("HTTP server closed — exiting");
       process.exit(0);
