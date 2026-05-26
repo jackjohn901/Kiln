@@ -144,15 +144,26 @@ export function triggerStep(
   }
 }
 
+// ── Shared AudioContext (reused across beat changes to eliminate startup lag) ─
+
+let sharedCtx: AudioContext | null = null;
+function getSharedAudioContext(): AudioContext {
+  if (!sharedCtx || sharedCtx.state === "closed") {
+    sharedCtx = new AudioContext();
+  }
+  if (sharedCtx.state === "suspended") {
+    sharedCtx.resume().catch(() => {});
+  }
+  return sharedCtx;
+}
+
 // ── Beat looper (used by Feed when a post has a community beat) ──────────────
 
 export function createBeatLooper(
   beat: CommunityBeat,
   opts: { onStep?: (step: number) => void } = {},
 ): { stop: () => void } {
-  const ctx = new AudioContext();
-  // Immediately resume — browsers suspend AudioContext until a user gesture fires
-  ctx.resume().catch(() => {});
+  const ctx = getSharedAudioContext();
 
   const steps   = beat.pattern[0]?.length ?? 16;
   const stepDur = 60 / beat.bpm / 4;

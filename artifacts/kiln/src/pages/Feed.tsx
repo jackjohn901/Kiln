@@ -875,6 +875,7 @@ export default function Feed() {
   const followingLoadedRef = useRef(false);
   const followingReelIdsRef = useRef<Set<string>>(new Set());
   const [activeIndex, setActiveIndex] = useState(0);
+  const lastTrackIdRef = useRef<string>("");
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
   const [pendingFollowingReels, setPendingFollowingReels] = useState<Reel[]>([]);
@@ -1231,14 +1232,30 @@ export default function Feed() {
 
   // Music: switch track (or beat) when the active reel changes
   useEffect(() => {
-    // Tear down whatever was playing before
+    if (!activeReel || !musicUnlocked) return;
+    const tid = activeReel.musicTrackId ?? "";
+
+    // Skip if the track hasn't actually changed — prevents gap on fast scroll
+    if (tid === lastTrackIdRef.current) {
+      if (tid.startsWith("beat-")) {
+        if (musicMuted) {
+          beatLooperRef.current?.stop();
+          beatLooperRef.current = null;
+        } else if (!beatLooperRef.current) {
+          const beatId = tid.replace(/^beat-/, "");
+          const beat = getCommunityBeats().find((b) => b.id === beatId);
+          if (beat) beatLooperRef.current = createBeatLooper(beat);
+        }
+      } else if (!musicMuted && audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
+      return;
+    }
+    lastTrackIdRef.current = tid;
+
+    // Tear down beat looper when leaving a beat post
     beatLooperRef.current?.stop();
     beatLooperRef.current = null;
-    audioRef.current?.pause();
-
-    if (!activeReel || !musicUnlocked) return;
-
-    const tid = activeReel.musicTrackId ?? "";
 
     if (tid.startsWith("beat-")) {
       // ── Community beat: synthesise via Web Audio ──────────────────────────
@@ -1253,21 +1270,48 @@ export default function Feed() {
       };
     }
 
-    // ── Library track: HTML5 Audio ────────────────────────────────────────
+    // ── Library track: HTML5 Audio with crossfade ────────────────────────
     const track = getTrackById(tid);
     if (!track) return;
-    if (!audioRef.current) {
-      audioRef.current = new Audio(track.url);
-      audioRef.current.loop   = true;
-      audioRef.current.volume = 0.65;
+    const el = audioRef.current ?? new Audio();
+    audioRef.current = el;
+
+    const startPlayback = () => {
+      el.loop = true;
+      el.src = track.url;
+      el.load();
+      if (!musicMuted) {
+        el.volume = 0;
+        el.play().catch(() => {});
+        // Fade in over 250ms to hide the switch gap
+        const start = performance.now();
+        const fade = (now: number) => {
+          const t = Math.min(1, (now - start) / 250);
+          el.volume = 0.65 * t;
+          if (t < 1) requestAnimationFrame(fade);
+        };
+        requestAnimationFrame(fade);
+      } else {
+        el.volume = 0.65;
+      }
+    };
+
+    if (el.paused || !el.src) {
+      startPlayback();
     } else {
-      audioRef.current.pause();
-      audioRef.current.src  = track.url;
-      audioRef.current.load();
-      audioRef.current.loop   = true;
-      audioRef.current.volume = 0.65;
+      // Fade out old track, then swap src and fade in
+      const start = performance.now();
+      const fadeOut = (now: number) => {
+        const t = Math.min(1, (now - start) / 200);
+        el.volume = 0.65 * (1 - t);
+        if (t < 1) {
+          requestAnimationFrame(fadeOut);
+        } else {
+          startPlayback();
+        }
+      };
+      requestAnimationFrame(fadeOut);
     }
-    if (!musicMuted) audioRef.current.play().catch(() => {});
     return () => { audioRef.current?.pause(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, musicUnlocked, activeReel]);
@@ -1643,7 +1687,7 @@ export default function Feed() {
               key={reel.id}
               reel={reel}
               isActive={i === activeIndex}
-              isNearby={Math.abs(i - activeIndex) <= 1}
+              isNearby={Math.abs(i - activeIndex) <= 2}
               musicMuted={musicMuted}
               onToggleMusic={handleToggleMusic}
               videoAudioOn={videoAudioOn}
