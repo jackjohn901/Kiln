@@ -479,15 +479,36 @@ export default function ArtistProfile() {
             </div>
           )}
 
-          <div className="flex items-start gap-4 mb-6">
+          <div className="flex flex-wrap items-start gap-4 mb-6">
             <img src={avatar} alt={name} className="h-20 w-20 rounded-full object-cover border-2 border-amber-500/40 shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="font-serif text-2xl font-bold text-amber-100">{name}</h1>
-                {isOwn && <Link href="/edit-profile"><span className="rounded-full border border-stone-700 px-3 py-1 text-xs text-stone-400 hover:border-amber-500/50 hover:text-amber-300 transition-colors">Edit Profile</span></Link>}
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="font-serif text-2xl font-bold text-amber-100">{name}</h1>
+                  {isOwn && <Link href="/edit-profile"><span className="rounded-full border border-stone-700 px-3 py-1 text-xs text-stone-400 hover:border-amber-500/50 hover:text-amber-300 transition-colors">Edit Profile</span></Link>}
+                </div>
+                {!isOwn && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleDbFollow}
+                      className={`shrink-0 rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                        dbFollowing
+                          ? "border border-stone-600 text-stone-400 hover:border-rose-500 hover:text-rose-400"
+                          : "bg-amber-500 text-stone-950 hover:bg-amber-400"
+                      }`}
+                    >
+                      {dbFollowing ? "Following" : "Follow"}
+                    </button>
+                    <Link href={`/broadcasts/${id}`}
+                      className="shrink-0 rounded-full px-3 py-2 text-sm border border-white/10 text-stone-400 hover:border-amber-500/30 hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                      Channel
+                    </Link>
+                  </div>
+                )}
               </div>
               {dbProfile.handle && <p className="text-sm text-stone-500 mt-0.5">@{dbProfile.handle}</p>}
-              {dbProfile.bio && <p className="text-sm text-stone-300 mt-2 leading-relaxed">{dbProfile.bio}</p>}
+              {dbProfile.bio && <p className="text-sm text-stone-300 mt-2 leading-relaxed max-w-xl">{dbProfile.bio}</p>}
               <div className="flex flex-wrap gap-3 mt-3 text-xs text-stone-500">
                 {dbProfile.medium && <span className="flex items-center gap-1"><Hammer size={11} className="text-amber-500" />{dbProfile.medium}</span>}
                 {dbProfile.location && <span className="flex items-center gap-1"><MapPin size={11} />{dbProfile.location}</span>}
@@ -499,25 +520,6 @@ export default function ArtistProfile() {
                 <span><span className="font-bold text-stone-100">{dbPosts.length}</span> <span className="text-stone-500">posts</span></span>
               </div>
             </div>
-            {!isOwn && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDbFollow}
-                  className={`shrink-0 rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                    dbFollowing
-                      ? "border border-stone-600 text-stone-400 hover:border-rose-500 hover:text-rose-400"
-                      : "bg-amber-500 text-stone-950 hover:bg-amber-400"
-                  }`}
-                >
-                  {dbFollowing ? "Following" : "Follow"}
-                </button>
-                <Link href={`/broadcasts/${id}`}
-                  className="shrink-0 rounded-full px-3 py-2 text-sm border border-white/10 text-stone-400 hover:border-amber-500/30 hover:text-amber-300 transition-colors flex items-center gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-                  Channel
-                </Link>
-              </div>
-            )}
           </div>
 
           {allDbPosts.length > 0 ? (
@@ -652,7 +654,7 @@ export default function ArtistProfile() {
 
       {/* Profile section */}
       <div className="mx-auto max-w-3xl px-4">
-        <div className="relative -mt-12 flex items-end gap-4">
+        <div className="relative -mt-12 flex flex-col sm:flex-row items-start sm:items-end gap-4">
           <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-[#12100e] bg-stone-800 shadow-xl">
             {avatarImg ? (
               <img src={avatarImg} alt={artist.name} className="h-full w-full object-cover" />
@@ -664,7 +666,7 @@ export default function ArtistProfile() {
           </div>
 
           {/* Action buttons */}
-          <div className="ml-auto flex items-center gap-2 pb-1 flex-wrap justify-end">
+          <div className="flex items-center gap-2 pb-1 flex-wrap justify-start sm:ml-auto sm:justify-end">
             {isOwn ? (
               <>
                 <Link href="/analytics" className="flex items-center gap-1.5 rounded-full border border-stone-700 px-3 py-1.5 text-xs font-medium text-stone-300 hover:border-amber-400/40 hover:text-amber-300 transition-colors">
