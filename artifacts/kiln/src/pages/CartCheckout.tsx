@@ -199,6 +199,34 @@ export default function CartCheckout() {
       .catch(() => {});
   }, [items]);
 
+  // Pre-fetch processing window from cart artist payment settings so it appears on the address step
+  useEffect(() => {
+    if (items.length === 0) return;
+    const artistIds = [...new Set(items.map(i => i.listing.artistId as string))];
+    Promise.all(
+      artistIds.map(aid =>
+        fetch(`/api/users/${aid}/payment-settings`, { credentials: "include" })
+          .then(r => r.ok ? r.json() as Promise<Record<string, unknown>> : null)
+          .catch(() => null)
+      )
+    ).then(results => {
+      let maxDays: number | null = null;
+      let firstLabel: string | null = null;
+      for (const ps of results) {
+        if (!ps) continue;
+        const w = typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+        if (w !== null) {
+          maxDays = maxDays === null ? w : Math.max(maxDays, w);
+        }
+        if (!firstLabel && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()) {
+          firstLabel = (ps.processingWindowLabel as string).trim();
+        }
+      }
+      setProcessingWindowDays(maxDays);
+      setProcessingWindowLabel(firstLabel);
+    }).catch(() => {});
+  }, [items]);
+
   // Detect return from success (legacy path — real Stripe flow lands on /cart/success)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
