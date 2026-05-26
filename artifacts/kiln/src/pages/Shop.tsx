@@ -25,9 +25,15 @@ function ShippingBadge({ shipping }: { shipping: ArtistShipping | undefined }) {
   }
   const hasDomestic = shipping.domesticRate != null && shipping.domesticRate > 0;
   const hasInternational = shipping.internationalRate != null && shipping.internationalRate > 0;
-  if (hasDomestic || hasInternational || shipping.offerLocalPickup) {
+  const hasThreshold = !shipping.offerFreeShipping && shipping.freeThreshold != null && shipping.freeThreshold > 0;
+  if (hasDomestic || hasInternational || shipping.offerLocalPickup || hasThreshold) {
     return (
       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        {hasThreshold && (
+          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+            <Truck size={9} />Free over ${shipping.freeThreshold}
+          </span>
+        )}
         {hasDomestic && (
           <span className="flex items-center gap-1 text-[10px] text-stone-500">
             <Truck size={9} />US ${shipping.domesticRate}
