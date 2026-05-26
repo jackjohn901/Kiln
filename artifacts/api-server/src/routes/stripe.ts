@@ -26,12 +26,13 @@ interface CartLineItem {
 router.post('/stripe/checkout', async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {
-    const { items, customerEmail, successPath, cancelPath, metadata: extraMetadata } = req.body as {
+    const { items, customerEmail, successPath, cancelPath, metadata: extraMetadata, shippingBreakdown: rawShippingBreakdown } = req.body as {
       items: CartLineItem[];
       customerEmail?: string;
       successPath?: string;
       cancelPath?: string;
       metadata?: Record<string, string>;
+      shippingBreakdown?: Array<{ artistId: string; artistName: string; amountCents: number }>;
     };
 
     if (!items?.length) {
@@ -165,8 +166,38 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       .map((item) => String(item.quantity))
       .join(',');
 
+    // Validate and encode per-artist shipping breakdown supplied by the client.
+    // We only store artist names and amounts (not IDs) since names are display-only.
+    // Validation: every artistId in the breakdown must belong to one of the listing's artists.
+    let shippingBreakdownMeta: string | null = null;
+    if (Array.isArray(rawShippingBreakdown) && rawShippingBreakdown.length > 0 && listingIds.length > 0) {
+      const listingArtistIdSet = new Set(
+        listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter(Boolean),
+      );
+      const validated: Array<{ n: string; c: number }> = [];
+      for (const entry of rawShippingBreakdown) {
+        if (
+          typeof entry.artistId === 'string' &&
+          typeof entry.artistName === 'string' &&
+          typeof entry.amountCents === 'number' &&
+          Number.isFinite(entry.amountCents) &&
+          entry.amountCents >= 0 &&
+          listingArtistIdSet.has(entry.artistId)
+        ) {
+          validated.push({ n: entry.artistName.slice(0, 60).trim(), c: Math.round(entry.amountCents) });
+        }
+      }
+      if (validated.length > 0) {
+        const encoded = JSON.stringify(validated);
+        // Stripe metadata values are capped at 500 characters; skip if the JSON is too large.
+        if (encoded.length <= 500) {
+          shippingBreakdownMeta = encoded;
+        }
+      }
+    }
+
     // Reserved keys that must NEVER be overridden by client-supplied extraMetadata.
-    const RESERVED_META_KEYS = new Set(['platform', 'userId', 'listingIds', 'listingQtys']);
+    const RESERVED_META_KEYS = new Set(['platform', 'userId', 'listingIds', 'listingQtys', 'shippingBreakdown']);
     // Allowlist of safe extra metadata keys clients may pass through (e.g. for digital/workshop flows).
     const ALLOWED_EXTRA_KEYS = new Set(['type', 'productId', 'workshopId', 'commissionId', 'milestone', 'auctionId', 'orderId']);
 
@@ -312,6 +343,8 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         ...(sessionListingIds ? { listingIds: sessionListingIds, listingQtys: sessionListingQtys } : {}),
         // Flag manual-payout sessions so the webhook can send a buyer receipt.
         ...(manualPayout ? { manualPayout: 'true' } : {}),
+        // Per-artist shipping breakdown for order confirmation email (display only).
+        ...(shippingBreakdownMeta ? { shippingBreakdown: shippingBreakdownMeta } : {}),
       },
       // Route funds to artist's connected account when available.
       ...(connectedAccountId

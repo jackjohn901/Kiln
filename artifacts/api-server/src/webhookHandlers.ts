@@ -1,5 +1,5 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
+import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, type PerArtistShippingLine, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable } from '@workspace/db';
@@ -326,11 +326,33 @@ export class WebhookHandlers {
 
           const shippingAddress = sessionOrders[0]?.shippingAddress ?? null;
 
+          // Parse per-artist shipping breakdown stored in session metadata.
+          let perArtistShipping: PerArtistShippingLine[] | null = null;
+          if (meta.shippingBreakdown) {
+            try {
+              const parsed = JSON.parse(meta.shippingBreakdown) as unknown;
+              if (Array.isArray(parsed)) {
+                perArtistShipping = parsed
+                  .filter(
+                    (e): e is { n: string; c: number } =>
+                      e !== null &&
+                      typeof e === 'object' &&
+                      typeof (e as Record<string, unknown>).n === 'string' &&
+                      typeof (e as Record<string, unknown>).c === 'number',
+                  )
+                  .map((e) => ({ artistName: e.n, amountCents: e.c }));
+                if (perArtistShipping.length === 0) perArtistShipping = null;
+              }
+            } catch {
+              // Malformed JSON — proceed without shipping breakdown.
+            }
+          }
+
           await sendEmailWithRetry(
             {
               to: email,
               subject: `Your Kiln order #${orderId} is confirmed`,
-              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined, shippingAddress),
+              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined, shippingAddress, perArtistShipping),
             },
             { contextId: session.id, label: 'order confirmation' },
           );

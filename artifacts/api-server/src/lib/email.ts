@@ -429,6 +429,11 @@ export interface ManualPayoutReceiptItem {
   artistName?: string;
 }
 
+export interface PerArtistShippingLine {
+  artistName: string;
+  amountCents: number;
+}
+
 export function manualPayoutReceiptEmail(
   sessionId: string,
   amountTotalCents: number,
@@ -436,6 +441,7 @@ export function manualPayoutReceiptEmail(
   processingWindowDays?: number | null,
   orderId?: string | null,
   shippingAddress?: string | null,
+  perArtistShipping?: PerArtistShippingLine[] | null,
 ): string {
   const itemRows = items
     .map(
@@ -462,12 +468,47 @@ export function manualPayoutReceiptEmail(
     )
     .join("");
 
+  const shippingLines = perArtistShipping ?? [];
+  const totalShippingCents = shippingLines.reduce((sum, s) => sum + s.amountCents, 0);
+  const hasMultiArtistShipping = shippingLines.length >= 2;
+
+  const shippingSection = shippingLines.length > 0
+    ? (() => {
+        if (hasMultiArtistShipping) {
+          const perArtistRows = shippingLines
+            .map(
+              (s) =>
+                `<div style="display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px;gap:12px;">
+                  <span style="color:#a8a29e;font-size:13px;">Shipping — ${escHtml(s.artistName)}</span>
+                  <span style="white-space:nowrap;color:#d6d3d1;font-size:13px;">${s.amountCents === 0 ? "Free" : `$${(s.amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}</span>
+                </div>`,
+            )
+            .join("");
+          return `
+            <div style="margin:12px 0 0;padding-top:12px;border-top:1px solid #3c3835;">
+              ${perArtistRows}
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 0;padding-top:6px;border-top:1px solid #3c3835;">
+                <span style="color:#a8a29e;font-size:13px;font-weight:bold;">Combined shipping</span>
+                <span style="white-space:nowrap;color:#d6d3d1;font-size:13px;font-weight:bold;">${totalShippingCents === 0 ? "Free" : `$${(totalShippingCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}</span>
+              </div>
+            </div>`;
+        }
+        const single = shippingLines[0];
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin:8px 0 0;gap:12px;">
+            <span style="color:#a8a29e;font-size:13px;">Shipping</span>
+            <span style="white-space:nowrap;color:#d6d3d1;font-size:13px;">${single.amountCents === 0 ? "Free" : `$${(single.amountCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}</span>
+          </div>`;
+      })()
+    : "";
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Order Confirmed</h1>
     <p style="color:#78716c;margin-bottom:0;">Your payment was received. Here's your receipt.</p>
     ${card(`
       <p style="margin:0 0 12px;font-size:12px;color:#78716c;">Order ref: <code style="color:#d6d3d1;">${escHtml(sessionId)}</code></p>
       ${itemRows}
+      ${shippingSection}
       <p style="margin:12px 0 0;font-size:16px;border-top:1px solid #3c3835;padding-top:12px;">
         Total: <strong style="color:#fcd34d;">$${(amountTotalCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
       </p>

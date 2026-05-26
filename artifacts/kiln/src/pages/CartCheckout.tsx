@@ -373,6 +373,11 @@ export default function CartCheckout() {
         imageUrl: (listing.imageUrl as string | undefined) ?? undefined,
         artistName: ((listing as unknown as Record<string, unknown>).artistName as string | undefined) ?? undefined,
       }));
+      const shippingBreakdown = perArtistShipping.map(({ artistId, artistName, cost }) => ({
+        artistId,
+        artistName,
+        amountCents: Math.round(cost * 100),
+      }));
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -382,6 +387,7 @@ export default function CartCheckout() {
           customerEmail: addr.email || undefined,
           successPath: "/cart/success",
           cancelPath: "/cart/checkout",
+          shippingBreakdown,
         }),
       });
       const data = await res.json();
