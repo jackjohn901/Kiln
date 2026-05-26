@@ -585,7 +585,7 @@ export default function Settings() {
                   placeholder="you@example.com"
                   className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${emailValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-amber-500/50"}`}
                 />
-                {emailSaved && <span className="text-xs text-emerald-400 shrink-0">Saved ✓</span>}
+                <span className="text-xs text-emerald-400 shrink-0 transition-opacity" style={{ opacity: emailSaved ? 1 : 0, transitionDuration: emailSaved ? "180ms" : "200ms" }}>Saved ✓</span>
               </div>
               {emailValidationError && (
                 <p className="text-xs text-red-400 mt-1.5">Please enter a valid email address.</p>
