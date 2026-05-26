@@ -330,6 +330,7 @@ export default function OrderDetailScreen() {
                 params: {
                   userId: order.sellerId,
                   orderRef: order.title,
+                  orderId: order.id,
                 },
               })
             }

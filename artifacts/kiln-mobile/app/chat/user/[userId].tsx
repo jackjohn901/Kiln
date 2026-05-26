@@ -50,7 +50,7 @@ export default function ChatByUserScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { userId, orderRef } = useLocalSearchParams<{ userId: string; orderRef?: string }>();
+  const { userId, orderRef, orderId } = useLocalSearchParams<{ userId: string; orderRef?: string; orderId?: string }>();
   const { user } = useAuth();
 
   const [draft, setDraft] = useState("");
@@ -58,6 +58,9 @@ export default function ChatByUserScreen() {
   const [resolvedThreadId, setResolvedThreadId] = useState<string | null>(null);
   const [contextRef, setContextRef] = useState<string | undefined>(
     orderRef ? String(orderRef) : undefined
+  );
+  const [contextOrderId, setContextOrderId] = useState<string | undefined>(
+    orderId ? String(orderId) : undefined
   );
   const flatRef = useRef<FlatList>(null);
 
@@ -105,6 +108,7 @@ export default function ChatByUserScreen() {
     const text = contextRef ? `Re: ${contextRef}\n\n${rawText}` : rawText;
     setDraft("");
     setContextRef(undefined);
+    setContextOrderId(undefined);
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -227,14 +231,29 @@ export default function ChatByUserScreen() {
             ]}
           >
             <Feather name="tag" size={13} color={colors.primary} />
-            <Text
-              style={[styles.contextChipText, { color: colors.foreground }]}
-              numberOfLines={1}
-            >
-              Re: {contextRef}
-            </Text>
             <Pressable
-              onPress={() => setContextRef(undefined)}
+              onPress={() =>
+                contextOrderId
+                  ? router.push({
+                      pathname: "/orders/[id]" as any,
+                      params: { id: contextOrderId },
+                    })
+                  : undefined
+              }
+              style={styles.contextChipLabel}
+            >
+              <Text
+                style={[styles.contextChipText, { color: colors.foreground }]}
+                numberOfLines={1}
+              >
+                Re: {contextRef}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setContextRef(undefined);
+                setContextOrderId(undefined);
+              }}
               hitSlop={8}
               style={styles.contextChipDismiss}
             >
@@ -352,10 +371,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     maxWidth: "90%",
   },
+  contextChipLabel: {
+    flex: 1,
+  },
   contextChipText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    flex: 1,
   },
   contextChipDismiss: {
     marginLeft: 2,
