@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { SlidersHorizontal, ShoppingCart, Plus, Check, Heart, Loader2, Truck } from "lucide-react";
+import { SlidersHorizontal, ShoppingCart, Plus, Check, Heart, Loader2, Truck, MapPin } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 
@@ -12,47 +12,64 @@ interface ArtistShipping {
   internationalRate: number | null;
   freeThreshold: number | null;
   offerLocalPickup: boolean;
+  shipsTo: string[];
 }
 
 function ShippingBadge({ shipping }: { shipping: ArtistShipping | undefined }) {
   if (!shipping) return null;
-  if (shipping.offerFreeShipping) {
-    return (
-      <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-        <Truck size={9} />Free shipping
-      </span>
-    );
-  }
   const hasDomestic = shipping.domesticRate != null && shipping.domesticRate > 0;
   const hasInternational = shipping.internationalRate != null && shipping.internationalRate > 0;
   const hasThreshold = !shipping.offerFreeShipping && shipping.freeThreshold != null && shipping.freeThreshold > 0;
-  if (hasDomestic || hasInternational || shipping.offerLocalPickup || hasThreshold) {
-    return (
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        {hasThreshold && (
-          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-            <Truck size={9} />Free over ${shipping.freeThreshold}
-          </span>
-        )}
-        {hasDomestic && (
-          <span className="flex items-center gap-1 text-[10px] text-stone-500">
-            <Truck size={9} />US ${shipping.domesticRate}
-          </span>
-        )}
-        {hasInternational && (
-          <span className="flex items-center gap-1 text-[10px] text-sky-500">
-            <Truck size={9} />Intl ${shipping.internationalRate}
-          </span>
-        )}
-        {shipping.offerLocalPickup && (
-          <span className="flex items-center gap-1 text-[10px] text-sky-400">
-            <Truck size={9} />Pickup avail.
-          </span>
-        )}
-      </span>
-    );
-  }
-  return null;
+  const hasRates = shipping.offerFreeShipping || hasDomestic || hasInternational || shipping.offerLocalPickup || hasThreshold;
+  const regions = shipping.shipsTo ?? [];
+  if (!hasRates && regions.length === 0) return null;
+  return (
+    <span className="flex flex-col gap-1">
+      {hasRates && (
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          {shipping.offerFreeShipping ? (
+            <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+              <Truck size={9} />Free shipping
+            </span>
+          ) : (
+            <>
+              {hasThreshold && (
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
+                  <Truck size={9} />Free over ${shipping.freeThreshold}
+                </span>
+              )}
+              {hasDomestic && (
+                <span className="flex items-center gap-1 text-[10px] text-stone-500">
+                  <Truck size={9} />US ${shipping.domesticRate}
+                </span>
+              )}
+              {hasInternational && (
+                <span className="flex items-center gap-1 text-[10px] text-sky-500">
+                  <Truck size={9} />Intl ${shipping.internationalRate}
+                </span>
+              )}
+              {shipping.offerLocalPickup && (
+                <span className="flex items-center gap-1 text-[10px] text-sky-400">
+                  <Truck size={9} />Pickup avail.
+                </span>
+              )}
+            </>
+          )}
+        </span>
+      )}
+      {regions.length > 0 && (
+        <span className="flex flex-wrap items-center gap-1 mt-0.5">
+          <MapPin size={9} className="text-stone-600 shrink-0" />
+          <span className="text-[10px] text-stone-600">Ships to:</span>
+          {regions.map((region) => (
+            <span key={region} className="rounded-full border border-white/8 bg-stone-900/50 px-1.5 py-0.5 text-[10px] text-stone-400">
+              {region}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 const MEDIUMS = ["All", "Glass", "Metal", "Sculpture", "Fiber"];

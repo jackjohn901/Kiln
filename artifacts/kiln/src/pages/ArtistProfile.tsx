@@ -36,50 +36,67 @@ interface ArtistShipping {
   freeThreshold: number | null;
   offerLocalPickup: boolean;
   perItemRate: number | null;
+  shipsTo: string[];
 }
 
 function ShippingBadge({ shipping }: { shipping: ArtistShipping | null }) {
   if (!shipping) return null;
-  if (shipping.offerFreeShipping) {
-    return (
-      <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
-        <Truck size={12} />Free shipping
-      </span>
-    );
-  }
   const hasDomestic = shipping.domesticRate != null && shipping.domesticRate > 0;
   const hasInternational = shipping.internationalRate != null && shipping.internationalRate > 0;
   const hasThreshold = !shipping.offerFreeShipping && shipping.freeThreshold != null && shipping.freeThreshold > 0;
-  if (hasDomestic || hasInternational || shipping.offerLocalPickup || hasThreshold) {
-    return (
-      <span className="flex flex-col gap-0.5">
-        {hasThreshold && (
-          <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
-            <Truck size={12} />Free over ${shipping.freeThreshold}
-          </span>
-        )}
-        {hasDomestic && (
-          <span className="flex items-center gap-1 text-xs text-stone-400">
-            <Truck size={12} />US from ${shipping.domesticRate}
-            {shipping.perItemRate != null && shipping.perItemRate > 0 && (
-              <> + ${shipping.perItemRate} per additional item</>
-            )}
-          </span>
-        )}
-        {hasInternational && (
-          <span className="flex items-center gap-1 text-xs text-stone-400">
-            <Truck size={12} />International: ${shipping.internationalRate}
-          </span>
-        )}
-        {shipping.offerLocalPickup && (
-          <span className="flex items-center gap-1 text-xs text-sky-400">
-            <Truck size={12} />Local pickup available
-          </span>
-        )}
-      </span>
-    );
-  }
-  return null;
+  const hasRates = shipping.offerFreeShipping || hasDomestic || hasInternational || shipping.offerLocalPickup || hasThreshold;
+  const regions = shipping.shipsTo ?? [];
+  if (!hasRates && regions.length === 0) return null;
+  return (
+    <span className="flex flex-col gap-1">
+      {hasRates && (
+        <span className="flex flex-col gap-0.5">
+          {shipping.offerFreeShipping ? (
+            <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+              <Truck size={12} />Free shipping
+            </span>
+          ) : (
+            <>
+              {hasThreshold && (
+                <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                  <Truck size={12} />Free over ${shipping.freeThreshold}
+                </span>
+              )}
+              {hasDomestic && (
+                <span className="flex items-center gap-1 text-xs text-stone-400">
+                  <Truck size={12} />US from ${shipping.domesticRate}
+                  {shipping.perItemRate != null && shipping.perItemRate > 0 && (
+                    <> + ${shipping.perItemRate} per additional item</>
+                  )}
+                </span>
+              )}
+              {hasInternational && (
+                <span className="flex items-center gap-1 text-xs text-stone-400">
+                  <Truck size={12} />International: ${shipping.internationalRate}
+                </span>
+              )}
+              {shipping.offerLocalPickup && (
+                <span className="flex items-center gap-1 text-xs text-sky-400">
+                  <Truck size={12} />Local pickup available
+                </span>
+              )}
+            </>
+          )}
+        </span>
+      )}
+      {regions.length > 0 && (
+        <span className="flex flex-wrap items-center gap-1.5 mt-0.5">
+          <MapPin size={11} className="text-stone-600 shrink-0" />
+          <span className="text-[11px] text-stone-600">Ships to:</span>
+          {regions.map((region) => (
+            <span key={region} className="rounded-full border border-white/8 bg-stone-900/50 px-2 py-0.5 text-[11px] text-stone-400">
+              {region}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function findArtist(id: string, ownProfile?: UserProfile | null): Artist | undefined {
