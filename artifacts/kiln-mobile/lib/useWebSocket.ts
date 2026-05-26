@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 
@@ -34,11 +35,10 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     if (!domain) return;
 
     const url = `wss://${domain}/api/ws?userId=${encodeURIComponent(user.id)}`;
-    let ws: WebSocket;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     function connect() {
-      ws = new WebSocket(url);
+      const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
@@ -92,9 +92,30 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       };
     }
 
+    function reconnectIfNeeded() {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        if (retryTimer) {
+          clearTimeout(retryTimer);
+          retryTimer = null;
+        }
+        connect();
+      }
+    }
+
     connect();
 
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          reconnectIfNeeded();
+        }
+      }
+    );
+
     return () => {
+      appStateSubscription.remove();
       if (retryTimer) clearTimeout(retryTimer);
       wsRef.current?.close();
       wsRef.current = null;
