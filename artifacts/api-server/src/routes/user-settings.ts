@@ -133,6 +133,15 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     }
   }
 
+  // Validate phoneNumber if provided — empty string is allowed (clears the number)
+  if (typeof phoneNumber === "string") {
+    const trimmed = phoneNumber.trim();
+    if (trimmed.length > 0 && !/^[0-9\s\-+().]+$/.test(trimmed)) {
+      res.status(400).json({ error: "phoneNumber may only contain digits, spaces, dashes, plus signs, and parentheses" });
+      return;
+    }
+  }
+
   // Persist contactEmail and phoneNumber to profiles table if provided
   const profileUpdates: Record<string, string | null> = {};
   if (typeof contactEmail === "string") profileUpdates.contactEmail = contactEmail.trim() || null;
