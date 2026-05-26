@@ -66,6 +66,7 @@ export default function Settings() {
   const [shipping, setShipping] = useState<ShippingSettings>(readShippingSettings);
   const [shippingSaved, setShippingSaved] = useState(false);
   const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
+  const [samplePrice, setSamplePrice] = useState<number>(45);
   const [contactEmail, setContactEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState(false);
@@ -88,6 +89,7 @@ export default function Settings() {
         const source = active.length > 0 ? active : data.listings;
         const avg = Math.round(source.reduce((sum, l) => sum + l.price, 0) / source.length);
         setAvgListingPrice(avg);
+        setSamplePrice(avg);
       })
       .catch(() => {});
   }, []);
@@ -973,7 +975,33 @@ export default function Settings() {
 
               {/* Buyer preview */}
               <div>
-                <p className="text-xs text-stone-500 mb-2">Buyer preview</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-stone-500">Buyer preview</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-stone-600">Sample order:</span>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-stone-500 text-[10px]">$</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={9999}
+                        step={5}
+                        value={samplePrice}
+                        onChange={(e) => setSamplePrice(Math.max(0, Math.min(9999, Number(e.target.value) || 0)))}
+                        className="w-20 rounded-lg border border-white/10 bg-stone-800/80 pl-4 pr-2 py-1 text-[11px] text-stone-200 focus:border-amber-500/50 focus:outline-none text-right"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={500}
+                  step={5}
+                  value={Math.min(samplePrice, 500)}
+                  onChange={(e) => setSamplePrice(Number(e.target.value))}
+                  className="w-full h-1.5 mb-3 rounded-full appearance-none cursor-pointer accent-amber-500 bg-stone-700"
+                />
                 <div className="rounded-xl border border-white/8 bg-stone-800/40 overflow-hidden divide-y divide-white/5">
                   {(
                     [
@@ -981,10 +1009,8 @@ export default function Settings() {
                       { label: "International buyer", flag: "🌍", type: "international" as const },
                     ] as const
                   ).map(({ label, flag, type }) => {
-                    const sampleTotal = avgListingPrice ?? 45;
-                    const sampleLabel = avgListingPrice != null
-                      ? `Based on your listings avg. $${avgListingPrice}`
-                      : "Sample $45 order";
+                    const sampleTotal = samplePrice;
+                    const sampleLabel = `$${samplePrice} order${avgListingPrice != null ? ` · avg. $${avgListingPrice}` : ""}`;
                     const baseRate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
                     let cost: string;
                     let multiItemCost: string | null = null;

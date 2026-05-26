@@ -83,6 +83,7 @@ export default function ShippingSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
+  const [samplePrice, setSamplePrice] = useState<number>(45);
 
   useEffect(() => {
     apiGet<{ shippingSettings?: Partial<ShippingSettings> }>("/api/me/settings")
@@ -103,6 +104,7 @@ export default function ShippingSettingsScreen() {
         const source = active.length > 0 ? active : data.listings;
         const avg = Math.round(source.reduce((sum, l) => sum + l.price, 0) / source.length);
         setAvgListingPrice(avg);
+        setSamplePrice(avg);
       })
       .catch(() => {});
   }, []);
@@ -241,9 +243,27 @@ export default function ShippingSettingsScreen() {
 
             {/* Buyer preview */}
             <View style={styles.previewSection}>
-              <Text style={[styles.previewHeading, { color: colors.mutedForeground }]}>
-                Buyer preview
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <Text style={[styles.previewHeading, { color: colors.mutedForeground, marginBottom: 0 }]}>
+                  Buyer preview
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Sample order:</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.card, paddingHorizontal: 8, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>$</Text>
+                    <TextInput
+                      keyboardType="numeric"
+                      value={String(samplePrice)}
+                      onChangeText={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!isNaN(n)) setSamplePrice(Math.max(0, Math.min(9999, n)));
+                        else if (v === "") setSamplePrice(0);
+                      }}
+                      style={{ fontSize: 11, color: colors.foreground, minWidth: 40, textAlign: "right" }}
+                    />
+                  </View>
+                </View>
+              </View>
               <View style={[styles.previewCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
                 {(
                   [
@@ -251,10 +271,8 @@ export default function ShippingSettingsScreen() {
                     { label: "International buyer", flag: "🌍", type: "international" as const },
                   ] as const
                 ).map(({ label, flag, type }, idx) => {
-                  const sampleTotal = avgListingPrice ?? 45;
-                  const sampleLabel = avgListingPrice != null
-                    ? `Based on your listings avg. $${avgListingPrice}`
-                    : "Sample $45 order";
+                  const sampleTotal = samplePrice;
+                  const sampleLabel = `$${samplePrice} order${avgListingPrice != null ? ` · avg. $${avgListingPrice}` : ""}`;
                   const baseRate = type === "domestic" ? shipping.domesticRate : shipping.internationalRate;
                   let cost: string;
                   let multiItemCost: string | null = null;
