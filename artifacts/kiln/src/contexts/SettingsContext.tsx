@@ -19,6 +19,7 @@ export interface KilnSettings {
   notif_email_new_patron: boolean;
   notif_email_outbid: boolean;
   notif_email_mentions: boolean;
+  notif_email_shipped: boolean;
   notif_sms_paused: boolean;
   notif_sms_outbid: boolean;
   notif_sms_drops: boolean;
@@ -53,6 +54,7 @@ export function defaultSettings(): KilnSettings {
     notif_email_new_patron: true,
     notif_email_outbid: true,
     notif_email_mentions: true,
+    notif_email_shipped: true,
     notif_sms_paused: false,
     notif_sms_outbid: true,
     notif_sms_drops: true,

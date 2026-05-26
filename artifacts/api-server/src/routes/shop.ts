@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
 import { sendEmailWithRetry, shippingNotificationEmail } from "../lib/email";
+import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -336,12 +337,14 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
 
         // SMS + email
         Promise.all([
-          db.select({ settings: userSettingsTable.settings }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
+          db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
           db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, updated.buyerId)),
           db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
         ]).then(([[s], [prof], [buyer]]) => {
-          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", s?.settings as Record<string, unknown> | null, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`);
-          if (buyer?.email) {
+          const buyerSettings = s?.settings as Record<string, unknown> | null;
+          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`);
+          const wantsEmail = !isEmailPaused(buyerSettings, s?.notifEmailResumeAt) && buyerSettings?.notif_email_shipped !== false;
+          if (buyer?.email && wantsEmail) {
             sendEmailWithRetry(
               {
                 to: buyer.email,
