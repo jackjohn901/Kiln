@@ -101,6 +101,11 @@ export default function CartSuccess() {
             if (Array.isArray(d.perSellerWindows) && d.perSellerWindows.length > 0) {
               setPerSellerWindows(d.perSellerWindows);
             }
+          } else if (res.status === 401) {
+            // Session expired during the Stripe redirect — payment was processed but the
+            // user is no longer authenticated. Order rows were created by the webhook and
+            // will be visible once they sign in again. Degrade gracefully without showing
+            // an error so the success page is still meaningful.
           } else {
             let message = "We couldn't complete your order because one or more items are no longer available. Please contact support.";
             try {

@@ -154,7 +154,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
 
     const basePath = process.env.BASE_PATH ?? '';
 
-    const userId = req.isAuthenticated() ? req.user.id : undefined;
+    const userId = req.user.id;
 
     // Embed server-resolved listing IDs and quantities in session metadata so that
     // order creation after success can derive line items from a trusted source,
@@ -307,7 +307,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
         // but reserved keys cannot appear in safeExtraMeta (enforced above).
         ...safeExtraMeta,
         platform: 'kiln',
-        ...(userId ? { userId } : {}),
+        userId,
         // Trusted server-side record of what was purchased (for order creation).
         ...(sessionListingIds ? { listingIds: sessionListingIds, listingQtys: sessionListingQtys } : {}),
         // Flag manual-payout sessions so the webhook can send a buyer receipt.

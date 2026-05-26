@@ -7,6 +7,7 @@ import {
   MapPin,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
 import { artists } from "@/data/artists";
@@ -110,6 +111,7 @@ function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDo
 
 export default function CartCheckout() {
   const [, navigate] = useLocation();
+  const { isAuthenticated, login } = useAuth();
   const { items, subtotal, itemCount, clearCart, removeItem } = useCart();
   const [step, setStep] = useState<Step>("address");
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDR);
@@ -309,6 +311,10 @@ export default function CartCheckout() {
 
   async function handleStripeCheckout() {
     if (!addrValid()) return;
+    if (!isAuthenticated) {
+      login();
+      return;
+    }
     setCheckingOut(true);
     setCheckoutError("");
     setNoPayoutMethod(false);
