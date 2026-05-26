@@ -202,7 +202,18 @@ function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artis
   const [mode, setMode] = useState<"domestic" | "international">("domestic");
   const [zip, setZip] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [country, setCountry] = useState("");
+  const [country, setCountry] = useState<string>(
+    () => localStorage.getItem("kiln_shipping_country") ?? ""
+  );
+
+  const handleCountryChange = (code: string) => {
+    setCountry(code);
+    if (code) {
+      localStorage.setItem("kiln_shipping_country", code);
+    } else {
+      localStorage.removeItem("kiln_shipping_country");
+    }
+  };
 
   const domesticEstimates = submitted ? estimateShipping(listing, zip) : null;
   const intlEstimates = country ? estimateInternational(listing, country, artistShipping) : null;
@@ -285,7 +296,7 @@ function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artis
             <>
               <select
                 value={country}
-                onChange={(e) => setCountry(e.target.value)}
+                onChange={(e) => handleCountryChange(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 focus:border-amber-500/40 focus:outline-none"
               >
                 <option value="">Select your country…</option>
