@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Heart, Bookmark, FlaskConical, Flame, X, Plus, ChevronDown, ChevronUp, Info, Check } from "lucide-react";
 import Nav from "@/components/Nav";
+import BetaBanner from "@/components/BetaBanner";
 
 interface Ingredient { name: string; amount: number; }
 interface GlazeRecipe {
@@ -448,9 +449,10 @@ export default function GlazeLibrary() {
     <div className="min-h-screen bg-stone-950 text-stone-100">
       <Nav />
       <div className="max-w-4xl mx-auto px-4 pt-20 pb-32">
+        <BetaBanner label="Glaze Library" />
 
         {/* Hero */}
-        <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="mt-4 mb-8 flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <FlaskConical size={20} className="text-amber-400" />

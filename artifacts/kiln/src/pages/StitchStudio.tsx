@@ -6,6 +6,7 @@ import {
   Clock, Flame, AlertCircle,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import BetaBanner from "@/components/BetaBanner";
 import { getReelById, ALL_REELS } from "@/data/reels";
 import { useUpload } from "@/hooks/useUpload";
 
@@ -97,7 +98,8 @@ export default function StitchStudio() {
     <div className="min-h-screen bg-stone-950 text-stone-200 pb-24">
       <Nav />
       <div className="mx-auto max-w-lg px-4 pt-4">
-        <Link href="/" className="mb-4 flex items-center gap-1 text-sm text-stone-400 hover:text-stone-200 transition-colors">
+        <BetaBanner label="Stitch Studio" />
+        <Link href="/" className="mt-4 mb-4 flex items-center gap-1 text-sm text-stone-400 hover:text-stone-200 transition-colors">
           <ChevronLeft size={16} /> Back to feed
         </Link>
 

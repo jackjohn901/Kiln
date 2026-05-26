@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import BetaBanner from "@/components/BetaBanner";
 import { listings } from "@/data/listings";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -187,8 +188,9 @@ export default function InspirationBoards() {
       <Nav />
       <div className="mx-auto max-w-4xl px-4 py-8 pb-24">
 
+        <BetaBanner label="Inspiration Boards" />
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mt-4 mb-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
               {view !== "boards" && (

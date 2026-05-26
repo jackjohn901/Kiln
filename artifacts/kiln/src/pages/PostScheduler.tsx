@@ -6,6 +6,7 @@ import {
   Edit2, Trash2, Send, CheckCircle, AlertCircle, ChevronRight, X
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import BetaBanner from "@/components/BetaBanner";
 
 type PostStatus = "draft" | "scheduled" | "published" | "failed";
 type PostType = "reel" | "photo" | "journal";
@@ -237,8 +238,9 @@ export default function PostScheduler() {
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="mx-auto max-w-3xl px-4 pb-32 pt-6">
+        <BetaBanner label="Post Scheduler" />
 
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-6 mt-4 flex items-center gap-3">
           <Link href="/create" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
             <ChevronLeft size={16} />
           </Link>

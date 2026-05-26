@@ -11,6 +11,7 @@ import { seedArtists } from "@/data/seedArtists";
 import { ALL_REELS } from "@/data/reels";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
+import BetaBanner from "@/components/BetaBanner";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -206,7 +207,8 @@ export default function DuetStudio() {
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="mx-auto max-w-3xl px-4 py-8 pb-24">
-        <div className="mb-8">
+        <BetaBanner label="Duet Studio" />
+        <div className="mt-4 mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/15 border border-amber-500/20">
               <SplitSquareHorizontal size={18} className="text-amber-400" />

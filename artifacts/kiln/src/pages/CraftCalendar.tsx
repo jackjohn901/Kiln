@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, ChevronRight, MapPin, Clock, Users, ExternalLink, Briefcase, Calendar } from "lucide-react";
 import Nav from "@/components/Nav";
+import BetaBanner from "@/components/BetaBanner";
 import { OPPORTUNITIES, daysUntilDeadline } from "@/data/opportunities";
 import { GUILDS } from "@/data/guilds";
 
@@ -142,8 +143,9 @@ export default function CraftCalendar() {
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="mx-auto max-w-3xl px-4 pb-20 pt-6">
+        <BetaBanner label="Craft Calendar" />
         {/* Header */}
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mt-4 mb-6 flex items-center gap-3">
           <Link href="/" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
             <ChevronLeft size={16} />
           </Link>

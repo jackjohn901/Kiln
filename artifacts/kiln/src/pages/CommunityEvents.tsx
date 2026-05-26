@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import BetaBanner from "@/components/BetaBanner";
 
 const STORAGE_KEY = "kiln_event_rsvps_v1";
 const CUSTOM_KEY = "kiln_custom_events_v1";
@@ -237,8 +238,9 @@ export default function CommunityEvents() {
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
       <div className="mx-auto max-w-3xl px-4 pb-32 pt-6">
+        <BetaBanner label="Community Events" />
 
-        <div className="mb-7 flex items-center justify-between gap-4">
+        <div className="mt-4 mb-7 flex items-center justify-between gap-4">
           <div>
             <h1 className="font-serif text-3xl text-amber-100 flex items-center gap-2">
               <Flame size={22} className="text-amber-400" /> Community Events
