@@ -176,7 +176,12 @@ function SliderRow({ label, value, min, max, def, fmt, onChange }: {
     <div className="flex items-center gap-2">
       <span className="w-20 shrink-0 text-xs text-stone-400">{label}</span>
       <input type="range" min={min} max={max} value={value}
-        onChange={(e) => onChange(Number(e.target.value))} className="flex-1 accent-amber-400" />
+        onChange={(e) => onChange(Number(e.target.value))}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.preventDefault()}
+        className="flex-1 accent-amber-400"
+        style={{ touchAction: "none" }}
+      />
       <button onClick={() => onChange(def)}
         className={`w-9 text-right text-xs tabular-nums transition-colors ${active ? "text-amber-400 hover:text-amber-300" : "text-stone-600 cursor-default"}`}>
         {display}

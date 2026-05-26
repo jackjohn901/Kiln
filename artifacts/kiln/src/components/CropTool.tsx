@@ -319,7 +319,12 @@ export default function CropTool({ src, onApply, onCancel }: Props) {
           </div>
         </div>
         <input type="range" min={-20} max={20} step={0.5} value={fineTune}
-          onChange={(e) => setFineTune(Number(e.target.value))} className="w-full accent-amber-400" />
+          onChange={(e) => setFineTune(Number(e.target.value))}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.preventDefault()}
+          className="w-full accent-amber-400"
+          style={{ touchAction: "none" }}
+        />
         <div className="flex justify-between text-[10px] text-stone-600">
           <span>−20°</span><span>−10°</span><span>0°</span><span>+10°</span><span>+20°</span>
         </div>

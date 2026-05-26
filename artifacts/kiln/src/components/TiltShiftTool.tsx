@@ -145,7 +145,12 @@ export default function TiltShiftTool({ previewUrl, onApply }: Props) {
             <span className="tabular-nums text-amber-400">{focus}%</span>
           </div>
           <input type="range" min={10} max={90} value={focus}
-            onChange={(e) => setFocus(Number(e.target.value))} className="w-full accent-amber-400" />
+            onChange={(e) => setFocus(Number(e.target.value))}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.preventDefault()}
+            className="w-full accent-amber-400"
+            style={{ touchAction: "none" }}
+          />
           <div className="flex justify-between text-[10px] text-stone-600">
             <span>Top</span><span>Middle</span><span>Bottom</span>
           </div>
@@ -158,7 +163,12 @@ export default function TiltShiftTool({ previewUrl, onApply }: Props) {
             <span className="tabular-nums text-amber-400">{band}%</span>
           </div>
           <input type="range" min={5} max={80} value={band}
-            onChange={(e) => setBand(Number(e.target.value))} className="w-full accent-amber-400" />
+            onChange={(e) => setBand(Number(e.target.value))}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.preventDefault()}
+            className="w-full accent-amber-400"
+            style={{ touchAction: "none" }}
+          />
           <div className="flex justify-between text-[10px] text-stone-600">
             <span>Narrow</span><span>Medium</span><span>Wide</span>
           </div>
@@ -171,7 +181,12 @@ export default function TiltShiftTool({ previewUrl, onApply }: Props) {
             <span className="tabular-nums text-amber-400">{blur}</span>
           </div>
           <input type="range" min={2} max={20} value={blur}
-            onChange={(e) => setBlur(Number(e.target.value))} className="w-full accent-amber-400" />
+            onChange={(e) => setBlur(Number(e.target.value))}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.preventDefault()}
+            className="w-full accent-amber-400"
+            style={{ touchAction: "none" }}
+          />
           <div className="flex justify-between text-[10px] text-stone-600">
             <span>Subtle</span><span>Medium</span><span>Strong</span>
           </div>

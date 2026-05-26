@@ -200,7 +200,12 @@ export default function WatermarkTool({ previewUrl, onApply }: Props) {
       <div className="flex items-center gap-3">
         <span className="text-xs text-stone-500 w-10">Opacity</span>
         <input type="range" min={20} max={100} value={opacity}
-          onChange={(e) => setOpacity(Number(e.target.value))} className="flex-1 accent-amber-400" />
+          onChange={(e) => setOpacity(Number(e.target.value))}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.preventDefault()}
+          className="flex-1 accent-amber-400"
+          style={{ touchAction: "none" }}
+        />
         <span className="w-8 text-right text-xs tabular-nums text-stone-500">{opacity}%</span>
       </div>
 
