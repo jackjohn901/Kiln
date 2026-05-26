@@ -299,6 +299,7 @@ interface SocialContextType extends SocialState {
   unreadMessageCount: number;
   markThreadRead: (threadId: string) => void;
   refreshUnreadMessageCount: () => void;
+  decrementUnreadMessageCount: (n: number) => void;
   lastNewMessagePing: { senderName: string; senderAvatarUrl: string | null; threadId: string } | null;
   clearNewMessagePing: () => void;
   setActiveMessageThreadId: (id: string | null) => void;
@@ -864,6 +865,13 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     fetchUnreadMessageCount();
   }, [fetchUnreadMessageCount]);
 
+  const decrementUnreadMessageCount = useCallback((n: number) => {
+    if (n <= 0) return;
+    setApiUnreadMessageCount((prev) => Math.max(0, (prev ?? 0) - n));
+    // Reconcile with server asynchronously
+    fetchUnreadMessageCount();
+  }, [fetchUnreadMessageCount]);
+
   const quoteInquiry = useCallback((id: string, quote: CommissionQuote) => {
     fetch(`/api/commissions/${id}`, {
       method: "PATCH",
@@ -942,6 +950,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         unreadMessageCount,
         markThreadRead,
         refreshUnreadMessageCount: fetchUnreadMessageCount,
+        decrementUnreadMessageCount,
         lastNewMessagePing,
         clearNewMessagePing,
         setActiveMessageThreadId,

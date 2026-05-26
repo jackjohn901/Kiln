@@ -209,7 +209,7 @@ export default function Messages() {
   const [composeSearch, setComposeSearch] = useState("");
   const params = useParams<{ participantId?: string }>();
   const { profile } = useProfile();
-  const { threads, sendDirectMessage, markThreadRead, refreshUnreadMessageCount, clearNewMessagePing, setActiveMessageThreadId } = useSocial();
+  const { threads, sendDirectMessage, markThreadRead, refreshUnreadMessageCount, decrementUnreadMessageCount, clearNewMessagePing, setActiveMessageThreadId } = useSocial();
   const { subscribe } = useWebSocket();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [newMsg, setNewMsg] = useState("");
@@ -534,6 +534,14 @@ export default function Messages() {
   async function openApiThread(id: string) {
     setActiveApiThreadId(id);
     setActiveThreadId(null);
+
+    // Optimistically clear the nav badge immediately — don't wait for the server round-trip
+    const currentUnread = apiThreads.find(t => t.id === id)?.unreadCount ?? 0;
+    if (currentUnread > 0) {
+      decrementUnreadMessageCount(currentUnread);
+      setApiThreads(prev => prev.map(t => t.id === id ? { ...t, unreadCount: 0 } : t));
+    }
+
     try {
       const [r] = await Promise.all([
         fetch(`/api/messages/threads/${id}`, { credentials: "include" }),
