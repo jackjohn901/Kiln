@@ -248,11 +248,12 @@ export default function SaleDetailScreen() {
   const canEditTracking = sale.status === "shipped" && isPhysical;
   const hasDeliveryEstimate =
     sale.processingWindowLabel !== null || sale.processingWindowDays !== null;
-  const deliveryEstimateText = sale.processingWindowLabel
+  const baseEstimate = sale.processingWindowLabel
     ? sale.processingWindowLabel
     : sale.processingWindowDays === 1
       ? "1 business day"
       : `${sale.processingWindowDays} business days`;
+  const deliveryEstimateText = `Ships within ${baseEstimate}`;
   const statusActions = getStatusActions(sale.status);
 
   return (
@@ -353,7 +354,7 @@ export default function SaleDetailScreen() {
               <View style={styles.infoRow}>
                 <Feather name="clock" size={14} color={colors.primary} />
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
-                  Processing:{" "}
+                  Processing time:{" "}
                   <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>
                     {deliveryEstimateText}
                   </Text>
