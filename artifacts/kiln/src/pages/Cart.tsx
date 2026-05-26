@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles } from "lucide-react";
+import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
@@ -108,6 +108,28 @@ export default function Cart() {
     return acc;
   }, {});
   const bundleEligible = Object.values(artistGroups).some((group) => group.length >= 2);
+
+  // Free-shipping proximity nudges: show when subtotal is within 20% below the threshold
+  const FREE_SHIPPING_GAP = 0.20;
+  interface FreeShippingNudge { artistId: string; threshold: number; subtotal: number; amountNeeded: number; progress: number; }
+  const freeShippingNudges: FreeShippingNudge[] = [];
+  if (shippingRates.size > 0) {
+    for (const [aid, info] of shippingRates.entries()) {
+      if (!info.freeThreshold || info.offerFreeShipping) continue;
+      const artistSub = artistSubtotals.get(aid) ?? 0;
+      if (artistSub >= info.freeThreshold) continue; // already qualifies
+      const lowerBound = info.freeThreshold * (1 - FREE_SHIPPING_GAP);
+      if (artistSub >= lowerBound) {
+        freeShippingNudges.push({
+          artistId: aid,
+          threshold: info.freeThreshold,
+          subtotal: artistSub,
+          amountNeeded: info.freeThreshold - artistSub,
+          progress: Math.max(0, Math.min(1, artistSub / info.freeThreshold)),
+        });
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -231,6 +253,50 @@ export default function Cart() {
                 </div>
               </motion.div>
             )}
+
+            {/* Free-shipping proximity nudges */}
+            <AnimatePresence>
+              {freeShippingNudges.map((nudge) => (
+                <motion.div
+                  key={nudge.artistId}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                      <Truck size={16} className="text-emerald-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-emerald-100">Almost free shipping!</p>
+                        <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-bold text-emerald-400 flex items-center gap-0.5">
+                          <PackageCheck size={8} />SO CLOSE
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-400 mb-2">
+                        Add <span className="font-semibold text-emerald-300">${nudge.amountNeeded.toLocaleString()}</span> more from{" "}
+                        <span className="text-stone-300">{nudge.artistId}</span> to unlock free shipping.
+                      </p>
+                      {/* Progress bar */}
+                      <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${nudge.progress * 100}%` }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-between text-[10px] text-stone-600">
+                        <span>${nudge.subtotal.toLocaleString()}</span>
+                        <span>${nudge.threshold.toLocaleString()} for free shipping</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
             {/* Order summary */}
             <div className="mt-2 rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-3">
