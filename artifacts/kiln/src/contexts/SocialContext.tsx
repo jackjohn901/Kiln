@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -298,6 +298,9 @@ interface SocialContextType extends SocialState {
   unreadMessageCount: number;
   markThreadRead: (threadId: string) => void;
   refreshUnreadMessageCount: () => void;
+  lastNewMessagePing: { senderName: string; senderAvatarUrl: string | null; threadId: string } | null;
+  clearNewMessagePing: () => void;
+  setActiveMessageThreadId: (id: string | null) => void;
   quoteInquiry: (id: string, quote: CommissionQuote) => void;
   addReview: (review: Omit<ShopReview, "id" | "createdAt">) => void;
   getReviews: (listingId: string) => ShopReview[];
@@ -475,10 +478,37 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     fetchUnreadMessageCount();
   }, [isAuthenticated, fetchUnreadMessageCount]);
 
+  // Track new-message pings for the nav toast
+  const [lastNewMessagePing, setLastNewMessagePing] = useState<{
+    senderName: string;
+    senderAvatarUrl: string | null;
+    threadId: string;
+  } | null>(null);
+
+  // Ref so WS handler always sees the latest active thread without needing re-subscription
+  const activeMessageThreadIdRef = useRef<string | null>(null);
+
+  const clearNewMessagePing = useCallback(() => setLastNewMessagePing(null), []);
+
+  const setActiveMessageThreadId = useCallback((id: string | null) => {
+    activeMessageThreadIdRef.current = id;
+    // Clear any stale ping for the thread being opened
+    if (id !== null) setLastNewMessagePing(prev => (prev?.threadId === id ? null : prev));
+  }, []);
+
   // Refresh unread message count when an incoming message WebSocket event arrives
+  // and set a ping so Nav can show a toast (skipped for the actively viewed thread)
   useEffect(() => {
-    const unsub = wsSubscribe("message", () => {
+    const unsub = wsSubscribe("message", (evt) => {
+      const e = evt as { threadId?: string; senderId?: string; senderName?: string; senderAvatarUrl?: string | null };
       fetchUnreadMessageCount();
+      if (e.threadId && e.senderName && e.threadId !== activeMessageThreadIdRef.current) {
+        setLastNewMessagePing({
+          senderName: e.senderName,
+          senderAvatarUrl: e.senderAvatarUrl ?? null,
+          threadId: e.threadId,
+        });
+      }
     });
     return unsub;
   }, [wsSubscribe, fetchUnreadMessageCount]);
@@ -903,6 +933,9 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         unreadMessageCount,
         markThreadRead,
         refreshUnreadMessageCount: fetchUnreadMessageCount,
+        lastNewMessagePing,
+        clearNewMessagePing,
+        setActiveMessageThreadId,
         quoteInquiry,
         addReview,
         getReviews,

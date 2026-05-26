@@ -209,7 +209,7 @@ export default function Messages() {
   const [composeSearch, setComposeSearch] = useState("");
   const params = useParams<{ participantId?: string }>();
   const { profile } = useProfile();
-  const { threads, sendDirectMessage, markThreadRead, refreshUnreadMessageCount } = useSocial();
+  const { threads, sendDirectMessage, markThreadRead, refreshUnreadMessageCount, clearNewMessagePing, setActiveMessageThreadId } = useSocial();
   const { subscribe } = useWebSocket();
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [newMsg, setNewMsg] = useState("");
@@ -236,6 +236,12 @@ export default function Messages() {
   // Keep a ref so WS handlers always see the latest value without needing re-subscription
   const activeApiThreadIdRef = useRef<string | null>(null);
   useEffect(() => { activeApiThreadIdRef.current = activeApiThreadId; }, [activeApiThreadId]);
+
+  // Tell SocialContext which thread is currently open so it can suppress pings for it
+  useEffect(() => {
+    setActiveMessageThreadId(activeApiThreadId);
+    return () => { setActiveMessageThreadId(null); };
+  }, [activeApiThreadId, setActiveMessageThreadId]);
 
   useEffect(() => {
     if (!params.participantId) {
@@ -314,7 +320,7 @@ export default function Messages() {
       const openThreadId = activeApiThreadIdRef.current;
 
       if (threadId === openThreadId) {
-        // Message arrived in the currently open thread — fetch latest messages and mark read
+        // Message arrived in the currently open thread — fetch latest and mark read
         Promise.all([
           fetch(`/api/messages/threads/${threadId}`, { credentials: "include" }),
           fetch(`/api/messages/threads/${threadId}/read`, { method: "POST", credentials: "include" }),

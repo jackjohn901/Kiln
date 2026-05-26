@@ -247,7 +247,14 @@ router.post("/messages/send", async (req, res): Promise<void> => {
       .set({ lastMessageAt: new Date(), lastMessageText: lastMsgPreview, lastMessageAttachmentUrl: attachmentUrl ?? null })
       .where(eq(messageThreadsTable.id, thread.id));
 
-    broadcast(recipientId, { type: "message", threadId: thread.id, senderId, recipientId });
+    broadcast(recipientId, {
+      type: "message",
+      threadId: thread.id,
+      senderId,
+      recipientId,
+      senderName: message.senderName,
+      senderAvatarUrl: message.senderAvatarUrl,
+    });
 
     res.status(201).json({
       ...message,

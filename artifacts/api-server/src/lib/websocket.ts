@@ -8,7 +8,7 @@ export type WsEvent =
   | { type: "follow"; followerId: string; followingId: string }
   | { type: "comment"; postId: string; commentId: string; authorId: string }
   | { type: "notification"; userId: string; text: string; link?: string; notifType?: string; fromName?: string }
-  | { type: "message"; threadId: string; senderId: string; recipientId: string }
+  | { type: "message"; threadId: string; senderId: string; recipientId: string; senderName: string; senderAvatarUrl: string | null }
   | { type: "typing"; threadId: string; userId: string }
   | { type: "bid"; auctionId: string; currentBid: number; bidCount: number; bidderName: string; bidAt?: string }
   | { type: "firing-viewers"; firingId: string; count: number }

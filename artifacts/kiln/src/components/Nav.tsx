@@ -8,17 +8,26 @@ import { useCart } from "@/contexts/CartContext";
 import { useStripeConnect } from "@/contexts/StripeConnectContext";
 import NotificationPanel from "@/components/NotificationPanel";
 import GlobalSearch from "@/components/GlobalSearch";
+import MessageToast from "@/components/MessageToast";
 
 export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, clearNewMessagePing } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [messagePulse, setMessagePulse] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!lastNewMessagePing) return;
+    setMessagePulse(true);
+    const t = setTimeout(() => setMessagePulse(false), 2000);
+    return () => clearTimeout(t);
+  }, [lastNewMessagePing]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -179,13 +188,21 @@ export default function Nav() {
             {/* Messages */}
             <Link
               href="/messages"
-              className="relative flex h-8 w-8 items-center justify-center rounded-full border border-stone-700 text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors"
+              className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors ${
+                messagePulse ? "border-blue-400/60 text-blue-300" : "border-stone-700"
+              }`}
               title="Messages"
             >
-              <MessageCircle size={15} />
+              <MessageCircle size={15} className={messagePulse ? "animate-bounce" : ""} />
               {unreadMessageCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white">
+                <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white ${messagePulse ? "animate-ping-once" : ""}`}>
                   {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
+                </span>
+              )}
+              {messagePulse && unreadMessageCount === 0 && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
                 </span>
               )}
             </Link>
@@ -338,6 +355,15 @@ export default function Nav() {
       <AnimatePresence>
         {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
       </AnimatePresence>
+
+      {lastNewMessagePing && (
+        <MessageToast
+          senderName={lastNewMessagePing.senderName}
+          senderAvatarUrl={lastNewMessagePing.senderAvatarUrl}
+          threadId={lastNewMessagePing.threadId}
+          onDismiss={clearNewMessagePing}
+        />
+      )}
     </>
   );
 }
