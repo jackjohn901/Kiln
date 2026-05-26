@@ -175,6 +175,7 @@ export default function OrderDetail() {
   const [buyerProfile, setBuyerProfile] = useState<BuyerProfile | null>(null);
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [buyerEmail, setBuyerEmail] = useState<string | null>(null);
+  const [perSellerWindows, setPerSellerWindows] = useState<{ sellerName: string; days: number | null; label: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -214,6 +215,9 @@ export default function OrderDetail() {
         if (data.buyerProfile) setBuyerProfile(data.buyerProfile as BuyerProfile);
         if (data.sellerProfile) setSellerProfile(data.sellerProfile as SellerProfile);
         if (data.buyerEmail) setBuyerEmail(data.buyerEmail as string);
+        if (Array.isArray(data.perSellerWindows) && data.perSellerWindows.length > 0) {
+          setPerSellerWindows(data.perSellerWindows as { sellerName: string; days: number | null; label: string | null }[]);
+        }
       } catch {
         // network error — leave as not found
       } finally {
@@ -682,7 +686,32 @@ export default function OrderDetail() {
 
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Fulfillment</p>
-          {hasDeliveryEstimate ? (
+          {perSellerWindows.length > 1 ? (
+            <div className="flex items-start gap-2.5">
+              <Clock size={15} className={`shrink-0 mt-0.5 ${isActive ? "text-amber-400" : "text-stone-600"}`} />
+              <div className="flex-1">
+                <p className={`text-sm font-semibold mb-2 ${isActive ? "text-amber-300" : "text-stone-500"}`}>
+                  Processing time by artist
+                </p>
+                <ul className="space-y-1.5">
+                  {perSellerWindows.map((w, i) => (
+                    <li key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-stone-300 font-medium">{w.sellerName}</span>
+                      <span className="text-stone-400 tabular-nums">
+                        {w.label
+                          ? w.label
+                          : w.days === null
+                            ? "Not specified"
+                            : w.days === 1
+                              ? "1 business day"
+                              : `${w.days} business days`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : hasDeliveryEstimate ? (
             <div className="flex items-start gap-2.5">
               <Clock size={15} className={`shrink-0 mt-0.5 ${isActive ? "text-amber-400" : "text-stone-600"}`} />
               <div>

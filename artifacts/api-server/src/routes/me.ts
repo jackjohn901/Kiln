@@ -144,19 +144,20 @@ router.get("/me/orders/cart/:sessionKey", async (req, res): Promise<void> => {
     // Use the first sibling as the "primary" order for top-level receipt fields.
     const order = siblingOrders[0]!;
 
-    const [buyerProfileRow, sellerProfileRow, buyerUserRow] = await Promise.all([
+    // Collect unique seller IDs across all sibling orders for profile + window lookups.
+    const allSellerIds = [...new Set(siblingOrders.map((o) => o.sellerId).filter((id): id is string => !!id))];
+
+    const [buyerProfileRow, allSellerProfileRows, buyerUserRow] = await Promise.all([
       db.select({ displayName: profilesTable.displayName, location: profilesTable.location })
         .from(profilesTable)
         .where(eq(profilesTable.userId, req.user.id))
         .limit(1)
         .then(r => r[0] ?? null),
-      order.sellerId
-        ? db.select({ displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
+      allSellerIds.length > 0
+        ? db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
             .from(profilesTable)
-            .where(eq(profilesTable.userId, order.sellerId))
-            .limit(1)
-            .then(r => r[0] ?? null)
-        : Promise.resolve(null),
+            .where(inArray(profilesTable.userId, allSellerIds))
+        : Promise.resolve([]),
       db.select({ email: usersTable.email })
         .from(usersTable)
         .where(eq(usersTable.id, req.user.id))
@@ -164,17 +165,31 @@ router.get("/me/orders/cart/:sessionKey", async (req, res): Promise<void> => {
         .then(r => r[0] ?? null),
     ]);
 
+    const sellerProfileMap = new Map(allSellerProfileRows.map((p) => [p.userId, p]));
+    const primarySellerRow = order.sellerId ? (sellerProfileMap.get(order.sellerId) ?? null) : null;
+
     const buyerProfile = buyerProfileRow
       ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
       : { displayName: null, location: null };
 
-    const sellerProfile = sellerProfileRow
-      ? { displayName: sellerProfileRow.displayName ?? null, handle: sellerProfileRow.handle ?? null, avatarUrl: sellerProfileRow.avatarUrl ?? null }
+    const sellerProfile = primarySellerRow
+      ? { displayName: primarySellerRow.displayName ?? null, handle: primarySellerRow.handle ?? null, avatarUrl: primarySellerRow.avatarUrl ?? null }
       : null;
 
     const buyerEmail = buyerUserRow?.email ?? null;
 
-    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail });
+    // Build per-seller processing windows for multi-seller cart display.
+    const seenCartSellerIds = new Set<string>();
+    const perSellerWindows = siblingOrders
+      .filter((o): o is typeof o & { sellerId: string } =>
+        typeof o.sellerId === "string" && !seenCartSellerIds.has(o.sellerId) && !!(seenCartSellerIds.add(o.sellerId) || true))
+      .map((o) => {
+        const p = sellerProfileMap.get(o.sellerId);
+        const sellerName = p?.displayName?.trim() || (p?.handle ? `@${p.handle}` : o.sellerId);
+        return { sellerName, days: o.processingWindowDays ?? null, label: o.processingWindowLabel ?? null };
+      });
+
+    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
   } catch (err) {
     logger.error({ err }, "me/orders/cart/:sessionKey GET error");
     res.status(500).json({ error: "Failed to load cart receipt" });
@@ -246,19 +261,21 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
         .where(and(eq(ordersTable.notes, order.notes), eq(ordersTable.buyerId, req.user.id)));
     }
 
-    const [buyerProfileRow, sellerProfileRow, buyerUserRow] = await Promise.all([
+    // Collect unique seller IDs across all sibling orders (or just the single order).
+    const ordersForSellers = siblingOrders.length > 0 ? siblingOrders : [order];
+    const allSellerIds = [...new Set(ordersForSellers.map((o) => o.sellerId).filter((id): id is string => !!id))];
+
+    const [buyerProfileRow, allSellerProfileRows, buyerUserRow] = await Promise.all([
       db.select({ displayName: profilesTable.displayName, location: profilesTable.location })
         .from(profilesTable)
         .where(eq(profilesTable.userId, req.user.id))
         .limit(1)
         .then(r => r[0] ?? null),
-      order.sellerId
-        ? db.select({ displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
+      allSellerIds.length > 0
+        ? db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, handle: profilesTable.handle, avatarUrl: profilesTable.avatarUrl })
             .from(profilesTable)
-            .where(eq(profilesTable.userId, order.sellerId))
-            .limit(1)
-            .then(r => r[0] ?? null)
-        : Promise.resolve(null),
+            .where(inArray(profilesTable.userId, allSellerIds))
+        : Promise.resolve([]),
       db.select({ email: usersTable.email })
         .from(usersTable)
         .where(eq(usersTable.id, req.user.id))
@@ -266,17 +283,33 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
         .then(r => r[0] ?? null),
     ]);
 
+    const sellerProfileMap = new Map(allSellerProfileRows.map((p) => [p.userId, p]));
+    const primarySellerRow = order.sellerId ? (sellerProfileMap.get(order.sellerId) ?? null) : null;
+
     const buyerProfile = buyerProfileRow
       ? { displayName: buyerProfileRow.displayName ?? null, location: buyerProfileRow.location ?? null }
       : { displayName: null, location: null };
 
-    const sellerProfile = sellerProfileRow
-      ? { displayName: sellerProfileRow.displayName ?? null, handle: sellerProfileRow.handle ?? null, avatarUrl: sellerProfileRow.avatarUrl ?? null }
+    const sellerProfile = primarySellerRow
+      ? { displayName: primarySellerRow.displayName ?? null, handle: primarySellerRow.handle ?? null, avatarUrl: primarySellerRow.avatarUrl ?? null }
       : null;
 
     const buyerEmail = buyerUserRow?.email ?? null;
 
-    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail });
+    // Build per-seller processing windows for multi-seller cart display.
+    const seenOrderSellerIds = new Set<string>();
+    const perSellerWindows = siblingOrders.length > 1
+      ? siblingOrders
+          .filter((o): o is typeof o & { sellerId: string } =>
+            typeof o.sellerId === "string" && !seenOrderSellerIds.has(o.sellerId) && !!(seenOrderSellerIds.add(o.sellerId) || true))
+          .map((o) => {
+            const p = sellerProfileMap.get(o.sellerId);
+            const sellerName = p?.displayName?.trim() || (p?.handle ? `@${p.handle}` : o.sellerId);
+            return { sellerName, days: o.processingWindowDays ?? null, label: o.processingWindowLabel ?? null };
+          })
+      : [];
+
+    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });
