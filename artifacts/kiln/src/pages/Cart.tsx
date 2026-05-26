@@ -22,10 +22,10 @@ async function fetchArtistShipping(artistId: string): Promise<ShippingRateInfo> 
   return { offerFreeShipping: false, domesticRate: null, internationalRate: null, perItemRate: null, freeThreshold: null };
 }
 
-function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, totalQty: number): number {
+function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDomestic: boolean, totalQty: number): number {
   if (info.offerFreeShipping) return 0;
   if (info.freeThreshold !== null && artistSubtotal >= info.freeThreshold) return 0;
-  const rate = info.domesticRate;
+  const rate = isDomestic ? info.domesticRate : (info.internationalRate ?? info.domesticRate);
   if (rate === null) return 0;
   const additionalItems = Math.max(0, totalQty - 1);
   const perItem = (info.perItemRate ?? 0) * additionalItems;
@@ -36,6 +36,19 @@ export default function Cart() {
   const { items, itemCount, subtotal, removeItem, updateQty, clearCart } = useCart();
   const [bundleApplied, setBundleApplied] = useState(false);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
+  const [isDomestic, setIsDomestic] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ defaultShippingAddress?: { country?: string } | null }> : null)
+      .then(data => {
+        const country = data?.defaultShippingAddress?.country;
+        if (country && typeof country === "string") {
+          setIsDomestic(country.trim().toUpperCase() === "US");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Stable key: only changes when the SET of artists changes, not on qty updates.
   // Shipping rate info (domestic rate, free threshold, etc.) is per-artist and
@@ -79,7 +92,7 @@ export default function Cart() {
       if (!info) continue;
       const adjSub = artistSub - (bundleApplied ? Math.round(artistSub * 0.10) : 0);
       if (info.offerFreeShipping || (info.freeThreshold !== null && adjSub >= info.freeThreshold)) continue;
-      const rate = info.domesticRate;
+      const rate = isDomestic ? info.domesticRate : (info.internationalRate ?? info.domesticRate);
       if (rate === null) continue;
       const qty = artistItemQtys.get(aid) ?? 1;
       const additional = Math.max(0, qty - 1);
@@ -324,7 +337,10 @@ export default function Cart() {
               ) : hasPerItemAddOn ? (
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm text-stone-400">
-                    <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
+                    <span className="flex items-center gap-1">
+                      <Truck size={12} /> Shipping
+                      {!isDomestic && <span className="ml-1 rounded-full bg-sky-500/15 border border-sky-500/25 px-1.5 py-0.5 text-[9px] font-semibold text-sky-400">Intl</span>}
+                    </span>
                     <span>${shipping.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-xs text-stone-500 pl-5">
@@ -342,7 +358,10 @@ export default function Cart() {
                 </div>
               ) : (
                 <div className="flex justify-between text-sm text-stone-400">
-                  <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
+                  <span className="flex items-center gap-1">
+                    <Truck size={12} /> Shipping
+                    {!isDomestic && <span className="ml-1 rounded-full bg-sky-500/15 border border-sky-500/25 px-1.5 py-0.5 text-[9px] font-semibold text-sky-400">Intl</span>}
+                  </span>
                   <span>${shipping.toLocaleString()}</span>
                 </div>
               )}
