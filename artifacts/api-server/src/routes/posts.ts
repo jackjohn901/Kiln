@@ -19,10 +19,10 @@ const router = Router();
 router.post("/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName } = req.body as {
+  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName, musicTrackId } = req.body as {
     caption?: string; videoUrl?: string; thumbnailUrl?: string; technique?: string; medium?: string;
     tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; isDraft?: boolean;
-    collaboratorId?: string; collaboratorName?: string;
+    collaboratorId?: string; collaboratorName?: string; musicTrackId?: string;
   };
   // Caption is optional, but a post must have *some* content —
   // either a caption, an image, or a video.
@@ -54,6 +54,7 @@ router.post("/posts", async (req, res): Promise<void> => {
       scheduledAt: schedDate,
       collaboratorId: collaboratorId ?? null,
       collaboratorName: collaboratorName ?? null,
+      musicTrackId: musicTrackId ?? null,
     }).returning();
 
     updateStreak(user.id).catch(() => {});

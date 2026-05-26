@@ -191,10 +191,15 @@ export default function Create() {
         credentials: "include",
         body: formData,
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Transcription failed");
+      }
       const data = await res.json() as { transcript?: string; error?: string };
       if (data.transcript) setCaption(data.transcript);
-    } catch {
-      // silently fail — user still has manual caption
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Couldn't transcribe audio. Try again.");
+      setTimeout(() => setPublishError(null), 4000);
     } finally {
       setTranscribing(false);
     }
@@ -211,10 +216,15 @@ export default function Create() {
         credentials: "include",
         body: JSON.stringify({ technique, caption, tags, medium: undefined }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Hashtag generation failed");
+      }
       const data = await res.json() as { hashtags?: string[] };
       setHashtagSuggestions(data.hashtags ?? []);
-    } catch {
-      setHashtagSuggestions([]);
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Couldn't generate hashtags. Try again.");
+      setTimeout(() => setPublishError(null), 4000);
     } finally {
       setLoadingHashtags(false);
     }
@@ -231,10 +241,15 @@ export default function Create() {
         credentials: "include",
         body: JSON.stringify({ technique, stage, tags }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Caption generation failed");
+      }
       const data = await res.json() as { captions?: string[] };
       setCaptionSuggestions(data.captions ?? []);
-    } catch {
-      setCaptionSuggestions([]);
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Couldn't generate captions. Try again.");
+      setTimeout(() => setPublishError(null), 4000);
     } finally {
       setLoadingSuggestions(false);
     }
@@ -401,6 +416,7 @@ export default function Create() {
           isDraft: scheduledAt ? true : false,
           collaboratorId: collaboratorId || null,
           collaboratorName: collabArtist || null,
+          musicTrackId: selectedTrack?.id ?? null,
         }),
       }).catch((err) => {
         console.error("Failed to save post to server", err);
