@@ -146,11 +146,37 @@ export default function CartCheckout() {
     artistItemQtys.set(aid, (artistItemQtys.get(aid) ?? 0) + quantity);
   }
 
-  const perArtistShipping: Array<{ artistId: string; artistName: string; cost: number }> = Array.from(artistSubtotals.entries()).map(([aid, artistSub]) => {
+  const perArtistShipping: Array<{
+    artistId: string;
+    artistName: string;
+    cost: number;
+    base: number;
+    perItemAddOn: number;
+    perItemRate: number | null;
+    additionalItems: number;
+  }> = Array.from(artistSubtotals.entries()).map(([aid, artistSub]) => {
     const info = shippingRates.get(aid);
-    const cost = info ? calcArtistShipping(info, artistSub, isDomestic, artistItemQtys.get(aid) ?? 1) : 0;
     const artist = ALL_ARTISTS.find(a => a.id === aid);
-    return { artistId: aid, artistName: artist?.name ?? aid, cost };
+    const artistName = artist?.name ?? aid;
+    if (!info) return { artistId: aid, artistName, cost: 0, base: 0, perItemAddOn: 0, perItemRate: null, additionalItems: 0 };
+    if (info.offerFreeShipping || (info.freeThreshold !== null && artistSub >= info.freeThreshold)) {
+      return { artistId: aid, artistName, cost: 0, base: 0, perItemAddOn: 0, perItemRate: null, additionalItems: 0 };
+    }
+    const rate = isDomestic ? info.domesticRate : (info.internationalRate ?? info.domesticRate);
+    if (rate === null) return { artistId: aid, artistName, cost: 0, base: 0, perItemAddOn: 0, perItemRate: null, additionalItems: 0 };
+    const qty = artistItemQtys.get(aid) ?? 1;
+    const additional = Math.max(0, qty - 1);
+    const addOn = (info.perItemRate ?? 0) * additional;
+    const showRate = info.perItemRate != null && info.perItemRate > 0 && additional > 0 ? info.perItemRate : null;
+    return {
+      artistId: aid,
+      artistName,
+      cost: rate + addOn,
+      base: rate,
+      perItemAddOn: addOn,
+      perItemRate: showRate,
+      additionalItems: additional,
+    };
   });
 
   const shipping = perArtistShipping.reduce((sum, { cost }) => sum + cost, 0);
@@ -1046,15 +1072,44 @@ export default function CartCheckout() {
                       <div className="flex items-center gap-1 text-stone-500">
                         <Truck size={9} /> <span>Shipping</span>
                       </div>
-                      {perArtistShipping.map(({ artistId, artistName, cost }) => (
-                        <div key={artistId} className="flex justify-between pl-3">
-                          <span className="text-stone-600 truncate max-w-[130px]">{artistName}</span>
-                          <span className={cost === 0 ? "text-emerald-400" : ""}>{cost === 0 ? "Free" : `$${cost.toFixed(2)}`}</span>
+                      {perArtistShipping.map(({ artistId, artistName, cost, perItemRate, additionalItems, base, perItemAddOn }) => (
+                        <div key={artistId} className="space-y-0.5">
+                          <div className="flex justify-between pl-3">
+                            <span className="text-stone-600 truncate max-w-[130px]">{artistName}</span>
+                            <span className={cost === 0 ? "text-emerald-400" : ""}>{cost === 0 ? "Free" : `$${cost.toFixed(2)}`}</span>
+                          </div>
+                          {perItemRate !== null && additionalItems > 0 && (
+                            <>
+                              <div className="flex justify-between pl-6 text-[10px] text-stone-700">
+                                <span>Base rate</span>
+                                <span>${base.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between pl-6 text-[10px] text-stone-700">
+                                <span>+ ${perItemRate} per additional item (×{additionalItems})</span>
+                                <span>${perItemAddOn.toFixed(2)}</span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ))}
                       <div className="flex justify-between pt-0.5 border-t border-white/5">
                         <span className="text-stone-500">Total shipping</span>
                         <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                      </div>
+                    </div>
+                  ) : perArtistShipping[0]?.perItemRate !== null && (perArtistShipping[0]?.additionalItems ?? 0) > 0 ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
+                        <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
+                      </div>
+                      <div className="flex justify-between pl-4 text-[10px] text-stone-700">
+                        <span>Base rate</span>
+                        <span>${(perArtistShipping[0]?.base ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between pl-4 text-[10px] text-stone-700">
+                        <span>+ ${perArtistShipping[0]?.perItemRate} per additional item (×{perArtistShipping[0]?.additionalItems})</span>
+                        <span>${(perArtistShipping[0]?.perItemAddOn ?? 0).toFixed(2)}</span>
                       </div>
                     </div>
                   ) : (

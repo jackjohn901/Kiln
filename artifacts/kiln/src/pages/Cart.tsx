@@ -56,13 +56,39 @@ export default function Cart() {
     artistItemQtys.set(aid, (artistItemQtys.get(aid) ?? 0) + quantity);
   }
 
-  const shipping = shippingRates.size > 0
-    ? Array.from(artistSubtotals.entries()).reduce((sum, [aid, artistSub]) => {
-        const info = shippingRates.get(aid);
-        if (!info) return sum;
-        return sum + calcArtistShipping(info, artistSub - (bundleApplied ? Math.round(artistSub * 0.10) : 0), artistItemQtys.get(aid) ?? 1);
-      }, 0)
-    : subtotal > 0 ? null : 0; // null = loading, show placeholder
+  // Compute shipping total + breakdown (base rate vs per-item add-on)
+  let shipping: number | null = subtotal > 0 ? null : 0;
+  let shippingBase = 0;
+  let shippingPerItemAddOn = 0;
+  let perItemAdditionalCount = 0;
+  let perItemRatesSeen: number[] = [];
+
+  if (shippingRates.size > 0) {
+    let total = 0;
+    for (const [aid, artistSub] of artistSubtotals.entries()) {
+      const info = shippingRates.get(aid);
+      if (!info) continue;
+      const adjSub = artistSub - (bundleApplied ? Math.round(artistSub * 0.10) : 0);
+      if (info.offerFreeShipping || (info.freeThreshold !== null && adjSub >= info.freeThreshold)) continue;
+      const rate = info.domesticRate;
+      if (rate === null) continue;
+      const qty = artistItemQtys.get(aid) ?? 1;
+      const additional = Math.max(0, qty - 1);
+      const addOn = (info.perItemRate ?? 0) * additional;
+      total += rate + addOn;
+      shippingBase += rate;
+      shippingPerItemAddOn += addOn;
+      if (info.perItemRate != null && info.perItemRate > 0 && additional > 0) {
+        perItemAdditionalCount += additional;
+        perItemRatesSeen.push(info.perItemRate);
+      }
+    }
+    shipping = total;
+  }
+
+  const uniquePerItemRates = [...new Set(perItemRatesSeen)];
+  const uniformPerItemRate = uniquePerItemRates.length === 1 ? uniquePerItemRates[0]! : null;
+  const hasPerItemAddOn = perItemAdditionalCount > 0 && shippingPerItemAddOn > 0;
 
   const total = subtotal - bundleDiscount + (shipping ?? 0);
 
@@ -210,18 +236,41 @@ export default function Cart() {
                   <span>−${bundleDiscount.toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm text-stone-400">
-                <span className="flex items-center gap-1">
-                  <Truck size={12} /> Shipping
-                </span>
-                <span className={shipping === 0 ? "text-emerald-400" : ""}>
-                  {shipping === null
-                    ? <span className="text-stone-600">Calculating…</span>
-                    : shipping === 0
-                      ? (subtotal > 0 ? "Free" : "—")
-                      : `$${shipping.toLocaleString()}`}
-                </span>
-              </div>
+              {shipping === null ? (
+                <div className="flex justify-between text-sm text-stone-400">
+                  <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
+                  <span className="text-stone-600">Calculating…</span>
+                </div>
+              ) : shipping === 0 ? (
+                <div className="flex justify-between text-sm text-stone-400">
+                  <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
+                  <span className="text-emerald-400">{subtotal > 0 ? "Free" : "—"}</span>
+                </div>
+              ) : hasPerItemAddOn ? (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-stone-400">
+                    <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
+                    <span>${shipping.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-stone-500 pl-5">
+                    <span>Base rate</span>
+                    <span>${shippingBase.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-stone-500 pl-5">
+                    <span>
+                      {uniformPerItemRate !== null
+                        ? `+ $${uniformPerItemRate} per additional item (×${perItemAdditionalCount})`
+                        : `Per-item add-on (×${perItemAdditionalCount} items)`}
+                    </span>
+                    <span>${shippingPerItemAddOn.toLocaleString()}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-between text-sm text-stone-400">
+                  <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
+                  <span>${shipping.toLocaleString()}</span>
+                </div>
+              )}
               <div className="border-t border-white/8 pt-3 flex justify-between text-base font-bold text-amber-100">
                 <span>Total</span>
                 <span>${total.toLocaleString()}</span>
