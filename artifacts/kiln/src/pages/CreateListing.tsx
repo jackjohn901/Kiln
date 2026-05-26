@@ -77,6 +77,19 @@ export default function CreateListing() {
   const [tagInput, setTagInput] = useState("");
   const [imagePreview, setImagePreview] = useState("");
 
+  // Pre-fill shipsTo from artist's shipping settings
+  useEffect(() => {
+    fetch("/api/me/settings", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { shippingSettings?: { shipsTo?: string[] } } | null) => {
+        const shipsTo = data?.shippingSettings?.shipsTo;
+        if (Array.isArray(shipsTo) && shipsTo.length > 0) {
+          setForm(f => ({ ...f, shipsTo }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Pre-fill price + technique from PriceCalculator query params
   useEffect(() => {
     const params = new URLSearchParams(search);
