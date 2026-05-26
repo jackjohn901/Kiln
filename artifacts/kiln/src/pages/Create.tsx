@@ -359,12 +359,16 @@ export default function Create() {
             }
           }
         }
-        await fetch("/api/stories", {
+        const storyRes = await fetch("/api/stories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ mediaUrl, mediaType, caption }),
-        }).catch(() => {});
+        });
+        if (!storyRes.ok) {
+          const err = await storyRes.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to post story.");
+        }
         navigate("/");
         return;
       }
@@ -486,6 +490,7 @@ export default function Create() {
 
       // Instagram cross-post if enabled and media is server-hosted
       if (crossPost.instagram && mediaUrl && !mediaUrl.startsWith("blob:") && !mediaUrl.startsWith("data:") && !mediaUrl.startsWith("idb:")) {
+        // Cross-post to Instagram — fire-and-forget; failure is non-critical
         fetch("/api/instagram/post", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

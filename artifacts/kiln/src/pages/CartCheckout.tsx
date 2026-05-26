@@ -1124,13 +1124,11 @@ export default function CartCheckout() {
                         <span className="flex items-center gap-1"><Truck size={9} /> Shipping</span>
                         <span className={shipping === 0 ? "text-emerald-400" : ""}>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
                       </div>
-                      {perArtistShipping.map(({ artistId, info, qty, cost }) => {
-                        const additionalItems = Math.max(0, qty - 1);
-                        if (!info || (info.perItemRate ?? 0) <= 0 || additionalItems === 0 || cost === 0) return null;
-                        const baseRate = isDomestic ? info.domesticRate : (info.internationalRate ?? info.domesticRate);
+                      {perArtistShipping.map(({ artistId, additionalItems, perItemRate, cost, base }) => {
+                        if (!perItemRate || perItemRate <= 0 || additionalItems === 0 || cost === 0) return null;
                         return (
                           <p key={artistId} className="text-[10px] text-stone-600 pl-4 mt-0.5">
-                            ${baseRate} base + ${info.perItemRate} × {additionalItems} additional {additionalItems === 1 ? "item" : "items"}
+                            ${base} base + ${perItemRate} × {additionalItems} additional {additionalItems === 1 ? "item" : "items"}
                           </p>
                         );
                       })}

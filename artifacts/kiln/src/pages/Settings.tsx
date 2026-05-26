@@ -79,6 +79,7 @@ export default function Settings() {
   const [emailResumeAt, setEmailResumeAt] = useState<string | null>(null);
   const [snoozePickerOpen, setSnoozePickerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("All");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -154,9 +155,13 @@ export default function Settings() {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notifEmailResumeAt: resumeAt }),
-    }).catch(() => {});
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t snooze notifications."); });
   }
 
   function clearSnooze() {
@@ -164,14 +169,19 @@ export default function Settings() {
     setEmailPausedAt(null);
     setSnoozePickerOpen(false);
     patchSettings({ notif_email_paused: false });
+    setSaveError(null);
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notifEmailResumeAt: null }),
-    }).catch(() => {});
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t clear snooze."); });
   }
 
   function snoozeCountdown(): string | null {
@@ -191,14 +201,19 @@ export default function Settings() {
       return;
     }
     setPhoneValidationError(false);
+    setSaveError(null);
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phoneNumber: trimmed }),
     })
-      .then(() => { setPhoneSaved(true); setTimeout(() => setPhoneSaved(false), 2000); })
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setPhoneSaved(true);
+        setTimeout(() => setPhoneSaved(false), 2000);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t save phone number."); });
   }
 
   function saveContactEmail(email: string) {
@@ -208,26 +223,36 @@ export default function Settings() {
       return;
     }
     setEmailValidationError(false);
+    setSaveError(null);
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contactEmail: trimmed }),
     })
-      .then(() => { setEmailSaved(true); setTimeout(() => setEmailSaved(false), 2000); })
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setEmailSaved(true);
+        setTimeout(() => setEmailSaved(false), 2000);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t save email address."); });
   }
 
   function saveShipping(next: ShippingSettings) {
     setShipping(next);
     saveShippingSettings(next);
-    setShippingSaved(true);
-    setTimeout(() => setShippingSaved(false), 1800);
+    setSaveError(null);
     fetch("/api/me/settings", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ shippingSettings: next }),
-    }).catch(() => { /* silent */ });
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setShippingSaved(true);
+        setTimeout(() => setShippingSaved(false), 1800);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t save shipping settings."); });
   }
 
   const EMAIL_KEYS: (keyof KilnSettings)[] = [
@@ -291,13 +316,18 @@ export default function Settings() {
   function savePayments(next: ArtistPayments) {
     setPayments(next);
     savePaymentSettings(next);
-    setPaymentSaved(true);
-    setTimeout(() => setPaymentSaved(false), 1800);
+    setSaveError(null);
     fetch("/api/me/settings", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentSettings: next }),
-    }).catch(() => { /* silent */ });
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setPaymentSaved(true);
+        setTimeout(() => setPaymentSaved(false), 1800);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t save payment settings."); });
   }
 
   function saveAddress(next: DefaultShippingAddress) {
@@ -309,13 +339,18 @@ export default function Settings() {
       country: next.country.trim(),
     };
     setAddress(next);
-    setAddressSaved(true);
-    setTimeout(() => setAddressSaved(false), 1800);
+    setSaveError(null);
     fetch("/api/me/settings", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ defaultShippingAddress: payload }),
-    }).catch(() => { /* silent */ });
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setAddressSaved(true);
+        setTimeout(() => setAddressSaved(false), 1800);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t save address. Please try again."); });
   }
 
   function Toggle({ settingKey, label, desc }: { settingKey: keyof KilnSettings; label: string; desc?: string }) {
@@ -353,7 +388,10 @@ export default function Settings() {
           )}
           <div>
             <h1 className="font-serif text-2xl text-amber-100">{section ? sections.find(s => s.key === section)?.label : "Settings"}</h1>
-            {saved && <p className="text-xs text-emerald-400 mt-0.5">Saved</p>}
+            {saved && !saveError && <p className="text-xs text-emerald-400 mt-0.5">Saved</p>}
+            {saveError && (
+              <p className="text-xs text-red-400 mt-0.5">{saveError}</p>
+            )}
           </div>
         </div>
 
