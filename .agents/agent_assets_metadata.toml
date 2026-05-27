@@ -42,6 +42,24 @@ uri = "file://artifacts/kiln-mobile/assets/images/icon-tinted.png"
 type = "image"
 title = "kilnfire icon tinted monochrome"
 
+[[generated]]
+id = "JC7l8qkk0tFEoI4TfUq79"
+uri = "file://attached_assets/kiln_ad_banner.png"
+type = "image"
+title = "Kiln Twitter banner ad"
+
+[[generated]]
+id = "boQPSpCMAdaynJRiCFVkm"
+uri = "file://attached_assets/kiln_ad_instagram.png"
+type = "image"
+title = "Kiln Instagram post ad"
+
+[[generated]]
+id = "xcPVtz3DkVlGWfvrFOL-n"
+uri = "file://attached_assets/kiln_ad_story.png"
+type = "image"
+title = "Kiln Instagram story ad"
+
 [[outputs]]
 id = "sJHvn6KG7yE_SSck3915p"
 uri = "file://assets/icons/kiln-icon-v1.png"
@@ -173,3 +191,21 @@ id = "HvUE0EUyOotRCCBSHlDX3"
 uri = "file://screenshots/screen-auctions.jpg"
 type = "image"
 title = "7 — Auctions"
+
+[[outputs]]
+id = "QM2McAe0l_GMwcc7lEVk6"
+uri = "file://attached_assets/kiln_ad_instagram.png"
+type = "image"
+title = "Instagram Square Post (1:1)"
+
+[[outputs]]
+id = "LipYxj1SIaE_-hzK76hB0"
+uri = "file://attached_assets/kiln_ad_story.png"
+type = "image"
+title = "Instagram Story / Reels (9:16)"
+
+[[outputs]]
+id = "hpVttnFcQr5PgAulFSyHE"
+uri = "file://attached_assets/kiln_ad_banner.png"
+type = "image"
+title = "Twitter/X Banner / LinkedIn Header (16:9)"
