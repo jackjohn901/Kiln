@@ -125,7 +125,7 @@ export default function MobileNav() {
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const [showMore, setShowMore] = useState(false);
 
-  const totalBadge = unreadCount + unreadMessageCount;
+  const totalBadge = unreadCount + unreadMessageCount + unreadWorkshopCount + unreadCommissionPaymentCount;
   const profileHref = profile ? `/artists/${profile.id}` : "/setup";
   const createHref = profile ? "/create" : "/setup";
   const isProfileActive = location.startsWith("/artists/") || location === "/setup" || location === "/edit-profile";
