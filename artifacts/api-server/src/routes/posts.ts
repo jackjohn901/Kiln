@@ -5,6 +5,7 @@ import {
 } from "@workspace/db";
 import { sendEmailWithRetry, newCommentEmail, newMentionEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
+import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import crypto from "crypto";
@@ -341,7 +342,11 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
             ]);
             const emailSettings = s?.settings as Record<string, unknown> | null;
             const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_mentions !== false;
-            if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: newMentionEmail(authorName, text.trim(), postId) }, { label: "mention notification" });
+            if (wantsEmail && p?.contactEmail) {
+              const unsubToken = generateUnsubscribeToken(mentionedUserId);
+              const unsubscribeUrl = `https://kilnfire.replit.app/api/unsubscribe/mentions?token=${encodeURIComponent(unsubToken)}`;
+              await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: newMentionEmail(authorName, text.trim(), postId, unsubscribeUrl) }, { label: "mention notification" });
+            }
           } catch (err) {
             logger.warn({ err, mentionedUserId, postId }, "Failed to send mention notification email");
           }
