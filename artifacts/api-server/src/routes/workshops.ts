@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { workshopsTable, workshopBookingsTable, notificationsTable } from "@workspace/db";
+import { workshopsTable, workshopBookingsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
 import { eq, and, desc, sql, gte, isNull } from "drizzle-orm";
 import crypto from "crypto";
-import { sendEmail, workshopReminderEmail, workshopBookingEmail } from "../lib/email";
+import { sendEmail, workshopReminderEmail, workshopBookingEmail, newWorkshopBookingArtistEmail } from "../lib/email";
 
 const router = Router();
 
@@ -106,13 +106,26 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
     await db.update(workshopsTable).set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` }).where(eq(workshopsTable.id, w.id));
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: w.artistId, type: "workshop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `booked your workshop: ${w.title}`, link: `/workshops` });
 
+    const calParams = w.startDate ? { startDateISO: w.startDate.toISOString(), endDateISO: w.endDate?.toISOString() ?? null, durationHours: w.durationHours, isOnline: w.isOnline, location: w.location ?? null, workshopId: w.id } : undefined;
+
     if (user.email) {
       const startLabel = w.startDate
         ? w.startDate.toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })
         : "Date TBD";
-      const calParams = w.startDate ? { startDateISO: w.startDate.toISOString(), endDateISO: w.endDate?.toISOString() ?? null, durationHours: w.durationHours, isOnline: w.isOnline, location: w.location ?? null, workshopId: w.id } : undefined;
       const html = workshopBookingEmail(w.title, w.artistName, startLabel, calParams, { isOnline: w.isOnline, location: w.location ?? null, meetingUrl: w.meetingUrl ?? null });
       sendEmail({ to: user.email, subject: `Booking confirmed: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "workshopBookingEmail send failed"); });
+    }
+
+    const [[artistUser], [artistSettings]] = await Promise.all([
+      db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, w.artistId)),
+      db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, w.artistId)),
+    ]);
+    const artistEmailSnoozed = artistSettings?.notifEmailResumeAt && artistSettings.notifEmailResumeAt > new Date();
+    const artistWantsEmail = !artistEmailSnoozed && (artistSettings?.settings as Record<string, unknown> | null)?.workshopBookingEmail !== false;
+    if (artistUser?.email && artistWantsEmail) {
+      const studentName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "A student";
+      const html = newWorkshopBookingArtistEmail(studentName, user.email ?? "", w.title, 0, calParams);
+      sendEmail({ to: artistUser.email, subject: `New booking: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "newWorkshopBookingArtistEmail send failed"); });
     }
 
     res.status(201).json({ booking: { ...booking, createdAt: booking.createdAt.toISOString() }, spotsLeft: w.maxSpots - w.spotsBooked - 1 });

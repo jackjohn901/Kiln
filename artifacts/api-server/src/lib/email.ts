@@ -641,7 +641,20 @@ export function newWorkshopBookingArtistEmail(
   buyerEmail: string,
   workshopTitle: string,
   amountCents: number,
+  calParams?: WorkshopCalendarParams,
 ): string {
+  const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, buyerName, calParams) : "";
+  const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
+
+  const calendarLinks = (gcalUrl || icsUrl) ? `
+    <div style="margin-top:16px;">
+      <p style="margin:0 0 10px;font-size:13px;color:#a8a29e;">Add this workshop to your calendar:</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${gcalUrl ? `<a href="${gcalUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:13px;font-weight:bold;">📅 Google Calendar</a>` : ""}
+        ${icsUrl ? `<a href="${icsUrl}" style="display:inline-block;background:#444039;color:#d6d3d1;padding:8px 18px;border-radius:20px;text-decoration:none;font-size:13px;font-weight:bold;border:1px solid #57534e;">🍎 Apple Calendar (.ics)</a>` : ""}
+      </div>
+    </div>` : "";
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Workshop Booking! 🎓</h1>
     <p style="color:#78716c;margin-bottom:0;">A student just booked a seat in your workshop.</p>
@@ -651,11 +664,12 @@ export function newWorkshopBookingArtistEmail(
       <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Student</p>
       <p style="margin:0 0 4px;"><strong>${escHtml(buyerName || 'A student')}</strong></p>
       <p style="margin:0;color:#78716c;">${escHtml(buyerEmail)}</p>
+      ${calendarLinks}
     `)}
-    ${card(`
+    ${amountCents > 0 ? card(`
       <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Payment received</p>
       <p style="margin:0;font-size:18px;"><strong style="color:#fcd34d;">$${(amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></p>
-    `)}
+    `) : ""}
     ${btn(`${BASE_URL}/workshops`, "View Workshop")}
   `);
 }
