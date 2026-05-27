@@ -581,6 +581,18 @@ export default function Settings() {
               <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
               <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
               <Toggle settingKey="notif_email_new_booking" label="New workshop bookings" desc="Email when a student books a seat in your workshop" />
+              <div className="flex items-center justify-between py-3 border-b border-white/5">
+                <div className="flex-1 min-w-0 pr-4">
+                  <p className="text-sm text-stone-200">Workshop reminder emails</p>
+                  <p className="text-xs text-stone-600 mt-0.5">Reminders before workshops you've booked as a student</p>
+                </div>
+                <button
+                  onClick={() => toggle("workshopReminderOptOut")}
+                  className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${!settings.workshopReminderOptOut ? "bg-amber-500" : "bg-stone-700"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${!settings.workshopReminderOptOut ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
               <Toggle settingKey="notif_email_commission_payment" label="Commission payments" desc="Email when a deposit or final payment lands on a commission" />
               <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
               <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />

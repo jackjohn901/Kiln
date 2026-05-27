@@ -24,6 +24,7 @@ export interface KilnSettings {
   notif_sms_outbid: boolean;
   notif_sms_drops: boolean;
   notif_sms_shipped: boolean;
+  workshopReminderOptOut: boolean;
   privacy_profile_public: boolean;
   privacy_show_location: boolean;
   privacy_allow_messages: boolean;
@@ -59,6 +60,7 @@ export function defaultSettings(): KilnSettings {
     notif_sms_outbid: true,
     notif_sms_drops: true,
     notif_sms_shipped: true,
+    workshopReminderOptOut: false,
     privacy_profile_public: true,
     privacy_show_location: true,
     privacy_allow_messages: true,
