@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -44,6 +45,39 @@ function formatDate(d: string | null) {
   return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function getApiBase(): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  return domain ? `https://${domain}` : "";
+}
+
+function buildGcalUrl(workshop: Workshop): string {
+  const details = `Workshop with ${workshop.artistName ?? "artist"} on Kiln.`;
+  const location = workshop.isOnline ? "Online" : (workshop.location ?? "");
+
+  const fmt = (d: Date) =>
+    d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+
+  let datesParam = "";
+  if (workshop.date) {
+    const start = new Date(workshop.date);
+    if (!isNaN(start.getTime())) {
+      const durationMs = workshop.durationHours
+        ? workshop.durationHours * 60 * 60 * 1000
+        : 6 * 60 * 60 * 1000;
+      datesParam = `${fmt(start)}/${fmt(new Date(start.getTime() + durationMs))}`;
+    }
+  }
+
+  const qs = new URLSearchParams({
+    action: "TEMPLATE",
+    text: workshop.title,
+    details,
+    ...(datesParam ? { dates: datesParam } : {}),
+    ...(location ? { location } : {}),
+  });
+  return `https://calendar.google.com/calendar/render?${qs.toString()}`;
+}
+
 const MEDIA = ["All", "Ceramics", "Glass", "Metal", "Wood", "Pottery"];
 
 export default function WorkshopsScreen() {
@@ -54,6 +88,7 @@ export default function WorkshopsScreen() {
   const [loading, setLoading] = useState(true);
   const [medium, setMedium] = useState("All");
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [justBooked, setJustBooked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     apiGet<{ workshops: Workshop[] }>("/api/workshops")
@@ -67,14 +102,22 @@ export default function WorkshopsScreen() {
     setBookingId(id);
     try {
       await apiPost(`/api/workshops/${id}/book`, {});
-      setWorkshops((prev) => prev.map((w) => w.id === id ? { ...w, isBooked: true, spotsRemaining: Math.max(0, w.spotsRemaining - 1) } : w));
+      setWorkshops((prev) =>
+        prev.map((w) =>
+          w.id === id
+            ? { ...w, isBooked: true, spotsRemaining: Math.max(0, w.spotsRemaining - 1) }
+            : w
+        )
+      );
+      setJustBooked((prev) => new Set(prev).add(id));
     } catch {}
     setBookingId(null);
   }
 
-  const filtered = medium === "All"
-    ? workshops
-    : workshops.filter((w) => w.medium?.toLowerCase().includes(medium.toLowerCase()));
+  const filtered =
+    medium === "All"
+      ? workshops
+      : workshops.filter((w) => w.medium?.toLowerCase().includes(medium.toLowerCase()));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -93,16 +136,26 @@ export default function WorkshopsScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => setMedium(item)}
-              style={[styles.chip, { backgroundColor: medium === item ? colors.primary : colors.card, borderColor: medium === item ? colors.primary : colors.border }]}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: medium === item ? colors.primary : colors.card,
+                  borderColor: medium === item ? colors.primary : colors.border,
+                },
+              ]}
             >
-              <Text style={[styles.chipText, { color: medium === item ? "#1a1a1a" : colors.foreground }]}>{item}</Text>
+              <Text style={[styles.chipText, { color: medium === item ? "#1a1a1a" : colors.foreground }]}>
+                {item}
+              </Text>
             </Pressable>
           )}
         />
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
           <Feather name="book-open" size={36} color={colors.mutedForeground} />
@@ -115,6 +168,7 @@ export default function WorkshopsScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80, gap: 14 }}
           renderItem={({ item }) => {
             const soldOut = item.spotsRemaining <= 0;
+            const isJustBooked = justBooked.has(item.id);
             return (
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {item.coverImageUrl ? (
@@ -128,10 +182,14 @@ export default function WorkshopsScreen() {
                   {item.level && (
                     <Text style={[styles.level, { color: colors.primary }]}>{item.level}</Text>
                   )}
-                  <Text style={[styles.workshopTitle, { color: colors.foreground }]} numberOfLines={2}>{item.title}</Text>
+                  <Text style={[styles.workshopTitle, { color: colors.foreground }]} numberOfLines={2}>
+                    {item.title}
+                  </Text>
                   <Text style={[styles.artistName, { color: colors.mutedForeground }]}>by {item.artistName}</Text>
                   {item.description && (
-                    <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={2}>{item.description}</Text>
+                    <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={2}>
+                      {item.description}
+                    </Text>
                   )}
                   <View style={styles.meta}>
                     {item.date && (
@@ -142,7 +200,9 @@ export default function WorkshopsScreen() {
                     )}
                     <View style={styles.metaItem}>
                       <Feather name={item.isOnline ? "video" : "map-pin"} size={11} color={colors.mutedForeground} />
-                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{item.isOnline ? "Online" : item.location}</Text>
+                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                        {item.isOnline ? "Online" : item.location}
+                      </Text>
                     </View>
                     {item.durationHours && (
                       <View style={styles.metaItem}>
@@ -152,21 +212,67 @@ export default function WorkshopsScreen() {
                     )}
                     <View style={styles.metaItem}>
                       <Feather name="users" size={11} color={colors.mutedForeground} />
-                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{item.spotsRemaining} of {item.spotsTotal} spots left</Text>
+                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                        {item.spotsRemaining} of {item.spotsTotal} spots left
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.cardFooter}>
                     <Text style={[styles.price, { color: colors.primary }]}>{formatPrice(item.price)}</Text>
                     <Pressable
-                      style={[styles.bookBtn, { backgroundColor: soldOut || item.isBooked ? colors.muted : colors.primary, opacity: bookingId === item.id ? 0.7 : 1 }]}
+                      style={[
+                        styles.bookBtn,
+                        {
+                          backgroundColor: soldOut || item.isBooked ? colors.muted : colors.primary,
+                          opacity: bookingId === item.id ? 0.7 : 1,
+                        },
+                      ]}
                       onPress={() => handleBook(item.id)}
                       disabled={soldOut || item.isBooked || bookingId === item.id}
                     >
-                      <Text style={[styles.bookBtnText, { color: soldOut || item.isBooked ? colors.mutedForeground : "#1a1a1a" }]}>
+                      <Text
+                        style={[
+                          styles.bookBtnText,
+                          { color: soldOut || item.isBooked ? colors.mutedForeground : "#1a1a1a" },
+                        ]}
+                      >
                         {item.isBooked ? "Booked" : soldOut ? "Sold out" : "Book"}
                       </Text>
                     </Pressable>
                   </View>
+
+                  {item.isBooked && (
+                    <View
+                      style={[
+                        styles.calendarSection,
+                        { borderTopColor: colors.border, backgroundColor: isJustBooked ? colors.muted : "transparent" },
+                      ]}
+                    >
+                      {isJustBooked && (
+                        <View style={styles.confirmedRow}>
+                          <Feather name="check-circle" size={13} color="#34d399" />
+                          <Text style={styles.confirmedText}>You're booked!</Text>
+                        </View>
+                      )}
+                      <Text style={[styles.calendarLabel, { color: colors.mutedForeground }]}>Add to calendar:</Text>
+                      <View style={styles.calendarButtons}>
+                        <Pressable
+                          style={[styles.calBtn, styles.gcalBtn]}
+                          onPress={() => Linking.openURL(buildGcalUrl(item))}
+                        >
+                          <Feather name="calendar" size={13} color="#fff" />
+                          <Text style={styles.gcalBtnText}>Google Calendar</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.calBtn, styles.icsBtn, { borderColor: colors.border }]}
+                          onPress={() => Linking.openURL(`${getApiBase()}/api/workshops/${item.id}/calendar.ics`)}
+                        >
+                          <Feather name="download" size={13} color={colors.foreground} />
+                          <Text style={[styles.icsBtnText, { color: colors.foreground }]}>Download .ics</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
                 </View>
               </View>
             );
@@ -202,4 +308,14 @@ const styles = StyleSheet.create({
   price: { fontSize: 18, fontWeight: "700" },
   bookBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
   bookBtnText: { fontSize: 13, fontWeight: "700" },
+  calendarSection: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderRadius: 10, paddingHorizontal: 2 },
+  confirmedRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 },
+  confirmedText: { fontSize: 13, fontWeight: "600", color: "#34d399" },
+  calendarLabel: { fontSize: 11, marginBottom: 8 },
+  calendarButtons: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  calBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  gcalBtn: { backgroundColor: "#2563eb" },
+  gcalBtnText: { fontSize: 12, fontWeight: "600", color: "#fff" },
+  icsBtn: { borderWidth: 1, backgroundColor: "transparent" },
+  icsBtnText: { fontSize: 12, fontWeight: "600" },
 });
