@@ -1,31 +1,100 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, X, Loader2, ChevronRight } from "lucide-react";
+import { Check, X, Loader2, ChevronRight, Clock, Wrench, RotateCcw, CheckCircle, MinusCircle } from "lucide-react";
 
 type ActionState =
   | "loading"
   | "idle"
   | "quoting"
   | "saving"
-  | "accepted"
-  | "quoted"
-  | "declined"
-  | "other"
+  | "resolved"
   | "error";
+
+type DbStatus =
+  | "pending"
+  | "quoted"
+  | "accepted"
+  | "in_progress"
+  | "revision"
+  | "completed"
+  | "declined"
+  | "cancelled"
+  | string;
+
+interface StatusBadgeProps {
+  status: DbStatus;
+}
+
+function StatusBadge({ status }: StatusBadgeProps) {
+  if (status === "pending") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-stone-700/60 px-2 py-0.5 text-xs font-medium text-stone-400">
+        <Clock size={10} /> Pending
+      </span>
+    );
+  }
+  if (status === "quoted") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
+        <Check size={10} /> Quote Sent
+      </span>
+    );
+  }
+  if (status === "accepted") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
+        <Check size={10} /> Accepted
+      </span>
+    );
+  }
+  if (status === "in_progress") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
+        <Wrench size={10} /> In Progress
+      </span>
+    );
+  }
+  if (status === "revision") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
+        <RotateCcw size={10} /> Revision
+      </span>
+    );
+  }
+  if (status === "completed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
+        <CheckCircle size={10} /> Completed
+      </span>
+    );
+  }
+  if (status === "declined") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">
+        <X size={10} /> Declined
+      </span>
+    );
+  }
+  if (status === "cancelled") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-stone-600/40 px-2 py-0.5 text-xs font-medium text-stone-500">
+        <MinusCircle size={10} /> Cancelled
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-stone-700/60 px-2 py-0.5 text-xs font-medium text-stone-500">
+      Resolved
+    </span>
+  );
+}
 
 interface Props {
   commissionId: string;
 }
 
-function statusToActionState(status: string): ActionState {
-  if (status === "pending") return "idle";
-  if (status === "quoted") return "quoted";
-  if (status === "in_progress" || status === "revision" || status === "completed") return "accepted";
-  if (status === "declined" || status === "cancelled") return "declined";
-  return "other";
-}
-
 export default function CommissionInlineActions({ commissionId }: Props) {
-  const [state, setState] = useState<ActionState>("loading");
+  const [actionState, setActionState] = useState<ActionState>("loading");
+  const [dbStatus, setDbStatus] = useState<DbStatus>("pending");
   const [price, setPrice] = useState("");
   const [notes, setNotes] = useState("");
   const priceRef = useRef<HTMLInputElement>(null);
@@ -38,22 +107,32 @@ export default function CommissionInlineActions({ commissionId }: Props) {
         return res.json();
       })
       .then((data) => {
-        if (!cancelled) setState(statusToActionState(data.status ?? "pending"));
+        if (cancelled) return;
+        const status: DbStatus = data.status ?? "pending";
+        setDbStatus(status);
+        if (status === "pending") {
+          setActionState("idle");
+        } else {
+          setActionState("resolved");
+        }
       })
       .catch(() => {
-        if (!cancelled) setState("idle");
+        if (!cancelled) {
+          setDbStatus("pending");
+          setActionState("idle");
+        }
       });
     return () => { cancelled = true; };
   }, [commissionId]);
 
   useEffect(() => {
-    if (state === "quoting") {
+    if (actionState === "quoting") {
       setTimeout(() => priceRef.current?.focus(), 50);
     }
-  }, [state]);
+  }, [actionState]);
 
   async function handleDecline() {
-    setState("saving");
+    setActionState("saving");
     try {
       const res = await fetch(`/api/commissions/${commissionId}`, {
         method: "PATCH",
@@ -61,18 +140,24 @@ export default function CommissionInlineActions({ commissionId }: Props) {
         credentials: "include",
         body: JSON.stringify({ status: "declined" }),
       });
-      setState(res.ok ? "declined" : "error");
+      if (res.ok) {
+        setDbStatus("declined");
+        setActionState("resolved");
+      } else {
+        setActionState("error");
+      }
     } catch {
-      setState("error");
+      setActionState("error");
     }
   }
 
   async function handleQuoteSubmit(e: React.FormEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setState("saving");
+    setActionState("saving");
     const trimmedPrice = price.trim();
     const trimmedNotes = notes.trim();
+    const newStatus = trimmedPrice ? "quoted" : "in_progress";
     const body: Record<string, unknown> = trimmedPrice
       ? { status: "quoted", quotedPrice: parseFloat(trimmedPrice), ...(trimmedNotes && { artistNotes: trimmedNotes }) }
       : { status: "in_progress", ...(trimmedNotes && { artistNotes: trimmedNotes }) };
@@ -84,63 +169,34 @@ export default function CommissionInlineActions({ commissionId }: Props) {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        setState(trimmedPrice ? "quoted" : "accepted");
+        setDbStatus(newStatus);
+        setActionState("resolved");
       } else {
-        setState("error");
+        setActionState("error");
       }
     } catch {
-      setState("error");
+      setActionState("error");
     }
   }
 
-  if (state === "loading" || state === "saving") {
+  if (actionState === "loading" || actionState === "saving") {
     return (
       <div className="mt-2 flex items-center gap-1.5">
         <Loader2 size={12} className="animate-spin text-stone-500" />
-        <span className="text-xs text-stone-500">{state === "loading" ? "Loading…" : "Updating…"}</span>
+        <span className="text-xs text-stone-500">{actionState === "loading" ? "Loading…" : "Updating…"}</span>
       </div>
     );
   }
 
-  if (state === "quoted") {
+  if (actionState === "resolved") {
     return (
       <div className="mt-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
-          <Check size={10} /> Quote sent
-        </span>
+        <StatusBadge status={dbStatus} />
       </div>
     );
   }
 
-  if (state === "accepted") {
-    return (
-      <div className="mt-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
-          <Check size={10} /> Accepted
-        </span>
-      </div>
-    );
-  }
-
-  if (state === "declined") {
-    return (
-      <div className="mt-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">
-          <X size={10} /> Declined
-        </span>
-      </div>
-    );
-  }
-
-  if (state === "other") {
-    return (
-      <div className="mt-2">
-        <span className="text-xs text-stone-500">Commission resolved</span>
-      </div>
-    );
-  }
-
-  if (state === "error") {
+  if (actionState === "error") {
     return (
       <div className="mt-2">
         <span className="text-xs text-stone-500">Could not update — already resolved?</span>
@@ -148,74 +204,80 @@ export default function CommissionInlineActions({ commissionId }: Props) {
     );
   }
 
-  if (state === "quoting") {
+  if (actionState === "quoting") {
     return (
-      <form
-        onSubmit={handleQuoteSubmit}
-        onClick={(e) => e.stopPropagation()}
-        className="mt-3 space-y-2"
-      >
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
-            <input
-              ref={priceRef}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Quote price (optional)"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-lg bg-stone-800 pl-6 pr-3 py-1.5 text-xs text-stone-200 placeholder-stone-500 border border-stone-700 focus:outline-none focus:border-amber-500/60"
-            />
+      <div className="mt-2 space-y-2">
+        <StatusBadge status={dbStatus} />
+        <form
+          onSubmit={handleQuoteSubmit}
+          onClick={(e) => e.stopPropagation()}
+          className="space-y-2"
+        >
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">$</span>
+              <input
+                ref={priceRef}
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Quote price (optional)"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full rounded-lg bg-stone-800 pl-6 pr-3 py-1.5 text-xs text-stone-200 placeholder-stone-500 border border-stone-700 focus:outline-none focus:border-amber-500/60"
+              />
+            </div>
           </div>
-        </div>
-        <textarea
-          rows={2}
-          placeholder="Notes to buyer (optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="w-full rounded-lg bg-stone-800 px-3 py-1.5 text-xs text-stone-200 placeholder-stone-500 border border-stone-700 focus:outline-none focus:border-amber-500/60 resize-none"
-        />
-        <div className="flex items-center gap-2">
-          <button
-            type="submit"
-            className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/30 transition-colors"
-          >
-            {price.trim() ? (
-              <>Send quote <ChevronRight size={10} /></>
-            ) : (
-              <>Accept <Check size={10} /></>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setState("idle"); }}
-            className="rounded-full px-2.5 py-1 text-xs font-medium text-stone-500 hover:text-stone-300 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+          <textarea
+            rows={2}
+            placeholder="Notes to buyer (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full rounded-lg bg-stone-800 px-3 py-1.5 text-xs text-stone-200 placeholder-stone-500 border border-stone-700 focus:outline-none focus:border-amber-500/60 resize-none"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/30 transition-colors"
+            >
+              {price.trim() ? (
+                <>Send quote <ChevronRight size={10} /></>
+              ) : (
+                <>Accept <Check size={10} /></>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setActionState("idle"); }}
+              className="rounded-full px-2.5 py-1 text-xs font-medium text-stone-500 hover:text-stone-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     );
   }
 
   return (
-    <div className="mt-2 flex items-center gap-2">
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setState("quoting"); }}
-        className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors"
-      >
-        Accept
-      </button>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); handleDecline(); }}
-        className="rounded-full bg-red-500/20 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/30 transition-colors"
-      >
-        Decline
-      </button>
+    <div className="mt-2 space-y-2">
+      <StatusBadge status={dbStatus} />
+      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setActionState("quoting"); }}
+          className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+        >
+          Accept
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); handleDecline(); }}
+          className="rounded-full bg-red-500/20 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/30 transition-colors"
+        >
+          Decline
+        </button>
+      </div>
     </div>
   );
 }
