@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { workshopsTable, workshopBookingsTable, notificationsTable } from "@workspace/db";
 import { eq, and, desc, sql, gte, isNull } from "drizzle-orm";
 import crypto from "crypto";
-import { sendEmail, workshopReminderEmail } from "../lib/email";
+import { sendEmail, workshopReminderEmail, workshopBookingEmail } from "../lib/email";
 
 const router = Router();
 
@@ -39,7 +39,7 @@ router.get("/workshops/:id", async (req, res): Promise<void> => {
 // POST /workshops — create (authenticated)
 router.post("/workshops", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { title, description, technique, level, location, isOnline, price, maxSpots, durationHours, imageUrl, startDate, endDate, tags } = req.body;
+  const { title, description, technique, level, location, isOnline, meetingUrl, price, maxSpots, durationHours, imageUrl, startDate, endDate, tags } = req.body;
   if (!title || !price) { res.status(400).json({ error: "title and price required" }); return; }
   try {
     const user = req.user;
@@ -47,11 +47,44 @@ router.post("/workshops", async (req, res): Promise<void> => {
     const [workshop] = await db.insert(workshopsTable).values({
       id: crypto.randomUUID(), artistId: user.id, artistName: name, artistAvatarUrl: user.profileImageUrl ?? null,
       title, description, technique, level: level ?? "All levels", location, isOnline: !!isOnline,
+      meetingUrl: isOnline && meetingUrl ? String(meetingUrl) : null,
       price: Number(price), maxSpots: Number(maxSpots ?? 8), durationHours: Number(durationHours ?? 3),
       imageUrl, startDate: startDate ? new Date(startDate) : null, endDate: endDate ? new Date(endDate) : null, tags: tags ?? [],
     }).returning();
     res.status(201).json({ ...workshop, spotsLeft: workshop.maxSpots, isBooked: false, startDate: workshop.startDate?.toISOString(), endDate: workshop.endDate?.toISOString(), createdAt: workshop.createdAt.toISOString(), updatedAt: workshop.updatedAt.toISOString() });
   } catch (err) { req.log.error({ err }, "createWorkshop error"); res.status(500).json({ error: "Failed to create workshop" }); }
+});
+
+// PATCH /workshops/:id — update workshop (owner only)
+router.patch("/workshops/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [existing] = await db.select().from(workshopsTable).where(eq(workshopsTable.id, req.params.id));
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    if (existing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const { title, description, technique, level, location, isOnline, meetingUrl, price, maxSpots, durationHours, imageUrl, startDate, endDate, tags, isActive } = req.body;
+
+    const updates: Partial<typeof workshopsTable.$inferInsert> = {};
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (technique !== undefined) updates.technique = technique;
+    if (level !== undefined) updates.level = level;
+    if (location !== undefined) updates.location = location;
+    if (isOnline !== undefined) updates.isOnline = !!isOnline;
+    if (meetingUrl !== undefined) updates.meetingUrl = (isOnline ?? existing.isOnline) && meetingUrl ? String(meetingUrl) : null;
+    if (price !== undefined) updates.price = Number(price);
+    if (maxSpots !== undefined) updates.maxSpots = Number(maxSpots);
+    if (durationHours !== undefined) updates.durationHours = Number(durationHours);
+    if (imageUrl !== undefined) updates.imageUrl = imageUrl;
+    if (startDate !== undefined) updates.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) updates.endDate = endDate ? new Date(endDate) : null;
+    if (tags !== undefined) updates.tags = tags;
+    if (isActive !== undefined) updates.isActive = !!isActive;
+
+    const [updated] = await db.update(workshopsTable).set(updates).where(eq(workshopsTable.id, req.params.id)).returning();
+    res.json({ ...updated, spotsLeft: updated.maxSpots - updated.spotsBooked, startDate: updated.startDate?.toISOString(), endDate: updated.endDate?.toISOString(), createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+  } catch (err) { req.log.error({ err }, "patchWorkshop error"); res.status(500).json({ error: "Failed to update workshop" }); }
 });
 
 // POST /workshops/:id/book — book a spot (free workshops only).
@@ -72,6 +105,16 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
     const [booking] = await db.insert(workshopBookingsTable).values({ id: crypto.randomUUID(), workshopId: w.id, userId, userName: name, userEmail: user.email ?? undefined, paidAmount: 0 }).returning();
     await db.update(workshopsTable).set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` }).where(eq(workshopsTable.id, w.id));
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: w.artistId, type: "workshop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `booked your workshop: ${w.title}`, link: `/workshops` });
+
+    if (user.email) {
+      const startLabel = w.startDate
+        ? w.startDate.toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })
+        : "Date TBD";
+      const calParams = w.startDate ? { startDateISO: w.startDate.toISOString(), endDateISO: w.endDate?.toISOString() ?? null, durationHours: w.durationHours, isOnline: w.isOnline, location: w.location ?? null, workshopId: w.id } : undefined;
+      const html = workshopBookingEmail(w.title, w.artistName, startLabel, calParams, { isOnline: w.isOnline, location: w.location ?? null, meetingUrl: w.meetingUrl ?? null });
+      sendEmail({ to: user.email, subject: `Booking confirmed: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "workshopBookingEmail send failed"); });
+    }
+
     res.status(201).json({ booking: { ...booking, createdAt: booking.createdAt.toISOString() }, spotsLeft: w.maxSpots - w.spotsBooked - 1 });
   } catch (err) { req.log.error({ err }, "bookWorkshop error"); res.status(500).json({ error: "Failed to book workshop" }); }
 });

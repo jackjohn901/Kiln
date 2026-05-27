@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useParams } from "wouter";
 import { ChevronLeft, BookOpen, Check, Loader2, X, ImageIcon, Globe, MapPin } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
@@ -12,10 +12,23 @@ const TECHNIQUES = [
 
 const LEVELS = ["Beginner", "Intermediate", "Advanced", "All levels"];
 
-export default function CreateWorkshop() {
+function toLocalDatetimeValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export default function EditWorkshop() {
   const [, navigate] = useLocation();
+  const { id } = useParams<{ id: string }>();
   const { upload, uploading } = useUpload();
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -39,6 +52,42 @@ export default function CreateWorkshop() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/workshops/${id}`, { credentials: "include" })
+      .then(async (res) => {
+        if (res.status === 404) { setNotFound(true); return; }
+        if (res.status === 403) { setForbidden(true); return; }
+        if (!res.ok) throw new Error("Failed to load");
+        const w = await res.json() as {
+          title: string; description: string | null; technique: string | null;
+          level: string; location: string | null; isOnline: boolean; meetingUrl: string | null;
+          price: number; maxSpots: number; durationHours: number; imageUrl: string | null;
+          startDate: string | null; endDate: string | null; tags: string[];
+          artistId: string;
+        };
+        setForm({
+          title: w.title,
+          description: w.description ?? "",
+          technique: w.technique ?? "",
+          level: w.level,
+          location: w.location ?? "",
+          isOnline: w.isOnline,
+          meetingUrl: w.meetingUrl ?? "",
+          price: String(w.price),
+          maxSpots: String(w.maxSpots),
+          durationHours: String(w.durationHours),
+          imageUrl: w.imageUrl ?? "",
+          startDate: toLocalDatetimeValue(w.startDate),
+          endDate: toLocalDatetimeValue(w.endDate),
+          tags: w.tags ?? [],
+        });
+        if (w.imageUrl) setImagePreview(w.imageUrl);
+      })
+      .catch(() => setError("Failed to load workshop"))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   function set<K extends keyof typeof form>(key: K, value: typeof form[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -75,8 +124,8 @@ export default function CreateWorkshop() {
           imageUrl = imagePreview;
         }
       }
-      const res = await fetch("/api/workshops", {
-        method: "POST",
+      const res = await fetch(`/api/workshops/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
@@ -101,8 +150,12 @@ export default function CreateWorkshop() {
           window.location.href = `/api/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
           return;
         }
+        if (res.status === 403) {
+          setError("You can only edit your own workshops.");
+          return;
+        }
         const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Failed to create workshop");
+        throw new Error(d.error ?? "Failed to update workshop");
       }
       setDone(true);
     } catch (err) {
@@ -112,33 +165,46 @@ export default function CreateWorkshop() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#12100e] flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-amber-400" />
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-4 text-center p-8">
+        <p className="text-stone-400">Workshop not found.</p>
+        <button onClick={() => navigate("/workshops")} className="text-sm text-amber-400 hover:underline">Back to Workshops</button>
+      </div>
+    );
+  }
+
+  if (forbidden) {
+    return (
+      <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-4 text-center p-8">
+        <p className="text-stone-400">You can only edit your own workshops.</p>
+        <button onClick={() => navigate("/workshops")} className="text-sm text-amber-400 hover:underline">Back to Workshops</button>
+      </div>
+    );
+  }
+
   if (done) {
     return (
       <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-6 p-8 text-center">
         <div className="h-16 w-16 flex items-center justify-center rounded-full bg-purple-500/20 border border-purple-500/40">
           <Check size={28} className="text-purple-400" />
         </div>
-        <h2 className="font-serif text-2xl text-amber-100">Workshop Published</h2>
-        <p className="text-stone-400 max-w-sm">Your workshop is now listed. Students can discover and book spots directly.</p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate("/workshops")}
-            className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-          >
-            View Workshops
-          </button>
-          <button
-            onClick={() => {
-              setDone(false);
-              setForm({ title: "", description: "", technique: "", level: "All levels", location: "", isOnline: false, meetingUrl: "", price: "", maxSpots: "8", durationHours: "3", imageUrl: "", startDate: "", endDate: "", tags: [] });
-              setImagePreview("");
-              setImageFile(null);
-            }}
-            className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors"
-          >
-            Add Another
-          </button>
-        </div>
+        <h2 className="font-serif text-2xl text-amber-100">Workshop Updated</h2>
+        <p className="text-stone-400 max-w-sm">Your changes have been saved.</p>
+        <button
+          onClick={() => navigate("/workshops")}
+          className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+        >
+          View Workshops
+        </button>
       </div>
     );
   }
@@ -159,8 +225,8 @@ export default function CreateWorkshop() {
             <BookOpen size={18} className="text-purple-400" />
           </div>
           <div>
-            <h1 className="font-serif text-2xl text-amber-100">Create a Workshop</h1>
-            <p className="text-sm text-stone-500">Teach your craft — in person or online</p>
+            <h1 className="font-serif text-2xl text-amber-100">Edit Workshop</h1>
+            <p className="text-sm text-stone-500">Update your workshop details</p>
           </div>
         </div>
 
@@ -174,7 +240,7 @@ export default function CreateWorkshop() {
                 <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
                 <button
                   type="button"
-                  onClick={() => { setImagePreview(""); setImageFile(null); }}
+                  onClick={() => { setImagePreview(""); setImageFile(null); set("imageUrl", ""); }}
                   className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
                 >
                   <X size={14} />
@@ -257,7 +323,7 @@ export default function CreateWorkshop() {
             </div>
           </div>
 
-          {/* Online toggle + location */}
+          {/* Online toggle + location/meeting link */}
           <div>
             <label className="mb-2 block text-sm font-medium text-stone-400">Format</label>
             <div className="flex gap-2 mb-3">
@@ -405,10 +471,10 @@ export default function CreateWorkshop() {
             {submitting || uploading ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                {uploading ? "Uploading…" : "Publishing…"}
+                {uploading ? "Uploading…" : "Saving…"}
               </>
             ) : (
-              "Publish Workshop"
+              "Save Changes"
             )}
           </button>
         </form>

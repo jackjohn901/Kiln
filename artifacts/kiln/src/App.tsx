@@ -114,6 +114,7 @@ import TechniqueGenetics from "@/pages/TechniqueGenetics";
 import CreateListing from "@/pages/CreateListing";
 import CreateDrop from "@/pages/CreateDrop";
 import CreateWorkshop from "@/pages/CreateWorkshop";
+import EditWorkshop from "@/pages/EditWorkshop";
 import MusicStudio from "@/pages/MusicStudio";
 import ReelStudio from "@/pages/ReelStudio";
 import VoiceStudio from "@/pages/VoiceStudio";
@@ -415,6 +416,7 @@ function Router() {
       <Route path="/create-listing" component={CreateListing} />
       <Route path="/create-drop" component={CreateDrop} />
       <Route path="/create-workshop" component={CreateWorkshop} />
+      <Route path="/workshops/:id/edit" component={EditWorkshop} />
       <Route path="/music-studio" component={MusicStudio} />
       <Route path="/reel-studio" component={ReelStudio} />
       <Route path="/voice-studio" component={VoiceStudio} />

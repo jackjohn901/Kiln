@@ -364,14 +364,32 @@ function buildGoogleCalendarUrl(
   return `https://calendar.google.com/calendar/render?${qs.toString()}`;
 }
 
+export interface WorkshopBookingEmailOptions {
+  isOnline?: boolean;
+  location?: string | null;
+  meetingUrl?: string | null;
+}
+
 export function workshopBookingEmail(
   workshopTitle: string,
   artistName: string,
   startDate: string,
   calParams?: WorkshopCalendarParams,
+  opts?: WorkshopBookingEmailOptions,
 ): string {
   const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, artistName, calParams) : "";
   const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
+
+  const isOnline = opts?.isOnline ?? calParams?.isOnline;
+  const locationLine = isOnline
+    ? opts?.meetingUrl
+      ? `<p style="margin:4px 0 0;font-size:13px;">🌐 <strong>Online workshop</strong> — <a href="${escHtml(opts.meetingUrl)}" style="color:#f59e0b;word-break:break-all;">${escHtml(opts.meetingUrl)}</a></p>`
+      : `<p style="margin:4px 0 0;font-size:12px;color:#4ade80;">🌐 Online workshop — the artist will share the meeting link shortly.</p>`
+    : opts?.location
+      ? `<p style="margin:4px 0 0;font-size:12px;color:#78716c;">📍 ${escHtml(opts.location)}</p>`
+      : calParams?.location
+        ? `<p style="margin:4px 0 0;font-size:12px;color:#78716c;">📍 ${escHtml(calParams.location)}</p>`
+        : "";
 
   const calendarLinks = (gcalUrl || icsUrl) ? `
     <div style="margin-top:16px;">
@@ -388,7 +406,7 @@ export function workshopBookingEmail(
       <p style="margin:0 0 8px;"><strong>${escHtml(workshopTitle)}</strong></p>
       <p style="margin:0 0 8px;">with <strong style="color:#fcd34d;">${escHtml(artistName)}</strong></p>
       <p style="margin:0 0 4px;color:#78716c;">${startDate}</p>
-      ${calParams?.isOnline ? `<p style="margin:4px 0 0;font-size:12px;color:#4ade80;">🌐 Online workshop</p>` : calParams?.location ? `<p style="margin:4px 0 0;font-size:12px;color:#78716c;">📍 ${escHtml(calParams.location)}</p>` : ""}
+      ${locationLine}
       ${calendarLinks}
     `)}
     ${btn(`${BASE_URL}/workshops`, "View Workshop")}
