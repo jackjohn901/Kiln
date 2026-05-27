@@ -95,6 +95,7 @@ import InspirationBoards from "@/pages/InspirationBoards";
 import DuetStudio from "@/pages/DuetStudio";
 import CollectorProfile from "@/pages/CollectorProfile";
 import CommissionTracker from "@/pages/CommissionTracker";
+import CommissionDetail from "@/pages/CommissionDetail";
 import GiftCards from "@/pages/GiftCards";
 import StitchStudio from "@/pages/StitchStudio";
 import PriceCalculator from "@/pages/PriceCalculator";
@@ -369,6 +370,7 @@ function Router() {
       <Route path="/collector" component={CollectorPortal} />
       <Route path="/scheduler" component={PostScheduler} />
       <Route path="/feed" component={Feed} />
+      <Route path="/commissions/:id" component={CommissionDetail} />
       <Route path="/commissions" component={CommissionTracker} />
       <Route path="/creator-home" component={CreatorHome} />
       <Route path="/newsletter" component={Newsletter} />
