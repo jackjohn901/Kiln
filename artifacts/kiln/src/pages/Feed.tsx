@@ -289,6 +289,7 @@ const ReelCard = memo(function ReelCard({
   videoAudioOn,
   onToggleVideoAudio,
   musicUnlocked,
+  autoplayEnabled,
   onComment,
   onNotInterested,
   onMoreLikeThis,
@@ -301,6 +302,7 @@ const ReelCard = memo(function ReelCard({
   videoAudioOn: boolean;
   onToggleVideoAudio: () => void;
   musicUnlocked: boolean;
+  autoplayEnabled: boolean;
   onComment: (reelId: string, artistName: string) => void;
   onNotInterested: (reelId: string) => void;
   onMoreLikeThis: (technique: string) => void;
@@ -361,13 +363,13 @@ const ReelCard = memo(function ReelCard({
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !resolvedVideoUrl) return;
-    if (isActive) {
+    if (isActive && autoplayEnabled) {
       v.currentTime = 0;
       v.play().catch(() => {});
     } else {
       v.pause();
     }
-  }, [isActive, resolvedVideoUrl]);
+  }, [isActive, resolvedVideoUrl, autoplayEnabled]);
 
   // Original audio: browsers require muted for autoplay — unmute imperatively after user gesture
   useEffect(() => {
@@ -402,11 +404,11 @@ const ReelCard = memo(function ReelCard({
         <MuxPlayer
           playbackId={reel.muxPlaybackId}
           streamType="on-demand"
-          autoPlay
+          autoPlay={autoplayEnabled}
           muted={!videoAudioOn || !musicUnlocked}
           loop
           playsInline
-          paused={!isActive}
+          paused={!isActive || !autoplayEnabled}
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : resolvedVideoUrl && isNearby ? (
@@ -925,6 +927,12 @@ export default function Feed() {
   const { following, unreadCount } = useSocial();
   const { profile } = useProfile();
   const { settings: kilnSettings } = useSettings();
+
+  // Sync sound and autoplay state from settings in real time
+  useEffect(() => {
+    setVideoAudioOn(kilnSettings.display_sound);
+  }, [kilnSettings.display_sound]);
+
   const [, navigate] = useLocation(); // used by StreakBadge and other sub-components
   const followedFirings = SEED_KILN_STATUSES.filter((s) => following.includes(s.artistId));
   const [kilnBannerDismissed, setKilnBannerDismissed] = useState(false);
@@ -1141,13 +1149,11 @@ export default function Feed() {
       reel: r,
       score: scoreReel(r, interactions, following, quizTechniques),
     }));
-    // Respect settings (autoplay / sound etc wired in feed)
-    void kilnSettings;
     return [
       ...userPostReels,
       ...scored.sort((a, b) => b.score - a.score).map((s) => s.reel),
     ];
-  }, [feedTab, following, userPostReels, followingApiReels, kilnSettings]);
+  }, [feedTab, following, userPostReels, followingApiReels]);
 
   const reels = useMemo(() => {
     const base = techniqueFilter ? baseReels.filter((r) => r.technique === techniqueFilter) : baseReels;
@@ -1693,6 +1699,7 @@ export default function Feed() {
               videoAudioOn={videoAudioOn}
               onToggleVideoAudio={handleToggleVideoAudio}
               musicUnlocked={musicUnlocked}
+              autoplayEnabled={kilnSettings.display_autoplay}
               onComment={handleComment}
               onNotInterested={handleNotInterested}
               onMoreLikeThis={handleMoreLikeThis}
