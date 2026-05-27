@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { commissionsTable, commissionUpdatesTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
 import { eq, or, desc, asc } from "drizzle-orm";
 import crypto from "crypto";
-import { sendEmailWithRetry, newCommissionEmail, commissionUpdateEmail } from "../lib/email";
+import { sendEmailWithRetry, newCommissionEmail, commissionUpdateEmail, commissionQuotedEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 
 const STORAGE_PATH_RE = /^\/api\/storage\/objects\/[a-zA-Z0-9_\-/.]+$/;
@@ -195,7 +195,22 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
     await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: notifText, link: `/commissions` });
     const clientEmail = commission.clientEmail ?? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, commission.clientId)).then(r => r[0]?.email));
     if (clientEmail) {
-      await sendEmailWithRetry({ to: clientEmail, subject: `Commission update from ${commission.artistName}`, html: commissionUpdateEmail(commission.artistName, status, commission.workType ?? "") }, { label: "commission update notification" });
+      const effectivePrice = updated.quotedPrice ?? commission.quotedPrice;
+      if (status === "quoted" && effectivePrice != null) {
+        await sendEmailWithRetry({
+          to: clientEmail,
+          subject: `You have a quote from ${commission.artistName}`,
+          html: commissionQuotedEmail(
+            commission.artistName,
+            commission.workType ?? "",
+            effectivePrice,
+            "USD",
+            updated.artistNotes ?? commission.artistNotes ?? null,
+          ),
+        }, { label: "commission quoted notification" });
+      } else {
+        await sendEmailWithRetry({ to: clientEmail, subject: `Commission update from ${commission.artistName}`, html: commissionUpdateEmail(commission.artistName, status, commission.workType ?? "") }, { label: "commission update notification" });
+      }
     }
   }
   res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), estimatedDelivery: updated.estimatedDelivery?.toISOString() ?? null });

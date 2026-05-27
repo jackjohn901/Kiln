@@ -247,6 +247,33 @@ export function newCommissionEmail(clientName: string, workType: string, descrip
   `);
 }
 
+export function commissionQuotedEmail(
+  artistName: string,
+  workType: string,
+  quotedPrice: number,
+  currency: string,
+  artistNotes?: string | null,
+): string {
+  const formattedPrice = quotedPrice.toLocaleString("en-US", {
+    style: "currency",
+    currency: currency || "USD",
+    minimumFractionDigits: 2,
+  });
+  const notesHtml = artistNotes
+    ? `<p style="margin:12px 0 0;color:#a8a29e;font-size:13px;"><strong style="color:#d6d3d1;">Artist notes:</strong> ${escHtml(artistNotes)}</p>`
+    : "";
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">You have a quote from ${escHtml(artistName)}</h1>
+    <p style="color:#78716c;margin-bottom:0;">The artist has reviewed your request and sent a price quote.</p>
+    ${card(`
+      <p style="margin:0 0 8px;color:#a8a29e;font-size:13px;">Work type: <strong style="color:#d6d3d1;">${escHtml(workType || "Custom work")}</strong></p>
+      <p style="margin:0;font-size:18px;">Quoted price: <strong style="color:#fcd34d;">${formattedPrice}</strong></p>
+      ${notesHtml}
+    `)}
+    ${btn(`${BASE_URL}/commission-tracker`, "Review Quote")}
+  `);
+}
+
 export function commissionUpdateEmail(artistName: string, status: string, workType: string): string {
   const label = status === "accepted"
     ? `<span style="color:#4ade80;">accepted your request</span>`
