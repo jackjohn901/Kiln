@@ -535,8 +535,14 @@ export default function Settings() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setSnoozePickerOpen(v => !v)}
-                    className="shrink-0 rounded-full bg-stone-800 border border-white/10 px-3 py-1 text-xs font-medium text-stone-300 hover:bg-stone-700 transition-colors"
+                    onClick={() => contactEmail.trim() && setSnoozePickerOpen(v => !v)}
+                    disabled={!contactEmail.trim()}
+                    title={!contactEmail.trim() ? "Add a notification email address below before snoozing" : undefined}
+                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      contactEmail.trim()
+                        ? "bg-stone-800 border-white/10 text-stone-300 hover:bg-stone-700 cursor-pointer"
+                        : "bg-stone-800/40 border-white/5 text-stone-600 cursor-not-allowed opacity-50"
+                    }`}
                   >
                     Snooze
                   </button>
