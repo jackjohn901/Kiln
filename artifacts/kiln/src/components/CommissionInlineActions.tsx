@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, X, Loader2, ChevronRight, Clock, Wrench, RotateCcw, CheckCircle, MinusCircle } from "lucide-react";
+import { Check, X, Loader2, ChevronRight, Clock, Wrench, RotateCcw, CheckCircle, MinusCircle, DollarSign } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ActionState =
   | "loading"
@@ -95,8 +96,11 @@ interface Props {
 }
 
 export default function CommissionInlineActions({ commissionId, initialStatus, onStatusChange }: Props) {
+  const { user } = useAuth();
   const [actionState, setActionState] = useState<ActionState>(initialStatus ? (initialStatus === "pending" ? "idle" : "resolved") : "loading");
   const [dbStatus, setDbStatus] = useState<DbStatus>(initialStatus ?? "pending");
+  const [role, setRole] = useState<"artist" | "buyer" | null>(null);
+  const [quotedPrice, setQuotedPrice] = useState<number | null>(null);
   const [price, setPrice] = useState("");
   const [notes, setNotes] = useState("");
   const priceRef = useRef<HTMLInputElement>(null);
@@ -113,7 +117,12 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
         if (cancelled) return;
         const status: DbStatus = data.status ?? "pending";
         setDbStatus(status);
-        if (status === "pending") {
+        if (data.quotedPrice != null) setQuotedPrice(Number(data.quotedPrice));
+        const detectedRole: "artist" | "buyer" = user?.id === data.clientId ? "buyer" : "artist";
+        setRole(detectedRole);
+        if (status === "pending" && detectedRole === "artist") {
+          setActionState("idle");
+        } else if (status === "quoted" && detectedRole === "buyer") {
           setActionState("idle");
         } else {
           setActionState("resolved");
@@ -126,7 +135,7 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
         }
       });
     return () => { cancelled = true; };
-  }, [commissionId, initialStatus]);
+  }, [commissionId, initialStatus, user?.id]);
 
   useEffect(() => {
     if (actionState === "quoting") {
@@ -147,6 +156,27 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
         setDbStatus("declined");
         setActionState("resolved");
         onStatusChange?.("declined");
+      } else {
+        setActionState("error");
+      }
+    } catch {
+      setActionState("error");
+    }
+  }
+
+  async function handleAccept() {
+    setActionState("saving");
+    try {
+      const res = await fetch(`/api/commissions/${commissionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "accepted" }),
+      });
+      if (res.ok) {
+        setDbStatus("accepted");
+        setActionState("resolved");
+        onStatusChange?.("accepted");
       } else {
         setActionState("error");
       }
@@ -260,6 +290,31 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
             </button>
           </div>
         </form>
+      </div>
+    );
+  }
+
+  if (role === "buyer" && dbStatus === "quoted") {
+    return (
+      <div className="mt-2 space-y-2">
+        {quotedPrice != null && (
+          <div className="flex items-center gap-1.5">
+            <DollarSign size={12} className="text-amber-400" />
+            <span className="text-xs font-semibold text-amber-300">
+              ${quotedPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-xs text-stone-500">quoted</span>
+          </div>
+        )}
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAccept(); }}
+            className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+          >
+            <Check size={10} /> Accept quote
+          </button>
+        </div>
       </div>
     );
   }
