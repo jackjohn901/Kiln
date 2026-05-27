@@ -7,6 +7,8 @@ export interface Workshop {
   description: string;
   technique: string;
   location: string;
+  isOnline?: boolean;
+  meetingUrl?: string | null;
   startDate: string;
   duration: string;
   spots: number;

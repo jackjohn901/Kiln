@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, CalendarPlus, Download } from "lucide-react";
+import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, CalendarPlus, Download, Video } from "lucide-react";
 import Nav from "@/components/Nav";
 import { workshops, type Workshop } from "@/data/workshops";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -161,7 +161,21 @@ export default function WorkshopCheckout() {
             <p className="text-xs text-amber-400 mb-3">with {workshop.artistName}</p>
             <div className="space-y-1.5 text-xs text-stone-400">
               <div className="flex items-center gap-2"><Star size={11} className="text-amber-400" />{workshop.startDate}</div>
-              <div className="flex items-center gap-2"><MapPin size={11} />{workshop.location}</div>
+              {workshop.isOnline && workshop.meetingUrl ? (
+                <div className="flex items-center gap-2">
+                  <Video size={11} className="text-sky-400 shrink-0" />
+                  <a
+                    href={workshop.meetingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-400 hover:text-sky-300 underline underline-offset-2 truncate"
+                  >
+                    {workshop.meetingUrl}
+                  </a>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2"><MapPin size={11} className="shrink-0" />{workshop.location}</div>
+              )}
               <div className="flex items-center gap-2"><Clock size={11} />{workshop.duration}</div>
               <div className="flex items-center gap-2"><Users size={11} />{workshop.spotsLeft - 1} spots remaining after yours</div>
             </div>

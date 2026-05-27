@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { markFeatureVisited } from "@/lib/featureDiscovery";
-import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X, CalendarPlus, Download } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X, CalendarPlus, Download, Video } from "lucide-react";
 import { useLocation } from "wouter";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
@@ -16,6 +16,7 @@ interface ApiWorkshop {
   level: string;
   location: string | null;
   isOnline: boolean;
+  meetingUrl: string | null;
   price: number;
   maxSpots: number;
   spotsBooked: number;
@@ -56,10 +57,27 @@ function BookingConfirmedModal({ w, onClose }: { w: ApiWorkshop; onClose: () => 
         <p className="text-sm text-stone-400 mb-1 font-semibold">{w.title}</p>
         <p className="text-xs text-amber-400 mb-4">with {w.artistName}</p>
         {w.startDate && (
-          <p className="text-xs text-stone-500 mb-5">
+          <p className="text-xs text-stone-500 mb-3">
             {new Date(w.startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-            {" · "}{w.isOnline ? "Online" : (w.location ?? "")}
+            {!w.isOnline && w.location && <>{" · "}{w.location}</>}
           </p>
+        )}
+        {w.isOnline && w.meetingUrl ? (
+          <div className="flex items-center justify-center gap-1.5 mb-5 px-3 py-2 rounded-xl bg-sky-500/10 border border-sky-500/20">
+            <Video size={12} className="text-sky-400 shrink-0" />
+            <a
+              href={w.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-sky-400 hover:text-sky-300 underline underline-offset-2 truncate"
+            >
+              {w.meetingUrl}
+            </a>
+          </div>
+        ) : w.isOnline ? (
+          <p className="text-xs text-sky-400 mb-5">Online — link will be sent to your email</p>
+        ) : (
+          <div className="mb-5" />
         )}
         <p className="text-xs text-stone-500 mb-3">Add this workshop to your calendar:</p>
         <div className="flex flex-wrap gap-2 justify-center mb-5">
