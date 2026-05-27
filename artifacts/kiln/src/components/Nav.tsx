@@ -6,6 +6,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { useCart } from "@/contexts/CartContext";
 import { useStripeConnect } from "@/contexts/StripeConnectContext";
+import { useSettings, deriveNotifStatus } from "@/contexts/SettingsContext";
 import NotificationPanel from "@/components/NotificationPanel";
 import GlobalSearch from "@/components/GlobalSearch";
 import MessageToast from "@/components/MessageToast";
@@ -16,6 +17,8 @@ export default function Nav() {
   const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, clearNewMessagePing } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
+  const { settings } = useSettings();
+  const { dimmed: notifDimmed, warn: notifWarn } = deriveNotifStatus(settings);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -224,13 +227,35 @@ export default function Nav() {
             {/* Notifications */}
             <button
               onClick={() => setShowNotifications((v) => !v)}
-              className="relative flex h-8 w-8 items-center justify-center rounded-full border border-stone-700 text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors"
+              title={
+                notifDimmed
+                  ? "Notifications silenced or paused — check Settings"
+                  : notifWarn
+                  ? "Email notifications misconfigured — check Settings"
+                  : "Notifications"
+              }
+              className={`relative flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                notifDimmed
+                  ? "border-stone-800 text-stone-600 hover:border-stone-600 hover:text-stone-500"
+                  : "border-stone-700 text-stone-400 hover:border-amber-400/40 hover:text-amber-300"
+              }`}
             >
-              <Bell size={15} />
-              {unreadCount > 0 && (
+              <Bell size={15} className={notifDimmed ? "opacity-60" : undefined} />
+              {unreadCount > 0 && !notifDimmed && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-stone-950">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
+              )}
+              {unreadCount > 0 && notifDimmed && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-stone-600 text-[9px] font-bold text-stone-300">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+              {notifWarn && !notifDimmed && unreadCount === 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-400/80 ring-1 ring-[#1a1209]" />
+              )}
+              {notifDimmed && unreadCount === 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-stone-500/70 ring-1 ring-[#1a1209]" />
               )}
             </button>
 

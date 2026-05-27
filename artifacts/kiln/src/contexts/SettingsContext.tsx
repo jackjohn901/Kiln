@@ -36,6 +36,56 @@ export interface KilnSettings {
 
 export const SETTING_KEY = "kiln_settings_v1";
 
+export const PUSH_KEYS = [
+  "notif_likes",
+  "notif_comments",
+  "notif_follows",
+  "notif_commissions",
+  "notif_workshops",
+  "notif_drops",
+] as const satisfies ReadonlyArray<keyof KilnSettings>;
+
+export const EMAIL_KEYS = [
+  "notif_email_digest",
+  "notif_email_follows",
+  "notif_email_comments",
+  "notif_email_new_sale",
+  "notif_email_new_booking",
+  "notif_email_commission_payment",
+  "notif_email_new_commission",
+  "notif_email_new_patron",
+  "notif_email_outbid",
+  "notif_email_mentions",
+  "notif_email_shipped",
+] as const satisfies ReadonlyArray<keyof KilnSettings>;
+
+export interface NotifStatus {
+  dimmed: boolean;
+  warn: boolean;
+}
+
+/**
+ * Derive the notification bell status from the current settings.
+ *
+ * dimmed — at least one major delivery channel is fully off:
+ *   all push types disabled, OR email paused, OR all email types disabled.
+ *
+ * warn — email channel is misconfigured (matches Settings-page notifWarn):
+ *   all email types disabled, OR email paused while some types are still
+ *   configured. Shown as a warning dot on the bell.
+ */
+export function deriveNotifStatus(s: KilnSettings): NotifStatus {
+  const allPushOff = PUSH_KEYS.every((k) => !s[k]);
+  const activeEmailCount = EMAIL_KEYS.filter((k) => s[k]).length;
+  const allEmailOff = activeEmailCount === 0;
+  const emailPaused = s.notif_email_paused;
+
+  const dimmed = allPushOff || emailPaused || allEmailOff;
+  const warn = allEmailOff || (emailPaused && activeEmailCount > 0);
+
+  return { dimmed, warn };
+}
+
 export function defaultSettings(): KilnSettings {
   return {
     notif_likes: true,

@@ -17,6 +17,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { useCart } from "@/contexts/CartContext";
 import { useStripeConnect } from "@/contexts/StripeConnectContext";
+import { useSettings, deriveNotifStatus } from "@/contexts/SettingsContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 const PRIMARY_TABS = [
@@ -123,7 +124,15 @@ export default function MobileNav() {
   const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
+  const { settings } = useSettings();
+  const { dimmed: notifDimmed, warn: notifWarn } = deriveNotifStatus(settings);
   const [showMore, setShowMore] = useState(false);
+
+  const notifTitle = notifDimmed
+    ? "Notifications silenced or paused — check Settings"
+    : notifWarn
+    ? "Email notifications misconfigured — check Settings"
+    : undefined;
 
   const totalBadge = unreadCount + unreadMessageCount + unreadWorkshopCount + unreadCommissionPaymentCount;
   const profileHref = profile ? `/artists/${profile.id}` : "/setup";
@@ -303,28 +312,42 @@ export default function MobileNav() {
                     <div className="grid grid-cols-3 gap-1.5">
                       {section.items.map(({ href, icon: Icon, label }) => {
                         const isActive = href === "/" ? location === "/" : location.startsWith(href);
+                        const isNotifItem = href === "/notifications";
                         const badge =
-                          href === "/notifications" ? unreadCount :
+                          isNotifItem ? unreadCount :
                           href === "/messages" ? unreadMessageCount :
                           href === "/cart" ? itemCount :
                           href === "/workshops" ? unreadWorkshopCount :
                           href === "/inbox" ? (pendingInquiries + unreadCommissionPaymentCount) : 0;
+                        const notifMuted = isNotifItem && notifDimmed;
+                        const notifItemWarn = isNotifItem && notifWarn && !notifDimmed;
 
                         return (
                           <Link key={href} href={href} onClick={() => setShowMore(false)}>
                             <button
+                              title={isNotifItem ? notifTitle : undefined}
                               className={`relative w-full flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 transition-all ${
                                 isActive
                                   ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                                  : notifMuted
+                                  ? "border-white/8 bg-stone-900/60 text-stone-600 hover:border-white/15 hover:text-stone-400"
                                   : "border-white/8 bg-stone-900/60 text-stone-400 hover:border-white/15 hover:text-stone-200"
                               }`}
                             >
-                              <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+                              <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} className={notifMuted && !isActive ? "opacity-50" : undefined} />
                               <span className="text-[10px] font-medium leading-tight text-center">{label}</span>
                               {badge > 0 && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                                <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
+                                  notifMuted ? "bg-stone-600 text-stone-300" : "bg-red-500 text-white"
+                                }`}>
                                   {badge > 9 ? "9+" : badge}
                                 </span>
+                              )}
+                              {notifItemWarn && badge === 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-400/80 ring-1 ring-[#1a1714]" />
+                              )}
+                              {notifMuted && badge === 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-stone-500/70 ring-1 ring-[#1a1714]" />
                               )}
                             </button>
                           </Link>
