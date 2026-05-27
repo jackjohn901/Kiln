@@ -90,16 +90,19 @@ function StatusBadge({ status }: StatusBadgeProps) {
 
 interface Props {
   commissionId: string;
+  initialStatus?: DbStatus;
+  onStatusChange?: (newStatus: string) => void;
 }
 
-export default function CommissionInlineActions({ commissionId }: Props) {
-  const [actionState, setActionState] = useState<ActionState>("loading");
-  const [dbStatus, setDbStatus] = useState<DbStatus>("pending");
+export default function CommissionInlineActions({ commissionId, initialStatus, onStatusChange }: Props) {
+  const [actionState, setActionState] = useState<ActionState>(initialStatus ? (initialStatus === "pending" ? "idle" : "resolved") : "loading");
+  const [dbStatus, setDbStatus] = useState<DbStatus>(initialStatus ?? "pending");
   const [price, setPrice] = useState("");
   const [notes, setNotes] = useState("");
   const priceRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (initialStatus !== undefined) return;
     let cancelled = false;
     fetch(`/api/commissions/${commissionId}`, { credentials: "include" })
       .then((res) => {
@@ -123,7 +126,7 @@ export default function CommissionInlineActions({ commissionId }: Props) {
         }
       });
     return () => { cancelled = true; };
-  }, [commissionId]);
+  }, [commissionId, initialStatus]);
 
   useEffect(() => {
     if (actionState === "quoting") {
@@ -143,6 +146,7 @@ export default function CommissionInlineActions({ commissionId }: Props) {
       if (res.ok) {
         setDbStatus("declined");
         setActionState("resolved");
+        onStatusChange?.("declined");
       } else {
         setActionState("error");
       }
@@ -171,6 +175,7 @@ export default function CommissionInlineActions({ commissionId }: Props) {
       if (res.ok) {
         setDbStatus(newStatus);
         setActionState("resolved");
+        onStatusChange?.(newStatus);
       } else {
         setActionState("error");
       }
