@@ -49,3 +49,57 @@ export function verifyUnsubscribeToken(token: string): string | null {
 
   return userId;
 }
+
+/**
+ * Generates a stateless HMAC-signed token that encodes both userId and bookingId
+ * for per-booking reminder opt-out.
+ * Format: base64url(userId\x00bookingId).<hex-hmac>
+ */
+export function generateBookingUnsubscribeToken(userId: string, bookingId: string): string {
+  const raw = `${userId}\x00${bookingId}`;
+  const sig = createHmac("sha256", UNSUBSCRIBE_SECRET)
+    .update(raw)
+    .digest("hex");
+  const payload = Buffer.from(raw).toString("base64url");
+  return `${payload}.${sig}`;
+}
+
+/**
+ * Verifies a booking-level unsubscribe token.
+ * Returns { userId, bookingId } on success, null on failure.
+ */
+export function verifyBookingUnsubscribeToken(token: string): { userId: string; bookingId: string } | null {
+  const dotIdx = token.indexOf(".");
+  if (dotIdx === -1) return null;
+  const payload = token.slice(0, dotIdx);
+  const sig = token.slice(dotIdx + 1);
+  if (!payload || !sig) return null;
+
+  let raw: string;
+  try {
+    raw = Buffer.from(payload, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+
+  const sepIdx = raw.indexOf("\x00");
+  if (sepIdx === -1) return null;
+  const userId = raw.slice(0, sepIdx);
+  const bookingId = raw.slice(sepIdx + 1);
+  if (!userId || !bookingId) return null;
+
+  const expected = createHmac("sha256", UNSUBSCRIBE_SECRET)
+    .update(raw)
+    .digest("hex");
+
+  try {
+    const sigBuf = Buffer.from(sig, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    if (sigBuf.length !== expBuf.length) return null;
+    if (!timingSafeEqual(sigBuf, expBuf)) return null;
+  } catch {
+    return null;
+  }
+
+  return { userId, bookingId };
+}

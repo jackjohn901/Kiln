@@ -2,7 +2,7 @@ import { db, workshopsTable, workshopBookingsTable, userSettingsTable } from "@w
 import { and, gte, lte, isNull, isNotNull, eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { sendEmail, workshopReminderEmail } from "./email";
-import { generateUnsubscribeToken } from "./unsubscribeTokens";
+import { generateUnsubscribeToken, generateBookingUnsubscribeToken } from "./unsubscribeTokens";
 
 async function sendWorkshopReminders() {
   try {
@@ -43,7 +43,13 @@ async function sendWorkshopReminders() {
           continue;
         }
 
-        // Check if the student has opted out of workshop reminder emails
+        // Check booking-level opt-out first
+        if (booking.reminderOptOut) {
+          logger.debug({ bookingId: booking.id, userId: booking.userId }, "workshopReminders: skipping booking-level opted-out");
+          continue;
+        }
+
+        // Then check the global workshop reminder opt-out preference
         const [userSettings] = await db
           .select({ settings: userSettingsTable.settings })
           .from(userSettingsTable)
@@ -51,7 +57,7 @@ async function sendWorkshopReminders() {
 
         const settings = userSettings?.settings as Record<string, unknown> | null ?? {};
         if (settings.workshopReminderOptOut === true) {
-          logger.debug({ bookingId: booking.id, userId: booking.userId }, "workshopReminders: skipping opted-out user");
+          logger.debug({ bookingId: booking.id, userId: booking.userId }, "workshopReminders: skipping globally opted-out user");
           continue;
         }
 
@@ -68,6 +74,7 @@ async function sendWorkshopReminders() {
           : "Tomorrow";
 
         const unsubscribeToken = generateUnsubscribeToken(booking.userId);
+        const bookingUnsubscribeToken = generateBookingUnsubscribeToken(booking.userId, booking.id);
 
         const html = workshopReminderEmail(
           workshop.title,
@@ -79,6 +86,7 @@ async function sendWorkshopReminders() {
             location: workshop.location,
             meetingUrl: workshop.meetingUrl,
             unsubscribeToken,
+            bookingUnsubscribeToken,
           },
           {
             startDateISO: workshop.startDate?.toISOString() ?? null,

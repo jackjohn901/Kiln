@@ -418,6 +418,7 @@ export interface WorkshopReminderOptions {
   location?: string | null;
   meetingUrl?: string | null;
   unsubscribeToken?: string | null;
+  bookingUnsubscribeToken?: string | null;
 }
 
 export function workshopReminderEmail(
@@ -448,9 +449,16 @@ export function workshopReminderEmail(
       </div>
     </div>` : "";
 
-  const unsubscribeLink = opts?.unsubscribeToken
-    ? `<a href="${BASE_URL.replace(/\/kiln$/, "")}/api/unsubscribe/workshop-reminders?token=${encodeURIComponent(opts.unsubscribeToken)}" style="color:#78716c;">Don't remind me for future workshops</a>`
+  const apiBase = BASE_URL.replace(/\/kiln$/, "");
+  const bookingUnsubLink = opts?.bookingUnsubscribeToken
+    ? `<a href="${apiBase}/api/unsubscribe/workshop-booking?token=${encodeURIComponent(opts.bookingUnsubscribeToken)}" style="color:#78716c;">Don't remind me for this workshop</a>`
+    : "";
+  const globalUnsubLink = opts?.unsubscribeToken
+    ? `<a href="${apiBase}/api/unsubscribe/workshop-reminders?token=${encodeURIComponent(opts.unsubscribeToken)}" style="color:#57534e;">Don't remind me for any workshops</a>`
     : `<a href="${BASE_URL}/settings" style="color:#78716c;">Manage notification preferences</a>`;
+  const unsubscribeLink = bookingUnsubLink
+    ? `${bookingUnsubLink} &nbsp;·&nbsp; ${globalUnsubLink}`
+    : globalUnsubLink;
 
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your workshop is tomorrow!</h1>

@@ -36,6 +36,7 @@ export const workshopBookingsTable = pgTable("workshop_bookings", {
   notes: text("notes"),
   paidAmount: integer("paid_amount"),
   reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+  reminderOptOut: boolean("reminder_opt_out").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

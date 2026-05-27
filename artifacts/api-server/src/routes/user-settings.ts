@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userSettingsTable, profilesTable } from "@workspace/db";
+import { userSettingsTable, profilesTable, workshopBookingsTable } from "@workspace/db";
 import { isEmailPaused } from "../lib/emailPaused";
 
 import { eq } from "drizzle-orm";
-import { verifyUnsubscribeToken } from "../lib/unsubscribeTokens";
+import { verifyUnsubscribeToken, verifyBookingUnsubscribeToken } from "../lib/unsubscribeTokens";
 
 const router = Router();
 
@@ -184,8 +184,52 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
   }
 });
 
+// GET /api/unsubscribe/workshop-booking?token=<booking-token>
+// Per-booking one-click unsubscribe — sets reminderOptOut on the specific booking row
+router.get("/unsubscribe/workshop-booking", async (req, res): Promise<void> => {
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  if (!token) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is missing a token. Please use the link from your email.", false));
+    return;
+  }
+
+  const parsed = verifyBookingUnsubscribeToken(token);
+  if (!parsed) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is invalid or has been tampered with. Please use the link from your original reminder email.", false));
+    return;
+  }
+
+  const { bookingId } = parsed;
+
+  try {
+    const [booking] = await db
+      .select({ id: workshopBookingsTable.id })
+      .from(workshopBookingsTable)
+      .where(eq(workshopBookingsTable.id, bookingId));
+
+    if (!booking) {
+      res.status(400).send(unsubscribePage("Booking not found", "We couldn't find the booking associated with this link.", false));
+      return;
+    }
+
+    await db
+      .update(workshopBookingsTable)
+      .set({ reminderOptOut: true })
+      .where(eq(workshopBookingsTable.id, bookingId));
+
+    res.send(unsubscribePage(
+      "Reminder turned off",
+      "You won't receive a reminder for this specific workshop. Your other workshop reminders are not affected. You can manage all your notification preferences in your account settings.",
+      true,
+    ));
+  } catch {
+    res.status(500).send(unsubscribePage("Something went wrong", "We couldn't update your preference right now. Please try again later or manage your settings from your account.", false));
+  }
+});
+
 // GET /api/unsubscribe/workshop-reminders?token=<token>
 // Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Opts the user out of ALL workshop reminder emails globally
 router.get("/unsubscribe/workshop-reminders", async (req, res): Promise<void> => {
   const token = typeof req.query.token === "string" ? req.query.token : null;
   if (!token) {
@@ -219,7 +263,7 @@ router.get("/unsubscribe/workshop-reminders", async (req, res): Promise<void> =>
 
     res.send(unsubscribePage(
       "You've been unsubscribed",
-      "You won't receive workshop reminder emails for future bookings. You can re-enable them any time in your notification settings.",
+      "You won't receive workshop reminder emails for any future bookings. You can re-enable them any time in your notification settings.",
       true,
     ));
   } catch {
