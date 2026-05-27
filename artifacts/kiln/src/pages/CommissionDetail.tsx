@@ -44,6 +44,7 @@ const MILESTONE_TEMPLATES = [
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "text-stone-400 bg-stone-800 border-stone-700",
+  quoted: "text-violet-400 bg-violet-500/10 border-violet-500/30",
   accepted: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
   in_progress: "text-amber-400 bg-amber-500/10 border-amber-500/30",
   completed: "text-blue-400 bg-blue-500/10 border-blue-500/30",
@@ -70,6 +71,26 @@ export default function CommissionDetail({ params }: { params: { id: string } })
   const [commission, setCommission] = useState<Commission | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+
+  async function handleAcceptQuote() {
+    if (!commission) return;
+    setAccepting(true);
+    try {
+      const r = await fetch(`/api/commissions/${commission.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "accepted" }),
+      });
+      if (r.ok) {
+        const updated = await r.json() as Commission;
+        setCommission(updated);
+      }
+    } finally {
+      setAccepting(false);
+    }
+  }
 
   useEffect(() => {
     markCommissionPaymentRead(id);
@@ -176,7 +197,28 @@ export default function CommissionDetail({ params }: { params: { id: string } })
                 )}
               </div>
 
-              {commission.status !== "pending" && commission.status !== "declined" && (
+              {!isArtist && commission.status === "quoted" && (
+                <div className="rounded-xl border border-violet-500/30 bg-violet-500/8 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] uppercase tracking-wider text-violet-400/70">Quote received</p>
+                    {commission.quotedPrice && (
+                      <span className="text-xl font-bold text-violet-300">${commission.quotedPrice.toLocaleString()}</span>
+                    )}
+                  </div>
+                  {commission.artistNotes && (
+                    <p className="text-xs text-stone-300 leading-relaxed">{commission.artistNotes}</p>
+                  )}
+                  <button
+                    onClick={handleAcceptQuote}
+                    disabled={accepting}
+                    className="w-full rounded-full bg-violet-500/20 border border-violet-500/40 text-xs text-violet-300 py-2.5 font-medium hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {accepting ? "Accepting…" : "Accept Quote"}
+                  </button>
+                </div>
+              )}
+
+              {commission.status !== "pending" && commission.status !== "declined" && commission.status !== "quoted" && (
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-stone-600 mb-3">Progress</p>
                   <div className="space-y-2">
@@ -213,7 +255,7 @@ export default function CommissionDetail({ params }: { params: { id: string } })
                 </div>
               )}
 
-              {commission.artistNotes && (
+              {commission.artistNotes && !(commission.status === "quoted" && !isArtist) && (
                 <div className="rounded-xl bg-stone-800/50 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-stone-600 mb-1">Artist notes</p>
                   <p className="text-xs text-stone-400">{commission.artistNotes}</p>
