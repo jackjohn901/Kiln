@@ -26,6 +26,7 @@ export const profilesTable = pgTable("profiles", {
   linkInBioSlug: varchar("link_in_bio_slug", { length: 100 }),
   accountType: varchar("account_type", { length: 50 }).default("artist"),
   contactEmail: varchar("contact_email", { length: 255 }),
+  contactEmailBounced: boolean("contact_email_bounced").notNull().default(false),
   phoneNumber: varchar("phone_number", { length: 30 }),
   stripeConnectedAccountId: text("stripe_connected_account_id"),
   stripeConnectStatus: varchar("stripe_connect_status", { length: 50 }),

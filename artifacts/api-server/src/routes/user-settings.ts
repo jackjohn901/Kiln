@@ -30,7 +30,7 @@ router.get("/me/settings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [[row], [profile]] = await Promise.all([
     db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, req.user.id)),
-    db.select({ contactEmail: profilesTable.contactEmail, phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, req.user.id)),
+    db.select({ contactEmail: profilesTable.contactEmail, contactEmailBounced: profilesTable.contactEmailBounced, phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, req.user.id)),
   ]);
   if (!row) {
     res.json({
@@ -40,6 +40,7 @@ router.get("/me/settings", async (req, res): Promise<void> => {
       defaultShippingAddress: null,
       notifEmailResumeAt: null,
       contactEmail: profile?.contactEmail ?? null,
+      contactEmailBounced: profile?.contactEmailBounced ?? false,
       phoneNumber: profile?.phoneNumber ?? null,
     });
     return;
@@ -58,7 +59,7 @@ router.get("/me/settings", async (req, res): Promise<void> => {
     resolvedRow = { ...row, settings: clearedSettings, notifEmailPausedAt: null, notifEmailResumeAt: null };
   }
 
-  res.json({ ...resolvedRow, contactEmail: profile?.contactEmail ?? null, phoneNumber: profile?.phoneNumber ?? null });
+  res.json({ ...resolvedRow, contactEmail: profile?.contactEmail ?? null, contactEmailBounced: profile?.contactEmailBounced ?? false, phoneNumber: profile?.phoneNumber ?? null });
 });
 
 // PATCH /me/settings
@@ -142,9 +143,14 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     }
   }
 
-  // Persist contactEmail and phoneNumber to profiles table if provided
-  const profileUpdates: Record<string, string | null> = {};
-  if (typeof contactEmail === "string") profileUpdates.contactEmail = contactEmail.trim() || null;
+  // Persist contactEmail and phoneNumber to profiles table if provided.
+  // Saving a new (non-empty) email always clears the bounced flag so the UI
+  // resets back to a clean state for the freshly-provided address.
+  const profileUpdates: Record<string, string | null | boolean> = {};
+  if (typeof contactEmail === "string") {
+    profileUpdates.contactEmail = contactEmail.trim() || null;
+    if (contactEmail.trim().length > 0) profileUpdates.contactEmailBounced = false;
+  }
   if (typeof phoneNumber === "string") profileUpdates.phoneNumber = phoneNumber.trim() || null;
   if (Object.keys(profileUpdates).length > 0) {
     await db.update(profilesTable)

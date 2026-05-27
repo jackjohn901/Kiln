@@ -105,6 +105,7 @@ export default function NotificationSettingsScreen() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [notifEmail, setNotifEmail] = useState("");
+  const [emailBounced, setEmailBounced] = useState(false);
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailError, setEmailError] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState(false);
@@ -180,7 +181,7 @@ export default function NotificationSettingsScreen() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null }>("/api/me/settings")
+    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null; contactEmailBounced?: boolean }>("/api/me/settings")
       .then((data) => {
         if (data.settings) {
           const merged = { ...DEFAULTS, ...data.settings };
@@ -188,6 +189,7 @@ export default function NotificationSettingsScreen() {
           latestSettingsRef.current = merged;
         }
         if (data.contactEmail) setNotifEmail(data.contactEmail);
+        if (data.contactEmailBounced) setEmailBounced(true);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -280,6 +282,7 @@ export default function NotificationSettingsScreen() {
       .then(() => {
         if (!mountedRef.current) return;
         setNotifEmail(trimmed);
+        setEmailBounced(false);
         setEmailError(false);
         setEmailSaved(true);
         if (emailSavedTimerRef.current) clearTimeout(emailSavedTimerRef.current);
@@ -411,6 +414,14 @@ export default function NotificationSettingsScreen() {
                 </Text>
               </View>
             )}
+            {notifEmail.trim() && emailBounced && (
+              <View style={styles.emailBouncedBanner}>
+                <Feather name="alert-octagon" size={13} color="#ef4444" style={styles.emailWarningIcon} />
+                <Text style={styles.emailBouncedText}>
+                  The address below couldn't be delivered to. Please update it with a working email.
+                </Text>
+              </View>
+            )}
             <ToggleRow
               label="Weekly digest"
               desc="Top posts, opportunities, and updates"
@@ -491,7 +502,11 @@ export default function NotificationSettingsScreen() {
               </Text>
               <TextInput
                 value={notifEmail}
-                onChangeText={(text) => { setNotifEmail(text); if (emailValidationError && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim())) setEmailValidationError(false); }}
+                onChangeText={(text) => {
+                  setNotifEmail(text);
+                  if (emailBounced) setEmailBounced(false);
+                  if (emailValidationError && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim())) setEmailValidationError(false);
+                }}
                 onBlur={() => saveNotifEmail(notifEmail)}
                 placeholder="you@example.com"
                 placeholderTextColor={colors.mutedForeground}
@@ -503,13 +518,18 @@ export default function NotificationSettingsScreen() {
                   {
                     color: colors.foreground,
                     backgroundColor: colors.background,
-                    borderColor: emailValidationError ? "#ef4444" : colors.border,
+                    borderColor: emailValidationError || emailBounced ? "#ef4444" : colors.border,
                   },
                 ]}
               />
               {emailValidationError && (
                 <Text style={[styles.toggleDesc, { color: "#ef4444", marginTop: 4 }]}>
                   Please enter a valid email address.
+                </Text>
+              )}
+              {!emailValidationError && emailBounced && (
+                <Text style={[styles.toggleDesc, { color: "#ef4444", marginTop: 4 }]}>
+                  This address is undeliverable. Update it to restore email notifications.
                 </Text>
               )}
             </View>
@@ -597,6 +617,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(245, 158, 11, 0.10)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(245, 158, 11, 0.25)",
+  },
+  emailBouncedBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(239, 68, 68, 0.25)",
+  },
+  emailBouncedText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#ef4444",
   },
   emailWarningIcon: {
     marginTop: 1,
