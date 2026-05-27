@@ -60,6 +60,36 @@ uri = "file://attached_assets/kiln_ad_story.png"
 type = "image"
 title = "Kiln Instagram story ad"
 
+[[generated]]
+id = "-uEOJwuMzCIhKLCAWkSyS"
+uri = "file://attached_assets/kiln_ad_wood.png"
+type = "image"
+title = "Kiln wood makers ad"
+
+[[generated]]
+id = "HDOBIXQ2F90iJoUfA15wJ"
+uri = "file://attached_assets/kiln_ad_bronze.png"
+type = "image"
+title = "Kiln bronze casters ad"
+
+[[generated]]
+id = "dXzoLaUjGEankeZvJ76l2"
+uri = "file://attached_assets/kiln_ad_fiber.png"
+type = "image"
+title = "Kiln fiber artists ad"
+
+[[generated]]
+id = "np4XMr2cyogCgQAvBEanz"
+uri = "file://attached_assets/kiln_ad_ceramics.png"
+type = "image"
+title = "Kiln ceramics ad"
+
+[[generated]]
+id = "by2O64HgoQn10RfnKxNbr"
+uri = "file://attached_assets/kiln_ad_glass.png"
+type = "image"
+title = "Kiln glass blowers ad"
+
 [[outputs]]
 id = "sJHvn6KG7yE_SSck3915p"
 uri = "file://assets/icons/kiln-icon-v1.png"
@@ -209,3 +239,33 @@ id = "hpVttnFcQr5PgAulFSyHE"
 uri = "file://attached_assets/kiln_ad_banner.png"
 type = "image"
 title = "Twitter/X Banner / LinkedIn Header (16:9)"
+
+[[outputs]]
+id = "1c5C5vlvAvQiw80889iYd"
+uri = "file://attached_assets/kiln_ad_wood.png"
+type = "image"
+title = "Wood Makers"
+
+[[outputs]]
+id = "IDB3LVnf3ol5LU88SrZ3l"
+uri = "file://attached_assets/kiln_ad_bronze.png"
+type = "image"
+title = "Bronze Casters"
+
+[[outputs]]
+id = "BH9GFhlQsWCTt4PKYvtM1"
+uri = "file://attached_assets/kiln_ad_fiber.png"
+type = "image"
+title = "Fiber Artists"
+
+[[outputs]]
+id = "RBk_kPr9b4zLBQcaolOX0"
+uri = "file://attached_assets/kiln_ad_ceramics.png"
+type = "image"
+title = "Ceramics"
+
+[[outputs]]
+id = "xyY6rc1DWscwFIHg-W7r2"
+uri = "file://attached_assets/kiln_ad_glass.png"
+type = "image"
+title = "Glass Blowers"
