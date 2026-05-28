@@ -78,13 +78,13 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
     try {
       const [[prev], [s], [prof]] = await Promise.all([
         db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, prevBidderId)),
-        db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
+        db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt, notifSmsResumeAt: userSettingsTable.notifSmsResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, prevBidderId)),
         db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, prevBidderId)),
       ]);
       const emailSettings = (s?.settings as Record<string, unknown> | null);
       const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_outbid !== false;
       if (wantsEmail && prev?.email) await sendEmailWithRetry({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }, { label: "outbid notification", contextId: auction.id });
-      sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilnfire.replit.app/kiln/auctions/${auction.id}`);
+      sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilnfire.replit.app/kiln/auctions/${auction.id}`, s?.notifSmsResumeAt);
     } catch (err) {
       logger.warn({ err, prevBidderId, auctionId: auction.id }, "Failed to send outbid notification email");
     }

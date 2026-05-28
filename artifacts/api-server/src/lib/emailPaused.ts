@@ -13,3 +13,17 @@ export function isEmailPaused(
   if (resumeAt != null && resumeAt <= new Date()) return false;
   return true;
 }
+
+/**
+ * Returns true if the user has SMS notifications paused right now.
+ *
+ * Mirrors isEmailPaused — handles both indefinite pauses and timed snoozes.
+ */
+export function isSmsPaused(
+  settings: Record<string, unknown> | null | undefined,
+  resumeAt: Date | null | undefined,
+): boolean {
+  if (settings?.notif_sms_paused !== true) return false;
+  if (resumeAt != null && resumeAt <= new Date()) return false;
+  return true;
+}

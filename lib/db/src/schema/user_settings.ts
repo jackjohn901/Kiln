@@ -8,6 +8,8 @@ export const userSettingsTable = pgTable("user_settings", {
   defaultShippingAddress: jsonb("default_shipping_address"),
   notifEmailPausedAt: timestamp("notif_email_paused_at", { withTimezone: true }),
   notifEmailResumeAt: timestamp("notif_email_resume_at", { withTimezone: true }),
+  notifSmsPausedAt: timestamp("notif_sms_paused_at", { withTimezone: true }),
+  notifSmsResumeAt: timestamp("notif_sms_resume_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

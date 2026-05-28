@@ -324,12 +324,12 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
 
         // SMS + email
         Promise.all([
-          db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
+          db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt, notifSmsResumeAt: userSettingsTable.notifSmsResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
           db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, updated.buyerId)),
           db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
         ]).then(([[s], [prof], [buyer]]) => {
           const buyerSettings = s?.settings as Record<string, unknown> | null;
-          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`);
+          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`, s?.notifSmsResumeAt);
           const wantsEmail = !isEmailPaused(buyerSettings, s?.notifEmailResumeAt) && buyerSettings?.notif_email_shipped !== false;
           if (buyer?.email && wantsEmail) {
             sendEmailWithRetry(

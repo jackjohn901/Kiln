@@ -1,5 +1,6 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
+import { isSmsPaused } from "./emailPaused";
 
 const connectors = new ReplitConnectors();
 
@@ -34,10 +35,11 @@ export async function sendSmsIfOptedIn(
   smsKey: string,
   settings: Record<string, unknown> | null | undefined,
   body: string,
+  resumeAt?: Date | null,
 ): Promise<void> {
   if (!phone) return;
-  const paused = settings?.notif_sms_paused === true;
+  if (isSmsPaused(settings, resumeAt)) return;
   const optedOut = settings?.[smsKey] === false;
-  if (paused || optedOut) return;
+  if (optedOut) return;
   sendSms(phone, body).catch(() => {});
 }

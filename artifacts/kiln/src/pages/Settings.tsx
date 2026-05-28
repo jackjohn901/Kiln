@@ -78,6 +78,8 @@ export default function Settings() {
   const [emailPausedAt, setEmailPausedAt] = useState<string | null>(null);
   const [emailResumeAt, setEmailResumeAt] = useState<string | null>(null);
   const [snoozePickerOpen, setSnoozePickerOpen] = useState(false);
+  const [smsResumeAt, setSmsResumeAt] = useState<string | null>(null);
+  const [smsSnoozePickerOpen, setSmsSnoozePickerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("All");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export default function Settings() {
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null; notifEmailPausedAt?: string | null; notifEmailResumeAt?: string | null }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ shippingSettings?: ShippingSettings; paymentSettings?: ArtistPayments; contactEmail?: string | null; defaultShippingAddress?: DefaultShippingAddress | null; notifEmailPausedAt?: string | null; notifEmailResumeAt?: string | null; notifSmsResumeAt?: string | null }> : null)
       .then(data => {
         if (!data) return;
         if (data.shippingSettings && Object.keys(data.shippingSettings).length > 0) {
@@ -125,6 +127,7 @@ export default function Settings() {
         }
         setEmailPausedAt(data.notifEmailPausedAt ?? null);
         setEmailResumeAt(data.notifEmailResumeAt ?? null);
+        setSmsResumeAt(data.notifSmsResumeAt ?? null);
       })
       .catch(() => {});
   }, []);
@@ -197,6 +200,54 @@ export default function Settings() {
   function snoozeCountdown(): string | null {
     if (!emailResumeAt) return null;
     const ms = new Date(emailResumeAt).getTime() - Date.now();
+    if (ms <= 0) return null;
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    if (hours < 24) return hours <= 1 ? "less than 1 hour" : `${hours} hours`;
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+
+  function applySmsSnooze(ms: number | null) {
+    const resumeAt = ms !== null ? new Date(Date.now() + ms).toISOString() : null;
+    setSmsResumeAt(resumeAt);
+    setSmsSnoozePickerOpen(false);
+    patchSettings({ notif_sms_paused: true });
+    fetch("/api/me/settings", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifSmsResumeAt: resumeAt }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t snooze SMS notifications."); });
+  }
+
+  function clearSmsSnooze() {
+    setSmsResumeAt(null);
+    setSmsSnoozePickerOpen(false);
+    patchSettings({ notif_sms_paused: false });
+    setSaveError(null);
+    fetch("/api/me/settings", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notifSmsResumeAt: null }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      })
+      .catch(() => { setSaveError("Couldn\u2019t resume SMS notifications."); });
+  }
+
+  function smsSnoozeCountdown(): string | null {
+    if (!smsResumeAt) return null;
+    const ms = new Date(smsResumeAt).getTime() - Date.now();
     if (ms <= 0) return null;
     const hours = Math.floor(ms / (1000 * 60 * 60));
     if (hours < 24) return hours <= 1 ? "less than 1 hour" : `${hours} hours`;
@@ -637,18 +688,74 @@ export default function Settings() {
               </div>
               <p className="text-xs text-stone-600 leading-relaxed">Get text alerts for time-sensitive events — auction bids, drop openings, and shipped orders. Standard messaging rates apply.</p>
 
-              <div className="flex items-center justify-between py-2 border-b border-white/5">
-                <div>
-                  <p className="text-sm text-stone-200">Pause all SMS</p>
-                  <p className="text-xs text-stone-600 mt-0.5">Temporarily stop all texts</p>
+              {/* Snooze SMS notifications row */}
+              <div className="py-3 border-b border-white/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-sm text-stone-200">Snooze all SMS notifications</p>
+                    <p className="text-xs text-stone-600 mt-0.5">
+                      {settings.notif_sms_paused
+                        ? smsResumeAt
+                          ? (() => { const cd = smsSnoozeCountdown(); return cd ? `Resuming in ${cd}` : "Resuming soon\u2026"; })()
+                          : "Paused indefinitely"
+                        : "Auto-resumes after the chosen period"}
+                    </p>
+                  </div>
+                  {settings.notif_sms_paused ? (
+                    <button
+                      onClick={clearSmsSnooze}
+                      className="shrink-0 rounded-full bg-red-500/20 border border-red-500/40 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/30 transition-colors"
+                    >
+                      Resume now
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => phoneNumber.trim() && setSmsSnoozePickerOpen(v => !v)}
+                      disabled={!phoneNumber.trim()}
+                      title={!phoneNumber.trim() ? "Add a phone number below before snoozing" : undefined}
+                      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                        phoneNumber.trim()
+                          ? "bg-stone-800 border-white/10 text-stone-300 hover:bg-stone-700 cursor-pointer"
+                          : "bg-stone-800/40 border-white/5 text-stone-600 cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      Snooze
+                    </button>
+                  )}
                 </div>
-                <button
-                  onClick={() => toggle("notif_sms_paused")}
-                  className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${settings.notif_sms_paused ? "bg-red-500" : "bg-stone-700"}`}
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${settings.notif_sms_paused ? "translate-x-5" : "translate-x-0.5"}`} />
-                </button>
+                {/* SMS snooze duration picker */}
+                {smsSnoozePickerOpen && !settings.notif_sms_paused && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {SNOOZE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.label}
+                        onClick={() => applySmsSnooze(opt.ms)}
+                        className="rounded-full bg-stone-800 border border-white/10 px-3 py-1.5 text-xs font-medium text-stone-300 hover:bg-sky-500/20 hover:border-sky-500/40 hover:text-sky-300 transition-colors"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setSmsSnoozePickerOpen(false)}
+                      className="rounded-full bg-stone-800/50 border border-white/5 px-3 py-1.5 text-xs text-stone-600 hover:text-stone-400 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
+              {settings.notif_sms_paused && (
+                <div className={`flex items-start gap-2 py-2.5 px-3 rounded-xl mb-1 ${phoneNumber.trim() ? "bg-sky-500/10 border border-sky-500/20" : "bg-stone-800/50 border border-white/8 opacity-50"}`}>
+                  <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${phoneNumber.trim() ? "text-sky-400" : "text-stone-500"}`} />
+                  <p className={`text-xs ${phoneNumber.trim() ? "text-sky-300" : "text-stone-500"}`}>
+                    {phoneNumber.trim()
+                      ? smsResumeAt
+                        ? `SMS snoozed until ${new Date(smsResumeAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(smsResumeAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })} \u2014 no texts will be sent even if individual types are enabled below.`
+                        : `SMS is paused indefinitely \u2014 tap \u201cResume now\u201d above to re-enable.`
+                      : "No phone number saved \u2014 add one below before pausing has any effect."}
+                  </p>
+                </div>
+              )}
 
               <div className={settings.notif_sms_paused ? "opacity-40 pointer-events-none" : undefined}>
                 <Toggle settingKey="notif_sms_outbid" label="Outbid alerts" desc="Text when someone outbids you in an auction" />
