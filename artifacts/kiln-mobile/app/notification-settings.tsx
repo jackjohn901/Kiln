@@ -24,6 +24,7 @@ interface NotifSettings {
   notif_commissions: boolean;
   notif_workshops: boolean;
   notif_drops: boolean;
+  notif_email_paused: boolean;
   notif_email_digest: boolean;
   notif_email_follows: boolean;
   notif_email_comments: boolean;
@@ -41,6 +42,7 @@ const DEFAULTS: NotifSettings = {
   notif_commissions: true,
   notif_workshops: true,
   notif_drops: true,
+  notif_email_paused: false,
   notif_email_digest: false,
   notif_email_follows: false,
   notif_email_comments: false,
@@ -105,6 +107,7 @@ export default function NotificationSettingsScreen() {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [notifEmail, setNotifEmail] = useState("");
+  const [emailPausedAt, setEmailPausedAt] = useState<string | null>(null);
   const [emailBounced, setEmailBounced] = useState(false);
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailError, setEmailError] = useState(false);
@@ -181,7 +184,7 @@ export default function NotificationSettingsScreen() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null; contactEmailBounced?: boolean }>("/api/me/settings")
+    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null; contactEmailBounced?: boolean; notifEmailPausedAt?: string | null }>("/api/me/settings")
       .then((data) => {
         if (data.settings) {
           const merged = { ...DEFAULTS, ...data.settings };
@@ -190,6 +193,7 @@ export default function NotificationSettingsScreen() {
         }
         if (data.contactEmail) setNotifEmail(data.contactEmail);
         if (data.contactEmailBounced) setEmailBounced(true);
+        if (data.notifEmailPausedAt) setEmailPausedAt(data.notifEmailPausedAt);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -414,6 +418,14 @@ export default function NotificationSettingsScreen() {
                 </Text>
               </View>
             )}
+            {notifEmail.trim() && settings.notif_email_paused && (
+              <View style={styles.emailPausedBanner}>
+                <Feather name="alert-triangle" size={13} color="#f59e0b" style={styles.emailWarningIcon} />
+                <Text style={styles.emailPausedText}>
+                  {`Emails are paused indefinitely${emailPausedAt ? ` since ${new Date(emailPausedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(emailPausedAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })}` : ""} — re-enable via the toggle to resume.`}
+                </Text>
+              </View>
+            )}
             {notifEmail.trim() && emailBounced && (
               <View style={styles.emailBouncedBanner}>
                 <Feather name="alert-octagon" size={13} color="#ef4444" style={styles.emailWarningIcon} />
@@ -617,6 +629,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(245, 158, 11, 0.10)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(245, 158, 11, 0.25)",
+  },
+  emailPausedBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "rgba(245, 158, 11, 0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(245, 158, 11, 0.25)",
+  },
+  emailPausedText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#fbbf24",
   },
   emailBouncedBanner: {
     flexDirection: "row",
