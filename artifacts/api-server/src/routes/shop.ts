@@ -313,9 +313,10 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       const orderLink = `/orders/${updated.id}`;
 
       if (status === "shipped") {
+        const shippedNotifId = crypto.randomUUID();
         // In-app notification
         db.insert(notificationsTable).values({
-          id: crypto.randomUUID(),
+          id: shippedNotifId,
           userId: updated.buyerId,
           type: "order_shipped",
           text: `Your order "${updated.title ?? "your order"}" has shipped!${tracking}`,
@@ -330,7 +331,11 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
         ]).then(([[s], [prof], [buyer]]) => {
           const buyerSettings = s?.settings as Record<string, unknown> | null;
           sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`, s?.notifSmsResumeAt);
-          const wantsEmail = !isEmailPaused(buyerSettings, s?.notifEmailResumeAt) && buyerSettings?.notif_email_shipped !== false;
+          const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
+          const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_shipped !== false;
+          if (emailSnoozed) {
+            db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, shippedNotifId)).catch(() => {});
+          }
           if (buyer?.email && wantsEmail) {
             sendEmailWithRetry(
               {

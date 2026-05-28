@@ -73,7 +73,8 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   const [bid] = await db.insert(auctionBidsTable).values({ id: crypto.randomUUID(), auctionId: auction.id, bidderId: user.id, bidderName: name, amount: bidAmount }).returning();
   const [updated] = await db.update(auctionsTable).set({ currentBid: bidAmount, currentBidderId: user.id, currentBidderName: name, bidCount: auction.bidCount + 1 }).where(eq(auctionsTable.id, auction.id)).returning();
   if (auction.currentBidderId && auction.currentBidderId !== user.id) {
-    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: auction.currentBidderId, type: "follow", fromId: user.id, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `outbid you on ${auction.title} with $${bidAmount.toLocaleString()}`, link: `/auctions/${auction.id}` });
+    const outbidNotifId = crypto.randomUUID();
+    await db.insert(notificationsTable).values({ id: outbidNotifId, userId: auction.currentBidderId, type: "follow", fromId: user.id, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `outbid you on ${auction.title} with $${bidAmount.toLocaleString()}`, link: `/auctions/${auction.id}` });
     const prevBidderId = auction.currentBidderId;
     try {
       const [[prev], [s], [prof]] = await Promise.all([
@@ -82,7 +83,11 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
         db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, prevBidderId)),
       ]);
       const emailSettings = (s?.settings as Record<string, unknown> | null);
-      const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_outbid !== false;
+      const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+      const wantsEmail = !emailSnoozed && emailSettings?.notif_email_outbid !== false;
+      if (emailSnoozed) {
+        db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, outbidNotifId)).catch(() => {});
+      }
       if (wantsEmail && prev?.email) await sendEmailWithRetry({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }, { label: "outbid notification", contextId: auction.id });
       sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilnfire.replit.app/kiln/auctions/${auction.id}`, s?.notifSmsResumeAt);
     } catch (err) {

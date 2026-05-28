@@ -274,8 +274,9 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
       const [post] = await db.select({ authorId: postsTable.authorId }).from(postsTable).where(eq(postsTable.id, postId));
       if (post && post.authorId !== user.id) {
         const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone";
+        const commentNotifId = crypto.randomUUID();
         await db.insert(notificationsTable).values({
-          id: crypto.randomUUID(),
+          id: commentNotifId,
           userId: post.authorId,
           type: "comment",
           fromId: user.id,
@@ -294,7 +295,11 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
             db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, post.authorId)).limit(1),
           ]);
           const emailSettings = s?.settings as Record<string, unknown> | null;
-          const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_comments !== false;
+          const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+          const wantsEmail = !emailSnoozed && emailSettings?.notif_email_comments !== false;
+          if (emailSnoozed) {
+            db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, commentNotifId)).catch(() => {});
+          }
           if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }, { label: "new comment notification" });
         } catch (err) {
           logger.warn({ err, authorId: post.authorId, postId }, "Failed to send new-comment notification email");
@@ -323,8 +328,9 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
         for (const mp of mentionedProfiles) {
           if (mp.userId === user.id) continue;
           if (mp.userId === postAuthorId) continue; // already notified as post author
+          const mentionNotifId = crypto.randomUUID();
           await db.insert(notificationsTable).values({
-            id: crypto.randomUUID(),
+            id: mentionNotifId,
             userId: mp.userId,
             type: "mention",
             fromId: user.id,
@@ -341,7 +347,11 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
               db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, mentionedUserId)).limit(1),
             ]);
             const emailSettings = s?.settings as Record<string, unknown> | null;
-            const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_mentions !== false;
+            const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+            const wantsEmail = !emailSnoozed && emailSettings?.notif_email_mentions !== false;
+            if (emailSnoozed) {
+              db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, mentionNotifId)).catch(() => {});
+            }
             if (wantsEmail && p?.contactEmail) {
               const unsubToken = generateUnsubscribeToken(mentionedUserId);
               const unsubscribeUrl = `https://kilnfire.replit.app/api/unsubscribe/mentions?token=${encodeURIComponent(unsubToken)}`;

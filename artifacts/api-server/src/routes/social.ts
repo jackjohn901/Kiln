@@ -101,8 +101,9 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
     ]);
 
     const user = req.user;
+    const followNotifId = crypto.randomUUID();
     await db.insert(notificationsTable).values({
-      id: crypto.randomUUID(),
+      id: followNotifId,
       userId: followingId,
       type: "follow",
       fromId: followerId,
@@ -132,7 +133,11 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
         db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, followingId)).limit(1),
       ]);
       const emailSettings = s?.settings as Record<string, unknown> | null;
-      const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_follows !== false;
+      const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+      const wantsEmail = !emailSnoozed && emailSettings?.notif_email_follows !== false;
+      if (emailSnoozed) {
+        db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, followNotifId)).catch(() => {});
+      }
       if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }, { label: "new follower notification" });
     } catch (err) {
       logger.warn({ err, followingId }, "Failed to send new-follower notification email");

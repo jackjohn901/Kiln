@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail, MailX } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -48,10 +48,83 @@ function extractCommissionId(link?: string): string | undefined {
   return m?.[1];
 }
 
+function NotificationRow({ n, onRead }: { n: KilnNotification; onRead: (id: string) => void }) {
+  const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.follow;
+  const Icon = cfg.icon;
+  const commissionId = n.commissionId ?? extractCommissionId(n.link);
+  const isCommission = n.type === "commission" && !!commissionId;
+
+  const content = (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
+          {n.emailSkipped && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-400 shrink-0">
+              <MailX size={9} />
+              email missed
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
+      </div>
+      {n.imageUrl && (
+        <img
+          src={n.imageUrl}
+          alt=""
+          className="h-12 w-12 flex-shrink-0 rounded-lg object-cover border border-white/10"
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <motion.div
+      key={n.id}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`group relative flex items-start gap-3 rounded-2xl p-3 transition-colors ${
+        n.read ? "bg-transparent hover:bg-white/3" : "bg-white/5 hover:bg-white/7"
+      } ${n.emailSkipped ? "ring-1 ring-amber-500/10" : ""}`}
+    >
+      {/* Avatar + type icon */}
+      <div className="relative flex-shrink-0">
+        <img
+          src={n.fromAvatarUrl || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${n.fromId}`}
+          alt=""
+          className="h-10 w-10 rounded-full object-cover"
+        />
+        <div className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ${cfg.bg} border border-[#12100e]`}>
+          <Icon size={10} className={cfg.color} />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <div onClick={() => onRead(n.id)}>
+          {n.link ? (
+            <Link href={n.link} className="block">{content}</Link>
+          ) : (
+            content
+          )}
+        </div>
+        {isCommission && (
+          <CommissionInlineActions commissionId={commissionId} />
+        )}
+      </div>
+
+      {/* Unread dot */}
+      {!n.read && (
+        <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-amber-400" />
+      )}
+    </motion.div>
+  );
+}
+
 export default function Notifications() {
   const { notifications, markRead, markAllRead } = useSocial();
   const { subscribe } = useWebSocket();
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "snoozed">("all");
   const [apiNotifications, setApiNotifications] = useState<KilnNotification[]>([]);
 
   const addLiveNotification = useCallback((evt: Record<string, unknown>) => {
@@ -94,6 +167,7 @@ export default function Notifications() {
             commissionId: extractCommissionId(link),
             imageUrl: (n.imageUrl as string | undefined) ?? undefined,
             read: (n.read as boolean) ?? false,
+            emailSkipped: (n.emailSkipped as boolean) ?? false,
             createdAt: n.createdAt as string,
           };
         }));
@@ -107,9 +181,23 @@ export default function Notifications() {
     return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [notifications, apiNotifications]);
 
-  const visible = filter === "unread" ? allNotifications.filter(n => !n.read) : allNotifications;
+  const snoozedNotifications = useMemo(() => allNotifications.filter(n => n.emailSkipped), [allNotifications]);
+
+  const handleRead = useCallback((id: string) => {
+    markRead(id);
+    if (id.startsWith("api-")) {
+      fetch(`/api/notifications/${id.slice(4)}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
+    }
+  }, [markRead]);
+
+  const filtered = useMemo(() => {
+    if (filter === "unread") return allNotifications.filter(n => !n.read);
+    if (filter === "snoozed") return snoozedNotifications;
+    return allNotifications;
+  }, [filter, allNotifications, snoozedNotifications]);
+
   const unreadCount = allNotifications.filter(n => !n.read).length;
-  const grouped = groupByDate(visible);
+  const grouped = groupByDate(filtered);
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -136,9 +224,32 @@ export default function Notifications() {
           </div>
         </div>
 
+        {/* Missed-during-snooze banner */}
+        {snoozedNotifications.length > 0 && filter !== "snoozed" && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-5 flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/8 px-4 py-3"
+          >
+            <MailX size={16} className="shrink-0 text-amber-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-300">
+                {snoozedNotifications.length} notification{snoozedNotifications.length !== 1 ? "s" : ""} missed while snoozed
+              </p>
+              <p className="text-xs text-amber-400/70">These arrived while your email was paused — no email was sent.</p>
+            </div>
+            <button
+              onClick={() => setFilter("snoozed")}
+              className="shrink-0 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+            >
+              View
+            </button>
+          </motion.div>
+        )}
+
         {/* Filter tabs */}
         <div className="mb-6 flex gap-1 rounded-xl bg-stone-900/50 p-1 border border-white/5">
-          {(["all", "unread"] as const).map((f) => (
+          {(["all", "unread", "snoozed"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -146,16 +257,41 @@ export default function Notifications() {
                 filter === f ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"
               }`}
             >
-              {f === "all" ? `All (${allNotifications.length})` : `Unread (${unreadCount})`}
+              {f === "all" && `All (${allNotifications.length})`}
+              {f === "unread" && `Unread (${unreadCount})`}
+              {f === "snoozed" && (
+                <span className="flex items-center justify-center gap-1.5">
+                  <MailX size={12} />
+                  Missed ({snoozedNotifications.length})
+                </span>
+              )}
             </button>
           ))}
         </div>
 
+        {/* Snoozed tab header */}
+        {filter === "snoozed" && snoozedNotifications.length > 0 && (
+          <div className="mb-4 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3">
+            <p className="text-sm text-amber-300/80">
+              These notifications arrived while your email was snoozed. Your in-app notification was saved, but no email was sent.
+            </p>
+          </div>
+        )}
+
         {/* Notifications */}
         {grouped.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Bell size={40} className="mb-4 text-stone-700" />
-            <p className="text-stone-500">{filter === "unread" ? "No unread notifications" : "No notifications yet"}</p>
+            {filter === "snoozed" ? (
+              <>
+                <MailX size={40} className="mb-4 text-stone-700" />
+                <p className="text-stone-500">No missed emails — you were reachable the whole time</p>
+              </>
+            ) : (
+              <>
+                <Bell size={40} className="mb-4 text-stone-700" />
+                <p className="text-stone-500">{filter === "unread" ? "No unread notifications" : "No notifications yet"}</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-8">
@@ -163,84 +299,9 @@ export default function Notifications() {
               <div key={label}>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-stone-600">{label}</p>
                 <div className="space-y-1">
-                  {items.map((n) => {
-                    const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.follow;
-                    const Icon = cfg.icon;
-                    const commissionId = n.commissionId ?? extractCommissionId(n.link);
-                    const isCommission = n.type === "commission" && !!commissionId;
-                    return (
-                      <motion.div
-                        key={n.id}
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`group relative flex items-start gap-3 rounded-2xl p-3 transition-colors ${
-                          n.read ? "bg-transparent hover:bg-white/3" : "bg-white/5 hover:bg-white/7"
-                        }`}
-                      >
-                        {/* Avatar + type icon */}
-                        <div className="relative flex-shrink-0">
-                          <img
-                            src={n.fromAvatarUrl || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${n.fromId}`}
-                            alt=""
-                            className="h-10 w-10 rounded-full object-cover"
-                          />
-                          <div className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ${cfg.bg} border border-[#12100e]`}>
-                            <Icon size={10} className={cfg.color} />
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="min-w-0 flex-1">
-                          <div onClick={() => {
-                            markRead(n.id);
-                            if (n.id.startsWith("api-")) {
-                              fetch(`/api/notifications/${n.id.slice(4)}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
-                            }
-                          }}>
-                            {n.link ? (
-                              <Link href={n.link} className="block">
-                                <div className="flex items-start gap-2">
-                                  <div className="min-w-0 flex-1">
-                                    <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                                    <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
-                                  </div>
-                                  {n.imageUrl && (
-                                    <img
-                                      src={n.imageUrl}
-                                      alt=""
-                                      className="h-12 w-12 flex-shrink-0 rounded-lg object-cover border border-white/10"
-                                    />
-                                  )}
-                                </div>
-                              </Link>
-                            ) : (
-                              <div className="flex items-start gap-2">
-                                <div className="min-w-0 flex-1">
-                                  <p className={`text-sm leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
-                                  <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
-                                </div>
-                                {n.imageUrl && (
-                                  <img
-                                    src={n.imageUrl}
-                                    alt=""
-                                    className="h-12 w-12 flex-shrink-0 rounded-lg object-cover border border-white/10"
-                                  />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          {isCommission && (
-                            <CommissionInlineActions commissionId={commissionId} />
-                          )}
-                        </div>
-
-                        {/* Unread dot */}
-                        {!n.read && (
-                          <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-amber-400" />
-                        )}
-                      </motion.div>
-                    );
-                  })}
+                  {items.map((n) => (
+                    <NotificationRow key={n.id} n={n} onRead={handleRead} />
+                  ))}
                 </div>
               </div>
             ))}

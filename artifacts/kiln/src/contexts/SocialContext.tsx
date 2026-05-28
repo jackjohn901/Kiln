@@ -24,6 +24,7 @@ export interface KilnNotification {
   commissionId?: string;
   imageUrl?: string;
   read: boolean;
+  emailSkipped?: boolean;
   createdAt: string;
 }
 
@@ -553,7 +554,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
     fetch("/api/notifications", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; imageUrl?: string | null; read: boolean; createdAt: string }> } | null) => {
+      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; imageUrl?: string | null; read: boolean; emailSkipped?: boolean; createdAt: string }> } | null) => {
         if (!data?.notifications?.length) return;
         const apiNotifs: KilnNotification[] = data.notifications.map((n) => {
           const link = n.link ?? undefined;
@@ -569,6 +570,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
             commissionId: commissionMatch?.[1],
             imageUrl: n.imageUrl ?? undefined,
             read: n.read,
+            emailSkipped: n.emailSkipped ?? false,
             createdAt: n.createdAt,
           };
         });

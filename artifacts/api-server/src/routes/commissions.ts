@@ -24,13 +24,18 @@ router.post("/commissions", async (req, res): Promise<void> => {
       workType, description, budgetRange, timeline, dimensions,
       referenceUrls: referenceUrls ?? [], status: "pending",
     }).returning();
-    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions/${commission.id}` });
+    const commissionNotifId = crypto.randomUUID();
+    await db.insert(notificationsTable).values({ id: commissionNotifId, userId: artistId, type: "commission", fromId: user.id, fromName: clientName, fromAvatarUrl: user.profileImageUrl ?? null, text: `sent you a commission request`, link: `/commissions/${commission.id}` });
     const [[artistUser], [artistSettings]] = await Promise.all([
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, artistId)),
       db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, artistId)),
     ]);
     const emailSettings = (artistSettings?.settings as Record<string, unknown> | null);
-    const wantsEmail = !isEmailPaused(emailSettings, artistSettings?.notifEmailResumeAt) && emailSettings?.notif_email_new_commission !== false;
+    const emailSnoozed = isEmailPaused(emailSettings, artistSettings?.notifEmailResumeAt);
+    const wantsEmail = !emailSnoozed && emailSettings?.notif_email_new_commission !== false;
+    if (emailSnoozed) {
+      db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, commissionNotifId)).catch(() => {});
+    }
     if (wantsEmail && artistUser?.email) {
       await sendEmailWithRetry({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description) }, { label: "new commission notification" });
     }

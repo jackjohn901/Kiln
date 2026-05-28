@@ -66,7 +66,8 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Patron";
   await db.insert(patronSubscriptionsTable).values({ id: crypto.randomUUID(), tierId: tier.id, artistId: tier.artistId, subscriberId: userId, subscriberName: name, amount: tier.price, status: "active" });
   await db.update(patronTiersTable).set({ subscriberCount: sql`${patronTiersTable.subscriberCount} + 1` }).where(eq(patronTiersTable.id, tier.id));
-  await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: tier.artistId, type: "subscription", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `subscribed to your ${tier.name} tier`, link: `/patrons` });
+  const patronNotifId = crypto.randomUUID();
+  await db.insert(notificationsTable).values({ id: patronNotifId, userId: tier.artistId, type: "subscription", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `subscribed to your ${tier.name} tier`, link: `/patrons` });
 
   // Email notification
   try {
@@ -75,7 +76,11 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
       db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, tier.artistId)).limit(1),
     ]);
     const emailSettings = (s?.settings as Record<string, unknown> | null);
-    const wantsEmail = !isEmailPaused(emailSettings, s?.notifEmailResumeAt) && emailSettings?.notif_email_new_patron !== false;
+    const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+    const wantsEmail = !emailSnoozed && emailSettings?.notif_email_new_patron !== false;
+    if (emailSnoozed) {
+      db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, patronNotifId)).catch(() => {});
+    }
     if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }, { label: "new patron notification" });
   } catch (err) {
     logger.warn({ err, artistId: tier.artistId }, "Failed to send new-patron notification email");
