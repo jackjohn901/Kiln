@@ -223,7 +223,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
     const totalAmountCents = lineItemsCents.reduce((sum, c) => sum + c, 0);
 
     // For single-seller listing checkouts, route funds to the artist's connected Stripe account
-    // if they have one with charges enabled (10% platform fee via application_fee_amount).
+    // if they have one with charges enabled (5% platform fee via application_fee_amount).
     let connectedAccountId: string | null = null;
     if (listingIds.length > 0) {
       const artistIds = new Set(
@@ -350,7 +350,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       ...(connectedAccountId
         ? {
             payment_intent_data: {
-              application_fee_amount: Math.round(totalAmountCents * 0.1),
+              application_fee_amount: Math.round(totalAmountCents * 0.05),
               transfer_data: { destination: connectedAccountId },
             },
           }
