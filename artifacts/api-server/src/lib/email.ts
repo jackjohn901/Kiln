@@ -737,6 +737,20 @@ export function welcomeEmail(firstName: string | null): string {
   `);
 }
 
+export function broadcastEmail(messageBody: string): string {
+  const paragraphs = messageBody
+    .split(/\n{2,}/)
+    .map((block) => escHtml(block.trim()).replace(/\n/g, "<br/>"))
+    .filter((block) => block.length > 0)
+    .map((block) => `<p style="margin:0 0 12px;color:#d6d3d1;">${block}</p>`)
+    .join("");
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:12px;">Kiln 🔥</h1>
+    ${paragraphs}
+    ${btn(`${BASE_URL}/`, "Open Kiln")}
+  `);
+}
+
 export function onboardingDay3Email(firstName: string | null): string {
   const name = firstName ? escHtml(firstName) : "there";
   return shell(`

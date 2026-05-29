@@ -8,6 +8,7 @@ import {
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker } from "../lib/seed";
+import { sendEmail, broadcastEmail } from "../lib/email";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -485,6 +486,79 @@ router.post("/admin/test-notification", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.testNotification error");
     res.status(500).json({ error: "Failed to send test notification" });
+  }
+});
+
+// POST /admin/broadcast-email — email every user (admin-only)
+// Body: { subject: string, message: string }. Use ?dry_run=true to preview the recipient count.
+router.post("/admin/broadcast-email", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const dryRun = req.query["dry_run"] === "true";
+  const { subject, message } = req.body as { subject?: string; message?: string };
+
+  const trimmedSubject = (subject ?? "").replace(/[\r\n]+/g, " ").trim();
+  const trimmedMessage = (message ?? "").trim();
+  if (!trimmedSubject || !trimmedMessage) {
+    res.status(400).json({ error: "Both a subject and a message are required." });
+    return;
+  }
+  if (trimmedSubject.length > 200) {
+    res.status(400).json({ error: "Subject must be 200 characters or fewer." });
+    return;
+  }
+  if (trimmedMessage.length > 10_000) {
+    res.status(400).json({ error: "Message must be 10,000 characters or fewer." });
+    return;
+  }
+
+  try {
+    // Gather every distinct contactable address: prefer the profile contact email,
+    // fall back to the account email. De-duplicate case-insensitively.
+    const rows = await db
+      .select({ accountEmail: usersTable.email, contactEmail: profilesTable.contactEmail })
+      .from(usersTable)
+      .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id));
+
+    const recipients = new Map<string, string>();
+    for (const row of rows) {
+      const contact = (row.contactEmail ?? "").trim();
+      const account = (row.accountEmail ?? "").trim();
+      const addr = contact || account;
+      if (!addr || !addr.includes("@")) continue;
+      const key = addr.toLowerCase();
+      if (!recipients.has(key)) recipients.set(key, addr);
+    }
+    const addresses = [...recipients.values()];
+
+    if (dryRun) {
+      res.json({ dryRun: true, recipientCount: addresses.length });
+      return;
+    }
+
+    const html = broadcastEmail(trimmedMessage);
+
+    // Send in small concurrent batches so a large user base doesn't open
+    // hundreds of simultaneous connections to the email provider.
+    let sent = 0;
+    let failed = 0;
+    const BATCH_SIZE = 20;
+    for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+      const batch = addresses.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((to) => sendEmail({ to, subject: trimmedSubject, html })),
+      );
+      for (const ok of results) {
+        if (ok) sent++; else failed++;
+      }
+    }
+
+    req.log.info({ adminId: req.user.id, recipientCount: addresses.length, sent, failed }, "admin.broadcastEmail sent");
+    res.json({ dryRun: false, recipientCount: addresses.length, sent, failed });
+  } catch (err) {
+    req.log.error({ err }, "admin.broadcastEmail error");
+    res.status(500).json({ error: "Failed to send broadcast email" });
   }
 });
 

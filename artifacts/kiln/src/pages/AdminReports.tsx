@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -106,6 +106,14 @@ export default function AdminReports() {
   const [healthResult, setHealthResult] = useState<HealthResult | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
+
+  // Broadcast email state
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastCount, setBroadcastCount] = useState<number | null>(null);
+  const [broadcastResult, setBroadcastResult] = useState<{ recipientCount: number; sent: number; failed: number } | null>(null);
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
 
   async function runBackfill(dryRun: boolean) {
     setBackfillLoading(true);
@@ -263,6 +271,66 @@ export default function AdminReports() {
   function resetHealth() {
     setHealthResult(null);
     setHealthError(null);
+  }
+
+  async function previewBroadcast() {
+    if (!broadcastSubject.trim() || !broadcastMessage.trim()) {
+      setBroadcastError("Please enter both a subject and a message.");
+      return;
+    }
+    setBroadcastLoading(true);
+    setBroadcastError(null);
+    setBroadcastResult(null);
+    try {
+      const res = await fetch("/api/admin/broadcast-email?dry_run=true", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ subject: broadcastSubject, message: broadcastMessage }),
+      });
+      const data = await res.json() as { recipientCount?: number; error?: string };
+      if (!res.ok) {
+        setBroadcastError(data?.error ?? "Request failed");
+        return;
+      }
+      setBroadcastCount(data.recipientCount ?? 0);
+    } catch {
+      setBroadcastError("Network error — please try again");
+    } finally {
+      setBroadcastLoading(false);
+    }
+  }
+
+  async function sendBroadcast() {
+    setBroadcastLoading(true);
+    setBroadcastError(null);
+    try {
+      const res = await fetch("/api/admin/broadcast-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ subject: broadcastSubject, message: broadcastMessage }),
+      });
+      const data = await res.json() as { recipientCount?: number; sent?: number; failed?: number; error?: string };
+      if (!res.ok) {
+        setBroadcastError(data?.error ?? "Request failed");
+        return;
+      }
+      setBroadcastResult({ recipientCount: data.recipientCount ?? 0, sent: data.sent ?? 0, failed: data.failed ?? 0 });
+      setBroadcastCount(null);
+    } catch {
+      setBroadcastError("Network error — please try again");
+    } finally {
+      setBroadcastLoading(false);
+    }
+  }
+
+  function resetBroadcast() {
+    setBroadcastSubject("");
+    setBroadcastMessage("");
+    setBroadcastCount(null);
+    setBroadcastResult(null);
+    setBroadcastError(null);
   }
 
   useEffect(() => {
@@ -970,6 +1038,96 @@ export default function AdminReports() {
                 <div className="flex items-center gap-2 text-xs text-stone-500">
                   <RefreshCw size={12} className="animate-spin" /> Sending…
                 </div>
+              )}
+            </div>
+
+            {/* Email all users card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <Mail size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-100">Email all users</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Send a one-off announcement to every user with a contact email. Preview the recipient count before sending. This goes to everyone — use sparingly.
+                  </p>
+                </div>
+              </div>
+
+              {broadcastError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {broadcastError}
+                </div>
+              )}
+
+              {broadcastResult ? (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 space-y-2">
+                  <p className="text-xs text-emerald-300 font-medium">
+                    Sent to {broadcastResult.sent} of {broadcastResult.recipientCount} {broadcastResult.recipientCount === 1 ? "recipient" : "recipients"}.
+                    {broadcastResult.failed > 0 && (
+                      <span className="text-amber-300"> {broadcastResult.failed} could not be delivered.</span>
+                    )}
+                  </p>
+                  <button onClick={resetBroadcast} className="text-xs text-stone-600 hover:text-stone-400 transition-colors">
+                    Write another
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={broadcastSubject}
+                      onChange={(e) => { setBroadcastSubject(e.target.value); setBroadcastCount(null); }}
+                      placeholder="Subject"
+                      maxLength={200}
+                      disabled={broadcastLoading}
+                      className="w-full rounded-xl border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none disabled:opacity-40"
+                    />
+                    <textarea
+                      value={broadcastMessage}
+                      onChange={(e) => { setBroadcastMessage(e.target.value); setBroadcastCount(null); }}
+                      placeholder="Write your message… (blank lines start a new paragraph)"
+                      rows={5}
+                      maxLength={10000}
+                      disabled={broadcastLoading}
+                      className="w-full rounded-xl border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none resize-y disabled:opacity-40"
+                    />
+                  </div>
+
+                  {broadcastCount !== null ? (
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 space-y-3">
+                      <p className="text-xs text-amber-200">
+                        This will email <strong>{broadcastCount}</strong> {broadcastCount === 1 ? "user" : "users"}. Are you sure?
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={sendBroadcast}
+                          disabled={broadcastLoading || broadcastCount === 0}
+                          className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-40"
+                        >
+                          {broadcastLoading ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
+                          {broadcastLoading ? "Sending…" : `Send to ${broadcastCount}`}
+                        </button>
+                        <button
+                          onClick={() => setBroadcastCount(null)}
+                          disabled={broadcastLoading}
+                          className="text-xs text-stone-600 hover:text-stone-400 transition-colors disabled:opacity-40"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={previewBroadcast}
+                      disabled={broadcastLoading || !broadcastSubject.trim() || !broadcastMessage.trim()}
+                      className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                    >
+                      {broadcastLoading ? <RefreshCw size={13} className="animate-spin" /> : <Mail size={13} />}
+                      {broadcastLoading ? "Checking…" : "Preview recipients"}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
