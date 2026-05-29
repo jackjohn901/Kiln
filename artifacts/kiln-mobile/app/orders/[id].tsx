@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -390,18 +391,39 @@ export default function OrderDetailScreen() {
           </View>
         )}
 
-        {order.trackingNumber ? (
-          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TRACKING</Text>
-            <View style={styles.infoRow}>
-              <Feather name="truck" size={14} color="#60a5fa" />
-              <Text style={[styles.infoText, { color: colors.foreground }]}>
-                Tracking:{" "}
-                <Text style={{ fontFamily: "Inter_500Medium" }}>{order.trackingNumber}</Text>
-              </Text>
+        {order.trackingNumber ? (() => {
+          const tn = order.trackingNumber.replace(/\s/g, "");
+          const carrier = /^1Z/i.test(tn) ? "UPS"
+            : /^(94|93|92|94|95)\d{18,}/.test(tn) || /^\d{22}$/.test(tn) || /^[A-Z]{2}\d{9}US$/i.test(tn) ? "USPS"
+            : /^\d{12}$/.test(tn) || /^\d{15}$/.test(tn) || /^\d{20}$/.test(tn) ? "FedEx"
+            : /^JD\d{18}$/i.test(tn) || /^\d{10}$/.test(tn) ? "DHL"
+            : null;
+          const trackingUrl = carrier === "UPS" ? `https://www.ups.com/track?tracknum=${tn}`
+            : carrier === "USPS" ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${tn}`
+            : carrier === "FedEx" ? `https://www.fedex.com/fedextrack/?trknbr=${tn}`
+            : carrier === "DHL" ? `https://www.dhl.com/en/express/tracking.html?AWB=${tn}`
+            : null;
+          return (
+            <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TRACKING</Text>
+              <View style={styles.infoRow}>
+                <Feather name="truck" size={14} color="#60a5fa" />
+                <View style={{ flex: 1 }}>
+                  {carrier ? (
+                    <Text style={[styles.carrierLabel, { color: colors.mutedForeground }]}>{carrier}</Text>
+                  ) : null}
+                  {trackingUrl ? (
+                    <Pressable onPress={() => Linking.openURL(trackingUrl)} hitSlop={6}>
+                      <Text style={styles.trackingLink}>{order.trackingNumber}</Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={[styles.trackingPlain, { color: colors.foreground }]}>{order.trackingNumber}</Text>
+                  )}
+                </View>
+              </View>
             </View>
-          </View>
-        ) : null}
+          );
+        })() : null}
 
         {order.shippingAddress ? (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -590,5 +612,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
+  },
+  carrierLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  trackingLink: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: "#60a5fa",
+    textDecorationLine: "underline",
+  },
+  trackingPlain: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
   },
 });
