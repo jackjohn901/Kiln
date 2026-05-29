@@ -12,6 +12,7 @@ import ImageEditPanel from "@/components/ImageEditPanel";
 import MusicPicker from "@/components/MusicPicker";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { createBeatLooper } from "@/lib/beatSynth";
@@ -50,6 +51,7 @@ export default function Create() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
   const { recordPost } = useSocial();
+  const { isAuthenticated, login } = useAuth();
   const { upload, uploadVideo, uploading, progress } = useUpload();
 
   const [step, setStep] = useState<Step>("upload");
@@ -91,6 +93,7 @@ export default function Create() {
   const [isPatronOnly, setIsPatronOnly] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [captionSuggestions, setCaptionSuggestions] = useState<string[]>([]);
@@ -320,8 +323,16 @@ export default function Create() {
       navigate("/setup");
       return;
     }
+    // The UI can show a locally-cached profile as "logged in" even after the
+    // server session has expired (7-day TTL). Every authenticated write would
+    // then fail with a raw 401, so send the user through sign-in first.
+    if (!isAuthenticated) {
+      login();
+      return;
+    }
     setPublishing(true);
     setPublishError(null);
+    setSessionExpired(false);
     try {
       let thumbnailUrl: string | undefined;
       let muxPlaybackId: string | undefined;
@@ -462,11 +473,12 @@ export default function Create() {
       if (!postRes.ok) {
         const errText = await postRes.text().catch(() => "");
         console.error("Server rejected post", postRes.status, errText);
-        setPublishError(
-          postRes.status === 401
-            ? "Your session expired. Please sign in again."
-            : "We couldn't publish your post. Please try again."
-        );
+        if (postRes.status === 401) {
+          setPublishError("Your session has expired. Please sign in again to post.");
+          setSessionExpired(true);
+        } else {
+          setPublishError("We couldn't publish your post. Please try again.");
+        }
         return;
       }
 
@@ -495,7 +507,14 @@ export default function Create() {
       }
     } catch (err) {
       console.error("Publish flow failed", err);
-      setPublishError(err instanceof Error ? err.message : "Something went wrong while publishing. Please try again.");
+      const msg = err instanceof Error ? err.message : "";
+      if (/unauthorized|401/i.test(msg)) {
+        // Session expired mid-flow — surface a clear re-login prompt instead of raw JSON.
+        setPublishError("Your session has expired. Please sign in again to post.");
+        setSessionExpired(true);
+      } else {
+        setPublishError(msg || "Something went wrong while publishing. Please try again.");
+      }
     } finally {
       setPublishing(false);
     }
@@ -1460,7 +1479,15 @@ export default function Create() {
 
             {publishError && (
               <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-sm text-red-300">
-                {publishError}
+                <p>{publishError}</p>
+                {sessionExpired && (
+                  <button
+                    onClick={() => login()}
+                    className="mt-2 rounded-full bg-amber-500 px-4 py-1.5 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                  >
+                    Sign in again
+                  </button>
+                )}
               </div>
             )}
 
