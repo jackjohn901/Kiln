@@ -3,25 +3,100 @@ import { BellOff } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import SaleBanner, { type SaleInfo } from "./SaleBanner";
 
+const SS_SNOOZE_UNTIL = "kiln_snooze_until";
+const SS_SNOOZE_QUEUE = "kiln_snooze_queue";
+const SS_SALE_QUEUE   = "kiln_sale_queue";
+
+function serializeSales(sales: SaleInfo[]): string {
+  return JSON.stringify(sales.map((s) => ({ ...s, arrivedAt: s.arrivedAt.toISOString() })));
+}
+
+function deserializeSales(raw: string | null): SaleInfo[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+    return parsed
+      .map((s) => {
+        if (
+          typeof s.text !== "string" ||
+          typeof s.link !== "string" ||
+          typeof s.fromName !== "string"
+        ) return null;
+        const arrivedAt = new Date(s.arrivedAt as string);
+        if (isNaN(arrivedAt.getTime())) return null;
+        return { text: s.text, link: s.link, fromName: s.fromName, arrivedAt } as SaleInfo;
+      })
+      .filter((s): s is SaleInfo => s !== null);
+  } catch {
+    return [];
+  }
+}
+
+function readSnoozeUntil(): Date | null {
+  const raw = sessionStorage.getItem(SS_SNOOZE_UNTIL);
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (isNaN(d.getTime()) || d <= new Date()) return null;
+  return d;
+}
+
+function computeInitialState() {
+  const storedSnoozeUntil  = readSnoozeUntil();
+  const storedSnoozeQueue  = deserializeSales(sessionStorage.getItem(SS_SNOOZE_QUEUE));
+  const storedVisibleQueue = deserializeSales(sessionStorage.getItem(SS_SALE_QUEUE));
+
+  if (!storedSnoozeUntil) {
+    // Snooze has expired or was never active — drain any queued snoozed sales into the visible queue
+    const mergedQueue = [...storedVisibleQueue, ...storedSnoozeQueue] as SaleInfo[];
+    sessionStorage.removeItem(SS_SNOOZE_UNTIL);
+    sessionStorage.removeItem(SS_SNOOZE_QUEUE);
+    // Persist the merged queue immediately so further navigations still find it
+    sessionStorage.setItem(SS_SALE_QUEUE, serializeSales(mergedQueue));
+    return {
+      queue:       mergedQueue,
+      snoozeUntil: null as Date | null,
+      snoozeQueue: [] as SaleInfo[],
+    };
+  }
+
+  return {
+    queue:       storedVisibleQueue,
+    snoozeUntil: storedSnoozeUntil,
+    snoozeQueue: storedSnoozeQueue,
+  };
+}
 
 export default function SaleNotificationListener() {
   const { subscribe } = useWebSocket();
 
-  const [queue, setQueue] = useState<SaleInfo[]>([]);
-  const queueRef = useRef<SaleInfo[]>([]);
+  // Compute initial state once (lazy initializer runs only on mount)
+  const [initialState] = useState(computeInitialState);
 
-  const [snoozeUntil, setSnoozeUntil] = useState<Date | null>(null);
-  const snoozeUntilRef = useRef<Date | null>(null);
-  const snoozeQueueRef = useRef<SaleInfo[]>([]);
+  const [queue, setQueue]           = useState<SaleInfo[]>(initialState.queue);
+  const queueRef                    = useRef<SaleInfo[]>(initialState.queue);
+
+  const [snoozeUntil, setSnoozeUntil] = useState<Date | null>(initialState.snoozeUntil);
+  const snoozeUntilRef                = useRef<Date | null>(initialState.snoozeUntil);
+  const snoozeQueueRef                = useRef<SaleInfo[]>(initialState.snoozeQueue);
 
   const [remainingSecs, setRemainingSecs] = useState(0);
+
+  const persistAll = useCallback(() => {
+    if (snoozeUntilRef.current) {
+      sessionStorage.setItem(SS_SNOOZE_UNTIL, snoozeUntilRef.current.toISOString());
+    } else {
+      sessionStorage.removeItem(SS_SNOOZE_UNTIL);
+    }
+    sessionStorage.setItem(SS_SNOOZE_QUEUE, serializeSales(snoozeQueueRef.current));
+    sessionStorage.setItem(SS_SALE_QUEUE,   serializeSales(queueRef.current));
+  }, []);
 
   const handleNotification = useCallback((evt: Record<string, unknown>) => {
     const notifType = evt.notifType as string | undefined;
     if (notifType !== "sale") return;
 
-    const text = (evt.text as string | undefined) ?? "You have a new sale!";
-    const link = (evt.link as string | undefined) ?? "/earnings";
+    const text     = (evt.text     as string | undefined) ?? "You have a new sale!";
+    const link     = (evt.link     as string | undefined) ?? "/earnings";
     const fromName = (evt.fromName as string | undefined) ?? "A buyer";
 
     const sale: SaleInfo = { text, link, fromName, arrivedAt: new Date() };
@@ -32,7 +107,8 @@ export default function SaleNotificationListener() {
       queueRef.current = [...queueRef.current, sale];
       setQueue([...queueRef.current]);
     }
-  }, []);
+    persistAll();
+  }, [persistAll]);
 
   useEffect(() => {
     return subscribe("notification", handleNotification);
@@ -52,6 +128,7 @@ export default function SaleNotificationListener() {
           snoozeQueueRef.current = [];
           setQueue([...queueRef.current]);
         }
+        persistAll();
         return;
       }
       setRemainingSecs(Math.ceil((snoozeUntil.getTime() - now.getTime()) / 1000));
@@ -60,12 +137,13 @@ export default function SaleNotificationListener() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [snoozeUntil]);
+  }, [snoozeUntil, persistAll]);
 
   const dismiss = useCallback(() => {
     queueRef.current = queueRef.current.slice(1);
     setQueue([...queueRef.current]);
-  }, []);
+    persistAll();
+  }, [persistAll]);
 
   const snooze = useCallback((durationMs: number) => {
     const until = new Date(Date.now() + durationMs);
@@ -74,7 +152,8 @@ export default function SaleNotificationListener() {
     snoozeQueueRef.current = [...queueRef.current, ...snoozeQueueRef.current];
     queueRef.current = [];
     setQueue([]);
-  }, []);
+    persistAll();
+  }, [persistAll]);
 
   const cancelSnooze = useCallback(() => {
     snoozeUntilRef.current = null;
@@ -85,7 +164,8 @@ export default function SaleNotificationListener() {
       snoozeQueueRef.current = [];
       setQueue([...queueRef.current]);
     }
-  }, []);
+    persistAll();
+  }, [persistAll]);
 
   const snoozedCount = snoozeUntil ? snoozeQueueRef.current.length : 0;
 
