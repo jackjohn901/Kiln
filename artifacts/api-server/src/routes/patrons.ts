@@ -5,6 +5,7 @@ import { sendEmailWithRetry, newPatronEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, sql, inArray, gte, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { isEarningsPeriod, resolveEarningsPeriodRange, monthBucketKeys, dayBucketKeys } from "../lib/earningsPeriod";
 import crypto from "crypto";
 
 const router = Router();
@@ -192,13 +193,17 @@ router.get("/me/earnings/monthly-summary", async (req, res): Promise<void> => {
 });
 
 // GET /me/earnings — artist earnings summary (tips + subscriptions + shop sales)
-// Optional query params: ?month=1-12&year=YYYY — filter to a specific calendar month
+// Optional query params:
+//   ?month=1-12&year=YYYY — filter to a specific calendar month
+//   ?period=30d|90d|1y    — filter totals/earnings to a trailing window (ignored if month/year given)
 router.get("/me/earnings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
 
   const monthParam = req.query.month !== undefined ? parseInt(req.query.month as string, 10) : null;
   const yearParam = req.query.year !== undefined ? parseInt(req.query.year as string, 10) : null;
+  const periodParam = isEarningsPeriod(req.query.period) ? req.query.period : null;
+  // dateRange = exact calendar month (skips time-series); periodRange = trailing window (keeps time-series).
   let dateRange: { start: Date; end: Date } | null = null;
   if (monthParam !== null && yearParam !== null && monthParam >= 1 && monthParam <= 12 && yearParam >= 2000 && yearParam <= 2100) {
     dateRange = {
@@ -206,6 +211,10 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
       end: new Date(yearParam, monthParam, 1),
     };
   }
+  // A month filter takes precedence over a trailing-window period filter.
+  const periodRange = dateRange ? null : resolveEarningsPeriodRange(periodParam);
+  // Effective range used to scope tips/subscriptions/sales WHERE clauses + totals.
+  const queryRange = dateRange ?? periodRange;
 
   const [tips, subs, sales] = await Promise.all([
     db.select({
@@ -222,27 +231,27 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
     }).from(tipsTable)
       .leftJoin(profilesTable, eq(tipsTable.fromUserId, profilesTable.userId))
       .where(
-        dateRange
-          ? and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"), gte(tipsTable.createdAt, dateRange.start), lt(tipsTable.createdAt, dateRange.end))
+        queryRange
+          ? and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"), gte(tipsTable.createdAt, queryRange.start), lt(tipsTable.createdAt, queryRange.end))
           : and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"))
       ).orderBy(desc(tipsTable.createdAt)),
     // When a date range is given, include subscriptions that were active at any
-    // point during the month: started before month-end AND (not cancelled OR
-    // cancelled on/after month-start). This approximates monthly patron revenue
+    // point during the window: started before window-end AND (not cancelled OR
+    // cancelled on/after window-start). This approximates recurring patron revenue
     // using available schema data (no separate charge-events table exists yet).
     db.select().from(patronSubscriptionsTable).where(
-      dateRange
+      queryRange
         ? and(
             eq(patronSubscriptionsTable.artistId, userId),
-            lt(patronSubscriptionsTable.startedAt, dateRange.end),
-            // not cancelled before the month started
-            sql`(${patronSubscriptionsTable.cancelledAt} IS NULL OR ${patronSubscriptionsTable.cancelledAt} >= ${dateRange.start})`
+            lt(patronSubscriptionsTable.startedAt, queryRange.end),
+            // not cancelled before the window started
+            sql`(${patronSubscriptionsTable.cancelledAt} IS NULL OR ${patronSubscriptionsTable.cancelledAt} >= ${queryRange.start})`
           )
         : and(eq(patronSubscriptionsTable.artistId, userId), eq(patronSubscriptionsTable.status, "active"))
     ).orderBy(desc(patronSubscriptionsTable.startedAt)),
     db.select().from(ordersTable).where(
-      dateRange
-        ? and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]), gte(ordersTable.createdAt, dateRange.start), lt(ordersTable.createdAt, dateRange.end))
+      queryRange
+        ? and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]), gte(ordersTable.createdAt, queryRange.start), lt(ordersTable.createdAt, queryRange.end))
         : and(eq(ordersTable.sellerId, userId), inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]))
     ).orderBy(desc(ordersTable.createdAt)),
   ]);
@@ -269,18 +278,14 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   const timeSeriesByDay: Record<string, StreamBucket> = {};
   const now = new Date();
 
-  // Initialise last 12 month keys and last 30 day keys
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    timeSeriesByMonth[key] = { tips: 0, subscriptions: 0, shopSales: 0, auctions: 0 };
-  }
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    timeSeriesByDay[key] = { tips: 0, subscriptions: 0, shopSales: 0, auctions: 0 };
-  }
+  // Build buckets that cover the active window so the chart never drops in-window
+  // data (and the chart sum lines up with the period totals). Month buckets span
+  // every calendar month the window touches; day buckets are only used by the
+  // 30d view, so size them to that window (else trailing 30 days).
+  const monthKeys = monthBucketKeys(periodRange ? periodRange.start : null, now);
+  const dayKeys = dayBucketKeys(periodParam === "30d" && periodRange ? periodRange.start : null, now);
+  for (const key of monthKeys) timeSeriesByMonth[key] = { tips: 0, subscriptions: 0, shopSales: 0, auctions: 0 };
+  for (const key of dayKeys) timeSeriesByDay[key] = { tips: 0, subscriptions: 0, shopSales: 0, auctions: 0 };
 
   if (!dateRange) {
     for (const t of tips) {

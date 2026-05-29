@@ -324,27 +324,32 @@ export default function Analytics() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.followerCount != null) setApiFollowers(data.followerCount); })
       .catch(() => {});
-    fetch("/api/me/earnings", { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.totals) {
-          const t = data.totals;
-          setEarningTotals({
-            tips: t.tips ?? 0,
-            subscriptions: t.subscriptions ?? 0,
-            shopSales: t.shopSales ?? t.sales ?? 0,
-            total: t.total ?? 0,
-            timeSeriesByMonth: data.timeSeriesByMonth ?? [],
-            timeSeriesByDay: data.timeSeriesByDay ?? [],
-          });
-        }
-      })
-      .catch(() => {});
     fetch("/api/analytics/me", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.totalPosts != null) setAnalyticsData(data); })
       .catch(() => {});
   }, []);
+
+  // Earnings are scoped to the selected period so totals + chart reflect the same window.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/me/earnings?period=${period}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.totals) return;
+        const t = data.totals;
+        setEarningTotals({
+          tips: t.tips ?? 0,
+          subscriptions: t.subscriptions ?? 0,
+          shopSales: t.shopSales ?? t.sales ?? 0,
+          total: t.total ?? 0,
+          timeSeriesByMonth: data.timeSeriesByMonth ?? [],
+          timeSeriesByDay: data.timeSeriesByDay ?? [],
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [period]);
 
   if (!profile) {
     return (
@@ -375,10 +380,12 @@ export default function Analytics() {
         auctions: b.auctions ?? 0,
       }));
     }
+    // The API already scopes the monthly buckets to the selected window
+    // (every calendar month the period touches), so render them as-is rather
+    // than slicing a fixed count — slicing dropped a partial leading month when
+    // a 90-day window spanned four calendar months.
     const byMonth = earningTotals?.timeSeriesByMonth ?? [];
-    const monthCount = period === "90d" ? 3 : 12;
-    const slice = byMonth.slice(-monthCount);
-    return slice.map(b => ({
+    return byMonth.map(b => ({
       label: new Date(b.month + "-01T00:00:00").toLocaleDateString("en-US", { month: "short" }),
       shopSales: b.shopSales,
       tips: b.tips,
@@ -386,8 +393,6 @@ export default function Analytics() {
       auctions: b.auctions ?? 0,
     }));
   }, [earningTotals, period]);
-
-  const streamChartTotal = streamChartData.reduce((s, d) => s + d.shopSales + d.tips + d.subscriptions + d.auctions, 0);
 
   const totalPostActivity = postActivityData.reduce((s, v) => s + v, 0);
   const halfLen = Math.floor(postActivityData.length / 2);
@@ -456,7 +461,7 @@ export default function Analytics() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-stone-200">Earnings Breakdown</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Total earned across all revenue streams</p>
+              <p className="text-xs text-stone-500 mt-0.5">Revenue streams · {period === "1y" ? "past year" : period === "90d" ? "past 90 days" : "past 30 days"}</p>
             </div>
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
               <DollarSign size={13} />
@@ -493,7 +498,7 @@ export default function Analytics() {
           </div>
           {earningTotals && (
             <div className="mt-3 border-t border-white/5 pt-3 flex items-center justify-between">
-              <span className="text-xs text-stone-500">Total earned</span>
+              <span className="text-xs text-stone-500">Total this period</span>
               <span className="text-sm font-bold text-amber-100">
                 ${earningTotals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -529,7 +534,7 @@ export default function Analytics() {
               <h2 className="text-sm font-bold text-stone-200">Revenue by Stream</h2>
               <p className="text-xs text-stone-500">
                 {earningTotals
-                  ? `$${streamChartTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this period`
+                  ? `$${earningTotals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this period`
                   : "Sales · Tips · Subscriptions over time"}
               </p>
             </div>
