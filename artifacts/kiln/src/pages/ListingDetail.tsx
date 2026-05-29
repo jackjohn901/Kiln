@@ -19,7 +19,6 @@ interface ArtistShipping {
   offerLocalPickup: boolean;
   shipsTo: string[];
 }
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import Nav from "@/components/Nav";
 import { listings, formatPrice, type Listing } from "@/data/listings";
 import { getArtistById, artists } from "@/data/artists";
@@ -73,23 +72,6 @@ function buildGallery(imageUrl: string | null): string[] {
   return imageUrl ? [imageUrl] : [];
 }
 
-function generatePriceHistory(listing: Listing) {
-  const seed = listing.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const months = 12;
-  const current = listing.price;
-  const start = Math.round(current * 0.78);
-  return Array.from({ length: months + 1 }, (_, i) => {
-    const date = new Date(2026, 4 - months + i, 1);
-    const progress = i / months;
-    const noiseFactor = ((seed * (i + 7) * 13) % 97 - 48) / 1200;
-    const price = Math.round(start + (current - start) * (progress + noiseFactor));
-    return {
-      month: date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      price: Math.max(price, Math.round(start * 0.88)),
-    };
-  });
-}
-
 function StarRow({ rating, size = 14, interactive = false, onRate }: {
   rating: number; size?: number; interactive?: boolean; onRate?: (r: number) => void;
 }) {
@@ -113,221 +95,67 @@ function StarRow({ rating, size = 14, interactive = false, onRate }: {
 
 // ─── Shipping Estimate ─────────────────────────────────────────────────────────
 
-const US_REGIONS: Record<string, string> = {
-  "0": "Northeast", "1": "Northeast", "2": "Mid-Atlantic", "3": "Southeast",
-  "4": "Southeast", "5": "Midwest", "6": "South Central", "7": "South Central",
-  "8": "Mountain", "9": "West Coast",
-};
-
-function estimateShipping(listing: Listing, zip: string): { label: string; days: string; price: number }[] | null {
-  if (zip.length !== 5 || !/^\d{5}$/.test(zip)) return null;
-  const region = US_REGIONS[zip[0]] ?? "US";
-  const base = listing.price >= 5000 ? 65 : listing.price >= 1500 ? 45 : listing.price >= 500 ? 25 : 18;
-  const regional = region === "West Coast" || region === "Northeast" ? 0 : 8;
-  const std = base + regional;
-  const exp = Math.round(std * 2.2);
-  const free = listing.price >= 3000;
-  return [
-    { label: `Standard — White Glove Delivery (${region})`, days: "7–14 business days", price: free ? 0 : std },
-    { label: "Expedited Freight", days: "3–5 business days", price: free ? Math.round(exp * 0.4) : exp },
-    { label: "Express Art Courier", days: "1–2 business days", price: Math.round(exp * 1.6) },
-  ];
-}
-
-const INTL_COUNTRIES = [
-  { code: "CA", name: "Canada", region: "North America" },
-  { code: "MX", name: "Mexico", region: "North America" },
-  { code: "GB", name: "United Kingdom", region: "Europe" },
-  { code: "DE", name: "Germany", region: "Europe" },
-  { code: "FR", name: "France", region: "Europe" },
-  { code: "IT", name: "Italy", region: "Europe" },
-  { code: "ES", name: "Spain", region: "Europe" },
-  { code: "NL", name: "Netherlands", region: "Europe" },
-  { code: "SE", name: "Sweden", region: "Europe" },
-  { code: "NO", name: "Norway", region: "Europe" },
-  { code: "DK", name: "Denmark", region: "Europe" },
-  { code: "CH", name: "Switzerland", region: "Europe" },
-  { code: "AT", name: "Austria", region: "Europe" },
-  { code: "BE", name: "Belgium", region: "Europe" },
-  { code: "PT", name: "Portugal", region: "Europe" },
-  { code: "PL", name: "Poland", region: "Europe" },
-  { code: "AU", name: "Australia", region: "Asia-Pacific" },
-  { code: "NZ", name: "New Zealand", region: "Asia-Pacific" },
-  { code: "JP", name: "Japan", region: "Asia-Pacific" },
-  { code: "KR", name: "South Korea", region: "Asia-Pacific" },
-  { code: "SG", name: "Singapore", region: "Asia-Pacific" },
-  { code: "HK", name: "Hong Kong", region: "Asia-Pacific" },
-  { code: "CN", name: "China", region: "Asia-Pacific" },
-  { code: "IN", name: "India", region: "Asia-Pacific" },
-  { code: "BR", name: "Brazil", region: "South America" },
-  { code: "AR", name: "Argentina", region: "South America" },
-  { code: "CL", name: "Chile", region: "South America" },
-  { code: "ZA", name: "South Africa", region: "Africa" },
-  { code: "AE", name: "UAE", region: "Middle East" },
-  { code: "IL", name: "Israel", region: "Middle East" },
-];
-
-function estimateInternational(
-  listing: Listing,
-  countryCode: string,
-  artistShipping: ArtistShipping | null,
-): { label: string; days: string; price: number }[] | null {
-  if (!countryCode) return null;
-  const country = INTL_COUNTRIES.find((c) => c.code === countryCode);
-  if (!country) return null;
-
-  const base =
-    artistShipping?.internationalRate != null && artistShipping.internationalRate > 0
-      ? artistShipping.internationalRate
-      : listing.price >= 5000 ? 120 : listing.price >= 1500 ? 85 : listing.price >= 500 ? 55 : 38;
-
-  const regionSurcharge: Record<string, number> = {
-    "North America": 0,
-    "Europe": 10,
-    "Asia-Pacific": 20,
-    "South America": 25,
-    "Africa": 30,
-    "Middle East": 20,
-  };
-  const surcharge = regionSurcharge[country.region] ?? 15;
-  const std = base + surcharge;
-  const exp = Math.round(std * 1.6);
-  return [
-    { label: `Standard International (${country.name})`, days: "10–21 business days", price: std },
-    { label: `Priority International (${country.name})`, days: "5–10 business days", price: exp },
-  ];
-}
-
 function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artistShipping: ArtistShipping | null }) {
-  const [mode, setMode] = useState<"domestic" | "international">("domestic");
-  const [zip, setZip] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [country, setCountry] = useState<string>(
-    () => localStorage.getItem("kiln_shipping_country") ?? ""
-  );
+  const freeThreshold = artistShipping?.freeThreshold ?? null;
+  const qualifiesFree =
+    !!artistShipping?.offerFreeShipping ||
+    (freeThreshold != null && freeThreshold > 0 && listing.price >= freeThreshold);
+  const domesticRate = artistShipping?.domesticRate ?? null;
+  const perItemRate = artistShipping?.perItemRate ?? null;
+  const intlRate = artistShipping?.internationalRate ?? null;
 
-  const handleCountryChange = (code: string) => {
-    setCountry(code);
-    if (code) {
-      localStorage.setItem("kiln_shipping_country", code);
-    } else {
-      localStorage.removeItem("kiln_shipping_country");
-    }
-  };
-
-  const domesticEstimates = submitted ? estimateShipping(listing, zip) : null;
-  const intlEstimates = country ? estimateInternational(listing, country, artistShipping) : null;
-
-  const hasIntl =
-    !artistShipping ||
-    artistShipping.internationalRate == null ||
-    artistShipping.internationalRate > 0 ||
-    (artistShipping.shipsTo ?? []).length === 0;
+  const domesticDisplay = qualifiesFree
+    ? "Free"
+    : domesticRate != null && domesticRate > 0
+      ? formatPrice(domesticRate)
+      : "Calculated at checkout";
+  const intlDisplay = intlRate != null && intlRate > 0 ? formatPrice(intlRate) : "Ask the artist";
 
   return (
     <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Truck size={14} className="text-amber-400" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shipping estimate</p>
-        {listing.price >= 3000 && mode === "domestic" && (
+        <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shipping</p>
+        {qualifiesFree && (
           <span className="ml-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
             Free shipping
           </span>
         )}
       </div>
 
-      {/* Mode toggle */}
-      <div className="flex rounded-xl border border-white/8 bg-stone-800/60 p-0.5 mb-3 text-[11px] font-semibold">
-        <button
-          onClick={() => setMode("domestic")}
-          className={`flex-1 rounded-lg py-1.5 transition-colors ${mode === "domestic" ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-400"}`}
-        >
-          Domestic (US)
-        </button>
-        <button
-          onClick={() => setMode("international")}
-          className={`flex-1 rounded-lg py-1.5 transition-colors ${mode === "international" ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-400"}`}
-        >
-          International
-        </button>
-      </div>
-
-      {mode === "domestic" ? (
-        <>
-          <div className="flex gap-2">
-            <input
-              value={zip}
-              onChange={(e) => { setZip(e.target.value.replace(/\D/g, "").slice(0, 5)); setSubmitted(false); }}
-              placeholder="Enter ZIP code"
-              inputMode="numeric"
-              maxLength={5}
-              className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none"
-            />
-            <button
-              onClick={() => zip.length === 5 && setSubmitted(true)}
-              disabled={zip.length !== 5}
-              className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
-            >
-              Calculate
-            </button>
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-stone-300">Domestic (US)</p>
+            {!qualifiesFree && perItemRate != null && perItemRate > 0 && (
+              <p className="text-[10px] text-stone-600">+{formatPrice(perItemRate)} per additional item</p>
+            )}
           </div>
-          {domesticEstimates && (
-            <div className="mt-3 space-y-2">
-              {domesticEstimates.map((e) => (
-                <div key={e.label} className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-stone-400 truncate">{e.label}</p>
-                    <p className="text-[10px] text-stone-600">{e.days}</p>
-                  </div>
-                  <span className="shrink-0 text-sm font-bold text-amber-300">
-                    {e.price === 0 ? "Free" : formatPrice(e.price)}
-                  </span>
-                </div>
-              ))}
-              <p className="text-[10px] text-stone-700 pt-1">Estimates only — final shipping arranged directly with artist. All works are professionally packed.</p>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          {!hasIntl ? (
-            <p className="text-xs text-stone-500 text-center py-2">This artist does not ship internationally.</p>
-          ) : (
-            <>
-              <select
-                value={country}
-                onChange={(e) => handleCountryChange(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 focus:border-amber-500/40 focus:outline-none"
-              >
-                <option value="">Select your country…</option>
-                {(["North America", "Europe", "Asia-Pacific", "South America", "Africa", "Middle East"] as const).map((region) => (
-                  <optgroup key={region} label={region}>
-                    {INTL_COUNTRIES.filter((c) => c.region === region).map((c) => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-              {intlEstimates && (
-                <div className="mt-3 space-y-2">
-                  {intlEstimates.map((e) => (
-                    <div key={e.label} className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs text-stone-400 truncate">{e.label}</p>
-                        <p className="text-[10px] text-stone-600">{e.days}</p>
-                      </div>
-                      <span className="shrink-0 text-sm font-bold text-amber-300">
-                        {formatPrice(e.price)}
-                      </span>
-                    </div>
-                  ))}
-                  <p className="text-[10px] text-stone-700 pt-1">International estimates only — customs duties and taxes may apply. Final shipping confirmed with artist.</p>
-                </div>
-              )}
-            </>
-          )}
-        </>
-      )}
+          <span className="shrink-0 text-sm font-bold text-amber-300">{domesticDisplay}</span>
+        </div>
+
+        {!qualifiesFree && freeThreshold != null && freeThreshold > 0 && (
+          <p className="text-[10px] text-emerald-400/80">
+            Free shipping on orders over {formatPrice(freeThreshold)}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2.5">
+          <p className="text-xs text-stone-300">International</p>
+          <span className="shrink-0 text-sm font-bold text-amber-300">{intlDisplay}</span>
+        </div>
+
+        {artistShipping?.offerLocalPickup && (
+          <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2.5">
+            <p className="text-xs text-stone-300">Local pickup</p>
+            <span className="shrink-0 text-sm font-bold text-emerald-400">Available</span>
+          </div>
+        )}
+
+        <p className="text-[10px] text-stone-700 pt-1">
+          Final shipping is arranged directly with the artist. All works are professionally packed; customs duties and taxes may apply on international orders.
+        </p>
+      </div>
     </div>
   );
 }
@@ -481,7 +309,6 @@ export default function ListingDetail() {
 
   const listing = staticListing ?? apiListing;
   const gallery = useMemo(() => buildGallery(listing?.imageUrl ?? null), [listing?.imageUrl]);
-  const priceHistory = useMemo(() => listing ? generatePriceHistory(listing) : [], [listing]);
 
   function handleShare() {
     const url = window.location.href;
@@ -598,9 +425,6 @@ export default function ListingDetail() {
   const reviews = apiReviews;
   const avgRating = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const suggestedOffer = Math.round(listing.price * 0.85 / 100) * 100;
-  const priceGrowth = priceHistory.length > 1
-    ? Math.round((listing.price / priceHistory[0]!.price - 1) * 100)
-    : 0;
   const currentImage = gallery[selectedImg] ?? listing.imageUrl;
 
   return (
@@ -800,46 +624,6 @@ export default function ListingDetail() {
                   )}
                 </div>
               )}
-            </div>
-
-            {/* Price history chart */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[10px] text-stone-600 uppercase tracking-wide font-semibold">Price history · 12 months</p>
-                {priceGrowth > 0 && (
-                  <span className="text-[10px] text-emerald-400 font-semibold">+{priceGrowth}% appreciation</span>
-                )}
-              </div>
-              <div className="rounded-xl border border-white/8 bg-stone-900/40 px-3 pt-3 pb-1">
-                <ResponsiveContainer width="100%" height={72}>
-                  <AreaChart data={priceHistory} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-                    <defs>
-                      <linearGradient id={`priceGrad-${listing.id}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <Tooltip
-                      contentStyle={{ background: "#1a1714", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11, padding: "4px 10px" }}
-                      formatter={(v: number) => [formatPrice(v), "Price"]}
-                      labelStyle={{ color: "#78716c", fontSize: 10 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="price"
-                      stroke="#f59e0b"
-                      strokeWidth={1.5}
-                      fill={`url(#priceGrad-${listing.id})`}
-                      dot={false}
-                      activeDot={{ r: 3, fill: "#f59e0b", stroke: "#12100e", strokeWidth: 1.5 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-                <div className="flex justify-between mt-0.5">
-                  <span className="text-[9px] text-stone-700">{priceHistory[0]?.month}</span>
-                  <span className="text-[9px] text-stone-700">{priceHistory[priceHistory.length - 1]?.month}</span>
-                </div>
-              </div>
             </div>
 
             {/* Price */}

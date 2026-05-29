@@ -122,11 +122,12 @@ export default function LineageGraph() {
       <div className="mx-auto max-w-2xl px-4">
         {/* Header */}
         <div className="pt-10 pb-5">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <GitBranch size={20} className="text-amber-400" />
             <h1 className="text-2xl font-bold text-amber-100">Craft Lineage</h1>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Curated reference</span>
           </div>
-          <p className="text-xs text-stone-500">The living family tree of craft knowledge — who taught whom, generation by generation.</p>
+          <p className="text-xs text-stone-500">A curated family tree of craft knowledge — who taught whom, generation by generation.</p>
         </div>
 
         {/* Stats */}

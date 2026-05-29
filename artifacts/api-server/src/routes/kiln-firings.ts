@@ -34,15 +34,16 @@ router.get("/kiln-firings", async (req, res): Promise<void> => {
 // POST /kiln-firings — start a firing
 router.post("/kiln-firings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { kilnName, cone, fuel, notes, estimatedHours, isPublic } = req.body;
+  const { kilnName, cone, fuel, notes, estimatedHours, pieces, isPublic } = req.body;
   if (!cone) { res.status(400).json({ error: "cone required" }); return; }
   const user = req.user;
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
+  const piecesNum = Number.isFinite(Number(pieces)) ? Math.max(0, Math.min(999, Math.round(Number(pieces)))) : 0;
   const [firing] = await db.insert(kilnFiringsTable).values({
     id: crypto.randomUUID(), userId: user.id, userName: name,
     userAvatarUrl: user.profileImageUrl ?? null,
     kilnName: kilnName ?? "Studio Kiln", cone, fuel: fuel ?? "Electric",
-    notes: notes ?? "", estimatedHours: estimatedHours ?? 8,
+    notes: notes ?? "", estimatedHours: estimatedHours ?? 8, pieces: piecesNum,
     isPublic: isPublic ?? true,
   }).returning();
   res.status(201).json({ ...firing, startedAt: firing.startedAt.toISOString(), completedAt: null, clearedAt: null });

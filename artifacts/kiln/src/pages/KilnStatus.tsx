@@ -5,7 +5,7 @@ import { ChevronLeft, Flame, Clock, Box, CheckCircle, X, Plus, Thermometer, Wind
 import Nav from "@/components/Nav";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
-  SEED_KILN_STATUSES, getUserKilnStatus, saveUserKilnStatus,
+  getUserKilnStatus, saveUserKilnStatus,
   getFiringProgress, getFiringETA, getHoursAgo,
   type KilnFiringStatus,
 } from "@/data/kilnStatuses";
@@ -26,20 +26,6 @@ const CONE_OPTIONS = [
 ];
 
 const FUEL_OPTIONS = ["Electric", "Gas", "Wood / Anagama", "Propane torch", "Oxygen-propane torch", "Coal", "Mixed"];
-
-function extractTargetTemp(cone: string): number | null {
-  const match = cone.match(/(\d{3,4})°F/);
-  return match ? parseInt(match[1]!) : null;
-}
-
-function getLiveTemp(cone: string, progress: number): string {
-  const targetTemp = extractTargetTemp(cone);
-  if (!targetTemp) return "";
-  if (progress >= 100) return `Peaked at ${targetTemp.toLocaleString()}°F`;
-  const factor = Math.pow(Math.min(progress, 100) / 100, 0.58);
-  const liveTemp = Math.round(72 + (targetTemp - 72) * factor);
-  return `~${liveTemp.toLocaleString()}°F`;
-}
 
 function FiringCard({ status, isMine = false, onClear, viewerCount = 0 }: {
   status: KilnFiringStatus; isMine?: boolean; onClear?: () => void; viewerCount?: number;
@@ -122,25 +108,22 @@ function FiringCard({ status, isMine = false, onClear, viewerCount = 0 }: {
             transition={{ duration: 0.8, ease: "easeOut" }}
           />
         </div>
-        {getLiveTemp(status.cone, progress) && (
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <Thermometer size={10} className={isComplete ? "text-stone-500" : "text-amber-400"} />
-            <span className={`text-xs font-semibold ${isComplete ? "text-stone-500" : "text-amber-300"}`}>
-              {getLiveTemp(status.cone, progress)}
-            </span>
-            <span className="text-[9px] text-stone-700">{isComplete ? "cooled" : "est. live temp"}</span>
-            {!isComplete && <span className="ml-auto text-[9px] text-stone-700">{progress}% complete</span>}
-          </div>
-        )}
+        <div className="flex items-center justify-end mt-1.5">
+          <span className="text-[9px] text-stone-600">
+            {isComplete ? "Firing complete" : `${Math.round(progress)}% complete`}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 text-[11px]">
         <span className="flex items-center gap-1 rounded-full bg-stone-800 px-2.5 py-1 text-stone-400">
           <Wind size={9} className="text-amber-400/70" /> {status.fuel}
         </span>
-        <span className="flex items-center gap-1 rounded-full bg-stone-800 px-2.5 py-1 text-stone-400">
-          <Box size={9} className="text-amber-400/70" /> {status.pieces} pieces
-        </span>
+        {status.pieces > 0 && (
+          <span className="flex items-center gap-1 rounded-full bg-stone-800 px-2.5 py-1 text-stone-400">
+            <Box size={9} className="text-amber-400/70" /> {status.pieces} {status.pieces === 1 ? "piece" : "pieces"}
+          </span>
+        )}
         {status.notes && (
           <span className="text-stone-500 italic line-clamp-1 flex-1 min-w-0">"{status.notes}"</span>
         )}
@@ -158,6 +141,7 @@ interface ApiFiring {
   cone: string;
   fuel: string;
   notes: string;
+  pieces: number;
   isPublic: boolean;
   startedAt: string;
   estimatedHours: number;
@@ -172,7 +156,7 @@ function apiFiringToStatus(f: ApiFiring): KilnFiringStatus {
     avatarUrl: f.userAvatarUrl ?? "",
     cone: f.cone,
     fuel: f.fuel,
-    pieces: 0,
+    pieces: f.pieces ?? 0,
     notes: f.notes || undefined,
     startedAt: f.startedAt,
     estimatedHours: f.estimatedHours,
@@ -222,15 +206,12 @@ export default function KilnStatus() {
     return unsub;
   }, [apiFirings, subscribe, send]);
 
-  const apiIds = new Set(apiFirings.map(f => f.userId));
-  const followedFirings = [
-    ...apiFirings.filter(f => following.includes(f.userId)).map(apiFiringToStatus),
-    ...SEED_KILN_STATUSES.filter(s => following.includes(s.artistId) && !apiIds.has(s.artistId)),
-  ];
-  const otherFirings = [
-    ...apiFirings.filter(f => !following.includes(f.userId) && f.userId !== (profile?.id ?? "")).map(apiFiringToStatus),
-    ...SEED_KILN_STATUSES.filter(s => !following.includes(s.artistId) && !apiIds.has(s.artistId)),
-  ];
+  const followedFirings = apiFirings
+    .filter(f => following.includes(f.userId))
+    .map(apiFiringToStatus);
+  const otherFirings = apiFirings
+    .filter(f => !following.includes(f.userId) && f.userId !== (profile?.id ?? ""))
+    .map(apiFiringToStatus);
 
   async function startFiring() {
     const status: KilnFiringStatus = {
@@ -249,7 +230,7 @@ export default function KilnStatus() {
       const res = await fetch("/api/kiln-firings", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cone, fuel, notes: notes.trim(), estimatedHours, kilnName: "Studio Kiln" }),
+        body: JSON.stringify({ cone, fuel, notes: notes.trim(), estimatedHours, pieces, kilnName: "Studio Kiln" }),
       });
       if (res.ok) {
         const saved = await res.json() as ApiFiring;
@@ -407,7 +388,7 @@ export default function KilnStatus() {
           <div className="mb-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">🔥 Artists you follow — firing now</h2>
             <div className="space-y-3">
-              {followedFirings.map((s) => <FiringCard key={s.artistId} status={s} viewerCount={s.firingId ? (viewerCounts[s.firingId] ?? 0) : 0} />)}
+              {followedFirings.map((s) => <FiringCard key={s.firingId ?? s.artistId} status={s} viewerCount={s.firingId ? (viewerCounts[s.firingId] ?? 0) : 0} />)}
             </div>
           </div>
         )}
@@ -415,11 +396,19 @@ export default function KilnStatus() {
         {/* Community firings */}
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">Community — active firings</h2>
-          <div className="space-y-3">
-            {(followedFirings.length > 0 ? otherFirings : SEED_KILN_STATUSES).map((s) => (
-              <FiringCard key={s.artistId} status={s} viewerCount={s.firingId ? (viewerCounts[s.firingId] ?? 0) : 0} />
-            ))}
-          </div>
+          {otherFirings.length > 0 ? (
+            <div className="space-y-3">
+              {otherFirings.map((s) => (
+                <FiringCard key={s.firingId ?? s.artistId} status={s} viewerCount={s.firingId ? (viewerCounts[s.firingId] ?? 0) : 0} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center">
+              <Flame size={24} className="mx-auto mb-2 text-stone-700" />
+              <p className="text-sm text-stone-500">No active community firings right now</p>
+              <p className="text-xs text-stone-700 mt-0.5">When artists light their kilns, you'll see them here.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

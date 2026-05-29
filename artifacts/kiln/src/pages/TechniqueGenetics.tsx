@@ -85,11 +85,12 @@ export default function TechniqueGenetics() {
     <div className="min-h-screen bg-[#12100e] pb-32 pt-2">
       <div className="mx-auto max-w-lg px-4">
         <div className="pt-10 pb-4">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Dna size={20} className="text-amber-400" />
             <h1 className="text-2xl font-bold text-amber-100">Technique Genetics</h1>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Curated reference</span>
           </div>
-          <p className="text-xs text-stone-500">The evolutionary family tree of craft — how every technique is related to every other.</p>
+          <p className="text-xs text-stone-500">A curated evolutionary family tree of craft — how every technique is related to every other.</p>
         </div>
 
         {/* Medium filter */}

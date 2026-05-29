@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { profilesTable, postsTable, followsTable, streaksTable } from "@workspace/db";
-import { desc, eq, and, or, inArray, sql, isNotNull, isNull, lte } from "drizzle-orm";
-import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
+import { profilesTable, followsTable, streaksTable } from "@workspace/db";
+import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
+import { publicProfileFields } from "../lib/publicFields";
 
 const router = Router();
 
@@ -93,23 +93,6 @@ router.get("/leaderboard/cities", async (req, res): Promise<void> => {
       }));
     res.json({ cities });
   } catch (err) { req.log.error({ err }, "cityLeaderboard error"); res.status(500).json({ error: "Failed" }); }
-});
-
-// GET /trending-posts — trending posts by like count
-router.get("/trending-posts", async (req, res): Promise<void> => {
-  try {
-    const { tag, limit = "30" } = req.query as Record<string, string>;
-    const baseFilter = and(
-      sql`${postsTable.isDraft} = false`,
-      or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
-      tag ? sql`${postsTable.tags} @> ARRAY[${tag}]::text[]` : undefined,
-    );
-    const posts = await db.select().from(postsTable)
-      .where(baseFilter)
-      .orderBy(desc(postsTable.likeCount))
-      .limit(Number(limit));
-    res.json({ posts: posts.map(p => redactPatronMedia({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })) });
-  } catch (err) { req.log.error({ err }, "trendingPosts error"); res.status(500).json({ error: "Failed to load trending posts" }); }
 });
 
 // GET /followers/:userId — who follows this user

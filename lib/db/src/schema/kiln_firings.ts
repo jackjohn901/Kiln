@@ -9,6 +9,7 @@ export const kilnFiringsTable = pgTable("kiln_firings", {
   cone: text("cone").notNull(),
   fuel: text("fuel").notNull().default("Electric"),
   notes: text("notes").notNull().default(""),
+  pieces: integer("pieces").notNull().default(0),
   isPublic: boolean("is_public").notNull().default(true),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   estimatedHours: integer("estimated_hours").notNull().default(8),

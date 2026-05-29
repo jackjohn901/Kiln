@@ -25,7 +25,7 @@ import Comments from "@/components/Comments";
 import NotificationPanel from "@/components/NotificationPanel";
 import Stories from "@/components/Stories";
 import VideoAnnotations, { TECHNIQUE_ANNOTATIONS } from "@/components/VideoAnnotations";
-import { SEED_KILN_STATUSES, getFiringETA } from "@/data/kilnStatuses";
+import { getFiringETA, type KilnFiringStatus } from "@/data/kilnStatuses";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 import MuxPlayer from "@mux/mux-player-react";
 
@@ -967,7 +967,21 @@ export default function Feed() {
   }, [kilnSettings.display_sound]);
 
   const [, navigate] = useLocation(); // used by StreakBadge and other sub-components
-  const followedFirings = SEED_KILN_STATUSES.filter((s) => following.includes(s.artistId));
+  const [activeFirings, setActiveFirings] = useState<KilnFiringStatus[]>([]);
+  useEffect(() => {
+    fetch("/api/kiln-firings", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { community?: Array<{ id: string; userId: string; userName: string; userAvatarUrl: string | null; cone: string; fuel: string; notes: string; pieces?: number; startedAt: string; estimatedHours: number }> } | null) => {
+        if (!data?.community) return;
+        setActiveFirings(data.community.map((f) => ({
+          artistId: f.userId, artistName: f.userName, avatarUrl: f.userAvatarUrl ?? "",
+          cone: f.cone, fuel: f.fuel, pieces: f.pieces ?? 0,
+          notes: f.notes || undefined, startedAt: f.startedAt, estimatedHours: f.estimatedHours, firingId: f.id,
+        })));
+      })
+      .catch(() => {});
+  }, []);
+  const followedFirings = activeFirings.filter((s) => following.includes(s.artistId));
   const [kilnBannerDismissed, setKilnBannerDismissed] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     try { return !!localStorage.getItem("kiln_welcome_dismissed"); } catch { return false; }
