@@ -27,15 +27,35 @@ Notifications.setNotificationHandler({
   }),
 });
 
-type NotifType = "like" | "follow" | "comment" | "sale";
+type NotifType =
+  | "like"
+  | "follow"
+  | "comment"
+  | "sale"
+  | "commission"
+  | "commission_payment"
+  | "tip"
+  | "workshop"
+  | "workshop_booking"
+  | "drop"
+  | "subscription"
+  | "message"
+  | "bid";
 
 const ICON_MAP: Record<string, { name: keyof typeof Feather.glyphMap; color: string }> = {
   like: { name: "heart", color: "#E05D5D" },
   follow: { name: "user-plus", color: "#4A90D9" },
   comment: { name: "message-circle", color: "#D87F31" },
   sale: { name: "shopping-bag", color: "#4CAF50" },
-  bid: { name: "trending-up", color: "#9C6FE4" },
+  commission: { name: "edit-2", color: "#9C6FE4" },
+  commission_payment: { name: "dollar-sign", color: "#4CAF50" },
   tip: { name: "gift", color: "#D87F31" },
+  workshop: { name: "book-open", color: "#4A90D9" },
+  workshop_booking: { name: "calendar", color: "#4A90D9" },
+  drop: { name: "droplet", color: "#26C6DA" },
+  subscription: { name: "star", color: "#F5A623" },
+  message: { name: "mail", color: "#78909C" },
+  bid: { name: "trending-up", color: "#9C6FE4" },
 };
 
 async function registerForPushNotifications(): Promise<string | null> {
