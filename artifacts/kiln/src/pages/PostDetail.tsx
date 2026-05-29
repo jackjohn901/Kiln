@@ -5,6 +5,7 @@ import {
   CheckCircle, Clock, Flame, ExternalLink,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import MuxPlayer from "@mux/mux-player-react";
 import Nav from "@/components/Nav";
 import Comments from "@/components/Comments";
 import PollBlock, { type Poll } from "@/components/PollBlock";
@@ -35,6 +36,7 @@ interface DbPost {
   caption: string;
   videoUrl: string | null;
   thumbnailUrl: string | null;
+  muxPlaybackId: string | null;
   technique: string | null;
   tags: string[];
   likeCount: number;
@@ -178,7 +180,17 @@ export default function PostDetail() {
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
             <div>
-              {dbPost.videoUrl ? (
+              {dbPost.muxPlaybackId ? (
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black">
+                  <MuxPlayer
+                    playbackId={dbPost.muxPlaybackId}
+                    streamType="on-demand"
+                    poster={dbPost.thumbnailUrl ?? undefined}
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : dbPost.videoUrl ? (
                 <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black">
                   <video
                     src={dbPost.videoUrl}

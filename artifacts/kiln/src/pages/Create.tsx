@@ -17,27 +17,6 @@ import { getTrackById, type MusicTrack } from "@/data/music";
 import { createBeatLooper } from "@/lib/beatSynth";
 import { getCommunityBeats } from "@/lib/communityBeats";
 import { useUpload } from "@/hooks/useUpload";
-import { storeBlob } from "@/lib/videoDB";
-
-function captureVideoThumbnail(src: string): Promise<string> {
-  return new Promise((resolve) => {
-    const vid = document.createElement("video");
-    vid.muted = true;
-    vid.playsInline = true;
-    vid.src = src;
-    vid.onloadeddata = () => {
-      const w = Math.min(vid.videoWidth || 640, 640);
-      const h = vid.videoHeight ? Math.round(w * vid.videoHeight / vid.videoWidth) : 360;
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.drawImage(vid, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.75));
-    };
-    vid.onerror = () => resolve("");
-  });
-}
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -71,7 +50,7 @@ export default function Create() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
   const { recordPost } = useSocial();
-  const { upload, uploading, progress } = useUpload();
+  const { upload, uploadVideo, uploading, progress } = useUpload();
 
   const [step, setStep] = useState<Step>("upload");
   const [postType, setPostType] = useState<"post" | "story">("post");
@@ -345,6 +324,7 @@ export default function Create() {
     setPublishError(null);
     try {
       let thumbnailUrl: string | undefined;
+      let muxPlaybackId: string | undefined;
       let mediaUrl = previewUrl;
 
       // ── Story publish path ──────────────────────────────────────────
@@ -375,15 +355,15 @@ export default function Create() {
       // ────────────────────────────────────────────────────────────────
 
       if (file && mediaType === "video") {
-        // Capture thumbnail while the blob URL is still valid
-        thumbnailUrl = await captureVideoThumbnail(previewUrl) || undefined;
-        // Upload video to Object Storage; fall back to IndexedDB
-        try {
-          const result = await upload(file);
-          mediaUrl = result.servingUrl;
-        } catch {
-          mediaUrl = await storeBlob(file);
-        }
+        // Upload the video to Mux so it's transcoded for adaptive streaming and
+        // gets an auto-generated poster image. This is what makes uploaded videos
+        // actually play (via MuxPlayer / native HLS) and show a real thumbnail on
+        // the profile grid and feed — object storage MP4s rendered as black cells
+        // and frequently failed to play on mobile.
+        const { playbackId } = await uploadVideo(file);
+        muxPlaybackId = playbackId;
+        mediaUrl = `https://stream.mux.com/${playbackId}.m3u8`;
+        thumbnailUrl = `https://image.mux.com/${playbackId}/thumbnail.jpg?width=640&height=640&fit_mode=crop`;
       } else if (file) {
         // Images: prefer bg-removed file if available, then try server upload
         const imgFile = bgFile ?? tsFile ?? wmFile ?? cropFile ?? file;
@@ -432,6 +412,7 @@ export default function Create() {
         type: mediaType,
         mediaUrl,
         thumbnailUrl,
+        muxPlaybackId,
         mediaUrls: extraUrls.length > 0 ? [mediaUrl, ...extraUrls] : undefined,
         caption: caption || technique,
         tags: [
@@ -458,7 +439,8 @@ export default function Create() {
         body: JSON.stringify({
           caption: caption || technique || "",
           videoUrl: mediaType === "video" ? mediaUrl : null,
-          thumbnailUrl: mediaType === "image" ? mediaUrl : null,
+          thumbnailUrl: mediaType === "image" ? mediaUrl : (thumbnailUrl ?? null),
+          muxPlaybackId: muxPlaybackId ?? null,
           technique: technique || null,
           tags: [...(technique ? [technique] : []), ...(stage ? [stage] : []), ...tags],
           beforeImageUrl: beforeImageUrl,

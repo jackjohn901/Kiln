@@ -20,8 +20,8 @@ const router = Router();
 router.post("/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { caption, videoUrl, thumbnailUrl, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName, musicTrackId } = req.body as {
-    caption?: string; videoUrl?: string; thumbnailUrl?: string; technique?: string; medium?: string;
+  const { caption, videoUrl, thumbnailUrl, muxPlaybackId, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName, musicTrackId } = req.body as {
+    caption?: string; videoUrl?: string; thumbnailUrl?: string; muxPlaybackId?: string; technique?: string; medium?: string;
     tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; isDraft?: boolean;
     collaboratorId?: string; collaboratorName?: string; musicTrackId?: string;
   };
@@ -47,6 +47,7 @@ router.post("/posts", async (req, res): Promise<void> => {
       caption: caption ?? "",
       videoUrl: videoUrl ?? null,
       thumbnailUrl: thumbnailUrl ?? null,
+      muxPlaybackId: muxPlaybackId ?? null,
       technique: technique ?? null,
       medium: medium ?? null,
       tags: tags ?? [],
