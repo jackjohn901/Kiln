@@ -153,6 +153,35 @@ function userPostsToReels(): Reel[] {
   }
 }
 
+// Map a post returned by the API feed (real DB content) into a feed Reel.
+// Keeping this in one place ensures every feed surface (For You, Following,
+// load-more) carries the same fields — including muxPlaybackId, so real
+// uploaded videos actually play instead of showing only a thumbnail.
+function apiPostToReel(p: any, defaultMusicId: string): Reel {
+  return {
+    id: `db-${p.id}`,
+    videoId: "",
+    videoUrl: p.videoUrl ?? undefined,
+    muxPlaybackId: p.muxPlaybackId ?? undefined,
+    artistId: p.authorId ?? "unknown",
+    artistName: p.authorName ?? "Artist",
+    technique: p.technique ?? "Studio Craft",
+    location: "",
+    caption: p.caption ?? "",
+    craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
+    likes: p.likeCount ?? 0,
+    saves: p.saveCount ?? 0,
+    thumbnail: p.thumbnailUrl ?? undefined,
+    avatarUrl: p.authorAvatarUrl ?? undefined,
+    musicTrackId: p.musicTrackId ?? defaultMusicId,
+    available: false,
+    patronOnly: p.isPatronOnly ?? false,
+    streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
+    artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
+    beforeImageUrl: p.beforeImageUrl ?? undefined,
+  };
+}
+
 const CS_ICON: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   open: { icon: CheckCircle, color: "text-emerald-400", label: "Open for commissions" },
   waitlisted: { icon: Clock, color: "text-amber-400", label: "Waitlisted" },
@@ -988,27 +1017,7 @@ export default function Feed() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!data?.posts?.length) return;
-        const apiReels: Reel[] = data.posts.map((p: any) => ({
-          id: `db-${p.id}`,
-          videoId: "",
-          videoUrl: p.videoUrl ?? undefined,
-          artistId: p.authorId ?? "unknown",
-          artistName: p.authorName ?? "Artist",
-          technique: p.technique ?? "Studio Craft",
-          location: "",
-          caption: p.caption ?? "",
-          craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
-          likes: p.likeCount ?? 0,
-          saves: p.saveCount ?? 0,
-          thumbnail: p.thumbnailUrl ?? undefined,
-          avatarUrl: p.authorAvatarUrl ?? undefined,
-          musicTrackId: p.musicTrackId ?? defaultMusicId,
-          available: false,
-          patronOnly: p.isPatronOnly ?? false,
-          streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
-          artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
-          beforeImageUrl: p.beforeImageUrl ?? undefined,
-        }));
+        const apiReels: Reel[] = data.posts.map((p: any) => apiPostToReel(p, defaultMusicId));
         if (!followingLoadedRef.current) {
           // First load: apply immediately, no pill
           followingLoadedRef.current = true;
@@ -1080,27 +1089,7 @@ export default function Feed() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!data?.posts?.length) return;
-        const apiReels: Reel[] = data.posts.map((p: any) => ({
-          id: `db-${p.id}`,
-          videoId: "",
-          videoUrl: p.videoUrl ?? undefined,
-          artistId: p.authorId ?? "unknown",
-          artistName: p.authorName ?? "Artist",
-          technique: p.technique ?? "Studio Craft",
-          location: "",
-          caption: p.caption ?? "",
-          craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
-          likes: p.likeCount ?? 0,
-          saves: p.saveCount ?? 0,
-          thumbnail: p.thumbnailUrl ?? undefined,
-          avatarUrl: p.authorAvatarUrl ?? undefined,
-          musicTrackId: p.musicTrackId ?? defaultMusicId,
-          available: false,
-          patronOnly: p.isPatronOnly ?? false,
-          streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
-          artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
-          beforeImageUrl: p.beforeImageUrl ?? undefined,
-        }));
+        const apiReels: Reel[] = data.posts.map((p: any) => apiPostToReel(p, defaultMusicId));
         setUserPostReels((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));
           const fresh = apiReels.filter((r) => !existingIds.has(r.id));
@@ -1144,14 +1133,19 @@ export default function Feed() {
       try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}"); } catch { return {}; }
     })();
     const quizTechniques: string[] = prefs.techniques ?? [];
-    // Score every reel
-    const scored = ALL_REELS.map((r) => ({
-      reel: r,
-      score: scoreReel(r, interactions, following, quizTechniques),
-    }));
+    // Real artist posts from the database (plus the viewer's own posts) are the
+    // primary feed. The curated showcase reels only fill in when there isn't
+    // enough real content yet, so early adopters always have something to watch
+    // without the feed being dominated by the same hardcoded clips.
+    const scored = ALL_REELS
+      .map((r) => ({ reel: r, score: scoreReel(r, interactions, following, quizTechniques) }))
+      .sort((a, b) => b.score - a.score)
+      .map((s) => s.reel);
+    const MIN_FEED = 12;
+    const fillerCount = Math.max(0, MIN_FEED - userPostReels.length);
     return [
       ...userPostReels,
-      ...scored.sort((a, b) => b.score - a.score).map((s) => s.reel),
+      ...scored.slice(0, fillerCount),
     ];
   }, [feedTab, following, userPostReels, followingApiReels]);
 
@@ -1176,27 +1170,7 @@ export default function Feed() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!data?.posts?.length) { setHasMoreApiPosts(false); return; }
-        const more: Reel[] = data.posts.map((p: any) => ({
-          id: `db-${p.id}`,
-          videoId: "",
-          videoUrl: p.videoUrl ?? undefined,
-          artistId: p.authorId ?? "unknown",
-          artistName: p.authorName ?? "Artist",
-          technique: p.technique ?? "Studio Craft",
-          location: "",
-          caption: p.caption ?? "",
-          craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
-          likes: p.likeCount ?? 0,
-          saves: p.saveCount ?? 0,
-          thumbnail: p.thumbnailUrl ?? undefined,
-          avatarUrl: p.authorAvatarUrl ?? undefined,
-          musicTrackId: p.musicTrackId ?? defaultMusicId,
-          available: false,
-          patronOnly: p.isPatronOnly ?? false,
-          streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
-          artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
-          beforeImageUrl: p.beforeImageUrl ?? undefined,
-        }));
+        const more: Reel[] = data.posts.map((p: any) => apiPostToReel(p, defaultMusicId));
         setUserPostReels((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));
           const fresh = more.filter((r) => !existingIds.has(r.id));
