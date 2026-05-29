@@ -9,7 +9,7 @@ import {
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
   Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Music2, Truck, Sparkles, ShoppingCart,
 } from "lucide-react";
-import { ALL_ACHIEVEMENTS, SEED_UNLOCKED, RARITY_COLORS, getXpLevel } from "@/data/achievements";
+import { ALL_ACHIEVEMENTS, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
 import Nav from "@/components/Nav";
 import ShareModal from "@/components/ShareModal";
@@ -18,7 +18,7 @@ import { seedArtists } from "@/data/seedArtists";
 import { getListingsByArtist, formatPrice, type Listing } from "@/data/listings";
 import { useCart } from "@/contexts/CartContext";
 import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
-import { useSocial, CommissionStatus, type ShopReview } from "@/contexts/SocialContext";
+import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
 import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
@@ -1407,9 +1407,22 @@ export default function ArtistProfile() {
                 </div>
               )}
 
-              {/* Achievements */}
+              {/* Achievements — derived only from this profile's real activity */}
               {(() => {
-                const unlocked = SEED_UNLOCKED;
+                const postCount = dbPosts.length;
+                const listingCount = apiListings?.length ?? 0;
+                const unlocked: string[] = [];
+                if (dbFollowerCount >= 1) unlocked.push("first-follow");
+                if (dbFollowerCount >= 10) unlocked.push("followers-10");
+                if (dbFollowerCount >= 100) unlocked.push("followers-100");
+                if (dbFollowerCount >= 1000) unlocked.push("followers-1000");
+                if (dbFollowerCount >= 10000) unlocked.push("followers-10000");
+                if (postCount >= 1) unlocked.push("first-post");
+                if (postCount >= 10) unlocked.push("posts-10");
+                if (postCount >= 50) unlocked.push("posts-50");
+                if (postCount >= 200) unlocked.push("posts-200");
+                if (listingCount >= 1) unlocked.push("first-listing");
+                if (verified) unlocked.push("verified");
                 const earned = ALL_ACHIEVEMENTS.filter(a => unlocked.includes(a.id));
                 const totalXp = earned.reduce((s, a) => s + a.xp, 0);
                 const { level, title: lvTitle } = getXpLevel(totalXp);
@@ -1838,20 +1851,13 @@ export default function ArtistProfile() {
 
 // ─── Review Section ────────────────────────────────────────────────────────────
 
-const SEED_REVIEWS: Record<string, ShopReview[]> = {};
-
 function ReviewSection({ artistId }: { artistId: string }) {
   const { getReviews, addReview } = useSocial();
   const { profile } = useProfile();
-  const contextReviews = getReviews(artistId);
-  const seedRevs = SEED_REVIEWS[artistId] ?? [
-    { id: `seed-r1-${artistId}`, listingId: artistId, fromName: "Margaret T.", fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${artistId}-r1`, rating: 5, text: "Absolutely stunning work. The piece arrived beautifully packed and exceeded every expectation. I've already commissioned a second piece.", createdAt: "2026-03-18" },
-    { id: `seed-r2-${artistId}`, listingId: artistId, fromName: "James K.", fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${artistId}-r2`, rating: 5, text: "Working with this artist was a pleasure from start to finish. Clear communication, exquisite craftsmanship, and delivered on time.", createdAt: "2026-01-22" },
-    { id: `seed-r3-${artistId}`, listingId: artistId, fromName: "Priya M.", fromAvatarUrl: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${artistId}-r3`, rating: 4, text: "The technique is extraordinary — you can see the years of practice in every detail. Highly recommend.", createdAt: "2025-12-05" },
-  ];
-
-  const allReviews = [...contextReviews, ...seedRevs];
-  const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+  const allReviews = getReviews(artistId);
+  const avgRating = allReviews.length
+    ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
+    : 0;
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ rating: 5, text: "" });
@@ -1875,15 +1881,19 @@ function ReviewSection({ artistId }: { artistId: string }) {
     <div className="space-y-4">
       {/* Summary */}
       <div className="flex items-center gap-4 mb-5">
-        <div className="text-center">
-          <p className="text-3xl font-bold text-amber-100">{avgRating.toFixed(1)}</p>
-          <div className="flex items-center gap-0.5 mt-1">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} size={12} className={i < Math.round(avgRating) ? "text-amber-400" : "text-stone-700"} fill="currentColor" />
-            ))}
+        {allReviews.length > 0 ? (
+          <div className="text-center">
+            <p className="text-3xl font-bold text-amber-100">{avgRating.toFixed(1)}</p>
+            <div className="flex items-center gap-0.5 mt-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} size={12} className={i < Math.round(avgRating) ? "text-amber-400" : "text-stone-700"} fill="currentColor" />
+              ))}
+            </div>
+            <p className="text-xs text-stone-500 mt-1">{allReviews.length} reviews</p>
           </div>
-          <p className="text-xs text-stone-500 mt-1">{allReviews.length} reviews</p>
-        </div>
+        ) : (
+          <p className="text-sm text-stone-500">No reviews yet — be the first to share your experience.</p>
+        )}
         {profile && !submitted && (
           <button
             onClick={() => setShowForm((v) => !v)}

@@ -6,4 +6,4 @@
 - [Duplicate route shadowing](duplicate-route-shadowing.md) — Two routers defining the same method+path: Express serves the first-registered one; a field can silently vanish from responses. Grep `routes/` for the path before editing.
 - [WS broadcast privacy](ws-broadcast-privacy.md) — `broadcastAll` reaches every client; include only public aggregates (counts), never actor userId or per-user records.
 - [Kiln mutation error handling](kiln-mutation-error-handling.md) — user-initiated mutation fetches must gate on r.ok + toast + revert optimistic UI; mark-read/like/follow/cart-sync intentionally stay silent.
-- [Kiln fabricated-data hotspots](kiln-fabricated-data-hotspots.md) — pages hide hardcoded "demo" numbers as real stats; delete (don't empty-state) sections with no backing feature; vet reports first.
+- [Kiln fabricated-data hotspots](kiln-fabricated-data-hotspots.md) — never show fake people/counts/reviews/AI answers or success-on-failure; derive from real data, empty-state backed features, delete unbacked sections.

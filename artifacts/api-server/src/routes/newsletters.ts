@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { newslettersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import crypto from "crypto";
+import { buildNewsletterValues } from "../lib/newsletterValues";
 
 const router = Router();
 
@@ -20,17 +20,9 @@ router.post("/newsletters", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { subject, body, audience } = req.body as { subject: string; body: string; audience: string };
   if (!subject?.trim() || !body?.trim()) { res.status(400).json({ error: "subject and body required" }); return; }
-  // recipientCount is server-owned: there is no real delivery pipeline yet, so we store 0
-  // rather than trusting a client-supplied figure that would be rendered as an authoritative metric.
-  const [row] = await db.insert(newslettersTable).values({
-    id: crypto.randomUUID(),
-    artistId: req.user.id,
-    subject: subject.trim(),
-    body: body.trim(),
-    audience: audience ?? "all",
-    recipientCount: 0,
-    status: "sent",
-  }).returning();
+  const [row] = await db.insert(newslettersTable)
+    .values(buildNewsletterValues(req.user.id, { subject, body, audience }))
+    .returning();
   res.status(201).json({ ...row, sentAt: row.sentAt.toISOString(), createdAt: row.createdAt.toISOString() });
 });
 

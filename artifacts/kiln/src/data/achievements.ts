@@ -79,14 +79,6 @@ export const RARITY_COLORS: Record<Achievement["rarity"], string> = {
   legendary: "text-amber-400 border-amber-500/40 bg-amber-500/8",
 };
 
-// Seed: achievements unlocked by seed profiles
-export const SEED_UNLOCKED: string[] = [
-  "first-follow", "followers-10", "followers-100", "followers-1000",
-  "first-post", "posts-10", "posts-50", "first-process-video", "first-story",
-  "first-listing", "first-sale", "sales-10", "first-commission", "first-drop",
-  "joined-guild", "first-workshop", "first-year", "kiln-picks", "verified", "early-adopter",
-];
-
 export function getXpLevel(xp: number): { level: number; title: string; nextLevelXp: number } {
   const thresholds = [
     { level: 1, title: "Apprentice", xp: 0 },

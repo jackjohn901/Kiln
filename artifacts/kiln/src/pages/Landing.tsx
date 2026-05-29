@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   Flame, Play, ShoppingBag, Users, DollarSign, Sparkles,
@@ -49,22 +50,22 @@ const FEATURES = [
   },
 ];
 
-const SEED_ARTISTS = [
-  { name: "Elena Vasquez", handle: "elena-vasquez", medium: "Ceramics", location: "Portland, OR", initial: "E", color: "bg-amber-700" },
-  { name: "Marco Chen", handle: "marco-chen", medium: "Glasswork", location: "Brooklyn, NY", initial: "M", color: "bg-sky-800" },
-  { name: "Zoe Nakamura", handle: "zoe-nakamura", medium: "Weaving", location: "Seattle, WA", initial: "Z", color: "bg-purple-800" },
-  { name: "Felix Okafor", handle: "felix-okafor", medium: "Woodwork", location: "Chicago, IL", initial: "F", color: "bg-emerald-800" },
-  { name: "Aria Patel", handle: "aria-patel", medium: "Metalwork", location: "San Francisco, CA", initial: "A", color: "bg-rose-800" },
-  { name: "Sam Rivera", handle: "sam-rivera", medium: "Pottery", location: "Austin, TX", initial: "S", color: "bg-stone-600" },
-];
-
 const DISCIPLINES = [
   "Ceramics", "Glass Blowing", "Flamework", "Weaving", "Natural Dyeing",
   "Blacksmithing", "Enamelwork", "Woodworking", "Bronze Casting", "Fiber Arts",
   "Kiln Forming", "Lost-Wax Casting", "Woodfire Pottery", "Raku", "Slab Building",
 ];
 
+type ShowcaseArtist = { userId: string; displayName: string | null; medium: string | null; location: string | null; avatarUrl: string | null };
+
 export default function Landing() {
+  const [artists, setArtists] = useState<ShowcaseArtist[]>([]);
+  useEffect(() => {
+    fetch("/api/leaderboard?limit=6")
+      .then((r) => (r.ok ? r.json() : { profiles: [] }))
+      .then((d) => setArtists(Array.isArray(d.profiles) ? d.profiles : []))
+      .catch(() => {});
+  }, []);
   return (
     <div className="min-h-screen bg-[#12100e] text-stone-200">
       {/* Minimal nav for guests */}
@@ -146,7 +147,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Artist showcase */}
+      {/* Artist showcase — real artists from the platform, ranked by followers */}
+      {artists.length > 0 && (
       <section className="mx-auto max-w-5xl px-4 py-12">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -158,26 +160,33 @@ export default function Landing() {
           </Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SEED_ARTISTS.map((a) => (
+          {artists.map((a) => (
             <Link
-              key={a.handle}
-              href={`/artists/seed-${a.handle}`}
+              key={a.userId}
+              href={`/artists/${a.userId}`}
               className="flex items-center gap-3 rounded-2xl border border-white/8 bg-stone-900/60 p-4 hover:border-amber-500/30 transition-colors"
             >
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${a.color} text-lg font-bold text-white`}>
-                {a.initial}
-              </div>
+              {a.avatarUrl ? (
+                <img src={a.avatarUrl} alt={a.displayName ?? "Artist"} className="h-12 w-12 shrink-0 rounded-full object-cover border border-white/10" />
+              ) : (
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-stone-700 text-lg font-bold text-white">
+                  {(a.displayName ?? "?").charAt(0).toUpperCase()}
+                </div>
+              )}
               <div className="min-w-0">
-                <p className="font-semibold text-stone-100 truncate">{a.name}</p>
-                <p className="text-xs text-stone-500">{a.medium}</p>
-                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-600">
-                  <MapPin size={9} /> {a.location}
-                </p>
+                <p className="font-semibold text-stone-100 truncate">{a.displayName}</p>
+                {a.medium && <p className="text-xs text-stone-500">{a.medium}</p>}
+                {a.location && (
+                  <p className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-600">
+                    <MapPin size={9} /> {a.location}
+                  </p>
+                )}
               </div>
             </Link>
           ))}
         </div>
       </section>
+      )}
 
       {/* Revenue streams callout */}
       <section className="mx-auto max-w-5xl px-4 py-12">

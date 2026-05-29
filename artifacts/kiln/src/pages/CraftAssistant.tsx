@@ -22,19 +22,7 @@ const SUGGESTED_QUESTIONS = [
   "What's the Orton cone temperature chart?",
 ];
 
-const LOCAL_FALLBACKS: Record<string, string> = {
-  default: "I'm having trouble connecting to my knowledge base right now. For craft technique questions, please try again in a moment — or reach out to fellow artists in the Guilds section!",
-};
-
-function localFallback(question: string): string {
-  const q = question.toLowerCase();
-  if (q.includes("cone 6") || q.includes("stoneware")) return "Cone 6 stoneware fires at approximately 2232°F (1222°C). Always allow a slow cool through quartz inversion at 1063°F (573°C) to prevent thermal shock.";
-  if (q.includes("anneal") || q.includes("blown glass")) return "Blown glass should be annealed at around 960°F (515°C) — the strain point for most soda-lime glass — for at least 1 hour per inch of thickness, then cool at no more than 50°F per hour through 700°F.";
-  if (q.includes("cobalt") || q.includes("green")) return "Cobalt in glass typically produces rich blue, but in a reducing atmosphere or with certain base glasses it can shift toward green or purple. Use a clean oxidizing flame for pure blue results.";
-  if (q.includes("crawl")) return "Glaze crawling is usually caused by over-application, high clay content causing excessive shrinkage, or applying glaze over a dusty/oily surface. Try thinning the glaze or calcining some of the clay content.";
-  if (q.includes("s-crack") || q.includes("s crack")) return "S-cracks form when the bottom of a wheel-thrown piece dries faster than the walls. Compress the floor firmly while throwing, and allow the piece to dry slowly under a cover.";
-  return LOCAL_FALLBACKS.default;
-}
+const AI_UNAVAILABLE_MESSAGE = "Kiln AI is unavailable right now — please try again in a moment. In the meantime, fellow artists in the Guilds section are a great place to ask technique questions.";
 
 export default function CraftAssistant() {
   const [messages, setMessages] = useState<Message[]>([
@@ -74,19 +62,19 @@ export default function CraftAssistant() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history }),
       });
-      const data = res.ok ? await res.json() as { reply: string } : null;
-      const reply = data?.reply ?? localFallback(content);
+      if (!res.ok) throw new Error("AI service unavailable");
+      const data = await res.json() as { reply: string };
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: reply,
+        content: data.reply,
         timestamp: new Date(),
       }]);
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: localFallback(content),
+        content: AI_UNAVAILABLE_MESSAGE,
         timestamp: new Date(),
       }]);
     }

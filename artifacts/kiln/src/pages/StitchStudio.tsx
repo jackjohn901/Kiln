@@ -1,13 +1,12 @@
 import { useState, useRef } from "react";
 import { Link, useParams, useLocation } from "wouter";
-import { motion } from "framer-motion";
 import {
-  ChevronLeft, Scissors, Video, Upload, Play, CheckCircle,
-  Clock, Flame, AlertCircle,
+  ChevronLeft, Scissors, Video, Upload,
+  Flame, AlertCircle,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import BetaBanner from "@/components/BetaBanner";
-import { getReelById, ALL_REELS } from "@/data/reels";
+import { getReelById } from "@/data/reels";
 import { useUpload } from "@/hooks/useUpload";
 
 const STITCH_LENGTHS = [
@@ -15,22 +14,6 @@ const STITCH_LENGTHS = [
   { value: 5, label: "5 sec" },
   { value: 10, label: "10 sec" },
 ];
-
-const RECENT_STITCHES = ALL_REELS.slice(0, 6).map((r, i) => ({
-  id: `stitch-${r.id}`,
-  sourceReelId: r.id,
-  sourceArtist: r.artistName,
-  sourceTechnique: r.technique,
-  thumbnail: r.thumbnail,
-  stitchArtist: ["Maya Chen", "James Okafor", "Elena Vasquez"][i % 3],
-  caption: [
-    "Great point — here's how I approach the same step differently…",
-    "Responding to this technique demo — my take from the other side",
-    "This changed how I think about the gather. Here's what I discovered…",
-  ][i % 3],
-  views: 1200 + i * 800,
-  createdAt: new Date(Date.now() - i * 2 * 24 * 60 * 60 * 1000).toISOString(),
-}));
 
 export default function StitchStudio() {
   const { reelId } = useParams<{ reelId?: string }>();
@@ -42,8 +25,8 @@ export default function StitchStudio() {
   const [caption, setCaption] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [step, setStep] = useState<"configure" | "record" | "done">("configure");
   const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const sourceReel = reelId ? getReelById(reelId) : null;
 
@@ -57,14 +40,20 @@ export default function StitchStudio() {
   async function handlePublish() {
     if (!videoFile) return;
     setPublishing(true);
+    setError(null);
     try {
-      // 1. Upload video to Object Storage
+      // 1. Upload video to Object Storage — a stitch requires the video
       let videoUrl: string | null = null;
       try {
         const result = await upload(videoFile);
         videoUrl = result.servingUrl;
       } catch (err) {
         console.error("Video upload failed", err);
+      }
+      if (!videoUrl) {
+        setError("We couldn't upload your video. Please check your connection and try again.");
+        setPublishing(false);
+        return;
       }
 
       // 2. Create post with uploaded URL
@@ -80,18 +69,24 @@ export default function StitchStudio() {
       });
 
       if (!postRes.ok) {
-        setStep("done");
+        setError("We couldn't publish your stitch. Please try again in a moment.");
+        setPublishing(false);
         return;
       }
 
       const createdPost = await postRes.json().catch(() => null);
       if (createdPost?.id) {
+        // Success is confirmed only once the post actually exists — land on it.
         navigate(`/posts/db-${createdPost.id}`);
         return;
       }
-    } catch { /* fall through */ }
-    setStep("done");
-    setPublishing(false);
+      setError("Something went wrong publishing your stitch. Please try again.");
+      setPublishing(false);
+    } catch (err) {
+      console.error("Stitch publish failed", err);
+      setError("Something went wrong publishing your stitch. Please try again.");
+      setPublishing(false);
+    }
   }
 
   return (
@@ -108,26 +103,13 @@ export default function StitchStudio() {
           <h1 className="text-xl font-bold text-white">Stitch</h1>
         </div>
 
-        {step === "done" ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center space-y-4 py-8"
-          >
-            <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/30">
-              <CheckCircle size={28} className="text-emerald-400" />
-            </div>
-            <h2 className="text-lg font-bold text-white">Stitch published!</h2>
-            <p className="text-sm text-stone-400">Your clip-and-response is live. The original creator has been notified.</p>
-            <Link href="/" className="inline-block rounded-full bg-amber-500 px-6 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
-              Back to feed
-            </Link>
-            <Link href="/create" className="block text-sm text-stone-500 hover:text-stone-300 transition-colors">
-              Create another post
-            </Link>
-          </motion.div>
-        ) : (
-          <div className="space-y-5">
+        {error && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+        <div className="space-y-5">
             {/* What is a Stitch */}
             <div className="rounded-xl bg-stone-900 border border-white/5 p-4">
               <div className="flex items-start gap-3">
@@ -252,48 +234,7 @@ export default function StitchStudio() {
               )}
             </button>
           </div>
-        )}
 
-        {/* Recent stitches */}
-        <div className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold text-stone-400">Recent stitches on Kiln</h2>
-          <div className="space-y-3">
-            {RECENT_STITCHES.map((s, i) => (
-              <motion.div
-                key={s.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex gap-3 rounded-2xl bg-stone-900 border border-white/5 p-3"
-              >
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-stone-800">
-                  <img
-                    src={s.thumbnail}
-                    alt={s.sourceArtist}
-                    className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&h=100&fit=crop&seed=${s.sourceReelId}`; }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Scissors size={14} className="text-amber-400" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-stone-200 truncate">{s.stitchArtist}</p>
-                  <p className="text-[11px] text-amber-400 truncate">↳ {s.sourceArtist} · {s.sourceTechnique}</p>
-                  <p className="mt-1 text-[11px] text-stone-500 line-clamp-2">{s.caption}</p>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <span className="text-[10px] text-stone-700 flex items-center gap-0.5">
-                      <Play size={9} /> {(s.views / 1000).toFixed(1)}k
-                    </span>
-                    <span className="text-[10px] text-stone-700 flex items-center gap-0.5">
-                      <Clock size={9} /> {new Date(s.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
