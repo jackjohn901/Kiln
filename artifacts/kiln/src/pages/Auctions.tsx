@@ -57,12 +57,17 @@ function getTimeLeft(endDate: string): string {
 
 function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBid: (a: Auction) => void; currentUserId?: string }) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(auction.endDate));
+  const [isCritical, setIsCritical] = useState(() => {
+    const diff = new Date(auction.endDate).getTime() - Date.now();
+    return diff > 0 && diff <= 10000;
+  });
   const [paying, setPaying] = useState(false);
   useEffect(() => {
     let handle: ReturnType<typeof setTimeout>;
     function tick() {
-      setTimeLeft(getTimeLeft(auction.endDate));
       const diff = new Date(auction.endDate).getTime() - Date.now();
+      setTimeLeft(getTimeLeft(auction.endDate));
+      setIsCritical(diff > 0 && diff <= 10000);
       if (diff <= 0) return;
       // 1-second ticks in final minute, 30-second ticks otherwise
       handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
@@ -130,7 +135,13 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
           </div>
           <div className="text-right">
             <p className="text-[10px] text-stone-500">{auction.bidCount} bid{auction.bidCount !== 1 ? "s" : ""}</p>
-            <p className={`text-xs font-medium flex items-center gap-1 justify-end ${isLive ? "text-amber-400" : "text-stone-500"}`}>
+            <p className={`text-xs font-medium flex items-center gap-1 justify-end transition-colors ${
+              isCritical
+                ? "text-red-500 animate-pulse"
+                : isLive
+                  ? "text-amber-400"
+                  : "text-stone-500"
+            }`}>
               <Clock size={10} /> {timeLeft}
             </p>
           </div>
