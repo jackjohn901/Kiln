@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   ChevronLeft, Heart, Bookmark, Users, Crown, Star,
-  TrendingUp, Share2, Award, Flame, Calendar,
+  TrendingUp, Share2, Award, Flame,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
@@ -20,10 +20,7 @@ interface Milestone {
   bg: string;
   label: string;
   sublabel: string;
-  date?: string;
 }
-
-const JOINED_DATE = "March 2025";
 
 interface CollectorLevel {
   level: string; icon: string; color: string;
@@ -66,7 +63,6 @@ export default function CollectorJourney() {
         bg: "bg-amber-500/15 border-amber-500/30",
         label: "Joined Kiln",
         sublabel: "Your craft journey begins",
-        date: JOINED_DATE,
       },
     ];
 
@@ -78,7 +74,6 @@ export default function CollectorJourney() {
         bg: "bg-rose-500/15 border-rose-500/30",
         label: "First artist followed",
         sublabel: `@${following[0]}`,
-        date: "March 2025",
       });
     }
     if (following.length >= 5) {
@@ -89,7 +84,6 @@ export default function CollectorJourney() {
         bg: "bg-sky-500/15 border-sky-500/30",
         label: "Following 5 artists",
         sublabel: "Your taste is taking shape",
-        date: "April 2025",
       });
     }
     if (Object.values(reelSaves).some(Boolean)) {
@@ -100,7 +94,6 @@ export default function CollectorJourney() {
         bg: "bg-violet-500/15 border-violet-500/30",
         label: "First reel saved",
         sublabel: "You're building a reference library",
-        date: "April 2025",
       });
     }
     if (subscriptions.length >= 1) {
@@ -111,7 +104,6 @@ export default function CollectorJourney() {
         bg: "bg-amber-500/20 border-amber-500/40",
         label: "Became a Patron",
         sublabel: `Supporting @${subscriptions[0]}`,
-        date: "May 2025",
       });
     }
     if (Object.values(reelLikes).filter(Boolean).length >= 10) {
@@ -122,7 +114,6 @@ export default function CollectorJourney() {
         bg: "bg-yellow-500/15 border-yellow-500/30",
         label: "10 reels liked",
         sublabel: "Your taste is showing",
-        date: "May 2025",
       });
     }
     if (following.length >= 10) {
@@ -133,7 +124,6 @@ export default function CollectorJourney() {
         bg: "bg-emerald-500/15 border-emerald-500/30",
         label: "Following 10 artists",
         sublabel: "Deep in the craft world now",
-        date: "May 2025",
       });
     }
     if (subscriptions.length >= 3) {
@@ -144,7 +134,6 @@ export default function CollectorJourney() {
         bg: "bg-amber-500/20 border-amber-500/40",
         label: "Patron of 3 artists",
         sublabel: "A true craft collector",
-        date: "June 2025",
       });
     }
     if (Object.values(reelLikes).filter(Boolean).length >= 25) {
@@ -155,7 +144,6 @@ export default function CollectorJourney() {
         bg: "bg-rose-500/15 border-rose-500/30",
         label: "25 reels liked",
         sublabel: "Your eye for craft is undeniable",
-        date: "June 2025",
       });
     }
     if (following.length >= 20) {
@@ -166,7 +154,6 @@ export default function CollectorJourney() {
         bg: "bg-sky-500/15 border-sky-500/30",
         label: "Following 20 artists",
         sublabel: "You've built a serious orbit",
-        date: "July 2025",
       });
     }
     if (subscriptions.length >= 5) {
@@ -177,7 +164,6 @@ export default function CollectorJourney() {
         bg: "bg-amber-500/25 border-amber-400/50",
         label: "Patron of 5 artists",
         sublabel: "You are the backbone of craft",
-        date: "August 2025",
       });
     }
     if (Object.values(reelSaves).filter(Boolean).length >= 10) {
@@ -188,7 +174,6 @@ export default function CollectorJourney() {
         bg: "bg-violet-500/15 border-violet-500/30",
         label: "10 reels saved",
         sublabel: "A curated reference library taking shape",
-        date: "July 2025",
       });
     }
 
@@ -232,9 +217,7 @@ export default function CollectorJourney() {
             )}
             <div>
               <p className="font-serif text-xl text-amber-100">{profile?.name ?? "Craft Collector"}</p>
-              <p className="text-xs text-stone-500 flex items-center gap-1.5 mt-0.5">
-                <Calendar size={10} /> Member since {JOINED_DATE}
-              </p>
+              <p className="text-xs text-stone-500 mt-0.5">Building a craft collection</p>
             </div>
           </div>
 
@@ -330,15 +313,8 @@ export default function CollectorJourney() {
                   <m.icon size={16} className={m.color} />
                 </div>
                 <div className="flex-1 rounded-2xl border border-white/8 bg-stone-900/60 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-stone-200">{m.label}</p>
-                      <p className="text-xs text-stone-500 mt-0.5">{m.sublabel}</p>
-                    </div>
-                    {m.date && (
-                      <span className="shrink-0 text-[10px] text-stone-700 mt-0.5">{m.date}</span>
-                    )}
-                  </div>
+                  <p className="text-sm font-semibold text-stone-200">{m.label}</p>
+                  <p className="text-xs text-stone-500 mt-0.5">{m.sublabel}</p>
                 </div>
               </motion.div>
             ))}

@@ -4,26 +4,18 @@ import { ChevronLeft, Calculator, DollarSign, Clock, Package, Plus, Trash2, Chec
 import Nav from "@/components/Nav";
 
 const TECHNIQUES = [
-  { name: "Glass Blowing", multiplier: 1.8 },
-  { name: "Flameworking", multiplier: 1.5 },
-  { name: "Raku", multiplier: 1.3 },
-  { name: "Ceramics / Pottery", multiplier: 1.0 },
-  { name: "Porcelain", multiplier: 1.4 },
-  { name: "Wood-Fired / Anagama", multiplier: 1.6 },
-  { name: "Metal Forging", multiplier: 1.7 },
-  { name: "Fiber Arts / Weaving", multiplier: 1.2 },
-  { name: "Enamelwork", multiplier: 1.5 },
-  { name: "Stone Carving", multiplier: 1.6 },
-  { name: "Bronze Casting", multiplier: 2.0 },
-  { name: "Studio Craft", multiplier: 1.0 },
-];
-
-const SIZES = [
-  { label: "Small (< 6\")", factor: 0.8 },
-  { label: "Medium (6–12\")", factor: 1.0 },
-  { label: "Large (12–24\")", factor: 1.4 },
-  { label: "Extra Large (> 24\")", factor: 2.0 },
-  { label: "Monumental (> 4\')", factor: 3.5 },
+  "Glass Blowing",
+  "Flameworking",
+  "Raku",
+  "Ceramics / Pottery",
+  "Porcelain",
+  "Wood-Fired / Anagama",
+  "Metal Forging",
+  "Fiber Arts / Weaving",
+  "Enamelwork",
+  "Stone Carving",
+  "Bronze Casting",
+  "Studio Craft",
 ];
 
 interface MaterialLine {
@@ -60,7 +52,7 @@ function Slider({ label, value, min, max, step, unit, onChange }: {
 
 export default function PriceCalculator() {
   const [technique, setTechnique] = useState("Glass Blowing");
-  const [size, setSize] = useState(1);
+  const [markup, setMarkup] = useState(2);
   const [hours, setHours] = useState(12);
   const [hourlyRate, setHourlyRate] = useState(45);
   const [platformFee, setPlatformFee] = useState(12);
@@ -71,13 +63,11 @@ export default function PriceCalculator() {
   const [newMatName, setNewMatName] = useState("");
   const [newMatCost, setNewMatCost] = useState(0);
 
-  const tech = TECHNIQUES.find((t) => t.name === technique) ?? TECHNIQUES[0]!;
-  const sizeObj = SIZES[size]!;
   const materialTotal = materials.reduce((s, m) => s + m.cost, 0);
   const laborCost = hours * hourlyRate;
 
   const { base, low, high, suggested } = useMemo(() => {
-    const base = (laborCost + materialTotal) * tech.multiplier * sizeObj.factor;
+    const base = (laborCost + materialTotal) * markup;
     const feeMultiplier = 1 / (1 - platformFee / 100);
     const withFee = base * feeMultiplier;
     return {
@@ -86,7 +76,7 @@ export default function PriceCalculator() {
       high: Math.round(withFee * 1.25),
       suggested: Math.round(withFee),
     };
-  }, [laborCost, materialTotal, tech.multiplier, sizeObj.factor, platformFee]);
+  }, [laborCost, materialTotal, markup, platformFee]);
 
   function addMaterial() {
     if (!newMatName.trim()) return;
@@ -124,50 +114,25 @@ export default function PriceCalculator() {
             <div className="grid grid-cols-2 gap-2">
               {TECHNIQUES.map((t) => (
                 <button
-                  key={t.name}
-                  onClick={() => setTechnique(t.name)}
+                  key={t}
+                  onClick={() => setTechnique(t)}
                   className={`rounded-xl border px-3 py-2.5 text-left text-xs font-medium transition-all ${
-                    technique === t.name
+                    technique === t
                       ? "border-amber-500 bg-amber-500/10 text-amber-300"
                       : "border-white/8 bg-stone-800/40 text-stone-400 hover:border-white/15"
                   }`}
                 >
-                  {t.name}
-                  <span className={`ml-1 text-[10px] ${technique === t.name ? "text-amber-500/70" : "text-stone-700"}`}>
-                    ×{t.multiplier}
-                  </span>
+                  {t}
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Size */}
-          <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
-            <h2 className="text-sm font-semibold text-stone-300 mb-3 flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">2</span>
-              Size
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {SIZES.map((s, i) => (
-                <button
-                  key={s.label}
-                  onClick={() => setSize(i)}
-                  className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
-                    size === i
-                      ? "border-amber-500 bg-amber-500/10 text-amber-300"
-                      : "border-white/8 text-stone-400 hover:border-white/15"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <p className="text-[11px] text-stone-600 mt-3">Recorded with your listing. It doesn’t change the price — your price comes from your real costs below.</p>
           </div>
 
           {/* Labor */}
           <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-5">
             <h2 className="text-sm font-semibold text-stone-300 flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">3</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">2</span>
               Your Labor
             </h2>
             <Slider label="Hours worked" value={hours} min={1} max={120} step={1} unit="" onChange={setHours} />
@@ -181,7 +146,7 @@ export default function PriceCalculator() {
           {/* Materials */}
           <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
             <h2 className="text-sm font-semibold text-stone-300 mb-3 flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">4</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">3</span>
               Material & Studio Costs
             </h2>
             <div className="space-y-2 mb-3">
@@ -220,6 +185,16 @@ export default function PriceCalculator() {
             </div>
           </div>
 
+          {/* Markup */}
+          <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+            <h2 className="text-sm font-semibold text-stone-300 mb-3 flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">4</span>
+              Markup
+            </h2>
+            <Slider label="Margin over cost" value={markup} min={1} max={4} step={0.1} unit="×" onChange={setMarkup} />
+            <p className="text-[11px] text-stone-600 mt-2">Many makers price at roughly 2× their material + labor cost (a “keystone” markup). This is your call — adjust it for your experience, demand, and the work itself.</p>
+          </div>
+
           {/* Platform fee */}
           <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
             <h2 className="text-sm font-semibold text-stone-300 mb-3 flex items-center gap-2">
@@ -253,12 +228,8 @@ export default function PriceCalculator() {
                 <span>${materialTotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-stone-400">
-                <span>Technique premium (×{tech.multiplier})</span>
+                <span>Markup (×{markup})</span>
                 <span>+${(base - laborCost - materialTotal).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-stone-400">
-                <span>Size factor (×{sizeObj.factor})</span>
-                <span>×{sizeObj.factor}</span>
               </div>
               <div className="flex justify-between text-stone-400">
                 <span>Platform fees ({platformFee}%)</span>
@@ -276,7 +247,7 @@ export default function PriceCalculator() {
                 <p className="text-xs font-semibold text-stone-300">How this is calculated</p>
               </div>
               <p className="text-xs text-stone-500">
-                This is a cost-based estimate from your own inputs — labor, materials, technique, and size —
+                This is a cost-based estimate from your own inputs — labor, materials, and the markup you choose —
                 not live sales data. Treat it as a starting point and adjust for your reputation, demand, and the piece itself.
               </p>
             </div>
