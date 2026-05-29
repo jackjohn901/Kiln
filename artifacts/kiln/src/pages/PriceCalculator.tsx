@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Calculator, DollarSign, Clock, Package, Plus, Trash2, TrendingUp, CheckCircle, Info } from "lucide-react";
+import { ChevronLeft, Calculator, DollarSign, Clock, Package, Plus, Trash2, CheckCircle, Info } from "lucide-react";
 import Nav from "@/components/Nav";
 
 const TECHNIQUES = [
@@ -25,21 +25,6 @@ const SIZES = [
   { label: "Extra Large (> 24\")", factor: 2.0 },
   { label: "Monumental (> 4\')", factor: 3.5 },
 ];
-
-const MARKET_DATA: Record<string, { low: number; high: number; label: string }> = {
-  "Glass Blowing": { low: 380, high: 2800, label: "studio glass vessels" },
-  "Flameworking": { low: 120, high: 900, label: "flameworked sculptures" },
-  "Raku": { low: 200, high: 1200, label: "raku vessels" },
-  "Ceramics / Pottery": { low: 80, high: 800, label: "functional ceramics" },
-  "Porcelain": { low: 150, high: 1800, label: "porcelain works" },
-  "Wood-Fired / Anagama": { low: 300, high: 3500, label: "wood-fired pieces" },
-  "Metal Forging": { low: 400, high: 4000, label: "forged metalwork" },
-  "Fiber Arts / Weaving": { low: 180, high: 2200, label: "handwoven textiles" },
-  "Enamelwork": { low: 200, high: 1600, label: "enamel pieces" },
-  "Stone Carving": { low: 600, high: 6000, label: "carved stone works" },
-  "Bronze Casting": { low: 800, high: 8000, label: "bronze sculptures" },
-  "Studio Craft": { low: 100, high: 1000, label: "studio works" },
-};
 
 interface MaterialLine {
   id: string;
@@ -102,8 +87,6 @@ export default function PriceCalculator() {
       suggested: Math.round(withFee),
     };
   }, [laborCost, materialTotal, tech.multiplier, sizeObj.factor, platformFee]);
-
-  const market = MARKET_DATA[technique];
 
   function addMaterial() {
     if (!newMatName.trim()) return;
@@ -287,28 +270,16 @@ export default function PriceCalculator() {
               </div>
             </div>
 
-            {market && (
-              <div className="rounded-xl border border-white/10 bg-stone-900/40 p-3">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <TrendingUp size={12} className="text-emerald-400" />
-                  <p className="text-xs font-semibold text-stone-300">Market comparison on Kiln</p>
-                </div>
-                <p className="text-xs text-stone-500">
-                  Comparable {market.label} sell for{" "}
-                  <span className="text-emerald-400 font-semibold">${market.low.toLocaleString()}–${market.high.toLocaleString()}</span>{" "}
-                  on this platform.
-                  {suggested < market.low && (
-                    <span className="text-amber-400 font-medium"> Your price is below market — consider raising it.</span>
-                  )}
-                  {suggested > market.high && (
-                    <span className="text-sky-400 font-medium"> Your price is above average — ensure strong provenance documentation.</span>
-                  )}
-                  {suggested >= market.low && suggested <= market.high && (
-                    <span className="text-emerald-400 font-medium"> Your price is right in the market range. ✓</span>
-                  )}
-                </p>
+            <div className="rounded-xl border border-white/10 bg-stone-900/40 p-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Calculator size={12} className="text-amber-400" />
+                <p className="text-xs font-semibold text-stone-300">How this is calculated</p>
               </div>
-            )}
+              <p className="text-xs text-stone-500">
+                This is a cost-based estimate from your own inputs — labor, materials, technique, and size —
+                not live sales data. Treat it as a starting point and adjust for your reputation, demand, and the piece itself.
+              </p>
+            </div>
 
             <div className="mt-3 flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
               <Info size={12} className="text-sky-400 shrink-0 mt-0.5" />

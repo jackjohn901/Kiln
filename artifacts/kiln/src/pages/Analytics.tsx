@@ -460,9 +460,9 @@ export default function Analytics() {
           <h2 className="mb-4 text-sm font-bold text-stone-200">Commission Activity</h2>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: "Inquiries", value: Math.max(receivedInquiries.length, 12), color: "text-amber-400" },
-              { label: "Accepted", value: Math.max(receivedInquiries.filter(i => i.status === "accepted" || i.status === "quoted").length, 7), color: "text-emerald-400" },
-              { label: "Completed", value: Math.max(commissions.length, 3), color: "text-sky-400" },
+              { label: "Inquiries", value: receivedInquiries.length, color: "text-amber-400" },
+              { label: "Accepted", value: receivedInquiries.filter(i => i.status === "accepted" || i.status === "quoted").length, color: "text-emerald-400" },
+              { label: "Completed", value: commissions.length, color: "text-sky-400" },
             ].map(s => (
               <div key={s.label} className="rounded-xl bg-stone-800/60 p-3 text-center">
                 <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -537,133 +537,6 @@ export default function Analytics() {
               </div>
             </>
           )}
-        </div>
-
-        {/* Audience demographics */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
-          <h2 className="mb-4 text-sm font-bold text-stone-200">Audience Demographics</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {/* Locations */}
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-3">Top Locations</p>
-              {[
-                { label: "United States", pct: 48 },
-                { label: "United Kingdom", pct: 16 },
-                { label: "Canada", pct: 11 },
-                { label: "Australia", pct: 8 },
-                { label: "Germany", pct: 5 },
-                { label: "Other", pct: 12 },
-              ].map(({ label, pct }) => (
-                <div key={label} className="mb-2">
-                  <div className="flex justify-between text-[10px] mb-0.5">
-                    <span className="text-stone-400">{label}</span>
-                    <span className="text-stone-500 font-medium">{pct}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
-                    <div className="h-full bg-sky-500/70 rounded-full" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Medium affinity */}
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-3">Medium Affinity</p>
-              {[
-                { label: "Glass Blowing", pct: 62, color: "bg-orange-500/70" },
-                { label: "Ceramics", pct: 44, color: "bg-orange-400/70" },
-                { label: "Fiber Arts", pct: 28, color: "bg-purple-500/70" },
-                { label: "Metal Forging", pct: 19, color: "bg-slate-400/70" },
-                { label: "Wood Turning", pct: 14, color: "bg-lime-600/70" },
-              ].map(({ label, pct, color }) => (
-                <div key={label} className="mb-2">
-                  <div className="flex justify-between text-[10px] mb-0.5">
-                    <span className="text-stone-400">{label}</span>
-                    <span className="text-stone-500 font-medium">{pct}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
-                    <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Follower type */}
-            <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-3">Follower Types</p>
-              <div className="space-y-3">
-                {[
-                  { label: "Collectors", pct: 34, emoji: "🏺", color: "bg-amber-500/70" },
-                  { label: "Fellow Artists", pct: 28, emoji: "🔥", color: "bg-red-500/70" },
-                  { label: "Craft Enthusiasts", pct: 22, emoji: "✨", color: "bg-purple-500/70" },
-                  { label: "Interior Design", pct: 10, emoji: "🏡", color: "bg-teal-500/70" },
-                  { label: "Press / Galleries", pct: 6, emoji: "🖼", color: "bg-sky-500/70" },
-                ].map(({ label, pct, emoji, color }) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <span className="text-base leading-none">{emoji}</span>
-                    <div className="flex-1">
-                      <div className="flex justify-between text-[10px] mb-0.5">
-                        <span className="text-stone-400">{label}</span>
-                        <span className="text-stone-500">{pct}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
-                        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* A/B Test Tracker */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-bold text-stone-200">Caption A/B Tests</h2>
-              <p className="text-xs text-stone-500 mt-0.5">Which caption style resonates more with your audience</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            {[
-              {
-                postTitle: "Cobalt vessel — midnight firing",
-                variantA: { caption: "Just pulled from the annealer 🔥 18 hours in the making", views: 4200, likes: 312, saves: 89 },
-                variantB: { caption: "Process over perfection. This piece taught me patience.", views: 6800, likes: 548, saves: 201 },
-                winner: "B",
-              },
-              {
-                postTitle: "New color series — Gaffer amber",
-                variantA: { caption: "Testing Gaffer 303 Amber in the hot shop — first results", views: 8900, likes: 720, saves: 234 },
-                variantB: { caption: "This color only works at 2,050°F. Chasing it for 6 months.", views: 7100, likes: 590, saves: 180 },
-                winner: "A",
-              },
-            ].map((test, i) => (
-              <div key={i} className="rounded-xl border border-white/8 bg-stone-800/40 p-4">
-                <p className="text-xs font-semibold text-stone-300 mb-3 truncate">{test.postTitle}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {(["A", "B"] as const).map((v) => {
-                    const variant = v === "A" ? test.variantA : test.variantB;
-                    const isWinner = test.winner === v;
-                    return (
-                      <div key={v} className={`rounded-lg p-3 border ${isWinner ? "border-emerald-500/30 bg-emerald-500/5" : "border-white/5 bg-stone-800/30"}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${isWinner ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-700 text-stone-400"}`}>
-                            Variant {v} {isWinner && "🏆"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-stone-400 mb-2 line-clamp-2 leading-relaxed">{variant.caption}</p>
-                        <div className="space-y-0.5 text-[10px] text-stone-500">
-                          <p>{(variant.views / 1000).toFixed(1)}k views · {variant.likes} likes · {variant.saves} saves</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Top posts */}

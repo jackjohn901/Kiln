@@ -90,7 +90,7 @@ export default function TechniqueGenetics() {
             <h1 className="text-2xl font-bold text-amber-100">Technique Genetics</h1>
             <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Curated reference</span>
           </div>
-          <p className="text-xs text-stone-500">A curated evolutionary family tree of craft — how every technique is related to every other.</p>
+          <p className="text-xs text-stone-500">A curated family tree of craft — a hand-built reference for how techniques relate to one another.</p>
         </div>
 
         {/* Medium filter */}

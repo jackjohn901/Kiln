@@ -78,18 +78,6 @@ const LINEAGE_GENERATION: Record<string, number> = {
   "alex-bernstein": 3, "caleb-siemon": 3, "erica-rosenfeld": 3,
 };
 
-function getArtistStudioHours(artistId: string): number {
-  const SEED: Record<string, number> = {
-    "alex-bernstein": 2400, "maya-chen": 1800, "james-okafor": 3200,
-    "elena-vasquez": 1200, "takeshi-mori": 4100, "dale-chihuly": 8500,
-    "lino-tagliapietra": 12000, "dante-marioni": 5600, "william-morris": 6200,
-  };
-  if (SEED[artistId]) return SEED[artistId];
-  let h = 0;
-  for (const c of artistId) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return 200 + (Math.abs(h) % 3800);
-}
-
 function scoreReel(
   reel: Reel,
   interactions: FeedInteractions,
@@ -118,8 +106,6 @@ function scoreReel(
   if (tasteWeights.traditional != null && reel.craftScore < 85) {
     score += ((tasteWeights.traditional - 50) / 50) * 6;
   }
-  // Add small random shuffle so it's not static
-  score += Math.floor(Math.random() * 10);
   return score;
 }
 
@@ -567,16 +553,6 @@ const ReelCard = memo(function ReelCard({
               <span className="text-[9px] font-bold text-purple-300">Gen {(LINEAGE_GENERATION[reel.artistId] ?? 0) + 1}</span>
             </span>
           )}
-          {(() => {
-            const hrs = getArtistStudioHours(reel.artistId);
-            const label = hrs >= 1000 ? (hrs / 1000).toFixed(1) + "k" : String(hrs);
-            return (
-              <span className="flex items-center gap-1 rounded-full bg-teal-500/20 border border-teal-500/30 px-2 py-0.5 backdrop-blur-sm">
-                <Clock size={9} className="text-teal-400" />
-                <span className="text-[9px] font-bold text-teal-300">{label}h studio</span>
-              </span>
-            );
-          })()}
           {(reel.streak ?? 0) >= 3 && (
             <span className="flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 backdrop-blur-sm">
               <Flame size={9} className="text-rose-400" />

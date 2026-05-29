@@ -5,3 +5,4 @@
 - [Route auth pattern](route-auth-pattern.md) — Prefer `if (!req.isAuthenticated()) { res.status(401)... return; }` as the first line of every mutation handler; `authMiddleware` is fine but adds no additional safety over inline checks.
 - [Duplicate route shadowing](duplicate-route-shadowing.md) — Two routers defining the same method+path: Express serves the first-registered one; a field can silently vanish from responses. Grep `routes/` for the path before editing.
 - [WS broadcast privacy](ws-broadcast-privacy.md) — `broadcastAll` reaches every client; include only public aggregates (counts), never actor userId or per-user records.
+- [Kiln fabricated-data hotspots](kiln-fabricated-data-hotspots.md) — where pages hide hardcoded "demo" numbers styled as real stats; delete (don't empty-state) sections with no backing feature; vet explorer reports before fixing.
