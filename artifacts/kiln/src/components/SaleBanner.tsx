@@ -31,9 +31,10 @@ export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze }: P
 
   return (
     <div
+      key={sale.arrivedAt.getTime()}
       role="status"
       aria-live="polite"
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm"
+      className="animate-banner-slide-in fixed top-4 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm"
     >
       <div className="relative flex items-start gap-3 rounded-xl border border-green-500/30 bg-stone-900/95 backdrop-blur px-4 py-3 shadow-xl">
         <ShoppingBag size={18} className="mt-0.5 shrink-0 text-green-400" />
