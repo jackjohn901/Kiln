@@ -19,6 +19,8 @@ interface ApiThread {
   lastMessageText: string | null;
   lastMessageAttachmentUrl: string | null;
   unreadCount: number;
+  linkedOrderId: string | null;
+  linkedOrderIsSeller?: boolean;
 }
 interface ApiMsg {
   id: string;
@@ -224,6 +226,7 @@ export default function Messages() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const [linkedOrderId, setLinkedOrderId] = useState<string | null>(null);
+  const [linkedOrderIsSeller, setLinkedOrderIsSeller] = useState(false);
 
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -249,6 +252,7 @@ export default function Messages() {
   useEffect(() => {
     if (!params.participantId) {
       setLinkedOrderId(null);
+      setLinkedOrderIsSeller(false);
       return;
     }
 
@@ -256,6 +260,7 @@ export default function Messages() {
     const prefill = qs.get("prefill");
     if (prefill) setNewMsg(prefill);
     setLinkedOrderId(qs.get("orderId"));
+    setLinkedOrderIsSeller(qs.get("orderRole") === "seller");
 
     const staticThread = threads.find((t) => t.participantId === params.participantId);
     if (staticThread) {
@@ -548,9 +553,14 @@ export default function Messages() {
         fetch(`/api/messages/threads/${id}/read`, { method: "POST", credentials: "include" }),
       ]);
       if (r.ok) {
-        const d = await r.json() as { messages?: ApiMsg[] };
+        const d = await r.json() as { messages?: ApiMsg[]; thread?: { linkedOrderId?: string | null; linkedOrderIsSeller?: boolean } };
         setApiMessages([...(d.messages ?? [])].reverse());
         setApiThreads(prev => prev.map(t => t.id === id ? { ...t, unreadCount: 0 } : t));
+        // Keep any order reference already set from the URL; otherwise use the persisted one.
+        if (d.thread?.linkedOrderId) {
+          setLinkedOrderId(d.thread.linkedOrderId);
+          setLinkedOrderIsSeller(d.thread.linkedOrderIsSeller ?? false);
+        }
         refreshUnreadMessageCount();
       }
     } catch {}
@@ -567,7 +577,7 @@ export default function Messages() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId: activeApiThread.otherUserId, text: text || undefined, attachmentUrl }),
+        body: JSON.stringify({ recipientId: activeApiThread.otherUserId, text: text || undefined, attachmentUrl, orderId: linkedOrderId ?? undefined }),
       });
       if (r.ok) {
         const msg = await r.json() as ApiMsg;
@@ -592,7 +602,7 @@ export default function Messages() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId: pendingRecipient.id, text: text || undefined, attachmentUrl }),
+        body: JSON.stringify({ recipientId: pendingRecipient.id, text: text || undefined, attachmentUrl, orderId: linkedOrderId ?? undefined }),
       });
       if (r.ok) {
         const msg = await r.json() as ApiMsg;
@@ -715,7 +725,7 @@ export default function Messages() {
             {apiThreads.map((t) => (
               <button
                 key={`api-${t.id}`}
-                onClick={() => { setLinkedOrderId(null); void openApiThread(t.id); }}
+                onClick={() => { setLinkedOrderId(t.linkedOrderId); setLinkedOrderIsSeller(t.linkedOrderIsSeller ?? false); void openApiThread(t.id); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-white/5 ${
                   activeApiThreadId === t.id ? "bg-amber-500/10 border-l-2 border-l-amber-500" : "hover:bg-white/[0.03]"
                 }`}
@@ -757,7 +767,7 @@ export default function Messages() {
                 key={thread.id}
                 thread={thread}
                 active={activeThreadId === thread.id}
-                onClick={() => { setLinkedOrderId(null); setActiveThreadId(thread.id); setActiveApiThreadId(null); }}
+                onClick={() => { setLinkedOrderId(null); setLinkedOrderIsSeller(false); setActiveThreadId(thread.id); setActiveApiThreadId(null); }}
               />
             ))}
           </div>
@@ -788,7 +798,7 @@ export default function Messages() {
                 <p className="text-sm font-medium text-amber-100">{pendingRecipient.name}</p>
               </div>
               {linkedOrderId && (
-                <Link href={`/orders/${linkedOrderId}`}>
+                <Link href={`${linkedOrderIsSeller ? "/sales/" : "/orders/"}${linkedOrderId}`}>
                   <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-500/20 bg-amber-500/8 hover:bg-amber-500/15 transition-colors cursor-pointer">
                     <ShoppingBag size={12} className="text-amber-400 shrink-0" />
                     <span className="text-xs text-amber-300">
@@ -839,7 +849,7 @@ export default function Messages() {
                 <p className="text-sm font-medium text-amber-100">{activeApiThread.otherUserName}</p>
               </div>
               {linkedOrderId && (
-                <Link href={`/orders/${linkedOrderId}`}>
+                <Link href={`${linkedOrderIsSeller ? "/sales/" : "/orders/"}${linkedOrderId}`}>
                   <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-500/20 bg-amber-500/8 hover:bg-amber-500/15 transition-colors cursor-pointer">
                     <ShoppingBag size={12} className="text-amber-400 shrink-0" />
                     <span className="text-xs text-amber-300">
@@ -954,7 +964,7 @@ export default function Messages() {
                 </div>
               </div>
               {linkedOrderId && (
-                <Link href={`/orders/${linkedOrderId}`}>
+                <Link href={`${linkedOrderIsSeller ? "/sales/" : "/orders/"}${linkedOrderId}`}>
                   <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-500/20 bg-amber-500/8 hover:bg-amber-500/15 transition-colors cursor-pointer">
                     <ShoppingBag size={12} className="text-amber-400 shrink-0" />
                     <span className="text-xs text-amber-300">

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { messageThreadsTable, messagesTable, profilesTable, notificationsTable } from "@workspace/db";
+import { messageThreadsTable, messagesTable, profilesTable, notificationsTable, ordersTable } from "@workspace/db";
 import { eq, or, desc, and, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcast } from "../lib/websocket";
@@ -49,12 +49,20 @@ router.get("/messages/threads", async (req, res): Promise<void> => {
         .where(and(eq(messagesTable.threadId, t.id), eq(messagesTable.read, false), ne(messagesTable.senderId, userId)));
       const unreadCount = unreadMessages.length;
 
+      let linkedOrderIsSeller = false;
+      if (t.linkedOrderId) {
+        const [order] = await db.select({ sellerId: ordersTable.sellerId })
+          .from(ordersTable).where(eq(ordersTable.id, t.linkedOrderId));
+        linkedOrderIsSeller = order?.sellerId === userId;
+      }
+
       return {
         ...t,
         otherUserId: otherId,
         otherUserName: profile?.displayName ?? "Artist",
         otherUserAvatar: profile?.avatarUrl ?? null,
         unreadCount,
+        linkedOrderIsSeller,
         lastMessageAt: t.lastMessageAt.toISOString(),
       };
     }));
@@ -95,6 +103,13 @@ router.get("/messages/threads/:threadId", async (req, res): Promise<void> => {
       .set({ read: true })
       .where(and(eq(messagesTable.threadId, threadId), eq(messagesTable.read, false), ne(messagesTable.senderId, userId)));
 
+    let linkedOrderIsSeller = false;
+    if (thread.linkedOrderId) {
+      const [order] = await db.select({ sellerId: ordersTable.sellerId })
+        .from(ordersTable).where(eq(ordersTable.id, thread.linkedOrderId));
+      linkedOrderIsSeller = order?.sellerId === userId;
+    }
+
     res.json({
       thread: {
         ...thread,
@@ -102,6 +117,7 @@ router.get("/messages/threads/:threadId", async (req, res): Promise<void> => {
         otherUserName: otherProfile?.displayName ?? "Artist",
         otherUserHandle: otherProfile?.handle ?? null,
         otherUserAvatar: otherProfile?.avatarUrl ?? null,
+        linkedOrderIsSeller,
         lastMessageAt: thread.lastMessageAt.toISOString(),
       },
       messages: messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
@@ -195,7 +211,7 @@ router.post("/messages/typing", async (req, res): Promise<void> => {
 router.post("/messages/send", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { recipientId, text, attachmentUrl } = req.body as { recipientId?: string; text?: string; attachmentUrl?: string };
+  const { recipientId, text, attachmentUrl, orderId } = req.body as { recipientId?: string; text?: string; attachmentUrl?: string; orderId?: string };
   const trimmedText = text?.trim() ?? "";
   if (!recipientId || (!trimmedText && !attachmentUrl)) {
     res.status(400).json({ error: "recipientId and either text or attachmentUrl required" }); return;
@@ -214,6 +230,17 @@ router.post("/messages/send", async (req, res): Promise<void> => {
   const user = req.user;
 
   try {
+    // If an orderId is supplied, only accept it when the sender is a participant
+    // (buyer or seller) of that order — never link an arbitrary order to a thread.
+    let validatedOrderId: string | null = null;
+    if (orderId) {
+      const [order] = await db.select({ buyerId: ordersTable.buyerId, sellerId: ordersTable.sellerId })
+        .from(ordersTable).where(eq(ordersTable.id, orderId));
+      if (order && (order.buyerId === senderId || order.sellerId === senderId)) {
+        validatedOrderId = orderId;
+      }
+    }
+
     let thread = await db.select().from(messageThreadsTable)
       .where(or(
         and(eq(messageThreadsTable.participantA, senderId), eq(messageThreadsTable.participantB, recipientId)),
@@ -229,8 +256,15 @@ router.post("/messages/send", async (req, res): Promise<void> => {
         participantB: recipientId,
         lastMessageText: lastMsgPreview,
         lastMessageAttachmentUrl: attachmentUrl ?? null,
+        linkedOrderId: validatedOrderId,
       }).returning();
       thread = created;
+    } else if (validatedOrderId && !thread.linkedOrderId) {
+      // Backfill the order reference on an existing thread that doesn't have one yet.
+      await db.update(messageThreadsTable)
+        .set({ linkedOrderId: validatedOrderId })
+        .where(eq(messageThreadsTable.id, thread.id));
+      thread = { ...thread, linkedOrderId: validatedOrderId };
     }
 
     const [message] = await db.insert(messagesTable).values({
