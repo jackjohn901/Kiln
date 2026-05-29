@@ -83,6 +83,15 @@ interface StreamPoint {
 
 function StackedBarChart({ data }: { data: StreamPoint[] }) {
   const max = Math.max(...data.map(d => d.shopSales + d.tips + d.subscriptions), 1);
+  const [active, setActive] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (active === null) return;
+    const dismiss = () => setActive(null);
+    window.addEventListener("scroll", dismiss, true);
+    return () => window.removeEventListener("scroll", dismiss, true);
+  }, [active]);
+
   return (
     <div>
       <div className="flex items-end gap-1 h-28">
@@ -92,8 +101,43 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
           const salesH = (d.shopSales / max) * 100;
           const tipsH = (d.tips / max) * 100;
           const subsH = (d.subscriptions / max) * 100;
+          const isActive = active === i;
           return (
-            <div key={i} className="flex flex-1 flex-col items-center gap-1 group relative" title={`$${total.toFixed(2)}\nSales: $${d.shopSales.toFixed(2)}\nTips: $${d.tips.toFixed(2)}\nSubscriptions: $${d.subscriptions.toFixed(2)}`}>
+            <div
+              key={i}
+              className="flex flex-1 flex-col items-center gap-1 group relative cursor-pointer"
+              tabIndex={0}
+              role="button"
+              aria-label={`${d.label}: total $${total.toFixed(2)}, sales $${d.shopSales.toFixed(2)}, tips $${d.tips.toFixed(2)}, subscriptions $${d.subscriptions.toFixed(2)}`}
+              onMouseEnter={() => setActive(i)}
+              onMouseLeave={() => setActive(a => (a === i ? null : a))}
+              onFocus={() => setActive(i)}
+              onBlur={() => setActive(a => (a === i ? null : a))}
+              onClick={() => setActive(a => (a === i ? null : i))}
+            >
+              {isActive && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 w-40 rounded-lg border border-white/10 bg-stone-950/95 p-2.5 shadow-xl pointer-events-none">
+                  <div className="mb-1.5 flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+                    <span className="text-[10px] font-semibold text-stone-300 truncate">{d.label}</span>
+                    <span className="text-[10px] font-bold text-white">${total.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { color: "#34d399", label: "Shop Sales", value: d.shopSales },
+                      { color: "#f59e0b", label: "Tips", value: d.tips },
+                      { color: "#38bdf8", label: "Subscriptions", value: d.subscriptions },
+                    ].map(({ color, label, value }) => (
+                      <div key={label} className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
+                          <span className="text-[10px] text-stone-400">{label}</span>
+                        </span>
+                        <span className="text-[10px] font-medium text-stone-200">${value.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="w-full flex flex-col justify-end" style={{ height: "112px" }}>
                 {subsH > 0 && (
                   <div className="w-full rounded-t-sm" style={{ height: `${subsH}%`, backgroundColor: "#38bdf8", opacity: 0.75 + pct * 0.25 }} />
