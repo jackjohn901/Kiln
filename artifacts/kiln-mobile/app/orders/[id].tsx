@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -95,8 +96,29 @@ const TYPE_ICON: Record<string, string> = {
 export default function OrderDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, highlight } = useLocalSearchParams<{ id: string; highlight?: string }>();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+
+  const isHighlighted = highlight === "shipped" || highlight === "delivered";
+  const [showUpdateBanner, setShowUpdateBanner] = useState(isHighlighted);
+  const [statusRing, setStatusRing] = useState(isHighlighted);
+  const bannerOpacity = useRef(new Animated.Value(isHighlighted ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (!isHighlighted) return;
+    const ringTimer = setTimeout(() => setStatusRing(false), 3000);
+    const bannerTimer = setTimeout(() => {
+      Animated.timing(bannerOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setShowUpdateBanner(false));
+    }, 5500);
+    return () => {
+      clearTimeout(ringTimer);
+      clearTimeout(bannerTimer);
+    };
+  }, [isHighlighted, bannerOpacity]);
 
   const [sellerWindow, setSellerWindow] = useState<SellerProcessingWindow | null>(null);
   const [siblingWindows, setSiblingWindows] = useState<Record<string, SellerProcessingWindow>>({});
@@ -217,7 +239,32 @@ export default function OrderDetailScreen() {
       >
         <Text style={[styles.orderId, { color: colors.primary }]}>{ordinalId(order.id)}</Text>
 
-        <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {showUpdateBanner && (
+          <Animated.View style={[styles.updateBanner, { opacity: bannerOpacity }]}>
+            <View style={styles.updateBannerDot} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.updateBannerTitle}>
+                {highlight === "shipped" ? "Your order has shipped!" : "Your order has been delivered!"}
+              </Text>
+              <Text style={styles.updateBannerSub}>
+                {highlight === "shipped"
+                  ? "The artist has marked this order as shipped."
+                  : "This order has been marked as delivered."}
+              </Text>
+            </View>
+            <Pressable onPress={() => setShowUpdateBanner(false)} hitSlop={8}>
+              <Feather name="x" size={14} color="#8A7E75" />
+            </Pressable>
+          </Animated.View>
+        )}
+
+        <View
+          style={[
+            styles.statusCard,
+            { backgroundColor: colors.card, borderColor: statusRing ? "#FBBF24" : colors.border },
+            statusRing && styles.statusCardHighlighted,
+          ]}
+        >
           <Feather name="clock" size={16} color={statusColor} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
@@ -508,4 +555,40 @@ const styles = StyleSheet.create({
   actionBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   itemWindowRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   itemWindowText: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  updateBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.3)",
+    backgroundColor: "rgba(251,191,36,0.08)",
+    padding: 12,
+    marginBottom: 10,
+  },
+  updateBannerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FBBF24",
+    flexShrink: 0,
+  },
+  updateBannerTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#FCD34D",
+  },
+  updateBannerSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#A8A29E",
+    marginTop: 2,
+  },
+  statusCardHighlighted: {
+    shadowColor: "#FBBF24",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
 });

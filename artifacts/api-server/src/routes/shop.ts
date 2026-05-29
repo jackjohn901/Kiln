@@ -310,7 +310,9 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
     // Notify the buyer when the seller marks as shipped or delivered
     if (updated.buyerId && status !== undefined && status !== existing.status && (status === "shipped" || status === "delivered")) {
       const tracking = updated.trackingNumber ? ` Tracking: ${updated.trackingNumber}.` : "";
-      const orderLink = `/orders/${updated.id}`;
+      const orderLink = status === "shipped"
+        ? `/orders/${updated.id}?highlight=shipped`
+        : `/orders/${updated.id}?highlight=delivered`;
 
       if (status === "shipped") {
         const shippedNotifId = crypto.randomUUID();

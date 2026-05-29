@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useLocation, useParams } from "wouter";
+import { Link, useLocation, useParams, useSearch } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
@@ -170,6 +170,8 @@ interface SellerProfile {
 export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const highlightParam = new URLSearchParams(search).get("highlight");
   const [order, setOrder] = useState<Order | null>(null);
   const [siblingOrders, setSiblingOrders] = useState<Order[]>([]);
   const [buyerProfile, setBuyerProfile] = useState<BuyerProfile | null>(null);
@@ -184,6 +186,22 @@ export default function OrderDetail() {
   const [addressDraft, setAddressDraft] = useState("");
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(
+    highlightParam === "shipped" || highlightParam === "delivered",
+  );
+  const [statusHighlighted, setStatusHighlighted] = useState(
+    highlightParam === "shipped" || highlightParam === "delivered",
+  );
+
+  useEffect(() => {
+    if (!showUpdateBanner) return;
+    const bannerTimer = setTimeout(() => setShowUpdateBanner(false), 6000);
+    const highlightTimer = setTimeout(() => setStatusHighlighted(false), 3000);
+    return () => {
+      clearTimeout(bannerTimer);
+      clearTimeout(highlightTimer);
+    };
+  }, [showUpdateBanner]);
 
   useEffect(() => {
     const fetchUrl = sessionKey
@@ -536,7 +554,33 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        <div className={`mb-4 flex items-center gap-2.5 rounded-2xl border p-4 ${statusConf.bg}`}>
+        {showUpdateBanner && (
+          <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="h-2 w-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-300">
+                {highlightParam === "shipped" ? "Your order has shipped!" : "Your order has been delivered!"}
+              </p>
+              <p className="text-xs text-stone-400 mt-0.5">
+                {highlightParam === "shipped"
+                  ? "The artist has marked this order as shipped."
+                  : "This order has been marked as delivered."}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowUpdateBanner(false)}
+              className="shrink-0 text-stone-500 hover:text-stone-300 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        <div
+          className={`mb-4 flex items-center gap-2.5 rounded-2xl border p-4 transition-all duration-700 ${statusConf.bg} ${
+            statusHighlighted ? "ring-2 ring-amber-400/50 shadow-[0_0_16px_rgba(251,191,36,0.15)]" : ""
+          }`}
+        >
           <StatusIcon size={18} className={statusConf.color} />
           <div>
             <p className={`font-semibold text-sm ${statusConf.color}`}>{statusConf.label}</p>
