@@ -6,6 +6,8 @@ import Nav from "@/components/Nav";
 import { listings, formatPrice } from "@/data/listings";
 import { artists } from "@/data/artists";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 const SAVED_KEY = "kiln_collector_saved_v1";
 const NOTES_KEY = "kiln_collector_notes_v1";
@@ -35,8 +37,38 @@ export default function CollectorPortal() {
   const [notesOpen, setNotesOpen] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const { addItem, isInCart } = useCart();
+  const { user } = useAuth();
 
   const MEDIUMS = ["All", "Glass", "Metal", "Ceramic", "Fiber", "Sculpture"];
+
+  interface Inquiry {
+    id: string;
+    artistId: string;
+    artistName: string;
+    clientId: string;
+    workType: string | null;
+    description: string;
+    budgetRange: string | null;
+    status: string;
+    quotedPrice: number | null;
+    createdAt: string;
+  }
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(true);
+  useEffect(() => {
+    fetch("/api/me/commissions", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.commissions) setInquiries(data.commissions as Inquiry[]);
+      })
+      .catch(() => {})
+      .finally(() => setInquiriesLoading(false));
+  }, []);
+
+  const sentInquiries = useMemo(
+    () => (user?.id ? inquiries.filter(c => c.clientId === user.id) : []),
+    [inquiries, user?.id],
+  );
 
   useEffect(() => {
     fetch("/api/me/collector-saves", { credentials: "include" })
@@ -80,7 +112,16 @@ export default function CollectorPortal() {
       try { localStorage.setItem(SAVED_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
-    fetch(`/api/me/collector-saves/${id}`, { method: "POST", credentials: "include" }).catch(() => {});
+    fetch(`/api/me/collector-saves/${id}`, { method: "POST", credentials: "include" })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        toast({ title: "Couldn't save", description: "We couldn't update your saved works. Please try again.", variant: "destructive" });
+        setSavedIds((prev) => {
+          const reverted = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+          try { localStorage.setItem(SAVED_KEY, JSON.stringify(reverted)); } catch {}
+          return reverted;
+        });
+      });
   }
 
   function openNotes(id: string) {
@@ -98,14 +139,28 @@ export default function CollectorPortal() {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: notesDraft }),
-    }).catch(() => {});
+    })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        toast({ title: "Note not saved", description: "We couldn't save your note. Please try again.", variant: "destructive" });
+      });
   }
 
   const TABS: { key: Tab; label: string; count?: number }[] = [
     { key: "browse", label: "Browse" },
     { key: "saved", label: "Saved", count: savedIds.length },
-    { key: "inquiries", label: "Inquiries" },
+    { key: "inquiries", label: "Inquiries", count: sentInquiries.length },
   ];
+
+  const STATUS_STYLES: Record<string, string> = {
+    pending: "bg-stone-700/50 text-stone-300 border-stone-600/40",
+    quoted: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    accepted: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    in_progress: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+    completed: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    declined: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+    cancelled: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  };
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -321,11 +376,47 @@ export default function CollectorPortal() {
 
         {/* Inquiries tab */}
         {tab === "inquiries" && (
-          <div className="py-24 text-center">
-            <MessageCircle size={32} className="mx-auto mb-3 text-stone-700" />
-            <p className="text-stone-500">Commission inquiries you've sent will appear here.</p>
-            <p className="text-xs text-stone-600 mt-2">Use the "Inquire" button on any listing to start a conversation with an artist.</p>
-          </div>
+          inquiriesLoading ? (
+            <div className="py-24 text-center text-stone-600 text-sm">Loading your inquiries…</div>
+          ) : sentInquiries.length === 0 ? (
+            <div className="py-24 text-center">
+              <MessageCircle size={32} className="mx-auto mb-3 text-stone-700" />
+              <p className="text-stone-500">Commission inquiries you've sent will appear here.</p>
+              <p className="text-xs text-stone-600 mt-2">Request a custom piece from any artist to start a conversation.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sentInquiries.map((c) => {
+                const statusClass = STATUS_STYLES[c.status] ?? STATUS_STYLES.pending;
+                const statusLabel = c.status.replace(/_/g, " ");
+                return (
+                  <Link key={c.id} href={`/commissions/${c.id}`}>
+                    <div className="group rounded-2xl border border-white/8 bg-stone-900/60 p-4 hover:border-amber-500/30 transition-colors cursor-pointer">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-stone-100 group-hover:text-amber-200 transition-colors truncate">
+                            {c.workType || "Custom commission"}
+                          </p>
+                          <p className="text-xs text-stone-500 mt-0.5">To {c.artistName}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold capitalize ${statusClass}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      {c.description && (
+                        <p className="mt-2 text-xs text-stone-400 line-clamp-2">{c.description}</p>
+                      )}
+                      <div className="mt-3 flex items-center gap-3 text-[11px] text-stone-600">
+                        {c.budgetRange && <span>Budget: {c.budgetRange}</span>}
+                        {c.quotedPrice != null && <span className="text-amber-400 font-medium">Quoted: {formatPrice(c.quotedPrice)}</span>}
+                        <span className="ml-auto">{new Date(c.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )
         )}
       </div>
 

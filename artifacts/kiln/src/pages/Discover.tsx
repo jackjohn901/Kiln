@@ -347,62 +347,45 @@ export default function Discover() {
             </Link>
           </div>
 
-          {/* Kiln Picks editorial */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Flame size={14} className="text-amber-400" />
-                <h2 className="text-sm font-semibold text-stone-300">Kiln Picks</h2>
-                <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-400">EDITORIAL</span>
+          {/* Kiln Picks — real top creators from the leaderboard */}
+          {leaderboardArtists.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Flame size={14} className="text-amber-400" />
+                  <h2 className="text-sm font-semibold text-stone-300">Kiln Picks</h2>
+                  <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-400">TOP CREATORS</span>
+                </div>
+                <span className="text-xs text-stone-600">The most-followed makers on Kiln right now</span>
               </div>
-              <span className="text-xs text-stone-600">Curated weekly by the Kiln team</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  artistId: "alex-bernstein",
-                  artistName: "Alex Bernstein",
-                  pick: "Best-in-class surface texture work — Bernstein's new optical-clear series is technically unprecedented.",
-                  tag: "Glass Blowing",
-                  badge: "🏆 Artist of the Week",
-                },
-                {
-                  artistId: "dante-marioni",
-                  artistName: "Dante Marioni",
-                  pick: "The Venetian tall-vessel series is a masterclass in form. A direct lineage from Murano to Seattle.",
-                  tag: "Glass Blowing",
-                  badge: "✨ Editor's Pick",
-                },
-                {
-                  artistId: "lino-tagliapietra",
-                  artistName: "Lino Tagliapietra",
-                  pick: "Lino's murrine work this quarter has pushed color layering into new territory. Required watching for any glass student.",
-                  tag: "Murrine",
-                  badge: "🔥 Most Watched",
-                },
-              ].map((pick) => {
-                const artist = ALL_ARTISTS.find((a) => a.id === pick.artistId);
-                const avatarUrl = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${pick.artistId}`;
-                return (
-                  <Link key={pick.artistId} href={`/artists/${pick.artistId}`}>
-                    <div className="group relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-stone-900 to-stone-950 p-4 hover:border-amber-500/40 hover:from-amber-500/5 transition-all cursor-pointer h-full">
-                      <div className="mb-3 flex items-center gap-2.5">
-                        <img src={avatarUrl} alt={pick.artistName} className="h-10 w-10 rounded-full object-cover border border-white/10 group-hover:border-amber-400/40 transition-colors" />
-                        <div>
-                          <p className="text-sm font-semibold text-stone-100 group-hover:text-amber-200 transition-colors">{pick.artistName}</p>
-                          <span className="text-[10px] text-amber-400/80 font-medium">{pick.tag}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {leaderboardArtists.slice(0, 3).map((artist, idx) => {
+                  const badge = idx === 0 ? "🏆 Most Followed" : idx === 1 ? "✨ #2 on Kiln" : "🔥 #3 on Kiln";
+                  const count = artist.followerCount ?? 0;
+                  const followerLabel = count === 1 ? "1 follower" : `${count.toLocaleString()} followers`;
+                  return (
+                    <Link key={artist.id} href={`/artists/${artist.id}`}>
+                      <div className="group relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-stone-900 to-stone-950 p-4 hover:border-amber-500/40 hover:from-amber-500/5 transition-all cursor-pointer h-full">
+                        <div className="mb-3 flex items-center gap-2.5">
+                          <img src={artist.avatarUrl} alt={artist.name} className="h-10 w-10 rounded-full object-cover border border-white/10 group-hover:border-amber-400/40 transition-colors" />
+                          <div>
+                            <p className="text-sm font-semibold text-stone-100 group-hover:text-amber-200 transition-colors">{artist.name}</p>
+                            {artist.medium && <span className="text-[10px] text-amber-400/80 font-medium">{artist.medium}</span>}
+                          </div>
                         </div>
+                        <div className="mb-3 inline-flex rounded-full bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                          {badge}
+                        </div>
+                        <p className="text-xs text-stone-400 leading-relaxed">
+                          {followerLabel}{artist.location ? ` · ${artist.location}` : ""}
+                        </p>
                       </div>
-                      <div className="mb-3 inline-flex rounded-full bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                        {pick.badge}
-                      </div>
-                      <p className="text-xs text-stone-400 leading-relaxed line-clamp-3">"{pick.pick}"</p>
-                    </div>
-                  </Link>
-                );
-              })}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* From the community — real profiles from the platform */}
           {communityProfiles.length > 0 && (

@@ -200,6 +200,33 @@ export default function Analytics() {
     postsByDay: Record<string, number>; likesByDay: Record<string, number>; viewsByDay: Record<string, number>;
   } | null>(null);
 
+  // Real "best time to post" derived from the artist's own posts: 7 days x 8 three-hour
+  // windows, weighted by the engagement each post earned, bucketed in the viewer's local timezone.
+  const postingHeatmap = useMemo(() => {
+    const COLS = 8;
+    const windows: number[][] = Array.from({ length: 7 }, () => new Array(COLS).fill(0));
+    let samples = 0;
+    for (const p of apiPosts) {
+      const d = new Date(p.createdAt);
+      if (Number.isNaN(d.getTime())) continue;
+      const col = Math.floor(d.getHours() / 3);
+      const engagement = (p.likeCount ?? 0) + (p.commentCount ?? 0) + (p.saveCount ?? 0);
+      windows[d.getDay()][col] += engagement + 1;
+      samples++;
+    }
+    let max = 0;
+    let peak = { day: 0, col: 0, val: 0 };
+    for (let di = 0; di < 7; di++) {
+      for (let ci = 0; ci < COLS; ci++) {
+        const v = windows[di][ci];
+        if (v > max) max = v;
+        if (v > peak.val) peak = { day: di, col: ci, val: v };
+      }
+    }
+    const intensities = windows.map((row) => row.map((v) => (max > 0 ? v / max : 0)));
+    return { intensities, samples, peak };
+  }, [apiPosts]);
+
   useEffect(() => {
     fetch("/api/me/posts", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
@@ -445,64 +472,71 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Best time to post */}
+        {/* Best time to post — derived from your own posts' engagement */}
         <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
           <div className="mb-4">
             <h2 className="text-sm font-bold text-stone-200">Best Time to Post</h2>
-            <p className="text-xs text-stone-500 mt-0.5">Follower activity by day & hour (your timezone)</p>
+            <p className="text-xs text-stone-500 mt-0.5">When your posts have earned the most engagement (your timezone)</p>
           </div>
-          <div className="overflow-x-auto">
-            <div className="min-w-[340px]">
-              {/* Day labels */}
-              <div className="flex items-center mb-1.5">
-                <div className="w-8 shrink-0" />
-                {["12a","3a","6a","9a","12p","3p","6p","9p"].map((h) => (
-                  <div key={h} className="flex-1 text-center text-[8px] text-stone-700">{h}</div>
-                ))}
-              </div>
-              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day, di) => {
-                const BASE = [0.05,0.04,0.03,0.04,0.08,0.14,0.18,0.22,0.26,0.30,0.34,0.38,0.42,0.44,0.46,0.48,0.56,0.72,0.88,0.96,0.90,0.78,0.60,0.32];
-                const WEEKEND_BOOST = di === 0 || di === 6 ? 0.12 : 0;
-                const WEEKDAY_LUNCH = (di >= 1 && di <= 5) ? [0,0,0,0,0,0,0,0,0,0,0,0.15,0.18,0.15,0,0,0,0,0,0,0,0,0,0] : new Array(24).fill(0);
-                const hourly = BASE.map((v, hi) => Math.min(1, v + WEEKEND_BOOST + (WEEKDAY_LUNCH[hi] ?? 0) + (((di * 7 + hi * 3) % 17) / 17) * 0.05));
-                const shown = [0,3,6,9,12,15,18,21].map((hi) => hourly[hi]);
-                return (
-                  <div key={day} className="flex items-center mb-1">
-                    <div className="w-8 shrink-0 text-[9px] text-stone-600 pr-1 text-right">{day}</div>
-                    {shown.map((intensity, ci) => {
-                      const isPeak = intensity > 0.8;
-                      const bg = intensity < 0.15 ? "bg-stone-800" : intensity < 0.4 ? "bg-amber-900/60" : intensity < 0.7 ? "bg-amber-600/70" : "bg-amber-400";
-                      return (
-                        <div key={ci} className="flex-1 mx-0.5">
-                          <div
-                            className={`h-5 rounded-sm ${bg} relative`}
-                            title={`${day} ${["12a","3a","6a","9a","12p","3p","6p","9p"][ci]} — ${Math.round(intensity * 100)}% activity`}
-                          >
-                            {isPeak && <div className="absolute inset-0 rounded-sm ring-1 ring-amber-300/50" />}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-              <div className="mt-2 flex items-center gap-3 justify-end">
-                <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
-                  <div className="h-2.5 w-2.5 rounded-sm bg-stone-800" /> Low
-                </div>
-                <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
-                  <div className="h-2.5 w-2.5 rounded-sm bg-amber-600/70" /> Medium
-                </div>
-                <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
-                  <div className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Peak 🔥
-                </div>
-              </div>
+          {postingHeatmap.samples < 3 ? (
+            <div className="py-10 text-center">
+              <p className="text-sm text-stone-400">Not enough posts yet to find your best times.</p>
+              <p className="text-xs text-stone-600 mt-1.5">Keep posting — once you have a few posts, we'll show which days and hours your work performs best.</p>
             </div>
-          </div>
-          <div className="mt-3 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 flex items-start gap-2">
-            <span className="text-amber-400 text-base leading-none mt-0.5">💡</span>
-            <p className="text-xs text-amber-200/80">Your peak engagement is <strong>Tue–Thu 6–9pm</strong> and <strong>Sat–Sun 12–3pm</strong>. Posts at these times get ~2.4× more views on average.</p>
-          </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <div className="min-w-[340px]">
+                  {/* Hour labels */}
+                  <div className="flex items-center mb-1.5">
+                    <div className="w-8 shrink-0" />
+                    {["12a","3a","6a","9a","12p","3p","6p","9p"].map((h) => (
+                      <div key={h} className="flex-1 text-center text-[8px] text-stone-700">{h}</div>
+                    ))}
+                  </div>
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day, di) => (
+                    <div key={day} className="flex items-center mb-1">
+                      <div className="w-8 shrink-0 text-[9px] text-stone-600 pr-1 text-right">{day}</div>
+                      {postingHeatmap.intensities[di].map((intensity, ci) => {
+                        const isPeak = intensity > 0.8;
+                        const bg = intensity < 0.15 ? "bg-stone-800" : intensity < 0.4 ? "bg-amber-900/60" : intensity < 0.7 ? "bg-amber-600/70" : "bg-amber-400";
+                        return (
+                          <div key={ci} className="flex-1 mx-0.5">
+                            <div
+                              className={`h-5 rounded-sm ${bg} relative`}
+                              title={`${day} ${["12–3a","3–6a","6–9a","9a–12p","12–3p","3–6p","6–9p","9p–12a"][ci]} — ${Math.round(intensity * 100)}% of your peak`}
+                            >
+                              {isPeak && <div className="absolute inset-0 rounded-sm ring-1 ring-amber-300/50" />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  <div className="mt-2 flex items-center gap-3 justify-end">
+                    <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
+                      <div className="h-2.5 w-2.5 rounded-sm bg-stone-800" /> Low
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
+                      <div className="h-2.5 w-2.5 rounded-sm bg-amber-600/70" /> Medium
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] text-stone-600">
+                      <div className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Peak 🔥
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2.5 flex items-start gap-2">
+                <span className="text-amber-400 text-base leading-none mt-0.5">💡</span>
+                <p className="text-xs text-amber-200/80">
+                  Your strongest engagement so far has come from posting{" "}
+                  <strong>{["Sundays","Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays"][postingHeatmap.peak.day]}{" "}
+                  {["12–3am","3–6am","6–9am","9am–12pm","12–3pm","3–6pm","6–9pm","9pm–12am"][postingHeatmap.peak.col]}</strong>.
+                  Based on {postingHeatmap.samples} of your recent posts.
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Audience demographics */}

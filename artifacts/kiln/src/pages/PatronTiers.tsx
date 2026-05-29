@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
 import { getArtistById } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
+import { toast } from "@/hooks/use-toast";
 
 interface ApiTier {
   id: string;
@@ -17,36 +18,6 @@ interface ApiTier {
   subscriberCount: number;
   sortOrder: number;
 }
-
-const FALLBACK_TIERS = [
-  {
-    name: "Supporter",
-    price: 5,
-    icon: Heart,
-    color: "text-rose-400",
-    borderColor: "border-rose-500/30",
-    description: "Support the work and stay close to the studio.",
-    perks: ["Early notifications on new work and drops", "Your name in the studio supporters list", "5% discount on all shop purchases", "Monthly supporters-only process update"],
-  },
-  {
-    name: "Studio Access",
-    price: 15,
-    icon: Star,
-    color: "text-amber-400",
-    borderColor: "border-amber-500/40",
-    description: "Go deeper into the process. See what most people never see.",
-    perks: ["Everything in Supporter", "Full process journal updates", "Behind-the-scenes studio videos", "10% discount on shop and commissions", "24-hour early access to all drops", "Annual studio postcard — signed and mailed"],
-  },
-  {
-    name: "Patron",
-    price: 25,
-    icon: Crown,
-    color: "text-purple-400",
-    borderColor: "border-purple-500/40",
-    description: "The inner circle. You're part of what gets made.",
-    perks: ["Everything in Studio Access", "Direct messaging", "Monthly patron-only Q&A session", "15% discount on all shop, commissions, workshops", "Vote on upcoming work direction", "Annual small original work (signed, shipped)", "48-hour early access + reserved spot on drops"],
-  },
-];
 
 const PERK_ICONS = [Bell, Video, Lock, Tag, Zap, Package, Star, Heart, Crown];
 
@@ -96,18 +67,16 @@ export default function PatronTiers() {
 
   const handleSubscribe = async (tierId: string, tierName: string) => {
     const tier = tiers.find(t => t.id === tierId);
-    const isFallback = tierId.startsWith("fallback-");
     const isCurrentlySubscribed = tier?.isSubscribed ?? false;
 
     setToggling(tierId);
     try {
-      if (isCurrentlySubscribed || isFallback) {
+      if (isCurrentlySubscribed) {
         const r = await fetch(`/api/patron-tiers/${tierId}/subscribe`, { method: "POST", credentials: "include" });
-        if (r.ok) {
-          const data = await r.json();
-          setTiers(prev => prev.map(t => t.id === tierId ? { ...t, isSubscribed: data.subscribed, subscriberCount: data.subscribed ? t.subscriberCount + 1 : t.subscriberCount - 1 } : t));
-          if (data.subscribed) { setConfirming(tierId); setTimeout(() => setConfirming(null), 3000); }
-        }
+        if (!r.ok) throw new Error("Could not update your membership.");
+        const data = await r.json();
+        setTiers(prev => prev.map(t => t.id === tierId ? { ...t, isSubscribed: data.subscribed, subscriberCount: data.subscribed ? t.subscriberCount + 1 : t.subscriberCount - 1 } : t));
+        if (data.subscribed) { setConfirming(tierId); setTimeout(() => setConfirming(null), 3000); }
       } else {
         const label = `${tierName} — ${artistName}`;
         const amount = tier?.price ?? 5;
@@ -124,12 +93,18 @@ export default function PatronTiers() {
             cancelPath: `/patron-tiers/${artistId}`,
           }),
         });
-        if (r.ok) {
-          const data = await r.json();
-          if (data.url) { window.location.href = data.url; return; }
-        }
+        if (!r.ok) throw new Error("Could not start checkout. Please try again.");
+        const data = await r.json();
+        if (data.url) { window.location.href = data.url; return; }
+        throw new Error("Checkout is unavailable right now. Please try again later.");
       }
-    } catch {}
+    } catch (err) {
+      toast({
+        title: "Something went wrong",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
     setToggling(null);
   };
 
@@ -138,10 +113,7 @@ export default function PatronTiers() {
   const artistMedium = localArtist?.medium ?? apiProfile?.medium;
   const avatarUrl = localArtist?.images?.[0]?.url ?? apiProfile?.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`;
 
-  const displayTiers = tiers.length > 0 ? tiers : FALLBACK_TIERS.map((t, i) => ({
-    id: `fallback-${i}`, artistId: artistId ?? "", name: t.name, description: t.description,
-    price: t.price, perks: t.perks, isSubscribed: false, subscriberCount: 0, sortOrder: i,
-  }));
+  const displayTiers = tiers;
 
   return (
     <div className="min-h-screen bg-[#12100e]">
@@ -197,6 +169,17 @@ export default function PatronTiers() {
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 size={22} className="animate-spin text-stone-600" />
+          </div>
+        ) : displayTiers.length === 0 ? (
+          <div className="rounded-2xl border border-white/8 bg-stone-900/60 py-16 px-6 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-stone-800 text-stone-500">
+              <Heart size={20} />
+            </div>
+            <p className="text-sm font-semibold text-stone-300">{artistName.split(" ")[0]} hasn't set up membership tiers yet</p>
+            <p className="mt-1.5 text-xs text-stone-500">Check back later, or follow along to support their work in other ways.</p>
+            <Link href={localArtist ? `/artists/${artistId}` : "/discover"} className="mt-5 inline-block rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-stone-300 hover:bg-stone-800 transition-colors">
+              {localArtist ? "View profile" : "Discover artists"}
+            </Link>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -254,10 +237,6 @@ export default function PatronTiers() {
                       <div className="flex items-center gap-2 text-sm text-emerald-400 font-semibold">
                         <Check size={14} /> Current plan
                       </div>
-                    ) : tier.id.startsWith("fallback-") ? (
-                      <Link href="/edit-profile" className="block w-full rounded-xl py-3 text-center text-sm font-bold transition-all bg-stone-800 text-stone-400 hover:text-stone-200">
-                        Sign in to subscribe
-                      </Link>
                     ) : (
                       <button onClick={() => handleSubscribe(tier.id, tier.name)} disabled={isToggling}
                         className={`w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-60 ${isPopular ? "bg-amber-500 text-stone-950 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]" : `border ${style.borderColor} ${style.color} hover:bg-stone-800`}`}>
