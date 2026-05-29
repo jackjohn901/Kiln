@@ -301,7 +301,15 @@ export default function Earnings() {
       const amount = s.amount.toFixed(2);
       return [escape(date), escape(s.title), escape(buyer), escape(s.status), amount].join(",");
     });
-    const csv = [header, ...rows].join("\n");
+    const filtersActive = !!(salesSearch.trim() || salesStatus !== "all" || salesDateFrom || salesDateTo);
+    const lines = [header, ...rows];
+    if (filtersActive) {
+      const total = filtered.reduce((sum, s) => sum + s.amount, 0);
+      const label = `Filtered total: ${filtered.length} ${filtered.length === 1 ? "sale" : "sales"}`;
+      lines.push("");
+      lines.push([escape(label), "", "", "", total.toFixed(2)].join(","));
+    }
+    const csv = lines.join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
