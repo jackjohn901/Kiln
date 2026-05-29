@@ -36,6 +36,7 @@ import { getPosts } from "@/data/posts";
 
 const PREFS_KEY = "kiln_prefs_v1";
 const INTERACTIONS_KEY = "kiln_interactions_v1";
+const PENDING_FOLLOWING_KEY = "kiln_pending_following_v1";
 
 interface FeedInteractions {
   likedTechniques: Record<string, number>;
@@ -885,10 +886,12 @@ export default function Feed() {
   const activeReelRef   = useRef<Reel | null>(null);
   const followingLoadedRef = useRef(false);
   const followingReelIdsRef = useRef<Set<string>>(new Set());
+  const followingApiReelsRef = useRef<Reel[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const lastTrackIdRef = useRef<string>("");
   const [userPostReels, setUserPostReels] = useState<Reel[]>(() => userPostsToReels());
   const [followingApiReels, setFollowingApiReels] = useState<Reel[]>([]);
+  followingApiReelsRef.current = followingApiReels;
   const [pendingFollowingReels, setPendingFollowingReels] = useState<Reel[]>([]);
   const [newFollowingPostCount, setNewFollowingPostCount] = useState(0);
   const [apiPostOffset, setApiPostOffset] = useState(20);
@@ -1023,19 +1026,37 @@ export default function Feed() {
           if (newPosts.length > 0) {
             setNewFollowingPostCount(newPosts.length);
             setPendingFollowingReels(apiReels);
+            try {
+              sessionStorage.setItem(PENDING_FOLLOWING_KEY, JSON.stringify({ reels: apiReels, count: newPosts.length }));
+            } catch {}
           }
         }
       })
       .catch(() => {});
   }, []);
 
-  // Reset following pill state when leaving the Following tab so next entry is treated as first load
+  // Reset following pill state when leaving the Following tab; rehydrate from sessionStorage on re-entry
   useEffect(() => {
     if (feedTab !== "following") {
       followingLoadedRef.current = false;
       followingReelIdsRef.current = new Set();
       setPendingFollowingReels([]);
       setNewFollowingPostCount(0);
+    } else {
+      // Re-entering Following tab: restore any pending pill that was active before the user left
+      try {
+        const raw = sessionStorage.getItem(PENDING_FOLLOWING_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw) as { reels: Reel[]; count: number };
+          if (Array.isArray(saved.reels) && saved.reels.length > 0) {
+            setPendingFollowingReels(saved.reels);
+            setNewFollowingPostCount(saved.count ?? saved.reels.length);
+            // Mark as already loaded so the next poll is treated as a background refresh
+            followingLoadedRef.current = true;
+            followingReelIdsRef.current = new Set(followingApiReelsRef.current.map((r) => r.id));
+          }
+        }
+      } catch {}
     }
   }, [feedTab]);
 
@@ -1047,12 +1068,14 @@ export default function Feed() {
     setNewFollowingPostCount(0);
     setActiveIndex(0);
     containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    try { sessionStorage.removeItem(PENDING_FOLLOWING_KEY); } catch {}
   }, [pendingFollowingReels]);
 
   // Dismiss pill: keep current scroll and feed unchanged
   const dismissPendingFollowingReels = useCallback(() => {
     setPendingFollowingReels([]);
     setNewFollowingPostCount(0);
+    try { sessionStorage.removeItem(PENDING_FOLLOWING_KEY); } catch {}
   }, []);
 
   // Auto-apply pill if the user is already at scroll-top when it appears
