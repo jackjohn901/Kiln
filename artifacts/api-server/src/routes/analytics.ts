@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, followsTable } from "@workspace/db";
+import { postsTable, followsTable, likesTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getFeedViewerCount } from "../lib/websocket";
 
@@ -14,7 +14,7 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   try {
-    const [allPosts, followerRows] = await Promise.all([
+    const [allPosts, followerRows, likeBuckets] = await Promise.all([
       db.select().from(postsTable)
         .where(and(eq(postsTable.authorId, userId), eq(postsTable.isDraft, false)))
         .orderBy(desc(postsTable.createdAt))
@@ -22,6 +22,18 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
       db.select({ count: sql<number>`count(*)::int` })
         .from(followsTable)
         .where(eq(followsTable.followingId, userId)),
+      // When the artist's audience actually engages: likes bucketed by UTC
+      // day-of-week and hour. The client rotates this into the viewer's
+      // local timezone for the "Best Time to Post" heatmap.
+      db.execute(sql`
+        SELECT EXTRACT(DOW FROM (${likesTable.createdAt} AT TIME ZONE 'UTC'))::int AS dow,
+               EXTRACT(HOUR FROM (${likesTable.createdAt} AT TIME ZONE 'UTC'))::int AS hour,
+               COUNT(*)::int AS cnt
+        FROM ${likesTable}
+        INNER JOIN ${postsTable} ON ${postsTable.id} = ${likesTable.postId}
+        WHERE ${eq(postsTable.authorId, userId)} AND ${eq(postsTable.isDraft, false)}
+        GROUP BY dow, hour
+      `),
     ]);
 
     const followerCount = followerRows[0]?.count ?? 0;
@@ -41,6 +53,26 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
       postsByDay[day] = (postsByDay[day] ?? 0) + 1;
       likesByDay[day] = (likesByDay[day] ?? 0) + (p.likeCount ?? 0);
       viewsByDay[day] = (viewsByDay[day] ?? 0) + (p.viewCount ?? 0);
+    }
+
+    // Engagement-by-hour grid for the "Best Time to Post" heatmap: 7 days
+    // (0=Sun..6=Sat) x 24 hours, in UTC. Combines two real signals:
+    //   - when the artist actually posted (posting history)
+    //   - when their audience engaged (like timestamps)
+    // The client rotates this into the viewer's local timezone before display.
+    const engagementByHour: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    let engagementSamples = 0;
+    for (const p of allPosts) {
+      const d = new Date(p.createdAt);
+      if (Number.isNaN(d.getTime())) continue;
+      engagementByHour[d.getUTCDay()][d.getUTCHours()] += 1;
+      engagementSamples++;
+    }
+    const likeRows = likeBuckets.rows as { dow: number; hour: number; cnt: number }[];
+    for (const r of likeRows) {
+      if (r.dow == null || r.hour == null) continue;
+      engagementByHour[r.dow][r.hour] += r.cnt;
+      engagementSamples += r.cnt;
     }
 
     // Top posts by engagement
@@ -68,6 +100,8 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
       postsByDay,
       likesByDay,
       viewsByDay,
+      engagementByHour,
+      engagementSamples,
     });
   } catch (err) {
     req.log.error({ err }, "analytics/me error");

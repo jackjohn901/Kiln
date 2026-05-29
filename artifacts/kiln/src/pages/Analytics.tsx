@@ -254,22 +254,36 @@ export default function Analytics() {
     totalPosts: number; totalLikes: number; totalComments: number;
     totalSaves: number; totalViews: number; followerCount: number; topPosts: ApiPost[];
     postsByDay: Record<string, number>; likesByDay: Record<string, number>; viewsByDay: Record<string, number>;
+    engagementByHour?: number[][]; engagementSamples?: number;
   } | null>(null);
 
-  // Real "best time to post" derived from the artist's own posts: 7 days x 8 three-hour
-  // windows, weighted by the engagement each post earned, bucketed in the viewer's local timezone.
+  // Real "best time to post" from the server's engagement-by-hour grid (7 days x
+  // 24 hours, in UTC, combining the artist's posting history with the timestamps
+  // of likes their work earned). We rotate the UTC grid into the viewer's local
+  // timezone, then collapse it into 8 three-hour display windows.
   const postingHeatmap = useMemo(() => {
     const COLS = 8;
     const windows: number[][] = Array.from({ length: 7 }, () => new Array(COLS).fill(0));
-    let samples = 0;
-    for (const p of apiPosts) {
-      const d = new Date(p.createdAt);
-      if (Number.isNaN(d.getTime())) continue;
-      const col = Math.floor(d.getHours() / 3);
-      const engagement = (p.likeCount ?? 0) + (p.commentCount ?? 0) + (p.saveCount ?? 0);
-      windows[d.getDay()][col] += engagement + 1;
-      samples++;
+    const utcGrid = analyticsData?.engagementByHour;
+    const samples = analyticsData?.engagementSamples ?? 0;
+
+    if (utcGrid && utcGrid.length === 7) {
+      // Local offset from UTC, in minutes (e.g. UTC-5 → -300).
+      const offsetMin = -new Date().getTimezoneOffset();
+      for (let utcDay = 0; utcDay < 7; utcDay++) {
+        for (let utcHour = 0; utcHour < 24; utcHour++) {
+          const v = utcGrid[utcDay]?.[utcHour] ?? 0;
+          if (v === 0) continue;
+          // Shift the UTC slot into local time, wrapping across day boundaries.
+          const localMinutes = utcDay * 24 * 60 + utcHour * 60 + offsetMin;
+          const wrapped = ((localMinutes % (7 * 24 * 60)) + 7 * 24 * 60) % (7 * 24 * 60);
+          const localDay = Math.floor(wrapped / (24 * 60));
+          const localHour = Math.floor((wrapped % (24 * 60)) / 60);
+          windows[localDay][Math.floor(localHour / 3)] += v;
+        }
+      }
     }
+
     let max = 0;
     let peak = { day: 0, col: 0, val: 0 };
     for (let di = 0; di < 7; di++) {
@@ -281,7 +295,7 @@ export default function Analytics() {
     }
     const intensities = windows.map((row) => row.map((v) => (max > 0 ? v / max : 0)));
     return { intensities, samples, peak };
-  }, [apiPosts]);
+  }, [analyticsData]);
 
   // Subscribe to live feed-viewer count updates for this artist
   useEffect(() => {
