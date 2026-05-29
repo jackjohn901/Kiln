@@ -727,7 +727,7 @@ export function newWorkshopBookingArtistEmail(
       <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Payment received</p>
       <p style="margin:0;font-size:18px;"><strong style="color:#fcd34d;">$${(amountCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></p>
     `) : ""}
-    ${btn(`${BASE_URL}/workshops`, "View Workshop")}
+    ${btn(calParams?.workshopId ? `${BASE_URL}/workshops/${calParams.workshopId}` : `${BASE_URL}/workshops`, "View Workshop")}
   `);
 }
 
