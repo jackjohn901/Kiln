@@ -807,6 +807,24 @@ export default function Settings() {
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Videos</p>
             <Toggle settingKey="display_autoplay" label="Autoplay videos" desc="Process reels play automatically" />
             <Toggle settingKey="display_sound" label="Sound on by default" desc="Videos play with audio" />
+            <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Earnings</p>
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="text-sm text-stone-200">Stats &ldquo;Updated just now&rdquo; duration</p>
+                <p className="text-xs text-stone-600 mt-0.5">How long the refresh label stays visible after earnings update</p>
+              </div>
+              <div className="flex rounded-xl overflow-hidden border border-white/10 shrink-0">
+                {([2000, 5000, 10000] as const).map((ms) => (
+                  <button
+                    key={ms}
+                    onClick={() => patchSettings({ earnings_flash_ms: ms })}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${settings.earnings_flash_ms === ms ? "bg-amber-500 text-stone-900" : "bg-stone-800 text-stone-400 hover:text-stone-200"}`}
+                  >
+                    {ms / 1000}s
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

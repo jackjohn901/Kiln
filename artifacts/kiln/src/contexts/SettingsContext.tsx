@@ -32,6 +32,7 @@ export interface KilnSettings {
   display_compact: boolean;
   display_autoplay: boolean;
   display_sound: boolean;
+  earnings_flash_ms: number;
 }
 
 export const SETTING_KEY = "kiln_settings_v1";
@@ -118,6 +119,7 @@ export function defaultSettings(): KilnSettings {
     display_compact: false,
     display_autoplay: true,
     display_sound: false,
+    earnings_flash_ms: 2000,
   };
 }
 

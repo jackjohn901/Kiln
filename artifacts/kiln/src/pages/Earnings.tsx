@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useSettings } from "@/contexts/SettingsContext";
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -158,6 +159,7 @@ function formatDate(iso: string) {
 export default function Earnings() {
   const { profile } = useProfile();
   const { bannerDismissed, dismissBanner, resetDismissal } = useStripeConnect();
+  const { settings } = useSettings();
   const search = useSearch();
   const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
@@ -531,8 +533,8 @@ export default function Earnings() {
     if (statsFlashTimerRef.current) clearTimeout(statsFlashTimerRef.current);
     setStatsFlash(true);
     setStatsLastRefreshed(new Date());
-    statsFlashTimerRef.current = setTimeout(() => setStatsFlash(false), 2000);
-  }, []);
+    statsFlashTimerRef.current = setTimeout(() => setStatsFlash(false), settings.earnings_flash_ms);
+  }, [settings.earnings_flash_ms]);
 
   useEffect(() => {
     return subscribe("notification", (evt) => {
