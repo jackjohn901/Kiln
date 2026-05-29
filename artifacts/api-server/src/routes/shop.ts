@@ -453,11 +453,30 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
   }
 });
 
-// GET /me/orders — my orders (as buyer)
+// GET /me/orders — my orders (as buyer) with seller (artist) profile info
 router.get("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const rows = await db.select().from(ordersTable).where(eq(ordersTable.buyerId, req.user.id)).orderBy(desc(ordersTable.createdAt));
-  res.json({ orders: rows.map(o => ({ ...o, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() })) });
+  const rows = await db
+    .select({
+      order: ordersTable,
+      sellerDisplayName: profilesTable.displayName,
+      sellerHandle: profilesTable.handle,
+      sellerAvatarUrl: profilesTable.avatarUrl,
+    })
+    .from(ordersTable)
+    .leftJoin(profilesTable, eq(ordersTable.sellerId, profilesTable.userId))
+    .where(eq(ordersTable.buyerId, req.user.id))
+    .orderBy(desc(ordersTable.createdAt));
+  res.json({
+    orders: rows.map(({ order, sellerDisplayName, sellerHandle, sellerAvatarUrl }) => ({
+      ...order,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+      sellerDisplayName,
+      sellerHandle,
+      sellerAvatarUrl,
+    })),
+  });
 });
 
 // GET /me/sales — my sales (as seller) with buyer profile info

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Nav from "@/components/Nav";
 
@@ -18,6 +18,9 @@ interface Order {
   manualPayout: boolean;
   notes: string | null;
   createdAt: string;
+  sellerDisplayName: string | null;
+  sellerHandle: string | null;
+  sellerAvatarUrl: string | null;
 }
 
 interface SellerProcessingWindow {
@@ -146,6 +149,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"all" | "active" | "completed">("all");
   const [sellerWindows, setSellerWindows] = useState<Record<string, SellerProcessingWindow>>({});
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     fetch("/api/me/orders", { credentials: "include" })
@@ -321,6 +325,51 @@ export default function Orders() {
                           );
                         })()}
                         <p className="text-xs text-stone-500 mt-0.5">{formatDate(primary.createdAt)}</p>
+                        {(() => {
+                          const sellerLabel = primary.sellerDisplayName?.trim()
+                            ? primary.sellerDisplayName
+                            : primary.sellerHandle
+                              ? `@${primary.sellerHandle}`
+                              : null;
+                          if (!sellerLabel) return null;
+                          const sellerHref = primary.sellerHandle
+                            ? `/artists/${primary.sellerHandle}`
+                            : primary.sellerId
+                              ? `/artists/${primary.sellerId}`
+                              : null;
+                          const initial = sellerLabel.replace(/^@/, "")[0]?.toUpperCase() ?? "?";
+                          const content = (
+                            <span className="inline-flex items-center gap-1.5">
+                              {primary.sellerAvatarUrl ? (
+                                <img
+                                  src={primary.sellerAvatarUrl}
+                                  alt={sellerLabel}
+                                  className="h-4 w-4 rounded-full object-cover"
+                                />
+                              ) : (
+                                <span className="h-4 w-4 rounded-full bg-amber-500/20 text-amber-300 text-[8px] font-semibold flex items-center justify-center">
+                                  {initial}
+                                </span>
+                              )}
+                              <span className="truncate max-w-[160px]">{sellerLabel}</span>
+                            </span>
+                          );
+                          return (
+                            <div className="mt-1 text-[11px] text-stone-400">
+                              {sellerHref ? (
+                                <span
+                                  role="link"
+                                  onClick={e => { e.preventDefault(); e.stopPropagation(); navigate(sellerHref); }}
+                                  className="inline-flex items-center hover:text-amber-300 transition-colors cursor-pointer"
+                                >
+                                  {content}
+                                </span>
+                              ) : (
+                                content
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <span className={`flex-shrink-0 flex items-center gap-1 text-xs font-medium ${statusConf.color}`}>
                         <StatusIcon size={11} />
