@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle } from "lucide-react";
+import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, Radio } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 function buildDayMap(dayMap: Record<string, number>, period: "30d" | "90d" | "1y"): number[] {
   const now = new Date();
@@ -190,10 +191,12 @@ interface EarningTotals {
 export default function Analytics() {
   const { profile } = useProfile();
   const { commissions, receivedInquiries } = useSocial();
+  const { subscribe: wsSubscribe } = useWebSocket();
   const [period, setPeriod] = useState<Period>("1y");
   const [apiPosts, setApiPosts] = useState<ApiPost[]>([]);
   const [apiFollowers, setApiFollowers] = useState<number | null>(null);
   const [earningTotals, setEarningTotals] = useState<EarningTotals | null>(null);
+  const [liveViewers, setLiveViewers] = useState<number>(0);
   const [analyticsData, setAnalyticsData] = useState<{
     totalPosts: number; totalLikes: number; totalComments: number;
     totalSaves: number; totalViews: number; followerCount: number; topPosts: ApiPost[];
@@ -226,6 +229,24 @@ export default function Analytics() {
     const intensities = windows.map((row) => row.map((v) => (max > 0 ? v / max : 0)));
     return { intensities, samples, peak };
   }, [apiPosts]);
+
+  // Subscribe to live feed-viewer count updates for this artist
+  useEffect(() => {
+    if (!profile) return;
+    const artistId = profile.id;
+    return wsSubscribe("feed-viewers", (e) => {
+      if (e.artistId === artistId) setLiveViewers(e.count as number);
+    });
+  }, [profile, wsSubscribe]);
+
+  // Fetch initial live viewer count
+  useEffect(() => {
+    if (!profile) return;
+    fetch("/api/analytics/me/feed-viewers", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.count != null) setLiveViewers(data.count); })
+      .catch(() => {});
+  }, [profile]);
 
   useEffect(() => {
     fetch("/api/me/posts", { credentials: "include" })
@@ -325,6 +346,31 @@ export default function Analytics() {
                 {p}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Live audience banner */}
+        <div className={`mb-5 rounded-2xl border p-4 flex items-center gap-4 transition-colors ${liveViewers > 0 ? "border-emerald-500/30 bg-emerald-500/8" : "border-white/8 bg-stone-900/60"}`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${liveViewers > 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-800 text-stone-600"}`}>
+            <Radio size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-amber-100">
+                {liveViewers > 0
+                  ? `${liveViewers} follower${liveViewers !== 1 ? "s" : ""} watching right now`
+                  : "No followers watching right now"}
+              </span>
+              {liveViewers > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  LIVE
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-stone-500 mt-0.5">
+              Followers with your Following tab open — updates in real time
+            </p>
           </div>
         </div>
 

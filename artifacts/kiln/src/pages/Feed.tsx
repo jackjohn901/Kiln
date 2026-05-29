@@ -1105,11 +1105,31 @@ export default function Feed() {
   }, [feedTab, fetchFollowingFeed]);
 
   // Refresh immediately on WebSocket new-post events while Following tab is active
-  const { subscribe: wsSubscribe } = useWebSocket();
+  const { subscribe: wsSubscribe, send: wsSend } = useWebSocket();
   useEffect(() => {
     if (feedTab !== "following") return;
     return wsSubscribe("new-post", fetchFollowingFeed);
   }, [feedTab, wsSubscribe, fetchFollowingFeed]);
+
+  // Announce presence to each followed artist's feed-viewer room while Following tab is active
+  const joinedFeedArtistsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (feedTab !== "following") {
+      if (joinedFeedArtistsRef.current.length > 0) {
+        wsSend({ type: "leave-feed" });
+        joinedFeedArtistsRef.current = [];
+      }
+      return;
+    }
+    const artistIds = [...new Set(followingApiReels.map((r) => r.artistId).filter(Boolean))];
+    if (artistIds.length === 0) return;
+    joinedFeedArtistsRef.current = artistIds;
+    wsSend({ type: "join-feed", artistIds });
+    return () => {
+      wsSend({ type: "leave-feed" });
+      joinedFeedArtistsRef.current = [];
+    };
+  }, [feedTab, followingApiReels, wsSend]);
 
   // Live like/save counts pushed from the server, keyed by reel id (db-<postId>)
   const [liveCounts, setLiveCounts] = useState<Record<string, { likes?: number; saves?: number }>>({});

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { postsTable, followsTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { getFeedViewerCount } from "../lib/websocket";
 
 const router = Router();
 
@@ -72,6 +73,13 @@ router.get("/analytics/me", async (req, res): Promise<void> => {
     req.log.error({ err }, "analytics/me error");
     res.status(500).json({ error: "Failed to load analytics" });
   }
+});
+
+// GET /analytics/me/feed-viewers — current live follower count watching this artist's feed
+router.get("/analytics/me/feed-viewers", (req, res): void => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const count = getFeedViewerCount(req.user.id);
+  res.json({ count });
 });
 
 export default router;

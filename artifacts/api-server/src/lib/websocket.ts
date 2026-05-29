@@ -13,14 +13,17 @@ export type WsEvent =
   | { type: "typing"; threadId: string; userId: string }
   | { type: "bid"; auctionId: string; currentBid: number; bidCount: number; bidderName: string; bidAt?: string }
   | { type: "firing-viewers"; firingId: string; count: number }
+  | { type: "feed-viewers"; artistId: string; count: number }
   | { type: "new-post"; authorId: string };
 
 const clients = new Map<string, Set<WebSocket>>();
 
 // firingId → set of userIds currently watching
 const firingRooms = new Map<string, Set<string>>();
-// ws → { userId, watchingFiringId } for cleanup on disconnect
-const wsMetadata = new Map<WebSocket, { userId: string | null; firingId: string | null }>();
+// artistId → set of follower userIds currently on the Following tab
+const feedRooms = new Map<string, Set<string>>();
+// ws → { userId, watchingFiringId, feedArtistIds } for cleanup on disconnect
+const wsMetadata = new Map<WebSocket, { userId: string | null; firingId: string | null; feedArtistIds: Set<string> }>();
 
 export function setupWebSocket(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
@@ -35,11 +38,11 @@ export function setupWebSocket(server: Server): WebSocketServer {
       logger.info({ userId }, "WebSocket client connected");
     }
 
-    wsMetadata.set(ws, { userId, firingId: null });
+    wsMetadata.set(ws, { userId, firingId: null, feedArtistIds: new Set() });
 
     ws.on("message", (raw) => {
       try {
-        const msg = JSON.parse(raw.toString()) as { type: string; firingId?: string };
+        const msg = JSON.parse(raw.toString()) as { type: string; firingId?: string; artistIds?: string[] };
         const meta = wsMetadata.get(ws);
         if (!meta || !userId) return;
 
@@ -57,6 +60,20 @@ export function setupWebSocket(server: Server): WebSocketServer {
           firingRooms.get(meta.firingId)?.delete(userId);
           broadcastViewerCount(meta.firingId);
           meta.firingId = null;
+        } else if (msg.type === "join-feed" && Array.isArray(msg.artistIds)) {
+          // Leave any previously joined feed rooms
+          leaveFeedRooms(userId, meta.feedArtistIds);
+          // Join new rooms
+          const ids = (msg.artistIds as string[]).filter((id) => typeof id === "string" && id.length > 0).slice(0, 100);
+          meta.feedArtistIds = new Set(ids);
+          for (const artistId of ids) {
+            if (!feedRooms.has(artistId)) feedRooms.set(artistId, new Set());
+            feedRooms.get(artistId)!.add(userId);
+            broadcastFeedViewerCount(artistId);
+          }
+        } else if (msg.type === "leave-feed") {
+          leaveFeedRooms(userId, meta.feedArtistIds);
+          meta.feedArtistIds = new Set();
         }
       } catch { /* ignore malformed messages */ }
     });
@@ -71,6 +88,9 @@ export function setupWebSocket(server: Server): WebSocketServer {
       if (meta?.firingId && userId) {
         firingRooms.get(meta.firingId)?.delete(userId);
         broadcastViewerCount(meta.firingId);
+      }
+      if (meta?.feedArtistIds && userId) {
+        leaveFeedRooms(userId, meta.feedArtistIds);
       }
     });
 
@@ -91,6 +111,22 @@ function broadcastViewerCount(firingId: string): void {
 
 export function getFireRoomCount(firingId: string): number {
   return firingRooms.get(firingId)?.size ?? 0;
+}
+
+function leaveFeedRooms(userId: string, artistIds: Set<string>): void {
+  for (const artistId of artistIds) {
+    feedRooms.get(artistId)?.delete(userId);
+    broadcastFeedViewerCount(artistId);
+  }
+}
+
+function broadcastFeedViewerCount(artistId: string): void {
+  const count = feedRooms.get(artistId)?.size ?? 0;
+  broadcast(artistId, { type: "feed-viewers", artistId, count });
+}
+
+export function getFeedViewerCount(artistId: string): number {
+  return feedRooms.get(artistId)?.size ?? 0;
 }
 
 export function broadcast(userId: string, event: WsEvent): void {
