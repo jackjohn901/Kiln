@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Timer, Plus, Flame, Trophy, Target, ChevronRight, X, Check, Clock, TrendingUp, Award, Play, Square } from "lucide-react";
+import { Timer, Plus, Target, Play, Square } from "lucide-react";
 
 interface HourLog {
   id: string;
@@ -25,35 +25,24 @@ interface CraftHoursState {
 
 const STORAGE_KEY = "kiln_craft_hours_v1";
 
-const SEED_STATE: CraftHoursState = {
-  goal: { hoursPerWeek: 15, startedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() },
+const DEFAULT_GOAL: WeeklyGoal = { hoursPerWeek: 15, startedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() };
+
+const EMPTY_STATE: CraftHoursState = {
+  goal: DEFAULT_GOAL,
   longestStreak: 0,
   totalHours: 0,
-  logs: [
-    { id: "l-001", date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 3, minutes: 30, technique: "Glass Blowing", note: "Hot shop session — worked on a new gather technique for the color series." },
-    { id: "l-002", date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 2, minutes: 0, technique: "Flameworking", note: "Bench time — practicing focal beads for an upcoming order." },
-    { id: "l-003", date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 4, minutes: 15, technique: "Cold Working", note: "Grinding and polishing the pieces from last week's hot shop session." },
-    { id: "l-004", date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), hours: 1, minutes: 45, technique: "Design / Sketching", note: "Planning the next commission. Two hours of sketching feels like real work." },
-  ],
+  logs: [],
 };
-
-const COMMUNITY_BOARD = [
-  { name: "Maya Chen", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&q=80", hoursThisWeek: 28, technique: "Ceramics", badge: "🔥" },
-  { name: "James Okafor", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=james", hoursThisWeek: 22, technique: "Metal Forging", badge: "⚒️" },
-  { name: "Elena Vasquez", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=elena", hoursThisWeek: 18, technique: "Fiber Arts", badge: "🧵" },
-  { name: "Alex Bernstein", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80", hoursThisWeek: 15, technique: "Glass", badge: "💎" },
-  { name: "Takeshi Mori", avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=takeshi", hoursThisWeek: 14, technique: "Raku", badge: "🏺" },
-];
 
 const TECHNIQUES = ["Glass Blowing", "Flameworking", "Kiln Forming", "Cold Working", "Ceramics", "Raku", "Porcelain", "Wood-Fired", "Metal Forging", "Bronze Casting", "Blacksmithing", "Enamel", "Fiber Arts", "Textile", "Design / Sketching", "Teaching", "Studio Admin"];
 
 function readState(): CraftHoursState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return SEED_STATE;
+    if (!raw) return EMPTY_STATE;
     const parsed = JSON.parse(raw) as CraftHoursState;
-    return { ...SEED_STATE, ...parsed };
-  } catch { return SEED_STATE; }
+    return { ...EMPTY_STATE, ...parsed };
+  } catch { return EMPTY_STATE; }
 }
 
 function saveState(s: CraftHoursState) {
@@ -113,8 +102,8 @@ export default function CraftHours() {
       .then(r => r.ok ? r.json() as Promise<{ logs: HourLog[]; goal: { hoursPerWeek: number; startedAt: string } | null }> : null)
       .then(data => {
         if (!data) return;
-        const logs = data.logs.length ? data.logs : SEED_STATE.logs;
-        const goal = data.goal ?? SEED_STATE.goal;
+        const logs = data.logs;
+        const goal = data.goal ?? DEFAULT_GOAL;
         setState({ logs, goal, longestStreak: 0, totalHours: 0 });
         setGoalInput(goal.hoursPerWeek.toString());
         setApiLoaded(true);
@@ -306,29 +295,8 @@ export default function CraftHours() {
           );
         })()}
 
-        {/* Community board */}
-        <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Top Craft Hours This Week</p>
-          <div className="space-y-2">
-            {COMMUNITY_BOARD.map((artist, i) => (
-              <div key={artist.name} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-stone-900/60 p-3">
-                <span className="text-[10px] font-black text-stone-600 w-4 shrink-0">#{i + 1}</span>
-                <img src={artist.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-amber-100">{artist.name} {artist.badge}</p>
-                  <p className="text-[10px] text-stone-500">{artist.technique}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-amber-300">{artist.hoursThisWeek}h</p>
-                  <p className="text-[9px] text-stone-600">this week</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Recent logs */}
-        {recentLogs.length > 0 && (
+        {recentLogs.length > 0 ? (
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-3">Your Log</p>
             <div className="space-y-2">
@@ -343,6 +311,12 @@ export default function CraftHours() {
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-stone-900/30 p-6 text-center">
+            <Timer size={22} className="mx-auto mb-2 text-stone-600" />
+            <p className="text-sm font-semibold text-stone-300">No studio time logged yet</p>
+            <p className="mt-1 text-xs text-stone-500">Start a live session or tap “Log” to record your first studio hours.</p>
           </div>
         )}
 

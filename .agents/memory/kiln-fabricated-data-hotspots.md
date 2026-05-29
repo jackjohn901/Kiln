@@ -12,6 +12,8 @@ Kiln's frontend pages frequently embed hardcoded arrays / constants that are ren
 - Hardcoded "people like you" / "twins" lists with fake names + avatars + match %.
 - Deterministic-hash or `Math.random()` helpers that invent metrics (e.g. lifetime "studio hours") or shuffle rankings to look "dynamic".
 - Static `MARKET_DATA`-style maps presented as live marketplace comparisons.
+- Per-artist values derived from a hash of the artist id (e.g. commission price ranges) — looks personalized but is invented; replace with "Quoted per project" / honest copy.
+- **Seed/default state that backfills *empty* user data with fabricated history** (e.g. a personal tracker that injects example logs when the API returns none, or `readState()` returning a SEED_STATE with fake entries). This shows invented activity as the user's own. For a *real* feature with no data yet, default to empty + an honest empty state — the opposite of the "delete the section" rule below, which is for features with no backend at all.
 
 **Why it matters:** the product rule is "never show fabricated numbers as real." If there is no backing data source AND no real feature, prefer deleting the section over showing an empty state — an empty state falsely implies the capability exists.
 

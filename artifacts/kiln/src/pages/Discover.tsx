@@ -8,14 +8,16 @@ import { getWorkshopsByArtist } from "@/data/workshops";
 import { ALL_REELS } from "@/data/reels";
 import Nav from "@/components/Nav";
 
-const TRENDING_TECHNIQUES = [
-  { name: "Glass Blowing", emoji: "🔥", growth: "+24%", reels: ALL_REELS.filter((r) => r.technique === "Glass Blowing").length },
-  { name: "Raku", emoji: "🏺", growth: "+18%", reels: ALL_REELS.filter((r) => r.technique === "Raku").length },
-  { name: "Metal Forging", emoji: "⚒️", growth: "+31%", reels: ALL_REELS.filter((r) => r.technique === "Metal Forging").length },
-  { name: "Fiber Arts", emoji: "🧵", growth: "+12%", reels: ALL_REELS.filter((r) => r.technique === "Fiber Arts").length },
-  { name: "Ceramics", emoji: "🎨", growth: "+9%", reels: ALL_REELS.filter((r) => r.technique === "Ceramics").length },
-  { name: "Flameworking", emoji: "🌡️", growth: "+41%", reels: ALL_REELS.filter((r) => r.technique === "Flameworking").length },
-];
+const POPULAR_TECHNIQUES = [
+  { name: "Glass Blowing", emoji: "🔥" },
+  { name: "Raku", emoji: "🏺" },
+  { name: "Metal Forging", emoji: "⚒️" },
+  { name: "Fiber Arts", emoji: "🧵" },
+  { name: "Ceramics", emoji: "🎨" },
+  { name: "Flameworking", emoji: "🌡️" },
+]
+  .map((t) => ({ ...t, reels: ALL_REELS.filter((r) => r.technique === t.name).length }))
+  .sort((a, b) => b.reels - a.reels);
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -257,22 +259,21 @@ export default function Discover() {
             <p className="text-sm text-stone-400">Find craft artists by technique, location, or commission availability</p>
           </div>
 
-          {/* Trending this week */}
+          {/* Popular techniques */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp size={14} className="text-amber-400" />
-              <h2 className="text-sm font-semibold text-stone-300">Trending this week</h2>
+              <h2 className="text-sm font-semibold text-stone-300">Popular techniques</h2>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-              {TRENDING_TECHNIQUES.map((t) => (
+              {POPULAR_TECHNIQUES.map((t) => (
                 <Link key={t.name} href={`/tag/${encodeURIComponent(t.name)}`}>
                   <div className="group flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/60 px-3 py-2.5 hover:border-amber-500/30 hover:bg-stone-900 transition-all cursor-pointer">
                     <span className="text-xl">{t.emoji}</span>
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-stone-200 truncate">{t.name}</p>
-                      <p className="text-[10px] text-stone-600">{t.reels} reels</p>
+                      <p className="text-[10px] text-stone-600">{t.reels} {t.reels === 1 ? "reel" : "reels"}</p>
                     </div>
-                    <span className="ml-auto text-[10px] font-bold text-emerald-400 shrink-0">{t.growth}</span>
                   </div>
                 </Link>
               ))}
@@ -338,8 +339,8 @@ export default function Discover() {
                 <div className="flex items-center gap-3">
                   <Trophy size={18} className="text-amber-400" />
                   <div>
-                    <p className="text-sm font-semibold text-amber-100">60-Second Gather · Live Challenge</p>
-                    <p className="text-xs text-stone-500">347 entries · ends in 16 days</p>
+                    <p className="text-sm font-semibold text-amber-100">Community Challenges</p>
+                    <p className="text-xs text-stone-500">Enter the latest prompt and share your work</p>
                   </div>
                 </div>
                 <span className="text-xs text-amber-400 font-medium">Enter →</span>

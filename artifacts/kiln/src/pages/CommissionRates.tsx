@@ -3,7 +3,7 @@ import { Link, useParams } from "wouter";
 import { motion } from "framer-motion";
 import {
   ChevronLeft, DollarSign, Clock, Shield, Check,
-  MessageSquare, ChevronRight, Info, Star, Sparkles,
+  MessageSquare, ChevronRight, Info,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getArtistById, artists } from "@/data/artists";
@@ -11,12 +11,6 @@ import { seedArtists } from "@/data/seedArtists";
 import { useSocial } from "@/contexts/SocialContext";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
-
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
-}
 
 interface RateTier {
   name: string;
@@ -28,45 +22,43 @@ interface RateTier {
   highlight?: boolean;
 }
 
-function getRates(artistId: string): RateTier[] {
-  const h = hash(artistId);
-  const base = 800 + (h % 1200);
-  return [
-    {
-      name: "Small work",
-      range: `$${base.toLocaleString()} – $${(base * 2).toLocaleString()}`,
-      description: "Single piece, tabletop scale",
-      timeline: "6–10 weeks",
-      deposit: "30%",
-      includes: ["One revision round", "Certificate of authenticity", "Studio documentation photos"],
-    },
-    {
-      name: "Signature piece",
-      range: `$${(base * 2.5).toLocaleString()} – $${(base * 6).toLocaleString()}`,
-      description: "Statement work, full custom brief",
-      timeline: "10–18 weeks",
-      deposit: "40%",
-      highlight: true,
-      includes: ["Two revision rounds", "Certificate of authenticity", "Professional photography", "Detailed process documentation", "Studio visit (local) or video call walkthrough"],
-    },
-    {
-      name: "Installation / series",
-      range: `$${(base * 8).toLocaleString()}+`,
-      description: "Multi-piece or large-scale work",
-      timeline: "4–12 months",
-      deposit: "50%",
-      includes: ["Full scope consultation", "Iterative approvals", "All documentation and certificates", "Shipping and installation coordination", "Ongoing relationship pricing for return collectors"],
-    },
-    {
-      name: "Collaboration",
-      range: "On request",
-      description: "Brand, editorial, or institutional projects",
-      timeline: "Negotiated",
-      deposit: "50%",
-      includes: ["Initial discovery call", "Detailed proposal", "Usage licensing included", "Co-credit in all publications"],
-    },
-  ];
-}
+// Generic commission tier structure. No artist-specific prices are fabricated —
+// exact pricing is always quoted per project and confirmed in writing.
+const RATE_TIERS: RateTier[] = [
+  {
+    name: "Small work",
+    range: "Quoted per project",
+    description: "Single piece, tabletop scale",
+    timeline: "Typically 6–10 weeks",
+    deposit: "Deposit set at quote",
+    includes: ["One revision round", "Certificate of authenticity", "Studio documentation photos"],
+  },
+  {
+    name: "Signature piece",
+    range: "Quoted per project",
+    description: "Statement work, full custom brief",
+    timeline: "Typically 10–18 weeks",
+    deposit: "Deposit set at quote",
+    highlight: true,
+    includes: ["Two revision rounds", "Certificate of authenticity", "Professional photography", "Detailed process documentation", "Studio visit (local) or video call walkthrough"],
+  },
+  {
+    name: "Installation / series",
+    range: "Quoted per project",
+    description: "Multi-piece or large-scale work",
+    timeline: "Typically 4–12 months",
+    deposit: "Deposit set at quote",
+    includes: ["Full scope consultation", "Iterative approvals", "All documentation and certificates", "Shipping and installation coordination", "Ongoing relationship pricing for return collectors"],
+  },
+  {
+    name: "Collaboration",
+    range: "On request",
+    description: "Brand, editorial, or institutional projects",
+    timeline: "Negotiated",
+    deposit: "Deposit set at quote",
+    includes: ["Initial discovery call", "Detailed proposal", "Usage licensing included", "Co-credit in all publications"],
+  },
+];
 
 export default function CommissionRates() {
   const { artistId } = useParams<{ artistId: string }>();
@@ -74,7 +66,7 @@ export default function CommissionRates() {
 
   const artist = getArtistById(artistId ?? "") ?? ALL_ARTISTS.find((a) => a.id === artistId);
   const avatar = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${artistId}`;
-  const rates = getRates(artistId ?? "anon");
+  const rates = RATE_TIERS;
   const status = getArtistCommissionStatus(artistId ?? "");
 
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
@@ -129,7 +121,7 @@ export default function CommissionRates() {
           </p>
           <div className="flex items-start gap-2 mt-3 text-xs text-amber-400/70">
             <Info size={12} className="shrink-0 mt-0.5" />
-            <span>Rates below are indicative. Final pricing is agreed in writing before any work begins.</span>
+            <span>The tiers below describe how commission work is typically scoped. Exact pricing, timeline, and deposit are quoted per project and agreed in writing before any work begins.</span>
           </div>
         </div>
 
@@ -211,25 +203,6 @@ export default function CommissionRates() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Reviews snippet */}
-        <div className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-stone-600 mb-3">Collector reviews</p>
-          {[
-            { name: "Rachel Osei", rating: 5, text: "The piece arrived perfectly packed and exceeded every expectation. Communication throughout was exceptional." },
-            { name: "James Whitfield", rating: 5, text: "Working on a gallery acquisition. Professional, responsive, and the documentation was impeccable." },
-          ].map((r) => (
-            <div key={r.name} className="rounded-xl border border-white/8 bg-stone-900/30 p-4 mb-2.5">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-stone-300">{r.name}</p>
-                <div className="flex items-center gap-0.5">
-                  {Array.from({ length: r.rating }).map((_, i) => <Star key={i} size={10} className="text-amber-400 fill-amber-400" />)}
-                </div>
-              </div>
-              <p className="text-xs text-stone-500 leading-relaxed">{r.text}</p>
-            </div>
-          ))}
         </div>
 
         {/* CTA */}
