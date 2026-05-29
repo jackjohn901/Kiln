@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
-import { sendEmailWithRetry, shippingNotificationEmail } from "../lib/email";
+import { sendEmailWithRetry, shippingNotificationEmail, deliveryNotificationEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -348,13 +348,34 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
           }
         }).catch(() => {});
       } else if (status === "delivered") {
+        const deliveredNotifId = crypto.randomUUID();
         // In-app notification
         db.insert(notificationsTable).values({
-          id: crypto.randomUUID(),
+          id: deliveredNotifId,
           userId: updated.buyerId,
           type: "order_delivered",
           text: `Your order "${updated.title ?? "your order"}" has been delivered!`,
           link: orderLink,
+        }).catch(() => {});
+
+        // Email
+        Promise.all([
+          db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
+          db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
+        ]).then(([[s], [buyer]]) => {
+          const buyerSettings = s?.settings as Record<string, unknown> | null;
+          const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
+          const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_delivered !== false;
+          if (buyer?.email && wantsEmail) {
+            sendEmailWithRetry(
+              {
+                to: buyer.email,
+                subject: `Your order has been delivered: ${updated.title}`,
+                html: deliveryNotificationEmail(updated.title ?? "Your order", updated.id),
+              },
+              { contextId: updated.id, label: "delivery notification" },
+            );
+          }
         }).catch(() => {});
       }
     }

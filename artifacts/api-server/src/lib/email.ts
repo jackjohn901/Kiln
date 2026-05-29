@@ -193,6 +193,22 @@ export function shippingNotificationEmail(
   `);
 }
 
+export function deliveryNotificationEmail(
+  orderTitle: string,
+  orderId: string,
+): string {
+  const receiptUrl = `${BASE_URL}/orders/${orderId}`;
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your order has been delivered! 🎉</h1>
+    <p style="color:#78716c;margin-bottom:0;">Great news — the artist has marked your order as delivered.</p>
+    ${card(`
+      <p style="margin:0 0 8px;font-size:15px;"><strong>${escHtml(orderTitle)}</strong></p>
+      <p style="margin:0;color:#78716c;font-size:13px;">We hope you love your new piece. If you have any issues with your order, please reach out to the artist directly.</p>
+    `)}
+    ${btn(receiptUrl, "View receipt")}
+  `);
+}
+
 export function newFollowerEmail(followerName: string): string {
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Follower</h1>
