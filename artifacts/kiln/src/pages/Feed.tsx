@@ -1055,6 +1055,18 @@ export default function Feed() {
     setNewFollowingPostCount(0);
   }, []);
 
+  // Auto-apply pill if the user is already at scroll-top when it appears
+  useEffect(() => {
+    if (feedTab !== "following" || newFollowingPostCount === 0) return;
+    if ((containerRef.current?.scrollTop ?? 1) > 0) return;
+    const timerId = setTimeout(() => {
+      if ((containerRef.current?.scrollTop ?? 1) === 0) {
+        applyPendingFollowingReels();
+      }
+    }, 3000);
+    return () => clearTimeout(timerId);
+  }, [feedTab, newFollowingPostCount, applyPendingFollowingReels]);
+
   // Fetch on tab switch
   useEffect(() => {
     if (feedTab !== "following") return;
