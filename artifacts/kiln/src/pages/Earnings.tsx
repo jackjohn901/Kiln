@@ -651,7 +651,12 @@ export default function Earnings() {
         ) : (
           <>
             {/* Earnings Summary Card */}
-            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+            <div className={[
+              "mb-4 rounded-2xl border bg-stone-900/50 p-4 transition-all duration-300",
+              statsFlash
+                ? "border-emerald-400/60 shadow-[0_0_12px_2px_rgba(52,211,153,0.25)] scale-[1.02]"
+                : "border-white/8",
+            ].join(" ")}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs uppercase tracking-wider text-stone-500">Earnings Summary</p>
                 <div className="flex items-center gap-1">
