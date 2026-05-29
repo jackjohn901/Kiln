@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { workshopsTable, workshopBookingsTable, notificationsTable, usersTable, userSettingsTable } from "@workspace/db";
+import { workshopsTable, workshopBookingsTable, notificationsTable, usersTable, userSettingsTable, profilesTable } from "@workspace/db";
 import { eq, and, desc, sql, gte, isNull } from "drizzle-orm";
 import crypto from "crypto";
 import { sendEmail, workshopReminderEmail, workshopBookingEmail, newWorkshopBookingArtistEmail } from "../lib/email";
@@ -116,15 +116,16 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
       sendEmail({ to: user.email, subject: `Booking confirmed: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "workshopBookingEmail send failed"); });
     }
 
-    const [[artistUser], [artistSettings]] = await Promise.all([
+    const [[artistUser], [artistSettings], [studentProfile]] = await Promise.all([
       db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, w.artistId)),
       db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, w.artistId)),
+      db.select({ handle: profilesTable.handle }).from(profilesTable).where(eq(profilesTable.userId, userId)),
     ]);
     const artistEmailSnoozed = artistSettings?.notifEmailResumeAt && artistSettings.notifEmailResumeAt > new Date();
     const artistWantsEmail = !artistEmailSnoozed && (artistSettings?.settings as Record<string, unknown> | null)?.workshopBookingEmail !== false;
     if (artistUser?.email && artistWantsEmail) {
       const studentName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "A student";
-      const html = newWorkshopBookingArtistEmail(studentName, user.email ?? "", w.title, 0, calParams);
+      const html = newWorkshopBookingArtistEmail(studentName, user.email ?? "", w.title, 0, calParams, studentProfile?.handle ?? null, userId);
       sendEmail({ to: artistUser.email, subject: `New booking: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "newWorkshopBookingArtistEmail send failed"); });
     }
 

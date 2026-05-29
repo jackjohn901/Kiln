@@ -699,6 +699,8 @@ export function newWorkshopBookingArtistEmail(
   workshopTitle: string,
   amountCents: number,
   calParams?: WorkshopCalendarParams,
+  buyerHandle?: string | null,
+  buyerId?: string | null,
 ): string {
   const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, buyerName, calParams) : "";
   const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
@@ -712,6 +714,16 @@ export function newWorkshopBookingArtistEmail(
       </div>
     </div>` : "";
 
+  const buyerProfileUrl = buyerHandle
+    ? `${BASE_URL}/artists/${encodeURIComponent(buyerHandle)}`
+    : buyerId
+      ? `${BASE_URL}/artists/${encodeURIComponent(buyerId)}`
+      : null;
+
+  const buyerNameHtml = buyerProfileUrl
+    ? `<a href="${buyerProfileUrl}" style="color:#fcd34d;text-decoration:none;font-weight:bold;">${escHtml(buyerName || "A student")}</a>`
+    : `<strong>${escHtml(buyerName || "A student")}</strong>`;
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Workshop Booking! 🎓</h1>
     <p style="color:#78716c;margin-bottom:0;">A student just booked a seat in your workshop.</p>
@@ -719,8 +731,9 @@ export function newWorkshopBookingArtistEmail(
       <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Workshop</p>
       <p style="margin:0 0 12px;"><strong>${escHtml(workshopTitle)}</strong></p>
       <p style="margin:0 0 8px;font-size:14px;color:#fcd34d;font-weight:bold;">Student</p>
-      <p style="margin:0 0 4px;"><strong>${escHtml(buyerName || 'A student')}</strong></p>
+      <p style="margin:0 0 4px;">${buyerNameHtml}</p>
       <p style="margin:0;color:#78716c;">${escHtml(buyerEmail)}</p>
+      ${buyerProfileUrl ? `<p style="margin:4px 0 0;font-size:12px;"><a href="${buyerProfileUrl}" style="color:#a8a29e;text-decoration:none;">View student profile →</a></p>` : ""}
       ${calendarLinks}
     `)}
     ${amountCents > 0 ? card(`
