@@ -4,7 +4,8 @@ import type { Server } from "http";
 import { logger } from "./logger";
 
 export type WsEvent =
-  | { type: "like"; postId: string; userId: string; likeCount: number }
+  | { type: "like"; postId: string; likeCount: number }
+  | { type: "save"; postId: string; saveCount: number }
   | { type: "follow"; followerId: string; followingId: string }
   | { type: "comment"; postId: string; commentId: string; authorId: string }
   | { type: "notification"; userId: string; text: string; link?: string; notifType?: string; fromName?: string }

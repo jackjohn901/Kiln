@@ -322,6 +322,8 @@ const ReelCard = memo(function ReelCard({
   onComment,
   onNotInterested,
   onMoreLikeThis,
+  liveLikes,
+  liveSaves,
 }: {
   reel: Reel;
   isActive: boolean;
@@ -335,6 +337,8 @@ const ReelCard = memo(function ReelCard({
   onComment: (reelId: string, artistName: string) => void;
   onNotInterested: (reelId: string) => void;
   onMoreLikeThis: (technique: string) => void;
+  liveLikes?: number;
+  liveSaves?: number;
 }) {
   const [showReport, setShowReport] = useState(false);
   const [showBoardPicker, setShowBoardPicker] = useState(false);
@@ -721,7 +725,7 @@ const ReelCard = memo(function ReelCard({
             style={{ transition: "all 0.15s" }}
           />
           <span className="text-[11px] font-bold text-white drop-shadow">
-            {fmt(reel.saves + (saved ? 1 : 0))}
+            {fmt(liveSaves != null ? liveSaves : reel.saves + (saved ? 1 : 0))}
           </span>
         </button>
 
@@ -758,7 +762,7 @@ const ReelCard = memo(function ReelCard({
             style={{ transition: "all 0.15s" }}
           />
           <span className="text-[11px] font-bold text-white drop-shadow">
-            {fmt(reel.likes + (liked ? 1 : 0))}
+            {fmt(liveLikes != null ? liveLikes : reel.likes + (liked ? 1 : 0))}
           </span>
         </button>
       </div>
@@ -1081,6 +1085,20 @@ export default function Feed() {
     if (feedTab !== "following") return;
     return wsSubscribe("new-post", fetchFollowingFeed);
   }, [feedTab, wsSubscribe, fetchFollowingFeed]);
+
+  // Live like/save counts pushed from the server, keyed by reel id (db-<postId>)
+  const [liveCounts, setLiveCounts] = useState<Record<string, { likes?: number; saves?: number }>>({});
+  useEffect(() => {
+    const offLike = wsSubscribe("like", (e) => {
+      const id = `db-${e.postId as string}`;
+      setLiveCounts((prev) => ({ ...prev, [id]: { ...prev[id], likes: e.likeCount as number } }));
+    });
+    const offSave = wsSubscribe("save", (e) => {
+      const id = `db-${e.postId as string}`;
+      setLiveCounts((prev) => ({ ...prev, [id]: { ...prev[id], saves: e.saveCount as number } }));
+    });
+    return () => { offLike(); offSave(); };
+  }, [wsSubscribe]);
 
   // Fetch real posts from API and prepend to feed
   useEffect(() => {
@@ -1677,6 +1695,8 @@ export default function Feed() {
               onComment={handleComment}
               onNotInterested={handleNotInterested}
               onMoreLikeThis={handleMoreLikeThis}
+              liveLikes={liveCounts[reel.id]?.likes}
+              liveSaves={liveCounts[reel.id]?.saves}
             />
           ))}
         </div>

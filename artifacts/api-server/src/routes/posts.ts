@@ -9,7 +9,7 @@ import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import crypto from "crypto";
-import { broadcast } from "../lib/websocket";
+import { broadcast, broadcastAll } from "../lib/websocket";
 import { updateStreak } from "./streaks";
 import { awardBadge } from "./badges";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -139,10 +139,12 @@ router.post("/posts/:postId/like", async (req, res): Promise<void> => {
       await db.delete(likesTable)
         .where(and(eq(likesTable.userId, userId), eq(likesTable.postId, postId)));
       const [updated] = await db.update(postsTable)
-        .set({ likeCount: sql`${postsTable.likeCount} - 1` })
+        .set({ likeCount: sql`GREATEST(${postsTable.likeCount} - 1, 0)` })
         .where(eq(postsTable.id, postId))
         .returning({ likeCount: postsTable.likeCount });
-      res.json({ liked: false, likeCount: updated?.likeCount ?? 0 }); return;
+      const likeCount = updated?.likeCount ?? 0;
+      broadcastAll({ type: "like", postId, likeCount });
+      res.json({ liked: false, likeCount }); return;
     }
 
     await db.insert(likesTable).values({ userId, postId });
@@ -165,11 +167,12 @@ router.post("/posts/:postId/like", async (req, res): Promise<void> => {
         text: "liked your post",
         link: `/post/${postId}`,
       });
-      broadcast(post.authorId, { type: "like", postId, userId, likeCount: updated?.likeCount ?? 0 });
       broadcast(post.authorId, { type: "notification", userId: post.authorId, text: "Someone liked your post", link: `/post/${postId}` });
     }
 
-    res.json({ liked: true, likeCount: updated?.likeCount ?? 0 });
+    const likeCount = updated?.likeCount ?? 0;
+    broadcastAll({ type: "like", postId, likeCount });
+    res.json({ liked: true, likeCount });
   } catch (err) {
     req.log.error({ err }, "likePost error");
     res.status(500).json({ error: "Failed to toggle like" });
@@ -191,10 +194,12 @@ router.post("/posts/:postId/save", async (req, res): Promise<void> => {
       await db.delete(savesTable)
         .where(and(eq(savesTable.userId, userId), eq(savesTable.postId, postId)));
       const [updated] = await db.update(postsTable)
-        .set({ saveCount: sql`${postsTable.saveCount} - 1` })
+        .set({ saveCount: sql`GREATEST(${postsTable.saveCount} - 1, 0)` })
         .where(eq(postsTable.id, postId))
         .returning({ saveCount: postsTable.saveCount });
-      res.json({ saved: false, saveCount: updated?.saveCount ?? 0 }); return;
+      const saveCount = updated?.saveCount ?? 0;
+      broadcastAll({ type: "save", postId, saveCount });
+      res.json({ saved: false, saveCount }); return;
     }
 
     await db.insert(savesTable).values({ userId, postId });
@@ -203,7 +208,9 @@ router.post("/posts/:postId/save", async (req, res): Promise<void> => {
       .where(eq(postsTable.id, postId))
       .returning({ saveCount: postsTable.saveCount });
 
-    res.json({ saved: true, saveCount: updated?.saveCount ?? 0 });
+    const saveCount = updated?.saveCount ?? 0;
+    broadcastAll({ type: "save", postId, saveCount });
+    res.json({ saved: true, saveCount });
   } catch (err) {
     req.log.error({ err }, "savePost error");
     res.status(500).json({ error: "Failed to toggle save" });

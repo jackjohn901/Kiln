@@ -32,6 +32,7 @@ A TikTok/Instagram Reels-style creator platform for craft artists at kilnfire.re
 ## Architecture decisions
 
 - All social actions (like/save/comment/follow) go through SocialContext — no inline fetch calls in pages.
+- Feed like/save counts update live: the like/save endpoints `broadcastAll` the authoritative count (aggregate only — never the actor's userId, which would leak the interaction graph); `Feed.tsx` subscribes and threads `liveLikes`/`liveSaves` into the memoized `ReelCard`, falling back to the optimistic count when no live event has arrived.
 - Feed is DB-first: For You loads real posts from `/api/feed` (scored by engagement) as the primary content; static `REELS` from `@/data/reels` are appended only as filler to reach a minimum feed length when real content is sparse. Following tab uses `/api/feed/following`. All API posts are mapped to `Reel` via the single `apiPostToReel` helper in `Feed.tsx` (maps `muxPlaybackId` so uploaded videos play).
 - Seed data uses a marker user ID (e.g. "seed-v4-marker") to run exactly once on server start.
 - GuildDetail and PatronTiers fetch from the API when the local static data file has no matching entry.
