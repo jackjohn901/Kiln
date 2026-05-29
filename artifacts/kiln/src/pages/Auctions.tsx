@@ -64,6 +64,7 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
   const [paying, setPaying] = useState(false);
   useEffect(() => {
     let handle: ReturnType<typeof setTimeout>;
+
     function tick() {
       const diff = new Date(auction.endDate).getTime() - Date.now();
       setTimeLeft(getTimeLeft(auction.endDate));
@@ -72,10 +73,21 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
       // 1-second ticks in final minute, 30-second ticks otherwise
       handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
     }
+
+    function onVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(handle);
+      tick();
+    }
+
     const diff = new Date(auction.endDate).getTime() - Date.now();
     if (diff <= 0) return;
     handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
-    return () => clearTimeout(handle);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearTimeout(handle);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [auction.endDate]);
 
   const isLive = auction.status === "live" && new Date(auction.endDate) > new Date();
