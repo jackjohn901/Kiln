@@ -163,10 +163,35 @@ export default function Earnings() {
   const { subscribe } = useWebSocket();
 
   const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
+
+  function readPersistedMonth(): { month: number; year: number } {
+    try {
+      const raw = localStorage.getItem("kiln:earnings:selectedMonth");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { month: number; year: number };
+        if (
+          typeof parsed.month === "number" && parsed.month >= 0 && parsed.month <= 11 &&
+          typeof parsed.year  === "number" && parsed.year  >= 2000
+        ) return parsed;
+      }
+    } catch { /* ignore */ }
+    return { month: now.getMonth(), year: now.getFullYear() };
+  }
+
+  const persisted = readPersistedMonth();
+  const [selectedMonth, setSelectedMonth] = useState(persisted.month);
+  const [selectedYear, setSelectedYear]   = useState(persisted.year);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [pickerYear, setPickerYear]           = useState(now.getFullYear());
+  const [pickerYear, setPickerYear]           = useState(persisted.year);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "kiln:earnings:selectedMonth",
+        JSON.stringify({ month: selectedMonth, year: selectedYear }),
+      );
+    } catch { /* ignore */ }
+  }, [selectedMonth, selectedYear]);
   const monthPickerRef = useRef<HTMLDivElement>(null);
 
   const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();

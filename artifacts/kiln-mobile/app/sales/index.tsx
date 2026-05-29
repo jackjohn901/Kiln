@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { apiGet } from "@/lib/api";
@@ -115,6 +116,30 @@ export default function SalesScreen() {
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear, setPickerYear]           = useState(now.getFullYear());
+
+  useEffect(() => {
+    AsyncStorage.getItem("kiln:earnings:selectedMonth").then((raw) => {
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as { month: number; year: number };
+        if (
+          typeof parsed.month === "number" && parsed.month >= 0 && parsed.month <= 11 &&
+          typeof parsed.year  === "number" && parsed.year  >= 2000
+        ) {
+          setSelectedMonth(parsed.month);
+          setSelectedYear(parsed.year);
+          setPickerYear(parsed.year);
+        }
+      } catch { /* ignore */ }
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(
+      "kiln:earnings:selectedMonth",
+      JSON.stringify({ month: selectedMonth, year: selectedYear }),
+    ).catch(() => { /* ignore */ });
+  }, [selectedMonth, selectedYear]);
 
   const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
 
