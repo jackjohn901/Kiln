@@ -30,6 +30,8 @@ const OFFSCREEN_X = 420;
 export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
   const translateX = useRef(new Animated.Value(OFFSCREEN_X)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
   const onAnimatedOutRef = useRef(onAnimatedOut);
   onAnimatedOutRef.current = onAnimatedOut;
 
@@ -44,7 +46,7 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
 
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        onDismiss();
+        onDismissRef.current();
       }, AUTO_DISMISS_MS);
     } else {
       Animated.timing(translateX, {
@@ -62,7 +64,7 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [sale, translateX, onDismiss]);
+  }, [sale, translateX]);
 
   const bodyText = sale ? sale.text.replace(/^New sale:\s*/i, "") : "";
 
