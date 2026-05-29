@@ -21,15 +21,21 @@ export const AUTO_DISMISS_MS = 6000;
 /** Duration of the slide-out (dismiss) timing animation in ms. */
 export const SLIDE_OUT_MS = 300;
 
+/**
+ * Off-screen translateX distance. Large enough to clear the card width on any
+ * device without needing a runtime Dimensions call.
+ */
+const OFFSCREEN_X = 420;
+
 export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
-  const translateY = useRef(new Animated.Value(-120)).current;
+  const translateX = useRef(new Animated.Value(OFFSCREEN_X)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onAnimatedOutRef = useRef(onAnimatedOut);
   onAnimatedOutRef.current = onAnimatedOut;
 
   useEffect(() => {
     if (sale) {
-      Animated.spring(translateY, {
+      Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
         tension: 80,
@@ -41,8 +47,8 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
         onDismiss();
       }, AUTO_DISMISS_MS);
     } else {
-      Animated.timing(translateY, {
-        toValue: -120,
+      Animated.timing(translateX, {
+        toValue: OFFSCREEN_X,
         duration: SLIDE_OUT_MS,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
@@ -56,13 +62,13 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [sale, translateY, onDismiss]);
+  }, [sale, translateX, onDismiss]);
 
   const bodyText = sale ? sale.text.replace(/^New sale:\s*/i, "") : "";
 
   return (
     <Animated.View
-      style={[styles.banner, { transform: [{ translateY }] }]}
+      style={[styles.banner, { transform: [{ translateX }] }]}
       pointerEvents={sale ? "box-none" : "none"}
     >
       <Pressable onPress={onView} style={styles.inner}>
@@ -94,16 +100,21 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
 const styles = StyleSheet.create({
   banner: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+    top: 56,
+    right: 12,
     zIndex: 9999,
-    paddingTop: 56,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    maxWidth: 340,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: "#1a2e1a",
-    borderBottomWidth: 1,
-    borderBottomColor: "#2d5a2d",
+    borderWidth: 1,
+    borderColor: "#2d5a2d",
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
   },
   inner: {
     flexDirection: "row",
