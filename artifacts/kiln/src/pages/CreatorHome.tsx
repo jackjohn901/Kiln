@@ -5,7 +5,7 @@ import {
   Flame, Plus, BarChart2, DollarSign, Users, Inbox,
   Clock, CheckCircle, Calendar, Package, Edit3, Radio,
   ChevronRight, TrendingUp, Sparkles, PenLine, MessageCircle,
-  ArrowUpRight, AlertCircle, Star, Zap, ShoppingBag,
+  ArrowUpRight, AlertCircle, Zap, ShoppingBag,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -13,12 +13,6 @@ import { useSocial } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
 import { getListingsByArtist } from "@/data/listings";
 import { getReelsByArtist } from "@/data/reels";
-
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
-}
 
 function fmt(n: number) {
   return n >= 1_000_000
@@ -33,7 +27,6 @@ export default function CreatorHome() {
   const { receivedInquiries, unreadCount, unreadMessageCount, following } = useSocial();
 
   const artistId = profile?.id ?? "";
-  const h = hash(artistId);
 
   const [apiProfile, setApiProfile] = useState<{ followerCount: number; postCount: number } | null>(null);
   const [apiPosts, setApiPosts] = useState<Array<{ id: string; likeCount: number; commentCount: number; saveCount: number }>>([]);
@@ -60,17 +53,14 @@ export default function CreatorHome() {
 
   // Derived stats
   const stats = useMemo(() => {
-    const reels = getReelsByArtist(artistId);
     const listings = getListingsByArtist(artistId);
-    const followers = apiProfile?.followerCount ?? (3000 + (h % 47000));
-    const monthEarnings = apiEarnings ? apiEarnings.totalCents / 100 : 800 + (h % 8200);
-    const totalEngagement = apiPosts.length > 0
-      ? apiPosts.reduce((s, p) => s + p.likeCount + p.commentCount + p.saveCount, 0)
-      : reels.reduce((s, r) => s + r.likes * 12, 0);
+    const followers = apiProfile?.followerCount ?? 0;
+    const monthEarnings = apiEarnings ? apiEarnings.totalCents / 100 : 0;
+    const totalEngagement = apiPosts.reduce((s, p) => s + p.likeCount + p.commentCount + p.saveCount, 0);
     const availListings = listings.filter((l) => l.available).length;
-    const postCount = apiProfile?.postCount ?? (apiPosts.length || reels.length);
+    const postCount = apiProfile?.postCount ?? apiPosts.length;
     return { followers, monthEarnings, views: totalEngagement, reels: postCount, availListings };
-  }, [artistId, h, apiProfile, apiPosts, apiEarnings]);
+  }, [artistId, apiProfile, apiPosts, apiEarnings]);
 
   const workshops = useMemo(() => getWorkshopsByArtist(artistId).slice(0, 3), [artistId]);
   const reels = useMemo(() => getReelsByArtist(artistId).slice(0, 4), [artistId]);
@@ -82,8 +72,8 @@ export default function CreatorHome() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   const STAT_CARDS = [
-    { label: "Followers", value: fmt(stats.followers), icon: Users, color: "text-blue-400", change: "+2.4%" },
-    { label: "Total engagement", value: fmt(stats.views), icon: TrendingUp, color: "text-purple-400", change: "+34%" },
+    { label: "Followers", value: fmt(stats.followers), icon: Users, color: "text-blue-400", change: "" },
+    { label: "Total engagement", value: fmt(stats.views), icon: TrendingUp, color: "text-purple-400", change: "" },
     { label: "Posts published", value: String(stats.reels), icon: Package, color: "text-amber-400", change: "" },
     { label: "Active listings", value: String(stats.availListings), icon: ShoppingBag, color: "text-emerald-400", change: "" },
   ];
@@ -257,10 +247,6 @@ export default function CreatorHome() {
                   </div>
                   <div className="text-right shrink-0 space-y-0.5">
                     <p className="text-xs font-semibold text-stone-300">{fmt(r.likes)} likes</p>
-                    <div className="flex items-center gap-1 justify-end">
-                      {i === 0 && <Star size={9} className="text-amber-400 fill-amber-400" />}
-                      <p className="text-[10px] text-stone-600">{fmt(r.likes * 12)} views</p>
-                    </div>
                   </div>
                 </div>
               )) : (

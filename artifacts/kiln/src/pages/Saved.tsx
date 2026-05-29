@@ -8,13 +8,6 @@ import { seedArtists } from "@/data/seedArtists";
 import { useWishlist } from "@/hooks/useWishlist";
 import { listings, formatPrice } from "@/data/listings";
 
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
-}
-function statVal(seed: string, min: number, max: number) { return min + (hash(seed) % (max - min)); }
-
 function getTechnique(medium: string): string {
   const m = medium.toLowerCase();
   if (m.includes("blown") || m.includes("blow")) return "Glass Blowing";
@@ -39,7 +32,6 @@ interface SavedReel {
   artistName: string;
   technique: string;
   caption: string;
-  likes: number;
   thumbnail: string;
   avatarUrl: string;
 }
@@ -106,7 +98,6 @@ export default function Saved() {
             artistName: a.name,
             technique: getTechnique(a.medium),
             caption: v.title,
-            likes: statVal(a.id + v.id, 800, 28000),
             thumbnail: `https://img.youtube.com/vi/${v.id}/hqdefault.jpg`,
             avatarUrl: a.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}-avatar`,
           });
@@ -210,12 +201,8 @@ export default function Saved() {
                           <span className="text-xs font-medium text-white truncate">{r.artistName}</span>
                         </div>
                         <p className="text-xs text-stone-300 line-clamp-2 leading-tight">{r.caption}</p>
-                        <div className="mt-1.5 flex items-center justify-between">
+                        <div className="mt-1.5 flex items-center">
                           <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-stone-400">{r.technique}</span>
-                          <div className="flex items-center gap-1">
-                            <Heart size={10} className="text-rose-400" />
-                            <span className="text-[10px] text-stone-400">{r.likes >= 1000 ? (r.likes / 1000).toFixed(1) + "k" : r.likes}</span>
-                          </div>
                         </div>
                       </div>
                     </div>

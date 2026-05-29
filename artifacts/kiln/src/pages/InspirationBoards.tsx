@@ -61,7 +61,7 @@ function buildSeedItems(): BoardItem[] {
       artistId: l.artistId,
       sourceType: "listing",
       sourceId: l.id,
-      addedAt: new Date(Date.now() - Math.random() * 86400000 * 30).toISOString(),
+      addedAt: new Date().toISOString(),
     });
   }
   return items;

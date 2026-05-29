@@ -1,53 +1,20 @@
 import { useState, useRef } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link } from "wouter";
 import {
-  ArrowLeft, Play, Mic, Video, SplitSquareHorizontal, Upload,
-  Check, Heart, Share2, ChevronRight, Flame,
+  ArrowLeft, Play, Video, SplitSquareHorizontal, Upload,
+  Check, Flame,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
-import { artists } from "@/data/artists";
-import { seedArtists } from "@/data/seedArtists";
 import { ALL_REELS } from "@/data/reels";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useSocial } from "@/contexts/SocialContext";
 import BetaBanner from "@/components/BetaBanner";
-
-const ALL_ARTISTS = [...artists, ...seedArtists];
-
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
-}
-
-const DUET_RESPONSES = [
-  "Trying this technique in porcelain — the results were completely different 🔥",
-  "Never seen this approach before. Had to try it myself",
-  "Response to this glaze breakdown — my version at Cone 6",
-  "Inspired by this method. Here's my take on the form",
-  "Duetting with this because it changed how I approach handles",
-  "Responding to this firing technique — tried it in my wood kiln",
-];
-
-const EXISTING_DUETS = ALL_REELS.slice(0, 6).map((r, i) => ({
-  id: `duet-${r.id}-${i}`,
-  responderName: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].name,
-  responderId: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].id,
-  responderAvatar: ALL_ARTISTS[(hash(r.id) + i) % ALL_ARTISTS.length].images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${r.id}-duet-${i}`,
-  thumbnail: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${r.id}-duet-${i}`,
-  caption: DUET_RESPONSES[(hash(r.id) + i) % DUET_RESPONSES.length],
-  likes: 400 + (hash(r.id + i) % 8000),
-  originalReel: r,
-}));
 
 type DuetStep = "browse" | "record" | "preview" | "done";
 
 export default function DuetStudio() {
   const { reelId } = useParams<{ reelId: string }>();
-  const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const { reelLikes, toggleReelLike } = useSocial();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<DuetStep>("browse");
@@ -56,9 +23,6 @@ export default function DuetStudio() {
   const [submitting, setSubmitting] = useState(false);
 
   const reel = ALL_REELS.find((r) => r.id === reelId);
-  const existingDuets = reelId
-    ? EXISTING_DUETS.filter((d) => d.originalReel.id === reelId)
-    : EXISTING_DUETS;
 
   async function handlePublish() {
     if (!response.trim() || !profile) return;
@@ -235,66 +199,15 @@ export default function DuetStudio() {
           ))}
         </div>
 
-        {/* Existing duets */}
+        {/* Community duets */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-stone-600">Recent duets in the community</p>
           </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {EXISTING_DUETS.slice(0, 9).map((duet) => {
-              const liked = !!reelLikes[duet.id];
-              return (
-                <div key={duet.id} className="group relative rounded-2xl overflow-hidden bg-stone-900 border border-white/8 hover:border-amber-500/20 transition-colors">
-                  {/* Split thumbnail preview */}
-                  <div className="relative aspect-[9/16] overflow-hidden">
-                    <div className="absolute inset-0 flex">
-                      <img
-                        src={duet.originalReel.thumbnail}
-                        alt="original"
-                        className="w-1/2 h-full object-cover opacity-80"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=350&fit=crop&seed=${duet.id}-orig`; }}
-                      />
-                      <div className="w-px bg-white/20" />
-                      <img
-                        src={duet.thumbnail}
-                        alt="response"
-                        className="w-1/2 h-full object-cover opacity-80"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=350&fit=crop&seed=${duet.id}-resp`; }}
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
-
-                    {/* Split icon */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 border border-white/20">
-                        <SplitSquareHorizontal size={12} className="text-white" />
-                      </div>
-                    </div>
-
-                    <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <img
-                          src={duet.responderAvatar}
-                          alt={duet.responderName}
-                          className="h-4 w-4 rounded-full object-cover border border-white/20"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=40&h=40&fit=crop&seed=${duet.responderId}`; }}
-                        />
-                        <span className="text-[10px] text-stone-300 truncate">{duet.responderName}</span>
-                      </div>
-                      <p className="text-[10px] text-stone-400 line-clamp-2 leading-snug">{duet.caption}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <button onClick={() => toggleReelLike(duet.id)} className="flex items-center gap-1">
-                          <Heart size={10} fill={liked ? "currentColor" : "none"} className={liked ? "text-rose-400" : "text-stone-500"} />
-                          <span className="text-[9px] text-stone-500">{(duet.likes + (liked ? 1 : 0) >= 1000 ? ((duet.likes + (liked ? 1 : 0)) / 1000).toFixed(1) + "k" : duet.likes + (liked ? 1 : 0))}</span>
-                        </button>
-                        <span className="text-[9px] text-stone-700">duet</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-8 text-center">
+            <SplitSquareHorizontal size={24} className="mx-auto mb-3 text-stone-600" />
+            <p className="text-sm text-stone-400">No duets yet</p>
+            <p className="text-xs text-stone-600 mt-1">Be the first to respond to a reel — your duet will show up here.</p>
           </div>
         </div>
 

@@ -19,14 +19,6 @@ interface DbProfile {
   craftScore: number | null;
 }
 
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
-}
-function getCraftScore(id: string, score?: number | null): number {
-  return score ?? (78 + (hash(id) % 20));
-}
 function formatFollowers(n: number): string {
   return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
 }
@@ -62,8 +54,6 @@ export default function Artists() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {staticArtists.map((artist, i) => {
             const img = artist.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${artist.id}-cover`;
-            const score = getCraftScore(artist.id);
-            const followers = formatFollowers(3000 + (hash(artist.id) % 47000));
             return (
               <motion.div key={artist.id} data-testid={`artist-card-${artist.id}`}
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -75,20 +65,12 @@ export default function Artists() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${artist.id}`; }} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                      <div className="absolute top-3 right-3">
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}>
-                          <Flame size={9} /> {score}
-                        </div>
-                      </div>
                       <div className="absolute bottom-3 left-3 right-3">
                         <p className="text-[9px] uppercase tracking-[0.2em] text-white/50 mb-0.5">{artist.medium.split(",")[0]}</p>
                         <p className="font-serif text-sm font-medium text-white leading-tight">{artist.name}</p>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="flex items-center gap-0.5 text-[9px] text-white/50">
                             <MapPin size={8} /> {artist.location.split(",")[0]}
-                          </span>
-                          <span className="flex items-center gap-0.5 text-[9px] text-white/50">
-                            <Users size={8} /> {followers}
                           </span>
                         </div>
                       </div>
@@ -102,7 +84,7 @@ export default function Artists() {
           {uniqueDbProfiles.map((p, i) => {
             const name = p.displayName ?? p.handle ?? "Artist";
             const img = p.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${p.userId}`;
-            const score = getCraftScore(p.userId, p.craftScore);
+            const score = p.craftScore;
             const followers = formatFollowers(p.followerCount);
             return (
               <motion.div key={p.userId}
@@ -115,11 +97,13 @@ export default function Artists() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         onError={e => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop&seed=${p.userId}`; }} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                      <div className="absolute top-3 right-3">
-                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}>
-                          <Flame size={9} /> {score}
+                      {score != null && (
+                        <div className="absolute top-3 right-3">
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "hsl(28 68% 52%)", color: "hsl(20 8% 9%)" }}>
+                            <Flame size={9} /> {score}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <div className="absolute bottom-3 left-3 right-3">
                         {p.medium && <p className="text-[9px] uppercase tracking-[0.2em] text-white/50 mb-0.5">{p.medium.split(",")[0]}</p>}
                         <p className="font-serif text-sm font-medium text-white leading-tight">{name}</p>

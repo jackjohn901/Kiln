@@ -23,12 +23,11 @@ const CITY_COORDS: Record<string, { x: number; y: number }> = {
   "Tucson": { x: 22, y: 63 }, "Albuquerque": { x: 28, y: 57 }, "Oklahoma City": { x: 47, y: 57 },
 };
 
-function getCoords(location: string): { x: number; y: number } {
+function getCoords(location: string): { x: number; y: number } | null {
   for (const [city, coords] of Object.entries(CITY_COORDS)) {
     if (location.toLowerCase().includes(city.toLowerCase())) return coords;
   }
-  const h = Math.abs(location.split("").reduce((a, c) => Math.imul(31, a) + c.charCodeAt(0) | 0, 0));
-  return { x: 15 + (h % 65), y: 25 + (h % 50) };
+  return null;
 }
 
 const MEDIUM_COLORS: Record<string, string> = {
@@ -57,15 +56,19 @@ interface ArtistPin {
   mediumCategory: string;
 }
 
-const PINS: ArtistPin[] = ALL_ARTISTS.map((a) => ({
-  id: a.id,
-  name: a.name,
-  medium: a.medium.split(",")[0].trim(),
-  location: a.location,
-  avatarUrl: a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`,
-  coords: getCoords(a.location),
-  mediumCategory: getMedium(a.medium),
-}));
+const PINS: ArtistPin[] = ALL_ARTISTS.flatMap((a) => {
+  const coords = getCoords(a.location);
+  if (!coords) return [];
+  return [{
+    id: a.id,
+    name: a.name,
+    medium: a.medium.split(",")[0].trim(),
+    location: a.location,
+    avatarUrl: a.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.id}`,
+    coords,
+    mediumCategory: getMedium(a.medium),
+  }];
+});
 
 const MEDIUMS = ["All", "Glass", "Metal", "Ceramics", "Fiber", "Wood", "Enamel"];
 
@@ -86,15 +89,19 @@ export default function StudioMap() {
         const existingIds = new Set(PINS.map(p => p.id));
         const newPins: ArtistPin[] = data.artists
           .filter(a => a.location && !existingIds.has(a.userId))
-          .map(a => ({
-            id: a.userId,
-            name: a.displayName,
-            medium: (a.medium ?? "Other").split(",")[0].trim(),
-            location: a.location!,
-            avatarUrl: a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.userId}`,
-            coords: getCoords(a.location!),
-            mediumCategory: getMedium(a.medium ?? "Other"),
-          }));
+          .flatMap(a => {
+            const coords = getCoords(a.location!);
+            if (!coords) return [];
+            return [{
+              id: a.userId,
+              name: a.displayName,
+              medium: (a.medium ?? "Other").split(",")[0].trim(),
+              location: a.location!,
+              avatarUrl: a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${a.userId}`,
+              coords,
+              mediumCategory: getMedium(a.medium ?? "Other"),
+            }];
+          });
         if (newPins.length > 0) setPins(prev => [...prev, ...newPins]);
       })
       .catch(() => {});
