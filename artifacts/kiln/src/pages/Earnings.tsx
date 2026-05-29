@@ -284,6 +284,10 @@ export default function Earnings() {
     URL.revokeObjectURL(url);
   }, [sales, salesSearch, salesStatus, salesSort, salesDateFrom, salesDateTo]);
 
+  // Monthly trend sparkline state
+  interface MonthSummary { month: string; label: string; total: number }
+  const [monthlyTrend, setMonthlyTrend] = useState<MonthSummary[]>([]);
+
   // Patron tier state
   const [myTiers, setMyTiers]           = useState<PatronTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
@@ -474,8 +478,21 @@ export default function Earnings() {
     } catch { /* ignore */ }
   }, [fetchBalance]);
 
+  const fetchMonthlyTrend = useCallback(async () => {
+    try {
+      const r = await fetch(
+        `/api/me/earnings/monthly-summary?months=6&year=${selectedYear}&month=${selectedMonth + 1}`,
+        { credentials: "include" },
+      );
+      if (!r.ok) return;
+      const data = await r.json() as { months?: MonthSummary[] };
+      setMonthlyTrend(data.months ?? []);
+    } catch { /* ignore */ }
+  }, [selectedYear, selectedMonth]);
+
   useEffect(() => {
     fetchEarnings().finally(() => setLoading(false));
+    void fetchMonthlyTrend();
 
     fetch("/api/payouts", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -484,7 +501,7 @@ export default function Earnings() {
       .finally(() => setPayoutLoading(false));
 
     fetchSales().finally(() => setSalesLoading(false));
-  }, [fetchEarnings, fetchSales]);
+  }, [fetchEarnings, fetchSales, fetchMonthlyTrend]);
 
   const triggerStatsFlash = useCallback(() => {
     if (statsFlashTimerRef.current) clearTimeout(statsFlashTimerRef.current);
@@ -498,6 +515,7 @@ export default function Earnings() {
       const notifType = evt.notifType as string | undefined;
       if (notifType !== "sale" && notifType !== "tip" && notifType !== "subscription") return;
       void fetchEarnings().then(triggerStatsFlash);
+      void fetchMonthlyTrend();
       void fetchSales();
       if (chargesEnabledRef.current) {
         void fetchBalance(true);
@@ -512,7 +530,7 @@ export default function Earnings() {
         saleBannerTimerRef.current = setTimeout(() => setSaleBanner(null), 8000);
       }
     });
-  }, [subscribe, fetchEarnings, fetchSales, fetchBalance, fetchStripeStatus, triggerStatsFlash]);
+  }, [subscribe, fetchEarnings, fetchMonthlyTrend, fetchSales, fetchBalance, fetchStripeStatus, triggerStatsFlash]);
 
   useEffect(() => {
     const POLL_MS = 60_000;
@@ -780,6 +798,73 @@ export default function Earnings() {
                 <p className="text-sm font-bold text-amber-400">{formatPrice(totals.total)}</p>
               </div>
             </div>
+
+            {/* 6-month sparkline trend */}
+            {monthlyTrend.length > 0 && (() => {
+              const selectedKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
+              const maxTotal = Math.max(...monthlyTrend.map(m => m.total), 1);
+              const chartH = 48;
+              const barW = 24;
+              const gap = 8;
+              const totalW = monthlyTrend.length * (barW + gap) - gap;
+
+              return (
+                <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 px-4 pt-3 pb-4">
+                  <p className="text-xs uppercase tracking-wider text-stone-500 mb-3">6-Month Trend</p>
+                  <div className="flex items-end justify-between gap-0" style={{ height: chartH + 32 }}>
+                    <svg
+                      width="100%"
+                      height={chartH + 32}
+                      viewBox={`0 0 ${totalW} ${chartH + 32}`}
+                      preserveAspectRatio="xMidYMid meet"
+                      style={{ overflow: "visible" }}
+                    >
+                      {monthlyTrend.map((m, i) => {
+                        const isSelected = m.month === selectedKey;
+                        const barH = maxTotal === 0 ? 2 : Math.max(2, Math.round((m.total / maxTotal) * chartH));
+                        const x = i * (barW + gap);
+                        const y = chartH - barH;
+                        return (
+                          <g key={m.month}>
+                            <rect
+                              x={x}
+                              y={y}
+                              width={barW}
+                              height={barH}
+                              rx={4}
+                              className={isSelected ? "fill-amber-400" : "fill-stone-700"}
+                              opacity={isSelected ? 1 : 0.7}
+                            />
+                            {isSelected && m.total > 0 && (
+                              <text
+                                x={x + barW / 2}
+                                y={y - 4}
+                                textAnchor="middle"
+                                fontSize={9}
+                                className="fill-amber-300"
+                                style={{ fontFamily: "inherit" }}
+                              >
+                                {formatPrice(m.total)}
+                              </text>
+                            )}
+                            <text
+                              x={x + barW / 2}
+                              y={chartH + 14}
+                              textAnchor="middle"
+                              fontSize={9}
+                              className={isSelected ? "fill-amber-300 font-semibold" : "fill-stone-500"}
+                              style={{ fontFamily: "inherit" }}
+                            >
+                              {m.label}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Stats */}
             <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">

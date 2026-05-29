@@ -136,6 +136,61 @@ router.get("/me/patrons", async (req, res): Promise<void> => {
   res.json({ patrons: rows.map(r => ({ ...r, tierName: tierMap[r.tierId] ?? null, startedAt: r.startedAt.toISOString() })) });
 });
 
+// GET /me/earnings/monthly-summary — trailing N months totals for sparkline chart
+// Query params: ?months=6 (default, clamped 1-12)
+//               ?year=YYYY&month=1-12 — anchor month (defaults to current month)
+//               Returns N months ending at the anchor month (inclusive).
+router.get("/me/earnings/monthly-summary", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+  const rawMonths = parseInt((req.query.months as string) || "6", 10);
+  const numMonths = Math.min(Math.max(isNaN(rawMonths) ? 6 : rawMonths, 1), 12);
+
+  const now = new Date();
+  const anchorYear = req.query.year ? parseInt(req.query.year as string, 10) : now.getFullYear();
+  const anchorMonth = req.query.month ? parseInt(req.query.month as string, 10) - 1 : now.getMonth(); // 0-indexed
+
+  const results: { month: string; label: string; total: number }[] = [];
+
+  for (let i = numMonths - 1; i >= 0; i--) {
+    // Work backwards from the anchor month
+    const start = new Date(anchorYear, anchorMonth - i, 1);
+    const end = new Date(anchorYear, anchorMonth - i + 1, 1);
+    const monthKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const label = start.toLocaleString("en-US", { month: "short" });
+
+    const [tipsAgg, subsAgg, salesAgg] = await Promise.all([
+      db.select({ total: sql<string>`COALESCE(SUM(${tipsTable.amountCents}), 0)` })
+        .from(tipsTable)
+        .where(and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"), gte(tipsTable.createdAt, start), lt(tipsTable.createdAt, end))),
+      db.select({ total: sql<string>`COALESCE(SUM(${patronSubscriptionsTable.amount}), 0)` })
+        .from(patronSubscriptionsTable)
+        .where(and(
+          eq(patronSubscriptionsTable.artistId, userId),
+          lt(patronSubscriptionsTable.startedAt, end),
+          sql`(${patronSubscriptionsTable.cancelledAt} IS NULL OR ${patronSubscriptionsTable.cancelledAt} >= ${start})`
+        )),
+      db.select({ total: sql<string>`COALESCE(SUM(${ordersTable.amount}), 0)` })
+        .from(ordersTable)
+        .where(and(
+          eq(ordersTable.sellerId, userId),
+          inArray(ordersTable.status, ["confirmed", "delivered", "shipped", "in_progress"]),
+          gte(ordersTable.createdAt, start),
+          lt(ordersTable.createdAt, end)
+        )),
+    ]);
+
+    const tipCents = Number(tipsAgg[0]?.total ?? 0);
+    const subCents = Number(subsAgg[0]?.total ?? 0);
+    const saleCents = Number(salesAgg[0]?.total ?? 0);
+    const total = (tipCents + subCents + saleCents) / 100;
+
+    results.push({ month: monthKey, label, total });
+  }
+
+  res.json({ months: results });
+});
+
 // GET /me/earnings — artist earnings summary (tips + subscriptions + shop sales)
 // Optional query params: ?month=1-12&year=YYYY — filter to a specific calendar month
 router.get("/me/earnings", async (req, res): Promise<void> => {
