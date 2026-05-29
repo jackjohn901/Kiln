@@ -4,9 +4,29 @@ import {
   usersTable, profilesTable, postsTable,
   listingsTable, dropsTable, auctionsTable, auctionBidsTable,
   workshopsTable, guildsTable, guildMembersTable,
-  patronTiersTable,
+  patronTiersTable, seedHistoryTable,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { randomUUID } from "crypto";
+
+export interface SeedActor {
+  id: string;
+  name?: string | null;
+}
+
+export interface SeedHistoryEntry {
+  id: string;
+  operation: string;
+  actorId: string | null;
+  actorName: string | null;
+  oldMarkerId: string | null;
+  newMarkerId: string;
+  userCount: number;
+  postCount: number;
+  listingCount: number;
+  guildCount: number;
+  createdAt: string;
+}
 
 const SEED_MARKER_ID = "seed-v4-marker";
 
@@ -615,9 +635,11 @@ export async function getSeedStatus(): Promise<SeedStatus> {
   };
 }
 
-export async function forceSeedDatabase(): Promise<{ users: number; posts: number; listings: number; guilds: number }> {
+export async function forceSeedDatabase(
+  actor?: SeedActor,
+): Promise<{ users: number; posts: number; listings: number; guilds: number }> {
   const currentMarkerId = await getCurrentMarkerId();
-  const result = await forceSeedDatabaseWithMarker(currentMarkerId);
+  const result = await forceSeedDatabaseWithMarker(currentMarkerId, actor, "reseed");
   return {
     users: result.users,
     posts: result.posts,
@@ -628,9 +650,13 @@ export async function forceSeedDatabase(): Promise<{ users: number; posts: numbe
 
 export async function forceSeedDatabaseWithMarker(
   newMarkerId: string,
+  actor?: SeedActor,
+  operation: string = "advance-marker",
 ): Promise<{ newMarkerId: string; users: number; posts: number; listings: number; guilds: number }> {
   const trimmed = newMarkerId.trim();
   if (!trimmed) throw new Error("newMarkerId must not be empty");
+
+  const oldMarkerId = await getCurrentMarkerId();
 
   await db.delete(usersTable).where(sql`${usersTable.id} LIKE '%-marker'`);
 
@@ -672,13 +698,57 @@ export async function forceSeedDatabaseWithMarker(
 
   logger.info({ newMarkerId: trimmed }, "Seed data re-applied with new marker");
 
-  return {
-    newMarkerId: trimmed,
+  const counts = {
     users: artistUsers.length,
     posts: SEED_POSTS.length,
     listings: SEED_LISTINGS.length,
     guilds: SEED_GUILDS.length,
   };
+
+  // Append an audit row so admins can see what changed and when. Never let a
+  // history-write failure break the actual reseed — log and continue.
+  try {
+    await db.insert(seedHistoryTable).values({
+      id: randomUUID(),
+      operation,
+      actorId: actor?.id ?? null,
+      actorName: actor?.name ?? null,
+      oldMarkerId,
+      newMarkerId: trimmed,
+      userCount: counts.users,
+      postCount: counts.posts,
+      listingCount: counts.listings,
+      guildCount: counts.guilds,
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to record seed history (non-fatal)");
+  }
+
+  return {
+    newMarkerId: trimmed,
+    ...counts,
+  };
+}
+
+export async function getSeedHistory(limit = 20): Promise<SeedHistoryEntry[]> {
+  const rows = await db.select()
+    .from(seedHistoryTable)
+    .orderBy(sql`${seedHistoryTable.createdAt} DESC`)
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    operation: r.operation,
+    actorId: r.actorId,
+    actorName: r.actorName,
+    oldMarkerId: r.oldMarkerId,
+    newMarkerId: r.newMarkerId,
+    userCount: r.userCount,
+    postCount: r.postCount,
+    listingCount: r.listingCount,
+    guildCount: r.guildCount,
+    createdAt: r.createdAt.toISOString(),
+  }));
 }
 
 export async function seedDatabase(): Promise<void> {

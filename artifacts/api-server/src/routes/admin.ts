@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker } from "../lib/seed";
+import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker, getSeedHistory } from "../lib/seed";
 import { sendEmail, broadcastEmail } from "../lib/email";
 import { randomUUID } from "crypto";
 
@@ -411,6 +411,36 @@ router.post("/admin/backfill-order-notes", async (req, res): Promise<void> => {
   }
 });
 
+// Resolve a display name for the acting admin so seed history rows are readable.
+async function getSeedActor(userId: string): Promise<{ id: string; name: string | null }> {
+  try {
+    const [profile] = await db
+      .select({ displayName: profilesTable.displayName })
+      .from(profilesTable)
+      .where(eq(profilesTable.userId, userId))
+      .limit(1);
+    return { id: userId, name: profile?.displayName ?? null };
+  } catch {
+    return { id: userId, name: null };
+  }
+}
+
+// GET /admin/seed-history — recent seed/reseed runs for the maintenance audit log
+router.get("/admin/seed-history", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const limit = Math.min(Number(req.query["limit"] ?? 20), 100);
+
+  try {
+    const history = await getSeedHistory(limit);
+    res.json({ history });
+  } catch (err) {
+    req.log.error({ err }, "admin.seedHistory error");
+    res.status(500).json({ error: "Failed to fetch seed history" });
+  }
+});
+
 // POST /admin/reseed-with-marker — re-seed and write a new marker ID
 router.post("/admin/reseed-with-marker", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -423,7 +453,8 @@ router.post("/admin/reseed-with-marker", async (req, res): Promise<void> => {
   }
 
   try {
-    const result = await forceSeedDatabaseWithMarker(newMarkerId.trim());
+    const actor = await getSeedActor(req.user.id);
+    const result = await forceSeedDatabaseWithMarker(newMarkerId.trim(), actor, "advance-marker");
     req.log.info({ result }, "admin.reseedWithMarker: completed");
     res.json(result);
   } catch (err) {
@@ -446,7 +477,8 @@ router.post("/admin/reseed", async (req, res): Promise<void> => {
       return;
     }
 
-    const result = await forceSeedDatabase();
+    const actor = await getSeedActor(req.user.id);
+    const result = await forceSeedDatabase(actor);
     req.log.info({ result }, "admin.reseed: forced reseed completed");
     res.json({ dryRun: false, ...result });
   } catch (err) {

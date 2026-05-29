@@ -73,3 +73,4 @@ export * from "./onboarding";
 export * from "./platform_tokens";
 export * from "./review_votes";
 export * from "./failed_emails";
+export * from "./seed_history";

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -69,6 +69,20 @@ interface HealthResult {
   checkedAt: string;
 }
 
+interface SeedHistoryEntry {
+  id: string;
+  operation: string;
+  actorId: string | null;
+  actorName: string | null;
+  oldMarkerId: string | null;
+  newMarkerId: string;
+  userCount: number;
+  postCount: number;
+  listingCount: number;
+  guildCount: number;
+  createdAt: string;
+}
+
 export default function AdminReports() {
   useMeta({ title: "Moderation Queue" });
   const { user } = useAuth();
@@ -107,6 +121,11 @@ export default function AdminReports() {
   const [healthResult, setHealthResult] = useState<HealthResult | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
+
+  // Seed history state
+  const [seedHistory, setSeedHistory] = useState<SeedHistoryEntry[]>([]);
+  const [seedHistoryLoading, setSeedHistoryLoading] = useState(false);
+  const [seedHistoryError, setSeedHistoryError] = useState<string | null>(null);
 
   // Broadcast email state
   const [broadcastSubject, setBroadcastSubject] = useState("");
@@ -294,6 +313,25 @@ export default function AdminReports() {
     setHealthError(null);
   }
 
+  async function loadSeedHistory() {
+    setSeedHistoryLoading(true);
+    setSeedHistoryError(null);
+    try {
+      const res = await fetch("/api/admin/seed-history", { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setSeedHistoryError(data?.error ?? "Request failed");
+        return;
+      }
+      const data = await res.json() as { history: SeedHistoryEntry[] };
+      setSeedHistory(data.history ?? []);
+    } catch {
+      setSeedHistoryError("Network error — please try again");
+    } finally {
+      setSeedHistoryLoading(false);
+    }
+  }
+
   async function previewBroadcast() {
     if (!broadcastSubject.trim() || !broadcastMessage.trim()) {
       setBroadcastError("Please enter both a subject and a message.");
@@ -388,6 +426,7 @@ export default function AdminReports() {
   useEffect(() => {
     if (section !== "maintenance") return;
     void checkMarkerSync();
+    void loadSeedHistory();
   }, [section]);
 
   useEffect(() => {
@@ -1006,6 +1045,74 @@ export default function AdminReports() {
                 <div className="flex items-center gap-2 text-xs text-stone-500">
                   <RefreshCw size={12} className="animate-spin" /> Running seed…
                 </div>
+              )}
+            </div>
+
+            {/* Seed run history card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <History size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h2 className="text-sm font-semibold text-amber-100">Seed run history</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    An audit log of every reseed and marker advance — who ran it, when, and which marker version it transitioned from and to. Use it to spot accidental reseeds.
+                  </p>
+                </div>
+                <button
+                  onClick={loadSeedHistory}
+                  disabled={seedHistoryLoading}
+                  className="shrink-0 text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-40"
+                  title="Refresh history"
+                >
+                  <RefreshCw size={14} className={seedHistoryLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+
+              {seedHistoryError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {seedHistoryError}
+                </div>
+              )}
+
+              {!seedHistoryError && seedHistory.length === 0 && !seedHistoryLoading && (
+                <p className="text-xs text-stone-600">No seed runs recorded yet. Once you reseed or advance the marker, runs will appear here.</p>
+              )}
+
+              {seedHistory.length > 0 && (
+                <ul className="space-y-2">
+                  {seedHistory.map((entry) => (
+                    <li key={entry.id} className="rounded-xl border border-white/5 bg-stone-950/40 px-4 py-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full ${entry.operation === "advance-marker" ? "bg-amber-500/15 text-amber-400" : "bg-stone-700/40 text-stone-300"}`}>
+                          {entry.operation === "advance-marker" ? "Advanced marker" : "Reseed"}
+                        </span>
+                        <span className="text-[10px] text-stone-600">
+                          {new Date(entry.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-400 flex items-center gap-1.5 flex-wrap">
+                        {entry.oldMarkerId && entry.oldMarkerId !== entry.newMarkerId ? (
+                          <>
+                            <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-stone-400">{entry.oldMarkerId}</span>
+                            <span className="text-stone-600">→</span>
+                            <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-stone-300">{entry.newMarkerId}</span>
+                          </>
+                        ) : (
+                          <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded text-stone-300">{entry.newMarkerId}</span>
+                        )}
+                      </p>
+                      <p className="text-[10px] text-stone-500">
+                        by{" "}
+                        <span className="text-stone-400">{entry.actorName ?? "Unknown"}</span>
+                        {entry.actorId && (
+                          <span className="font-mono text-stone-600"> ({entry.actorId})</span>
+                        )}
+                        {" · "}
+                        {entry.userCount} artists · {entry.postCount} posts · {entry.listingCount} listings · {entry.guildCount} guilds
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 
