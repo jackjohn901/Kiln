@@ -159,6 +159,78 @@ router.get("/messages/thread-by-user/:userId", async (req, res): Promise<void> =
   }
 });
 
+// GET /messages/thread-by-order/:orderId — find the thread between the order's
+// buyer & seller plus the latest message from the OTHER participant. Read-only:
+// does NOT mark anything read, so glancing at it on the order page is side-effect free.
+router.get("/messages/thread-by-order/:orderId", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { orderId } = req.params;
+  const me = req.user.id;
+
+  try {
+    const [order] = await db.select({ buyerId: ordersTable.buyerId, sellerId: ordersTable.sellerId })
+      .from(ordersTable).where(eq(ordersTable.id, orderId));
+    if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+    if (order.buyerId !== me && order.sellerId !== me) {
+      res.status(403).json({ error: "Forbidden" }); return;
+    }
+
+    const otherId = order.buyerId === me ? order.sellerId : order.buyerId;
+
+    const [thread] = await db.select().from(messageThreadsTable)
+      .where(or(
+        and(eq(messageThreadsTable.participantA, me), eq(messageThreadsTable.participantB, otherId)),
+        and(eq(messageThreadsTable.participantA, otherId), eq(messageThreadsTable.participantB, me)),
+      ));
+
+    const [otherProfile] = await db.select({
+      displayName: profilesTable.displayName,
+      avatarUrl: profilesTable.avatarUrl,
+      handle: profilesTable.handle,
+    }).from(profilesTable).where(eq(profilesTable.userId, otherId));
+
+    let latestMessage: {
+      id: string;
+      senderId: string;
+      senderName: string;
+      senderAvatarUrl: string | null;
+      text: string;
+      attachmentUrl: string | null;
+      createdAt: string;
+    } | null = null;
+
+    if (thread) {
+      const [msg] = await db.select().from(messagesTable)
+        .where(and(eq(messagesTable.threadId, thread.id), eq(messagesTable.senderId, otherId)))
+        .orderBy(desc(messagesTable.createdAt))
+        .limit(1);
+      if (msg) {
+        latestMessage = {
+          id: msg.id,
+          senderId: msg.senderId,
+          senderName: msg.senderName,
+          senderAvatarUrl: msg.senderAvatarUrl,
+          text: msg.text,
+          attachmentUrl: msg.attachmentUrl,
+          createdAt: msg.createdAt.toISOString(),
+        };
+      }
+    }
+
+    res.json({
+      threadId: thread?.id ?? null,
+      otherUserId: otherId,
+      otherUserName: otherProfile?.displayName ?? "Artist",
+      otherUserAvatar: otherProfile?.avatarUrl ?? null,
+      otherUserHandle: otherProfile?.handle ?? null,
+      latestMessage,
+    });
+  } catch (err) {
+    req.log.error({ err }, "threadByOrder error");
+    res.status(500).json({ error: "Failed to look up order thread" });
+  }
+});
+
 // POST /messages/threads/:threadId/read — mark all received messages in the thread as read
 router.post("/messages/threads/:threadId/read", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

@@ -3,12 +3,13 @@ import { Link, useLocation, useParams, useSearch } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail, Link2, Check, Download, Pencil, X,
+  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 import { useSocial } from "@/contexts/SocialContext";
+import { toast } from "@/hooks/use-toast";
 
 interface Order {
   id: string;
@@ -169,6 +170,25 @@ interface SellerProfile {
   avatarUrl: string | null;
 }
 
+interface OrderThreadMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatarUrl: string | null;
+  text: string;
+  attachmentUrl: string | null;
+  createdAt: string;
+}
+
+interface OrderThreadInfo {
+  threadId: string | null;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserAvatar: string | null;
+  otherUserHandle: string | null;
+  latestMessage: OrderThreadMessage | null;
+}
+
 export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
@@ -189,6 +209,10 @@ export default function OrderDetail() {
   const [addressDraft, setAddressDraft] = useState("");
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
+  const [orderThread, setOrderThread] = useState<OrderThreadInfo | null>(null);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(
     highlightParam === "shipped" || highlightParam === "delivered",
   );
@@ -252,6 +276,27 @@ export default function OrderDetail() {
 
     void load();
   }, [id, sessionKey]);
+
+  // Load the order's message thread (latest artist message) so the buyer can
+  // glance at it and reply inline. Only for authenticated single-order views.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    async function loadThread() {
+      try {
+        const r = await fetch(`/api/messages/thread-by-order/${encodeURIComponent(id!)}`, {
+          credentials: "include",
+        });
+        if (!r.ok) return;
+        const data = await r.json() as OrderThreadInfo;
+        if (!cancelled) setOrderThread(data);
+      } catch {
+        // ignore — quick-reply just won't render
+      }
+    }
+    void loadThread();
+    return () => { cancelled = true; };
+  }, [id]);
 
   const handleCopyLink = useCallback((rawNotes: string | null) => {
     const key = rawNotes?.startsWith("stripe:") ? rawNotes.slice(7) : null;
@@ -328,6 +373,46 @@ export default function OrderDetail() {
       setAddressSaving(false);
     }
   }
+  async function handleSendReply() {
+    if (!order) return;
+    const text = replyDraft.trim();
+    if (!text) return;
+    const recipientId = orderThread?.otherUserId ?? order.sellerId;
+    if (!recipientId) return;
+    setReplySending(true);
+    setReplyError(null);
+    try {
+      const r = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ recipientId, text, orderId: order.id }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({})) as { error?: string };
+        setReplyError(data.error ?? "Couldn't send your reply. Please try again.");
+        toast({
+          title: "Couldn't send your reply",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setReplyDraft("");
+      // Open the full thread so the buyer can continue the conversation.
+      navigate(`/messages/${recipientId}?orderId=${order.id}`);
+    } catch {
+      setReplyError("Network error — please try again.");
+      toast({
+        title: "Couldn't send your reply",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setReplySending(false);
+    }
+  }
+
   const cartTotal = isCartOrder ? siblingOrders.reduce((sum, o) => sum + o.amount, 0) : order.amount;
 
   function handlePrint() {
@@ -913,6 +998,78 @@ export default function OrderDetail() {
               <FileText size={14} className="text-stone-500 shrink-0 mt-0.5" />
               <p className="text-sm text-stone-400">{order.notes}</p>
             </div>
+          </div>
+        )}
+
+        {orderThread?.latestMessage && (
+          <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                Message from the artist
+              </p>
+              {orderThread.threadId && (
+                <button
+                  onClick={() => navigate(`/messages/${orderThread.otherUserId}?orderId=${order.id}`)}
+                  className="text-xs text-stone-500 hover:text-amber-300 transition-colors"
+                >
+                  View thread
+                </button>
+              )}
+            </div>
+            <div className="flex items-start gap-3">
+              {orderThread.latestMessage.senderAvatarUrl ?? orderThread.otherUserAvatar ? (
+                <img
+                  src={orderThread.latestMessage.senderAvatarUrl ?? orderThread.otherUserAvatar ?? ""}
+                  alt={orderThread.otherUserName}
+                  className="h-8 w-8 flex-shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                />
+              ) : (
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-stone-700 text-xs font-semibold text-stone-300 ring-1 ring-white/10">
+                  {(orderThread.otherUserName || "?")[0].toUpperCase()}
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="rounded-2xl rounded-tl-sm bg-stone-800 px-3.5 py-2.5">
+                  {orderThread.latestMessage.text && (
+                    <p className="text-sm text-stone-200 whitespace-pre-line break-words">
+                      {orderThread.latestMessage.text}
+                    </p>
+                  )}
+                  {orderThread.latestMessage.attachmentUrl && (
+                    <p className="text-xs text-stone-500 mt-1">📎 Sent an image</p>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-stone-600">
+                  {orderThread.otherUserName} ·{" "}
+                  <RelativeTime since={orderThread.latestMessage.createdAt} className="text-[11px] text-stone-600" />
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={replyDraft}
+                onChange={(e) => { setReplyDraft(e.target.value); if (replyError) setReplyError(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSendReply();
+                  }
+                }}
+                disabled={replySending}
+                placeholder="Write a reply…"
+                className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-3.5 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none disabled:opacity-50"
+              />
+              <button
+                onClick={() => { void handleSendReply(); }}
+                disabled={replySending || replyDraft.trim().length === 0}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+              >
+                {replySending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              </button>
+            </div>
+            {replyError && <p className="mt-2 text-xs text-rose-400">{replyError}</p>}
           </div>
         )}
 
