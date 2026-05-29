@@ -109,109 +109,7 @@ const VERIFIED_ARTIST_IDS = [
   "michael-rogers",
 ];
 
-const SEED_RECEIVED_INQUIRIES: CommissionInquiry[] = [
-  {
-    id: "recv-001",
-    toArtistId: "__current_user__",
-    toArtistName: "You",
-    fromName: "Rachel Osei",
-    fromEmail: "rachel@collectorsclub.com",
-    fromHandle: "rachel-osei",
-    type: "custom",
-    description: "I've been following your work for two years and would love to commission a custom piece for our new dining room. We're looking for something in your signature style, approximately 18\" tall, in warm amber tones to complement natural wood furniture.",
-    budget: "$3,000–$5,000",
-    timeline: "3–4 months",
-    dimensions: "~18\" H × 10\" W",
-    status: "pending",
-    createdAt: "2026-05-14T09:30:00Z",
-  },
-  {
-    id: "recv-002",
-    toArtistId: "__current_user__",
-    toArtistName: "You",
-    fromName: "James Whitfield",
-    fromEmail: "james@whitfieldgallery.com",
-    fromHandle: "whitfield-gallery",
-    type: "series",
-    description: "We're curating a group show on craft and materiality opening in October. We'd love to discuss including 2–3 pieces from your recent series. We handle shipping and insurance, and we take 40%.",
-    budget: "Gallery terms",
-    timeline: "By September 1, 2026",
-    status: "pending",
-    createdAt: "2026-05-13T14:15:00Z",
-  },
-  {
-    id: "recv-003",
-    toArtistId: "__current_user__",
-    toArtistName: "You",
-    fromName: "Mei Lin",
-    fromEmail: "mei@designstudio.co",
-    fromHandle: "mei-lin",
-    type: "custom",
-    description: "We're designing a hotel lobby in Portland and are looking for a statement art piece for the entrance. Your work was recommended by two of our other artist partners. Budget is flexible for the right piece.",
-    budget: "$8,000–$15,000",
-    timeline: "6 months",
-    dimensions: "Large-scale, 3'–5' in some dimension",
-    status: "accepted",
-    createdAt: "2026-05-08T11:00:00Z",
-  },
-];
 
-const SEED_MESSAGE_THREADS: MessageThread[] = [
-  {
-    id: "thread-001",
-    participantId: "alex-bernstein",
-    participantName: "Alex Bernstein",
-    participantAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80",
-    lastMessageAt: "2026-05-14T16:20:00Z",
-    messages: [
-      {
-        id: "msg-001",
-        senderId: "alex-bernstein",
-        senderName: "Alex Bernstein",
-        senderAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80",
-        text: "Hey — saw your post from the hot shop yesterday. What temperature are you working at for that blue color? Mine always goes greenish.",
-        createdAt: "2026-05-14T14:30:00Z",
-        read: true,
-      },
-      {
-        id: "msg-002",
-        senderId: "__current_user__",
-        senderName: "You",
-        senderAvatar: "",
-        text: "I'm hitting the cobalt at around 2,100°F and keeping the gather cooler on the outside before I add it. The greenish shift usually means it's picking up iron from the batch — what furnace glass are you using?",
-        createdAt: "2026-05-14T15:05:00Z",
-        read: true,
-      },
-      {
-        id: "msg-003",
-        senderId: "alex-bernstein",
-        senderName: "Alex Bernstein",
-        senderAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80",
-        text: "Gaffer. Maybe I need a fresher batch. Thanks — that helps.",
-        createdAt: "2026-05-14T16:20:00Z",
-        read: false,
-      },
-    ],
-  },
-  {
-    id: "thread-002",
-    participantId: "maya-chen",
-    participantName: "Maya Chen",
-    participantAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80",
-    lastMessageAt: "2026-05-12T10:45:00Z",
-    messages: [
-      {
-        id: "msg-004",
-        senderId: "maya-chen",
-        senderName: "Maya Chen",
-        senderAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80",
-        text: "Just reserved a spot in your workshop. So excited — I've been wanting to understand reduction firing properly for years.",
-        createdAt: "2026-05-12T10:45:00Z",
-        read: true,
-      },
-    ],
-  },
-];
 
 interface RepostRecord {
   reelId: string;
@@ -323,56 +221,9 @@ interface SocialContextType extends SocialState {
 
 const SocialContext = createContext<SocialContextType>({} as SocialContextType);
 
-const STORAGE_KEY = "kiln_social_v3";
+const STORAGE_KEY = "kiln_social_v4";
 
-const SEED_STATUSES: Record<string, CommissionStatus> = {
-  "alex-bernstein": "waitlisted",
-  "lino-tagliapietra": "closed",
-  "william-morris": "closed",
-  "dante-marioni": "open",
-  "richard-royal": "open",
-  "john-kiley": "open",
-  "caleb-siemon": "waitlisted",
-  "erica-rosenfeld": "open",
-  "laura-donefer": "open",
-  "michael-rogers": "open",
-  "maya-chen": "open",
-  "james-okafor": "open",
-  "elena-vasquez": "waitlisted",
-  "takeshi-mori": "open",
-  "sarah-thornton": "open",
-  "marcus-williams": "open",
-  "ingrid-larsson": "closed",
-  "priya-patel": "open",
-  "rafael-santos": "waitlisted",
-  "anna-kowalski": "open",
-  "david-park": "open",
-  "yuki-nakamura": "closed",
-  "amara-diallo": "open",
-  "ben-torres": "open",
-  "mateo-garcia": "open",
-  "freya-lindqvist": "waitlisted",
-  "sonja-berg": "open",
-  "kwame-asante": "open",
-  "leila-nouri": "open",
-  "riku-sato": "closed",
-  "celia-moss": "open",
-  "tomas-novak": "waitlisted",
-  "hana-kim": "open",
-  "felix-braun": "open",
-  "ines-costa": "open",
-  "petra-vance": "open",
-};
 
-const SEED_COMMENTS: Record<string, KilnComment[]> = {
-  "maya-chen-dQhKVFbpZoQ": [
-    { id: "sc1", postId: "maya-chen-dQhKVFbpZoQ", authorId: "visitor1", authorName: "Clara H.", authorAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=clara", text: "The way the celadon pools in those textures — absolutely stunning.", likes: 7, createdAt: "2026-05-10T14:22:00Z" },
-    { id: "sc2", postId: "maya-chen-dQhKVFbpZoQ", authorId: "visitor2", authorName: "Erik L.", authorAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=erik", text: "How long does the reduction firing take?", likes: 2, createdAt: "2026-05-11T09:40:00Z" },
-  ],
-  "james-okafor-8P8U8PzFHV8": [
-    { id: "sc3", postId: "james-okafor-8P8U8PzFHV8", authorId: "visitor3", authorName: "Mia T.", authorAvatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=mia", text: "I want this in my living room. Is this available?", likes: 4, createdAt: "2026-05-09T18:00:00Z" },
-  ],
-};
 
 function defaultState(): SocialState {
   return {
@@ -389,18 +240,18 @@ function defaultState(): SocialState {
         createdAt: new Date().toISOString(),
       },
     ],
-    comments: SEED_COMMENTS,
+    comments: {},
     commissions: [],
-    receivedInquiries: SEED_RECEIVED_INQUIRIES,
+    receivedInquiries: [],
     tips: [],
     myCommissionStatus: "open",
-    artistCommissionStatuses: SEED_STATUSES,
+    artistCommissionStatuses: {},
     reelLikes: {},
     reelSaves: {},
     reelReposts: {},
     dropsWaitlisted: {},
     subscriptions: [],
-    threads: SEED_MESSAGE_THREADS,
+    threads: [],
     verifiedArtists: VERIFIED_ARTIST_IDS,
     reviews: [],
     blocked: [],

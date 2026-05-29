@@ -30,87 +30,6 @@ interface CommunityEvent {
   link?: string;
 }
 
-const SEED_EVENTS: CommunityEvent[] = [
-  {
-    id: "evt-001",
-    title: "Open Studio: Summer Works",
-    type: "open-studio",
-    mode: "in-person",
-    date: "2026-05-24",
-    time: "12:00 PM – 5:00 PM",
-    location: "Bernstein Glass Studio, Asheville NC",
-    city: "Asheville, NC",
-    artistName: "Alex Bernstein",
-    description: "Come visit the studio and see the new Summer series in progress. Glass blowing demonstrations every hour. Light refreshments, no reservation required.",
-    attendees: 42,
-  },
-  {
-    id: "evt-002",
-    title: "Pacific Northwest Glass Summit",
-    type: "gallery",
-    mode: "in-person",
-    date: "2026-06-07",
-    time: "6:00 PM – 9:00 PM",
-    location: "Habatat Gallery, Seattle WA",
-    city: "Seattle, WA",
-    artistName: "Multiple Artists",
-    description: "Annual gathering of PNW studio glass artists. Opening reception for the summer group show featuring Lino Tagliapietra, Dante Marioni, Richard Royal, and eight emerging artists.",
-    attendees: 178,
-    link: "https://habatat.com",
-  },
-  {
-    id: "evt-003",
-    title: "Virtual Critique Circle: Process & Intent",
-    type: "virtual",
-    mode: "virtual",
-    date: "2026-05-28",
-    time: "7:00 PM ET",
-    location: "Zoom — link sent on RSVP",
-    city: "Virtual",
-    artistName: "Kiln Community",
-    description: "Monthly group critique session open to all Kiln members. Bring 1–3 images of recent work and be ready to share your process. Max 12 participants for deep conversation.",
-    attendees: 9,
-  },
-  {
-    id: "evt-004",
-    title: "Craft Fair & Collector Preview",
-    type: "fair",
-    mode: "in-person",
-    date: "2026-06-14",
-    time: "10:00 AM – 4:00 PM",
-    location: "Union Hall, Portland OR",
-    city: "Portland, OR",
-    artistName: "Portland Craft Collective",
-    description: "Juried craft market featuring 35 studio artists across glass, ceramics, metalwork, and fiber. Collector preview 9–10 AM with introductions by the artists.",
-    attendees: 312,
-  },
-  {
-    id: "evt-005",
-    title: "Kiln Meetup: NYC Glass Community",
-    type: "workshop-social",
-    mode: "hybrid",
-    date: "2026-06-02",
-    time: "6:30 PM – 9:00 PM",
-    location: "Urban Glass, Brooklyn NY",
-    city: "New York, NY",
-    artistName: "Kiln NYC Chapter",
-    description: "Informal gathering for NYC-area Kiln members. Studio tour of Urban Glass, then drinks and conversation. Virtual attendees welcome — we'll keep a camera rolling.",
-    attendees: 27,
-  },
-  {
-    id: "evt-006",
-    title: "Virtual Artist Talk: Developing a Series",
-    type: "virtual",
-    mode: "virtual",
-    date: "2026-06-10",
-    time: "2:00 PM PT",
-    location: "Kiln Live — watch in the app",
-    city: "Virtual",
-    artistName: "Laura Donefer",
-    description: "Award-winning glass artist Laura Donefer talks through her process for developing a major series — from initial concept to final exhibition. Q&A to follow.",
-    attendees: 204,
-  },
-];
 
 const TYPE_LABELS: Record<EventType, string> = {
   "open-studio": "Open Studio",
@@ -168,7 +87,7 @@ export default function CommunityEvents() {
       .catch(() => {});
   }, []);
 
-  const allEvents = [...SEED_EVENTS, ...apiEvents, ...customEvents]
+  const allEvents = [...apiEvents, ...customEvents]
     .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 

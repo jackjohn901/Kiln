@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useSocial } from "@/contexts/SocialContext";
 
 const STORAGE_KEY = "kiln_newsletters_v1";
 
@@ -28,26 +27,6 @@ function writeSent(items: SentNewsletter[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch {}
 }
 
-const SEED_NEWSLETTERS: SentNewsletter[] = [
-  {
-    id: "nl-001",
-    subject: "New series dropping this Friday 🔥",
-    body: "Hey everyone — after three months in the hot shop I'm finally ready to share the Vessel Series. Twelve pieces, each one exploring how heat transforms color. Friday at noon, shop goes live.",
-    audience: "all",
-    sentAt: new Date(Date.now() - 14 * 86400000).toISOString(),
-    recipientCount: 847,
-    openRate: 68,
-  },
-  {
-    id: "nl-002",
-    subject: "Workshop spots opening Monday",
-    body: "Quick note for patrons — I'm opening 6 spots in the September intensive before it goes public. These will be small groups (max 4), full day, hot shop access. Reply to claim.",
-    audience: "patrons",
-    sentAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    recipientCount: 124,
-    openRate: 81,
-  },
-];
 
 type Audience = "all" | "patrons" | "supporters" | "followers";
 
@@ -58,11 +37,6 @@ const AUDIENCE_OPTIONS: { key: Audience; label: string; desc: string; icon: Reac
   { key: "followers", label: "Followers", desc: "Everyone following your profile", icon: Users, color: "text-blue-400" },
 ];
 
-function audienceCount(audience: Audience): number {
-  const counts: Record<Audience, number> = { all: 847, patrons: 124, supporters: 312, followers: 2840 };
-  return counts[audience];
-}
-
 const AI_TEMPLATES = [
   { label: "New work drop", text: "After weeks in the studio, I'm thrilled to share something new. {project description}. Available in the shop this {day} — limited pieces, first come first served." },
   { label: "Workshop announcement", text: "Exciting news — I'm opening registration for my upcoming {workshop name} workshop. Small group, hands-on, and designed for {skill level}. Details and booking in the link below." },
@@ -72,7 +46,6 @@ const AI_TEMPLATES = [
 
 export default function Newsletter() {
   const { profile } = useProfile();
-  const { following } = useSocial();
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -81,11 +54,11 @@ export default function Newsletter() {
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [history, setHistory] = useState<SentNewsletter[]>(SEED_NEWSLETTERS);
+  const [history, setHistory] = useState<SentNewsletter[]>([]);
   const [showHistory, setShowHistory] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sendError, setSendError] = useState("");
 
-  const recipientCount = audienceCount(audience);
   const canSend = subject.trim().length > 0 && body.trim().length > 10;
   const wordCount = body.split(/\s+/).filter(Boolean).length;
 
@@ -94,13 +67,7 @@ export default function Newsletter() {
     fetch("/api/me/newsletters", { credentials: "include" })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
-        if (data?.newsletters?.length) {
-          setHistory(prev => {
-            const serverIds = new Set(data.newsletters.map((n: SentNewsletter) => n.id));
-            const seeds = prev.filter(n => !serverIds.has(n.id) && n.id.startsWith("nl-00"));
-            return [...data.newsletters, ...seeds];
-          });
-        }
+        if (data?.newsletters) setHistory(data.newsletters);
       })
       .catch(() => {});
   }, []);
@@ -108,27 +75,30 @@ export default function Newsletter() {
   async function handleSend() {
     if (!canSend) return;
     setSending(true);
+    setSendError("");
     try {
       const r = await fetch("/api/newsletters", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, body, audience, recipientCount }),
+        body: JSON.stringify({ subject, body, audience }),
       });
-      const data = r.ok ? await r.json() : null;
-      const newsletter: SentNewsletter = data
-        ? { id: data.id, subject: data.subject, body: data.body, audience: data.audience, sentAt: data.sentAt, recipientCount: data.recipientCount, openRate: 0 }
-        : { id: `nl-${Date.now()}`, subject, body, audience, sentAt: new Date().toISOString(), recipientCount, openRate: 0 };
+      if (!r.ok) throw new Error("send failed");
+      const data = await r.json();
+      const newsletter: SentNewsletter = {
+        id: data.id, subject: data.subject, body: data.body, audience: data.audience,
+        sentAt: data.sentAt, recipientCount: data.recipientCount ?? 0, openRate: 0,
+      };
       setHistory(prev => [newsletter, ...prev.filter(n => n.id !== newsletter.id)]);
+      setSent(true);
+      setSubject("");
+      setBody("");
+      setTimeout(() => setSent(false), 4000);
     } catch {
-      const newsletter: SentNewsletter = { id: `nl-${Date.now()}`, subject, body, audience, sentAt: new Date().toISOString(), recipientCount, openRate: 0 };
-      setHistory(prev => [newsletter, ...prev]);
+      setSendError("Couldn't send your newsletter. Please try again.");
+    } finally {
+      setSending(false);
     }
-    setSending(false);
-    setSent(true);
-    setSubject("");
-    setBody("");
-    setTimeout(() => setSent(false), 4000);
   }
 
   function applyTemplate(text: string) {
@@ -163,10 +133,17 @@ export default function Newsletter() {
               className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/8 px-4 py-3"
             >
               <Check size={16} className="text-emerald-400" />
-              <p className="text-sm text-emerald-300">Newsletter sent to {recipientCount.toLocaleString()} subscribers!</p>
+              <p className="text-sm text-emerald-300">Newsletter sent!</p>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {sendError && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-rose-500/25 bg-rose-500/8 px-4 py-3">
+            <X size={16} className="text-rose-400" />
+            <p className="text-sm text-rose-300">{sendError}</p>
+          </div>
+        )}
 
         {/* Compose card */}
         <div className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden mb-4">
@@ -187,7 +164,7 @@ export default function Newsletter() {
                   <Icon size={14} className={`${color} mt-0.5 shrink-0`} />
                   <div className="min-w-0">
                     <p className={`text-xs font-semibold ${audience === key ? "text-amber-200" : "text-stone-300"}`}>{label}</p>
-                    <p className="text-[10px] text-stone-600 leading-snug">{audienceCount(key as Audience).toLocaleString()} recipients</p>
+                    <p className="text-[10px] text-stone-600 leading-snug">{desc}</p>
                   </div>
                 </button>
               ))}
@@ -263,7 +240,6 @@ export default function Newsletter() {
               <Eye size={12} /> Preview
             </button>
             <div className="flex-1" />
-            <p className="text-xs text-stone-600 mr-2">{recipientCount.toLocaleString()} recipients</p>
             <button
               onClick={handleSend}
               disabled={!canSend || sending}
@@ -342,7 +318,7 @@ export default function Newsletter() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-stone-200 truncate">{nl.subject}</p>
                             <p className="text-xs text-stone-600">
-                              {new Date(nl.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {nl.recipientCount.toLocaleString()} sent
+                              {new Date(nl.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{nl.recipientCount > 0 ? ` · ${nl.recipientCount.toLocaleString()} sent` : ""}
                               {nl.openRate > 0 && ` · ${nl.openRate}% opened`}
                             </p>
                           </div>

@@ -26,76 +26,6 @@ interface StudioEvent {
   status: string;
 }
 
-const SEED_EVENTS: StudioEvent[] = [
-  {
-    id: "seed-1",
-    artistId: "artist-1",
-    artistName: "Elena Rossi",
-    artistAvatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elena",
-    title: "Oil Painting Open House",
-    description: "Come see my latest series of Mediterranean landscapes and enjoy some light refreshments.",
-    eventDate: new Date(Date.now() + 86400000 * 5).toISOString(),
-    durationMins: 180,
-    maxAttendees: 15,
-    attendeeCount: 12,
-    price: 0,
-    location: "Studio 4B, The Arts District",
-    address: "123 Creative Way, Portland, OR",
-    isVirtual: false,
-    status: "upcoming"
-  },
-  {
-    id: "seed-2",
-    artistId: "artist-2",
-    artistName: "Marcus Chen",
-    artistAvatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus",
-    title: "Pottery Wheel Live Demo",
-    description: "A live demonstration of large-scale vessel throwing followed by a studio tour.",
-    eventDate: new Date(Date.now() + 86400000 * 7).toISOString(),
-    durationMins: 120,
-    maxAttendees: 20,
-    attendeeCount: 8,
-    price: 1500,
-    location: "Chen Ceramics Studio",
-    address: "456 Clay St, Seattle, WA",
-    isVirtual: false,
-    status: "upcoming"
-  },
-  {
-    id: "seed-3",
-    artistId: "artist-3",
-    artistName: "Sarah Jenkins",
-    artistAvatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    title: "Virtual Sketchbook Tour",
-    description: "Join me online as I walk through my process and show sketches that never made it to canvas.",
-    eventDate: new Date(Date.now() + 86400000 * 3).toISOString(),
-    durationMins: 60,
-    maxAttendees: 50,
-    attendeeCount: 15,
-    price: 0,
-    location: "Online / Zoom",
-    address: "Link provided after RSVP",
-    isVirtual: true,
-    status: "upcoming"
-  },
-  {
-    id: "seed-4",
-    artistId: "artist-4",
-    artistName: "David Miller",
-    artistAvatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-    title: "Sculpture Foundry Visit",
-    description: "Witness the bronze casting process in person. Safety gear provided.",
-    eventDate: new Date(Date.now() + 86400000 * 10).toISOString(),
-    durationMins: 240,
-    maxAttendees: 10,
-    attendeeCount: 9,
-    price: 5000,
-    location: "Miller Foundry",
-    address: "789 Industrial Blvd, Chicago, IL",
-    isVirtual: false,
-    status: "upcoming"
-  }
-];
 
 export default function StudioOpenDays() {
   const [events, setEvents] = useState<StudioEvent[]>([]);
@@ -111,13 +41,13 @@ export default function StudioOpenDays() {
       const res = await fetch("/api/studio-events");
       if (res.ok) {
         const data = await res.json();
-        setEvents([...data, ...SEED_EVENTS]);
+        setEvents(data);
       } else {
-        setEvents(SEED_EVENTS);
+        setEvents([]);
       }
     } catch (error) {
       console.error("Failed to fetch events:", error);
-      setEvents(SEED_EVENTS);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -131,14 +61,6 @@ export default function StudioOpenDays() {
         variant: "destructive",
       });
       return;
-    }
-
-    if (eventId.startsWith("seed-")) {
-        toast({
-            title: "RSVP Successful",
-            description: "You're on the list for this demo event!",
-        });
-        return;
     }
 
     try {

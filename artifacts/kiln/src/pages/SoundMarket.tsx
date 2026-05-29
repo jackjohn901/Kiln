@@ -14,149 +14,6 @@ import {
 } from "@/lib/beatLicenses";
 import { createBeatLooper } from "@/lib/beatSynth";
 
-// ── Seed "platform beats" from fictional Kiln artists ─────────────────────────
-// Shown when the community library has few beats, so the market feels alive.
-
-function b(p: number[]): boolean[] { return p.map(Boolean); }
-
-const SEED_BEATS: CommunityBeat[] = [
-  {
-    id: "seed-1", title: "Clay Session", artistHandle: "wheelwright", artistName: "The Wheelwright",
-    bpm: 95, license: "community", price: 1, createdAt: "2026-04-10T08:00:00Z", usedCount: 34,
-    genre: "Jazz", steps: 16,
-    pattern: [
-      b([1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,1]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([1,0,1,0, 1,1,1,0, 1,0,1,0, 1,1,1,0]),
-      b([0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([0,0,1,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-      b([1,0,0,0, 0,1,0,0, 1,0,0,1, 0,0,1,0]),
-      b([1,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([0,0,0,1, 0,0,1,0, 0,1,0,0, 0,0,0,1]),
-    ],
-  },
-  {
-    id: "seed-2", title: "Kiln Fire", artistHandle: "ceramist", artistName: "Ceramist",
-    bpm: 128, license: "free", price: 0, createdAt: "2026-04-05T12:00:00Z", usedCount: 87,
-    genre: "House", steps: 16,
-    pattern: [
-      b([1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1]),
-      b([1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0]),
-      b([0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1]),
-      b([1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1]),
-      b([1,0,0,0, 0,0,1,0, 1,0,0,0, 0,1,0,0]),
-      b([1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0]),
-      b([0,0,1,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
-    ],
-  },
-  {
-    id: "seed-3", title: "Glaze Waves", artistHandle: "potterella", artistName: "Potterella",
-    bpm: 78, license: "free", price: 0, createdAt: "2026-03-28T09:00:00Z", usedCount: 62,
-    genre: "Lo-Fi", steps: 16,
-    pattern: [
-      b([1,0,0,0, 0,0,0,1, 1,0,0,0, 0,0,0,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([1,0,1,0, 0,1,1,0, 1,1,0,0, 0,1,1,0]),
-      b([0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([0,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0]),
-      b([1,0,0,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-      b([0,0,0,1, 0,0,0,0, 0,0,1,0, 0,0,0,1]),
-    ],
-  },
-  {
-    id: "seed-4", title: "Throwing Session", artistHandle: "thrownpot", artistName: "Thrown Pot",
-    bpm: 105, license: "community", price: 1, createdAt: "2026-04-18T14:00:00Z", usedCount: 28,
-    genre: "Original", steps: 16,
-    pattern: [
-      b([1,0,0,1, 0,0,1,0, 1,0,0,0, 0,1,0,0]),
-      b([0,0,1,0, 0,0,0,1, 0,0,1,0, 0,0,1,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,0,1]),
-      b([0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0]),
-      b([1,0,1,0, 0,1,0,1, 1,0,1,0, 0,1,0,1]),
-      b([0,0,0,1, 0,0,0,0, 0,0,0,0, 0,0,0,1]),
-      b([1,0,0,0, 0,1,0,0, 1,0,0,0, 0,0,0,1]),
-      b([0,1,0,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-      b([0,0,0,1, 0,1,0,0, 1,0,0,0, 0,0,1,0]),
-    ],
-  },
-  {
-    id: "seed-5", title: "Studio Night", artistHandle: "slipcast", artistName: "Slipcast",
-    bpm: 92, license: "premium", price: 5, createdAt: "2026-05-01T20:00:00Z", usedCount: 19,
-    genre: "Hip-Hop", steps: 16,
-    pattern: [
-      b([1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,1]),
-      b([0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0]),
-      b([0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1]),
-      b([0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,1]),
-      b([1,0,0,0, 0,0,1,0, 0,1,0,0, 0,0,0,1]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 0,1,0,0]),
-      b([0,0,1,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-    ],
-  },
-  {
-    id: "seed-6", title: "Electric Kiln", artistHandle: "wireform", artistName: "Wireform",
-    bpm: 135, license: "community", price: 1, createdAt: "2026-05-10T11:00:00Z", usedCount: 41,
-    genre: "Techno", steps: 16,
-    pattern: [
-      b([1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1]),
-      b([1,1,0,1, 1,0,1,1, 1,1,0,1, 1,0,1,1]),
-      b([0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0]),
-      b([0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0]),
-      b([1,0,1,0, 0,0,0,0, 1,0,1,0, 0,0,0,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-    ],
-  },
-  {
-    id: "seed-7", title: "Centering", artistHandle: "muddyhands", artistName: "Muddy Hands",
-    bpm: 115, license: "free", price: 0, createdAt: "2026-04-22T16:00:00Z", usedCount: 55,
-    genre: "World", steps: 16,
-    pattern: [
-      b([1,0,0,0, 0,1,0,1, 0,0,1,0, 0,0,0,1]),
-      b([0,0,1,0, 0,0,0,0, 0,1,0,0, 0,0,1,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([1,0,1,0, 1,0,1,0, 1,1,0,1, 1,0,1,0]),
-      b([0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0]),
-      b([1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1]),
-      b([0,1,0,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-      b([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
-      b([0,1,0,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-      b([0,0,0,1, 0,0,0,0, 0,0,0,1, 0,0,0,0]),
-    ],
-  },
-  {
-    id: "seed-8", title: "Late Trim", artistHandle: "bisquefire", artistName: "Bisque & Fire",
-    bpm: 140, license: "premium", price: 5, createdAt: "2026-05-14T23:00:00Z", usedCount: 12,
-    genre: "Trap", steps: 16,
-    pattern: [
-      b([1,0,0,0, 0,0,0,0, 1,0,0,1, 0,0,0,0]),
-      b([0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]),
-      b([0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]),
-      b([1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1]),
-      b([0,0,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0]),
-      b([0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1]),
-      b([0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1]),
-      b([1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0]),
-      b([0,1,0,0, 0,0,0,0, 0,1,0,0, 0,0,0,0]),
-      b([0,0,0,1, 0,0,0,0, 0,0,0,0, 0,0,0,1]),
-    ],
-  },
-];
 
 // ── Track colors for mini grid ─────────────────────────────────────────────────
 
@@ -365,13 +222,10 @@ export default function SoundMarket() {
 
   const myHandle = profile?.handle ?? "me";
 
-  // Combine seed beats + user's community beats (other creators)
-  const allBeats = (() => {
-    const userBeats = getCommunityBeats().filter((b) => b.artistHandle !== myHandle);
-    const seedIds   = new Set(userBeats.map((b) => b.id));
-    const seeds     = SEED_BEATS.filter((s) => !seedIds.has(s.id));
-    return [...userBeats, ...seeds].sort((a, b) => b.usedCount - a.usedCount);
-  })();
+  // Community beats from other creators
+  const allBeats = getCommunityBeats()
+    .filter((b) => b.artistHandle !== myHandle)
+    .sort((a, b) => b.usedCount - a.usedCount);
 
   // Load licenses — try API first, fall back to localStorage
   useEffect(() => {

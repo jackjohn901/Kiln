@@ -18,15 +18,17 @@ router.get("/me/newsletters", async (req, res): Promise<void> => {
 // POST /newsletters — record a sent newsletter
 router.post("/newsletters", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { subject, body, audience, recipientCount } = req.body as { subject: string; body: string; audience: string; recipientCount: number };
+  const { subject, body, audience } = req.body as { subject: string; body: string; audience: string };
   if (!subject?.trim() || !body?.trim()) { res.status(400).json({ error: "subject and body required" }); return; }
+  // recipientCount is server-owned: there is no real delivery pipeline yet, so we store 0
+  // rather than trusting a client-supplied figure that would be rendered as an authoritative metric.
   const [row] = await db.insert(newslettersTable).values({
     id: crypto.randomUUID(),
     artistId: req.user.id,
     subject: subject.trim(),
     body: body.trim(),
     audience: audience ?? "all",
-    recipientCount: Number(recipientCount ?? 0),
+    recipientCount: 0,
     status: "sent",
   }).returning();
   res.status(201).json({ ...row, sentAt: row.sentAt.toISOString(), createdAt: row.createdAt.toISOString() });

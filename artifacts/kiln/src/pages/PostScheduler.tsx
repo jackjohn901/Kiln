@@ -23,7 +23,7 @@ interface ScheduledPost {
   technique?: string;
 }
 
-const STORAGE_KEY = "kiln_scheduled_posts_v1";
+const STORAGE_KEY = "kiln_scheduled_posts_v2";
 const COLORS = ["#7c3aed","#b45309","#047857","#1d4ed8","#be123c","#0e7490","#92400e","#3b0764"];
 
 function readPosts(): ScheduledPost[] {
@@ -33,26 +33,6 @@ function savePosts(posts: ScheduledPost[]) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posts)); } catch {}
 }
 
-const SEED_POSTS: ScheduledPost[] = [
-  {
-    id: "seed-1", type: "reel", title: "Blowing the Vase Series ep.4",
-    caption: "Getting the gather just right — took 14 attempts to nail this gather temperature. The color shift at 1800°F is everything.",
-    scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-    status: "scheduled", hashtags: ["glassblowing", "kilncraft", "processvideo"], thumbnailColor: "#7c3aed", technique: "Glass Blowing"
-  },
-  {
-    id: "seed-2", type: "photo", title: "Finished pieces from the annealing oven",
-    caption: "After 18 hours in the annealing oven, pulling these out is always the best feeling. New series available in the shop.",
-    scheduledAt: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
-    status: "scheduled", hashtags: ["glassart", "craftart", "studioglass"], thumbnailColor: "#b45309"
-  },
-  {
-    id: "seed-3", type: "journal", title: "The chemistry of color in glass",
-    caption: "A deep dive into what cobalt, copper, and gold actually do at the molecular level when they enter molten silica.",
-    scheduledAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    status: "published", hashtags: ["glasschem", "craftscience"], thumbnailColor: "#047857"
-  },
-];
 
 function formatRelative(iso: string): string {
   const diff = new Date(iso).getTime() - Date.now();
@@ -94,10 +74,7 @@ function apiDraftToPost(d: Record<string, unknown>): ScheduledPost {
 }
 
 export default function PostScheduler() {
-  const [posts, setPosts] = useState<ScheduledPost[]>(() => {
-    const stored = readPosts();
-    return stored.length > 0 ? stored : SEED_POSTS;
-  });
+  const [posts, setPosts] = useState<ScheduledPost[]>(() => readPosts());
   const [apiLoaded, setApiLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<PostStatus | "all">("all");

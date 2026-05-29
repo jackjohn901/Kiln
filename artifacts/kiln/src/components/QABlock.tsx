@@ -13,7 +13,7 @@ interface QAItem {
   createdAt: string;
 }
 
-const QA_STORAGE_KEY = "kiln_qa_v1";
+const QA_STORAGE_KEY = "kiln_qa_v2";
 
 function loadQA(artistId: string): QAItem[] {
   try {
@@ -29,38 +29,6 @@ function saveQA(artistId: string, items: QAItem[]) {
   } catch {}
 }
 
-const SEED_QA: Record<string, QAItem[]> = {
-  "alex-bernstein": [
-    {
-      id: "qa-ab-001",
-      question: "What temperature do you typically cast at, and how does that affect the final clarity of the piece?",
-      askerName: "Marcus W.",
-      askerHandle: "marcus-williams",
-      answer: "For cast work I usually pour between 1,600–1,650°F. Lower temps give you more time to work but can trap bubbles if the mold isn't hot enough. The clarity is more about the annealing schedule than the pour temp — a slow cool from 900° down is what eliminates the internal stress lines that scatter light.",
-      answeredAt: "2026-05-12",
-      likes: 47,
-      createdAt: "2026-05-10",
-    },
-    {
-      id: "qa-ab-002",
-      question: "How long does the polishing phase take for a piece like Color Series No. 12?",
-      askerName: "Priya P.",
-      askerHandle: "priya-patel",
-      answer: "That piece took about 40 hours of hand polishing across three grades of diamond compound. The carving came first — maybe 25 hours — then polishing. The curved interior faces are the hardest; you can't get a wheel in there.",
-      answeredAt: "2026-05-13",
-      likes: 31,
-      createdAt: "2026-05-11",
-    },
-    {
-      id: "qa-ab-003",
-      question: "Do you ever use color in your cast work, or is the clarity itself the focus?",
-      askerName: "Rachel O.",
-      askerHandle: "rachel-osei",
-      likes: 18,
-      createdAt: "2026-05-14",
-    },
-  ],
-};
 
 interface Props {
   artistId: string;
@@ -78,7 +46,7 @@ export default function QABlock({ artistId, artistName, isOwner = false }: Props
   const [localQA, setLocalQA] = useState<QAItem[]>(() => {
     const stored = loadQA(artistId);
     if (stored.length > 0) return stored;
-    return SEED_QA[artistId] ?? [];
+    return [];
   });
 
   const answered = localQA.filter((q) => q.answer);

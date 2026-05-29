@@ -29,60 +29,6 @@ interface MaterialListing {
   condition: "new" | "like-new" | "good" | "used";
 }
 
-const SEED: MaterialListing[] = [
-  {
-    id: "ml-1", userId: "u1", userName: "Maya Chen", userAvatar: "https://i.pravatar.cc/40?img=5",
-    type: "sell", category: "clay", title: "25 lbs Laguna B-Mix 5 Cone Stoneware",
-    description: "Opened but barely used — moved studio, no room. Great for throwing and hand-building. Stays moist.",
-    price: 35, quantity: "25 lbs", location: "Portland, OR",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80",
-    postedAt: Date.now() - 86400000 * 2, likes: 4, condition: "like-new",
-  },
-  {
-    id: "ml-2", userId: "u2", userName: "James Okafor", userAvatar: "https://i.pravatar.cc/40?img=12",
-    type: "trade", category: "glass",
-    title: "Spectrum 96 COE Sheet Glass — 6 colors",
-    description: "~3 lbs each of amber, cobalt, forest green, opalescent white, red, and clear. Happy to trade for fusible frit or glass powder.",
-    tradeFor: "Glass frit, kiln wash, or fiber tools",
-    quantity: "~18 lbs total", location: "Chicago, IL",
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80",
-    postedAt: Date.now() - 86400000 * 5, likes: 11, condition: "good",
-  },
-  {
-    id: "ml-3", userId: "u3", userName: "Sofia Reyes", userAvatar: "https://i.pravatar.cc/40?img=47",
-    type: "free", category: "fiber",
-    title: "Weaving warp threads — natural cotton",
-    description: "Leftover from a series. Several spools of 8/2 natural cotton warp. Great for rigid heddle or floor loom. Free to a good home!",
-    quantity: "5 spools, ~250 yds each", location: "Brooklyn, NY",
-    postedAt: Date.now() - 3600000 * 6, likes: 17, condition: "good",
-  },
-  {
-    id: "ml-4", userId: "u4", userName: "Wei Liang", userAvatar: "https://i.pravatar.cc/40?img=3",
-    type: "wanted", category: "tools",
-    title: "Looking for: Skutt KM-818 kiln parts",
-    description: "Need replacement elements and a new thermocouple for a Skutt KM-818 (10-amp). Happy to pay fair market price.",
-    quantity: "2 elements + thermocouple", location: "Austin, TX",
-    postedAt: Date.now() - 86400000 * 1, likes: 2, condition: "used",
-  },
-  {
-    id: "ml-5", userId: "u5", userName: "Anna Björk", userAvatar: "https://i.pravatar.cc/40?img=9",
-    type: "sell", category: "pigment",
-    title: "Sennelier Artist-grade dry pigments — 12 colors",
-    description: "Full set of Sennelier dry pigments in original tins. Used lightly for oil painting experiments. Includes ultramarine, burnt sienna, yellow ochre, and more.",
-    price: 80, quantity: "12 tins × 100g", location: "Seattle, WA",
-    imageUrl: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&q=80",
-    postedAt: Date.now() - 86400000 * 8, likes: 6, condition: "like-new",
-  },
-  {
-    id: "ml-6", userId: "u6", userName: "Marcus Rivera", userAvatar: "https://i.pravatar.cc/40?img=15",
-    type: "sell", category: "wood",
-    title: "Cherry wood turning blanks — 6 pieces",
-    description: "Air-dried cherry, 4–6\" diameter, 12\" long. Cut from a local orchard. Excellent for bowls and spindles.",
-    price: 55, quantity: "6 blanks", location: "Asheville, NC",
-    imageUrl: "https://images.unsplash.com/photo-1587486936739-78c3e7d71a72?w=400&q=80",
-    postedAt: Date.now() - 86400000 * 3, likes: 9, condition: "good",
-  },
-];
 
 const TYPE_LABELS: Record<ListingType, string> = {
   sell: "For Sale", trade: "Trade", free: "Free", wanted: "Wanted",
@@ -110,7 +56,7 @@ const CATEGORIES: { value: Category | "all"; label: string }[] = [
 export default function MaterialExchange() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
-  const [listings, setListings] = useState<MaterialListing[]>(SEED);
+  const [listings, setListings] = useState<MaterialListing[]>([]);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState<Category | "all">("all");
   const [typeFilter, setTypeFilter] = useState<ListingType | "all">("all");
@@ -118,7 +64,7 @@ export default function MaterialExchange() {
   useEffect(() => {
     fetch("/api/material-exchange")
       .then(r => r.ok ? r.json() as Promise<{ listings: MaterialListing[] }> : null)
-      .then(data => { if (data?.listings?.length) setListings([...data.listings, ...SEED]); })
+      .then(data => { if (data?.listings) setListings(data.listings); })
       .catch(() => {});
   }, []);
   const [showPost, setShowPost] = useState(false);

@@ -17,37 +17,7 @@ interface PurchasedItem {
   type: "drop" | "shop";
 }
 
-const SEED_PURCHASED: PurchasedItem[] = [
-  {
-    id: "p1",
-    name: "Cobalt Gather Vessel No. 5",
-    artistName: "Alex Bernstein",
-    artistId: "alex-bernstein",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=500&fit=crop&seed=vessel5",
-    price: 2800,
-    acquiredAt: "2026-04-10T12:00:00Z",
-    type: "drop",
-  },
-  {
-    id: "p2",
-    name: "Forged Steel Garden Form",
-    artistName: "James Okafor",
-    artistId: "james-okafor",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=500&fit=crop&seed=steel-garden",
-    price: 1450,
-    acquiredAt: "2026-03-22T09:00:00Z",
-    type: "shop",
-  },
-  {
-    id: "p3",
-    name: "Raku Tea Bowl — Ceremony Set",
-    artistName: "Maya Chen",
-    artistId: "maya-chen",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=500&fit=crop&seed=tea-bowl",
-    price: 680,
-    acquiredAt: "2026-02-14T14:00:00Z",
-    type: "shop",
-  },
+const PURCHASED: PurchasedItem[] = [
 ];
 
 const TABS = ["Owned", "Waitlisted"] as const;
@@ -73,7 +43,7 @@ export default function Collection() {
           </div>
           <div>
             <h1 className="font-serif text-2xl font-bold text-amber-100">My Collection</h1>
-            <p className="text-sm text-stone-500">{SEED_PURCHASED.length} owned · {waitlistedDrops.length} waitlisted</p>
+            <p className="text-sm text-stone-500">{PURCHASED.length} owned · {waitlistedDrops.length} waitlisted</p>
           </div>
         </div>
 
@@ -87,7 +57,7 @@ export default function Collection() {
                 tab === t ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"
               }`}
             >
-              {t} {t === "Owned" ? `(${SEED_PURCHASED.length})` : `(${waitlistedDrops.length})`}
+              {t} {t === "Owned" ? `(${PURCHASED.length})` : `(${waitlistedDrops.length})`}
             </button>
           ))}
         </div>
@@ -95,14 +65,14 @@ export default function Collection() {
         {/* Owned */}
         {tab === "Owned" && (
           <div className="space-y-3">
-            {SEED_PURCHASED.length === 0 ? (
+            {PURCHASED.length === 0 ? (
               <div className="flex flex-col items-center py-20 text-center">
                 <ShoppingBag size={36} className="mb-3 text-stone-700" />
                 <p className="text-stone-500">Nothing in your collection yet</p>
                 <Link href="/shop" className="mt-4 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400">Browse Shop</Link>
               </div>
             ) : (
-              SEED_PURCHASED.map((item) => (
+              PURCHASED.map((item) => (
                 <div key={item.id} className="flex gap-4 rounded-2xl border border-white/8 bg-stone-900/40 p-4">
                   <img src={item.imageUrl} alt={item.name} className="h-20 w-20 rounded-xl object-cover flex-shrink-0" />
                   <div className="min-w-0 flex-1">

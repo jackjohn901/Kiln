@@ -31,124 +31,6 @@ interface CritiquePost {
   }[];
 }
 
-const SEED_POSTS: CritiquePost[] = [
-  {
-    id: "c-001",
-    artistId: "maya-chen",
-    artistName: "Maya Chen",
-    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=maya-chen",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=raku1",
-    caption: "New raku bowl — copper matte glaze. [critique welcome] I'm struggling with the balance between the raw clay body and the metallic areas. Is the contrast too harsh?",
-    medium: "Ceramics / Raku",
-    postedAt: "2026-05-13T10:00:00Z",
-    critiqueCount: 4,
-    tags: ["raku", "ceramics", "glaze", "form"],
-    critiques: [
-      {
-        id: "cr-001-a",
-        fromName: "Elena Vasquez",
-        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=elena",
-        technique: 4,
-        concept: 5,
-        finish: 4,
-        originality: 4,
-        text: "The tension you're identifying is actually the strength of the piece. Raku has always lived in that contradiction between controlled technique and raw accident. The copper metallic areas don't overpower — they create a focal point that draws the eye inward. My only note: the rim feels slightly heavy relative to the rest. Would a lighter treatment there open up the form?",
-        helpful: 12,
-        postedAt: "2026-05-13T14:00:00Z",
-      },
-      {
-        id: "cr-001-b",
-        fromName: "Takeshi Mori",
-        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=takeshi",
-        technique: 5,
-        concept: 4,
-        finish: 4,
-        originality: 3,
-        text: "Your reduction timing is excellent — the copper has bloomed evenly without going black. Conceptually, I'd push further: the contrast you're worried about is too controlled. True raku embraces the accident. Could you let more bare clay show? The metallic areas are beautiful but they feel contained.",
-        helpful: 8,
-        postedAt: "2026-05-14T09:00:00Z",
-      },
-    ],
-  },
-  {
-    id: "c-002",
-    artistId: "james-okafor",
-    artistName: "James Okafor",
-    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=james",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=forge1",
-    caption: "First attempt at a Japanese-style gyuto. [critique welcome] The bevel grind is inconsistent behind the heel — I can see the grind angle shifting. Looking for feedback on the overall profile and any tips on maintaining bevel consistency.",
-    medium: "Metal Forging / Bladesmithing",
-    postedAt: "2026-05-12T16:00:00Z",
-    critiqueCount: 3,
-    tags: ["bladesmithing", "knife", "grind", "technique"],
-    critiques: [
-      {
-        id: "cr-002-a",
-        fromName: "Felix Braun",
-        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=felix",
-        technique: 3,
-        concept: 5,
-        finish: 3,
-        originality: 4,
-        text: "The profile is actually very good for a first Japanese-style blade — the distal taper is well-executed and the tip is nicely thin. The bevel inconsistency behind the heel is a very common problem. Solution: use a sharpie to color the flat of the bevel before grinding. Watch where the sharpie disappears to map exactly where your angle is drifting. You're taking it off at two different points in the stroke.",
-        helpful: 19,
-        postedAt: "2026-05-12T20:00:00Z",
-      },
-    ],
-  },
-  {
-    id: "c-003",
-    artistId: "caleb-siemon",
-    artistName: "Caleb Siemon",
-    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=caleb",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=glass-vessel",
-    caption: "Color experiment — trying to push the aquamarine-to-clear gradient further without losing the internal luminosity. [critique welcome] Does the vessel form support the color work, or is the shape too simple?",
-    medium: "Glass Blowing",
-    postedAt: "2026-05-11T12:00:00Z",
-    critiqueCount: 6,
-    tags: ["glass-blowing", "color", "vessel", "form"],
-    critiques: [
-      {
-        id: "cr-003-a",
-        fromName: "Dante Marioni",
-        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=dante",
-        technique: 5,
-        concept: 4,
-        finish: 5,
-        originality: 4,
-        text: "The gradient is masterful — the aquamarine holds its intensity all the way to the clear without going murky. The form is not too simple; it's appropriate. A more complex vessel would compete with the color work and lose. My only push: the neck feels slightly short relative to the shoulder. 5mm more height there would give the color gradient more space to breathe in the upper third.",
-        helpful: 24,
-        postedAt: "2026-05-11T18:00:00Z",
-      },
-    ],
-  },
-  {
-    id: "c-004",
-    artistId: "ingrid-larsson",
-    artistName: "Ingrid Larsson",
-    avatarUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=ingrid",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=500&fit=crop&seed=fiber1",
-    caption: "Weld and indigo-dyed tapestry — first piece for the autumn collection. [critique welcome] I'm unsure whether the composition reads as two distinct color areas or as a continuous gradient. Viewing it at distance vs close up gives me different answers.",
-    medium: "Fiber Arts / Natural Dye",
-    postedAt: "2026-05-10T09:00:00Z",
-    critiqueCount: 2,
-    tags: ["fiber-arts", "tapestry", "natural-dye", "composition"],
-    critiques: [
-      {
-        id: "cr-004-a",
-        fromName: "Freya Lindqvist",
-        fromAvatar: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=freya",
-        technique: 5,
-        concept: 5,
-        finish: 4,
-        originality: 5,
-        text: "The ambiguity you're experiencing IS the work. A composition that reads differently at distance and at close range has achieved something genuinely interesting — it rewards both the glance and the study. Don't resolve it. The weld-yellow is pushing into the indigo in a way that suggests movement rather than edge. This is rare in tapestry. Keep it exactly as it is.",
-        helpful: 31,
-        postedAt: "2026-05-10T14:00:00Z",
-      },
-    ],
-  },
-];
 
 function RatingBar({ label, value }: { label: string; value: number }) {
   return (
@@ -173,9 +55,9 @@ export default function CritiqueFeed() {
   const [critiqueForm, setCritiqueForm] = useState<{ postId: string; postArtistId: string; ratings: { technique: number; concept: number; finish: number; originality: number }; text: string } | null>(null);
   const [helpfulClicked, setHelpfulClicked] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
-  const [posts, setPosts] = useState(SEED_POSTS);
+  const [posts, setPosts] = useState<CritiquePost[]>([]);
 
-  // Merge real posts that have [critique welcome] from DB on top of seeds
+  // Merge real posts that have [critique welcome] from DB
   useEffect(() => {
     fetch("/api/critique-posts")
       .then(r => r.ok ? r.json() : Promise.reject())
