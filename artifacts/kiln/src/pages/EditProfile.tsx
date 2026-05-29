@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Save, User, Camera, Globe, Instagram, MapPin, Layers, AlignLeft, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { toast } from "@/hooks/use-toast";
 import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -224,7 +225,7 @@ export default function EditProfile() {
     setProfile({ ...form, isCustom: true });
 
     try {
-      await fetch("/api/me/profile", {
+      const r = await fetch("/api/me/profile", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -243,7 +244,10 @@ export default function EditProfile() {
           collectorStory: form.collectorStory ?? "",
         }),
       });
+      if (!r.ok) throw new Error();
     } catch {
+      toast({ title: "Couldn\u2019t save your profile", description: "Please check your connection and try again.", variant: "destructive" });
+      return;
     }
 
     setSaved(true);

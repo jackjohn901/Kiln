@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export interface KilnComment {
@@ -612,7 +613,12 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ text }),
-      }).catch(() => {});
+      })
+        .then((r) => { if (!r.ok) throw new Error(); })
+        .catch(() => {
+          update((s) => ({ ...s, comments: { ...s.comments, [postId]: (s.comments[postId] ?? []).filter((c) => c.id !== comment.id) } }));
+          toast({ title: "Couldn\u2019t post comment", description: "Please try again.", variant: "destructive" });
+        });
     }
   }, []);
 
@@ -714,6 +720,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
   const sendCommissionInquiry = useCallback((inquiry: Omit<CommissionInquiry, "id" | "status" | "createdAt">) => {
     const newInquiry: CommissionInquiry = { ...inquiry, id: genId(), status: "pending", createdAt: new Date().toISOString() };
+    update((s) => ({ ...s, commissions: [newInquiry, ...s.commissions] }));
     fetch("/api/commissions", {
       method: "POST",
       credentials: "include",
@@ -724,8 +731,12 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         budget: inquiry.budget ?? null,
         timeline: inquiry.timeline ?? null,
       }),
-    }).catch(() => {});
-    update((s) => ({ ...s, commissions: [newInquiry, ...s.commissions] }));
+    })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        update((s) => ({ ...s, commissions: s.commissions.filter((c) => c.id !== newInquiry.id) }));
+        toast({ title: "Couldn\u2019t send your request", description: "Please try again.", variant: "destructive" });
+      });
   }, []);
 
   const acceptInquiry = useCallback((id: string) => {
@@ -912,6 +923,16 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   }, [fetchUnreadMessageCount]);
 
   const quoteInquiry = useCallback((id: string, quote: CommissionQuote) => {
+    let prevInquiry: CommissionInquiry | undefined;
+    update((s) => {
+      prevInquiry = s.receivedInquiries.find((i) => i.id === id);
+      return {
+        ...s,
+        receivedInquiries: s.receivedInquiries.map((i) =>
+          i.id === id ? { ...i, status: "quoted" as const, quote } : i
+        ),
+      };
+    });
     fetch(`/api/commissions/${id}`, {
       method: "PATCH",
       credentials: "include",
@@ -922,13 +943,20 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         artistNotes: quote.terms,
         estimatedDelivery: quote.deliveryDate || null,
       }),
-    }).catch(() => {});
-    update((s) => ({
-      ...s,
-      receivedInquiries: s.receivedInquiries.map((i) =>
-        i.id === id ? { ...i, status: "quoted" as const, quote } : i
-      ),
-    }));
+    })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        if (prevInquiry) {
+          const restored = prevInquiry;
+          update((s) => ({
+            ...s,
+            receivedInquiries: s.receivedInquiries.map((i) =>
+              i.id === id ? restored : i
+            ),
+          }));
+        }
+        toast({ title: "Couldn\u2019t send your quote", description: "Please try again.", variant: "destructive" });
+      });
   }, []);
 
   const addReview = useCallback((review: Omit<ShopReview, "id" | "createdAt">) => {

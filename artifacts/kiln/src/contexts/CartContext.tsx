@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { Listing } from "@/data/listings";
+import { toast } from "@/hooks/use-toast";
 
 export interface CartItem {
   listing: Listing;
@@ -80,7 +81,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId: listing.id, quantity: 1 }),
-    }).catch(() => {});
+    })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        toast({ title: "Couldn\u2019t sync your cart", description: "Your cart is saved on this device, but may not appear elsewhere.", variant: "destructive" });
+      });
   }, []);
 
   const removeItem = useCallback((listingId: string) => {
@@ -89,7 +94,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       saveCart(next);
       return next;
     });
-    fetch(`/api/me/cart/${listingId}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+    fetch(`/api/me/cart/${listingId}`, { method: "DELETE", credentials: "include" })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        toast({ title: "Couldn\u2019t sync your cart", description: "Your cart is saved on this device, but may not appear elsewhere.", variant: "destructive" });
+      });
   }, []);
 
   const updateQty = useCallback((listingId: string, qty: number) => {
@@ -105,7 +114,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(() => {
     setItems([]);
     saveCart([]);
-    fetch("/api/me/cart", { method: "DELETE", credentials: "include" }).catch(() => {});
+    fetch("/api/me/cart", { method: "DELETE", credentials: "include" })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        toast({ title: "Couldn\u2019t sync your cart", description: "Your cart is saved on this device, but may not appear elsewhere.", variant: "destructive" });
+      });
   }, []);
 
   const isInCart = useCallback((listingId: string) => {

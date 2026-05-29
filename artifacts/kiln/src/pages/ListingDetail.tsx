@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWishlist } from "@/hooks/useWishlist";
+import { toast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ShoppingCart, Heart, Share2, Check, Plus,
   Shield, Truck, Award, MapPin, ExternalLink, ChevronRight,
@@ -323,10 +324,17 @@ export default function ListingDetail() {
 
   function handleWaitlist() {
     const current = getWaitlisted();
+    const wasOn = onWaitlist;
     const next = onWaitlist ? current.filter((i) => i !== id) : [...current, id!];
     setWaitlistedLocal(next);
     setOnWaitlist(!onWaitlist);
-    fetch(`/api/me/listing-waitlist/${id}`, { method: "POST", credentials: "include" }).catch(() => {});
+    fetch(`/api/me/listing-waitlist/${id}`, { method: "POST", credentials: "include" })
+      .then((r) => { if (!r.ok) throw new Error(); })
+      .catch(() => {
+        setWaitlistedLocal(current);
+        setOnWaitlist(wasOn);
+        toast({ title: "Couldn\u2019t update waitlist", description: "Please try again.", variant: "destructive" });
+      });
   }
 
   function handleSendOffer() {
@@ -384,11 +392,15 @@ export default function ListingDetail() {
         credentials: "include",
         body: JSON.stringify({ targetId: listing.id, targetType: "listing", rating: reviewRating, body: reviewText }),
       });
+      if (!res.ok) throw new Error();
       const data = await res.json();
       if (data.id) {
         setApiReviews(prev => [data, ...prev]);
       }
-    } catch {}
+    } catch {
+      toast({ title: "Couldn\u2019t submit review", description: "Please try again.", variant: "destructive" });
+      return;
+    }
     setReviewSubmitted(true);
     setShowReviewForm(false);
     setReviewRating(0);

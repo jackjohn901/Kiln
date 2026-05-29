@@ -7,6 +7,7 @@ import {
   FileText,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { toast } from "@/hooks/use-toast";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
 import { useSocial } from "@/contexts/SocialContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -241,14 +242,15 @@ function UpdateThread({ commissionId, artistId, isArtist, currentUserId }: {
           milestone: isArtist && milestone ? milestone : undefined,
         }),
       });
-      if (r.ok) {
-        const update = await r.json() as CommissionUpdate;
-        setUpdates(prev => [...prev, update]);
-        setText("");
-        setMilestone("");
-        attach.clear();
-      }
-    } catch {}
+      if (!r.ok) throw new Error();
+      const update = await r.json() as CommissionUpdate;
+      setUpdates(prev => [...prev, update]);
+      setText("");
+      setMilestone("");
+      attach.clear();
+    } catch {
+      toast({ title: "Couldn\u2019t send update", description: "Please try again.", variant: "destructive" });
+    }
     setSending(false);
   }
 
@@ -404,8 +406,11 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (r.ok) { const data = await r.json(); onUpdate(commission.id, data); }
-    } catch {}
+      if (!r.ok) throw new Error();
+      const data = await r.json(); onUpdate(commission.id, data);
+    } catch {
+      toast({ title: "Couldn\u2019t update commission", description: "Please try again.", variant: "destructive" });
+    }
     setUpdating(false);
   };
 

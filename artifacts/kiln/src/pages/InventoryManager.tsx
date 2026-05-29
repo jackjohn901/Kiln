@@ -6,6 +6,7 @@ import {
   Image, Trash2, Loader2, Star, GripVertical,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { toast } from "@/hooks/use-toast";
 import { useProfile } from "@/contexts/ProfileContext";
 import { formatPrice } from "@/data/listings";
 
@@ -76,12 +77,13 @@ export default function InventoryManager() {
         credentials: "include",
         body: JSON.stringify({ isAvailable: !current }),
       });
-      if (r.ok) {
-        setApiListings(prev => prev.map(l => l.id === id ? { ...l, isAvailable: !current } : l));
-        setSaved(id);
-        setTimeout(() => setSaved(null), 1500);
-      }
-    } catch {}
+      if (!r.ok) throw new Error();
+      setApiListings(prev => prev.map(l => l.id === id ? { ...l, isAvailable: !current } : l));
+      setSaved(id);
+      setTimeout(() => setSaved(null), 1500);
+    } catch {
+      toast({ title: "Couldn\u2019t update availability", description: "Please try again.", variant: "destructive" });
+    }
   }
 
   async function togglePinned(id: string, current: boolean) {
@@ -93,18 +95,19 @@ export default function InventoryManager() {
         credentials: "include",
         body: JSON.stringify({ isPinned: !current }),
       });
-      if (r.ok) {
-        setApiListings(prev => {
-          const updated = prev.map(l => l.id === id ? { ...l, isPinned: !current } : l);
-          return [...updated].sort((a, b) => {
-            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-            return a.sortOrder - b.sortOrder;
-          });
+      if (!r.ok) throw new Error();
+      setApiListings(prev => {
+        const updated = prev.map(l => l.id === id ? { ...l, isPinned: !current } : l);
+        return [...updated].sort((a, b) => {
+          if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+          return a.sortOrder - b.sortOrder;
         });
-        setSaved(id);
-        setTimeout(() => setSaved(null), 1500);
-      }
-    } catch {}
+      });
+      setSaved(id);
+      setTimeout(() => setSaved(null), 1500);
+    } catch {
+      toast({ title: "Couldn\u2019t update pin", description: "Please try again.", variant: "destructive" });
+    }
   }
 
   function startEdit(listing: ApiListing) {
@@ -124,12 +127,13 @@ export default function InventoryManager() {
         credentials: "include",
         body: JSON.stringify({ price: Math.round(price), title: editTitle }),
       });
-      if (r.ok) {
-        setApiListings(prev => prev.map(l => l.id === id ? { ...l, price: Math.round(price), title: editTitle } : l));
-        setSaved(id);
-        setTimeout(() => setSaved(null), 1500);
-      }
-    } catch {}
+      if (!r.ok) throw new Error();
+      setApiListings(prev => prev.map(l => l.id === id ? { ...l, price: Math.round(price), title: editTitle } : l));
+      setSaved(id);
+      setTimeout(() => setSaved(null), 1500);
+    } catch {
+      toast({ title: "Couldn\u2019t save changes", description: "Please try again.", variant: "destructive" });
+    }
     setEditingId(null);
     setSaving(false);
   }
@@ -154,11 +158,14 @@ export default function InventoryManager() {
           isAvailable: true,
         }),
       });
-      if (r.ok) {
-        const data = await r.json() as { listing?: ApiListing };
-        if (data.listing) setApiListings(prev => [data.listing!, ...prev]);
-      }
-    } catch {}
+      if (!r.ok) throw new Error();
+      const data = await r.json() as { listing?: ApiListing };
+      if (data.listing) setApiListings(prev => [data.listing!, ...prev]);
+    } catch {
+      toast({ title: "Couldn\u2019t add listing", description: "Please try again.", variant: "destructive" });
+      setSaving(false);
+      return;
+    }
     setForm(EMPTY_FORM);
     setAddingNew(false);
     setSaving(false);
@@ -166,9 +173,12 @@ export default function InventoryManager() {
 
   async function deleteNew(id: string) {
     try {
-      await fetch(`/api/listings/${id}`, { method: "DELETE", credentials: "include" });
+      const r = await fetch(`/api/listings/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error();
       setApiListings(prev => prev.filter(l => l.id !== id));
-    } catch {}
+    } catch {
+      toast({ title: "Couldn\u2019t delete listing", description: "Please try again.", variant: "destructive" });
+    }
   }
 
   function handleDragStart(index: number) {
@@ -188,6 +198,7 @@ export default function InventoryManager() {
       return;
     }
 
+    const prevListings = apiListings;
     const reordered = [...apiListings];
     const [dragged] = reordered.splice(dragIndex, 1);
     reordered.splice(dropIndex, 0, dragged);
@@ -198,13 +209,17 @@ export default function InventoryManager() {
     setDragOverIndex(null);
 
     try {
-      await fetch("/api/me/listings/reorder", {
+      const r = await fetch("/api/me/listings/reorder", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ order: withOrder.map(l => ({ id: l.id, sortOrder: l.sortOrder })) }),
       });
-    } catch {}
+      if (!r.ok) throw new Error();
+    } catch {
+      setApiListings(prevListings);
+      toast({ title: "Couldn\u2019t save new order", description: "Please try again.", variant: "destructive" });
+    }
   }
 
   function handleDragEnd() {

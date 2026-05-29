@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Zap, Plus, X, Clock, Calendar, DollarSign, Trash2, Eye, Edit2, CheckCircle } from "lucide-react";
 import Nav from "@/components/Nav";
+import { toast } from "@/hooks/use-toast";
 import { useProfile } from "@/contexts/ProfileContext";
 
 const DROP_STORAGE_KEY = "kiln_my_drops_v1";
@@ -194,10 +195,15 @@ export default function DropScheduler() {
   }
 
   async function deleteDrop(id: string) {
+    const prevDrops = drops;
     setDrops(prev => prev.filter(d => d.id !== id));
     try {
-      await fetch(`/api/drops/${id}`, { method: "DELETE", credentials: "include" });
-    } catch {}
+      const r = await fetch(`/api/drops/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error();
+    } catch {
+      setDrops(prevDrops);
+      toast({ title: "Couldn\u2019t delete drop", description: "Please try again.", variant: "destructive" });
+    }
   }
 
   const draftDrop: MyDrop | null = title.trim() ? {
