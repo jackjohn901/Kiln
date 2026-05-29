@@ -349,6 +349,25 @@ export default function Earnings() {
     URL.revokeObjectURL(url);
   }, [sales, salesSearch, salesStatus, salesSort, salesDateFrom, salesDateTo]);
 
+  const exportEarningsCSV = useCallback(() => {
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const typeLabel = (t: EarningLine["type"]) =>
+      t === "tip" || t === "subscription" ? t : "sale";
+    const header = ["Date", "Type", "Amount", "Label"].join(",");
+    const rows = earnings.map(line => {
+      const date = new Date(line.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+      return [escape(date), escape(typeLabel(line.type)), line.amount.toFixed(2), escape(line.label)].join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "earnings.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [earnings]);
+
   // Monthly trend sparkline state
   interface MonthSummary { month: string; label: string; total: number }
   const [monthlyTrend, setMonthlyTrend] = useState<MonthSummary[]>([]);
@@ -1071,7 +1090,16 @@ export default function Earnings() {
               </div>
             ) : (
               <div className="space-y-2 mb-8">
-                <h2 className="text-xs uppercase tracking-wider text-stone-600 mb-3">Recent Transactions</h2>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h2 className="text-xs uppercase tracking-wider text-stone-600">Recent Transactions</h2>
+                  <button
+                    onClick={exportEarningsCSV}
+                    className="flex items-center gap-1 rounded-lg border border-white/8 px-2.5 py-1 text-[11px] text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+                  >
+                    <Download size={10} />
+                    Export CSV
+                  </button>
+                </div>
                 {earnings.map(line => {
                   const conf = TYPE_CONFIG[line.type] ?? TYPE_CONFIG.tip;
                   const Icon = conf.icon;
