@@ -3,7 +3,6 @@ import { BellOff } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import SaleBanner, { type SaleInfo } from "./SaleBanner";
 
-const SNOOZE_MS = 5 * 60 * 1000;
 
 export default function SaleNotificationListener() {
   const { subscribe } = useWebSocket();
@@ -68,8 +67,8 @@ export default function SaleNotificationListener() {
     setQueue([...queueRef.current]);
   }, []);
 
-  const snooze = useCallback(() => {
-    const until = new Date(Date.now() + SNOOZE_MS);
+  const snooze = useCallback((durationMs: number) => {
+    const until = new Date(Date.now() + durationMs);
     snoozeUntilRef.current = until;
     setSnoozeUntil(until);
     snoozeQueueRef.current = [...queueRef.current, ...snoozeQueueRef.current];

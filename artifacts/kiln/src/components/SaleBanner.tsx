@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShoppingBag, X, BellOff } from "lucide-react";
 import { useLocation } from "wouter";
 import RelativeTime from "./RelativeTime";
@@ -14,18 +14,37 @@ interface Props {
   sale: SaleInfo;
   queueLength: number;
   onDismiss: () => void;
-  onSnooze: () => void;
+  onSnooze: (durationMs: number) => void;
 }
 
 const AUTO_DISMISS_MS = 6_000;
 
+const SNOOZE_OPTIONS: { label: string; ms: number }[] = [
+  { label: "5 min", ms: 5 * 60 * 1000 },
+  { label: "15 min", ms: 15 * 60 * 1000 },
+  { label: "30 min", ms: 30 * 60 * 1000 },
+];
+
 export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze }: Props) {
   const [, navigate] = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const id = setTimeout(onDismiss, AUTO_DISMISS_MS);
     return () => clearTimeout(id);
   }, [sale, onDismiss]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   const bodyText = sale.text.replace(/^New sale:\s*/i, "");
 
@@ -68,14 +87,35 @@ export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze }: P
           >
             View
           </button>
-          <button
-            onClick={onSnooze}
-            aria-label="Snooze banners for 5 minutes"
-            title="Snooze 5 min"
-            className="rounded-md p-1 text-stone-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
-          >
-            <BellOff size={14} />
-          </button>
+
+          <div ref={menuRef} className="relative">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Snooze banners"
+              title="Snooze"
+              className="rounded-md p-1 text-stone-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+            >
+              <BellOff size={14} />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-10 flex flex-col rounded-lg border border-amber-500/30 bg-stone-900 shadow-xl overflow-hidden">
+                {SNOOZE_OPTIONS.map(({ label, ms }) => (
+                  <button
+                    key={ms}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onSnooze(ms);
+                    }}
+                    className="whitespace-nowrap px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors text-left"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={onDismiss}
             aria-label="Dismiss"
