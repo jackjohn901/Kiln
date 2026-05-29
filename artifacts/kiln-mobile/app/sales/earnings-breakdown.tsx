@@ -66,6 +66,47 @@ const CATEGORY_CONFIG: Record<
   },
 };
 
+type ShopSubtype = "listing" | "drop" | "commission" | "workshop";
+
+interface ShopSubtypeConfig {
+  type: ShopSubtype;
+  title: string;
+  icon: string;
+  iconColor: string;
+  emptyText: string;
+}
+
+const SHOP_SUBTYPES: ShopSubtypeConfig[] = [
+  {
+    type: "listing",
+    title: "Listings",
+    icon: "shopping-bag",
+    iconColor: "#34d399",
+    emptyText: "No listing sales yet.",
+  },
+  {
+    type: "drop",
+    title: "Drops",
+    icon: "zap",
+    iconColor: "#60a5fa",
+    emptyText: "No drop sales yet.",
+  },
+  {
+    type: "commission",
+    title: "Commissions",
+    icon: "message-square",
+    iconColor: "#f59e0b",
+    emptyText: "No commission sales yet.",
+  },
+  {
+    type: "workshop",
+    title: "Workshops",
+    icon: "book-open",
+    iconColor: "#a78bfa",
+    emptyText: "No workshop sales yet.",
+  },
+];
+
 const TYPE_ICON: Record<EarningType, string> = {
   tip: "heart",
   subscription: "star",
@@ -81,7 +122,7 @@ const TYPE_COLOR: Record<EarningType, string> = {
   listing: "#34d399",
   drop: "#60a5fa",
   commission: "#f59e0b",
-  workshop: "#34d399",
+  workshop: "#a78bfa",
 };
 
 function formatPrice(n: number, currency = "USD") {
@@ -106,15 +147,24 @@ export default function EarningsBreakdownScreen() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const params = useLocalSearchParams<{ category?: string; month?: string; year?: string }>();
+  const params = useLocalSearchParams<{
+    category?: string;
+    month?: string;
+    year?: string;
+    subtype?: string;
+  }>();
   const category = (params.category ?? "shop") as Category;
   const config = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.shop;
+  const subtype = params.subtype as ShopSubtype | undefined;
 
   const monthParam = params.month ? parseInt(params.month, 10) : null;
   const yearParam = params.year ? parseInt(params.year, 10) : null;
   const hasDateFilter = monthParam !== null && yearParam !== null;
   const monthLabel = hasDateFilter
-    ? new Date(yearParam!, monthParam! - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    ? new Date(yearParam!, monthParam! - 1, 1).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
     : null;
 
   const { data, isLoading } = useQuery({
@@ -127,8 +177,42 @@ export default function EarningsBreakdownScreen() {
   });
 
   const allEarnings = data?.earnings ?? [];
-  const filtered = allEarnings.filter((e) => config.types.includes(e.type));
+
+  const isShopOverview = category === "shop" && !subtype;
+  const isShopSubtype = category === "shop" && !!subtype;
+
+  const subtypeConfig = isShopSubtype
+    ? SHOP_SUBTYPES.find((s) => s.type === subtype)
+    : undefined;
+
+  const filtered = allEarnings.filter((e) => {
+    if (isShopSubtype && subtype) return e.type === subtype;
+    return config.types.includes(e.type);
+  });
   const total = filtered.reduce((s, e) => s + e.amount, 0);
+
+  const headerTitle = isShopSubtype && subtypeConfig ? subtypeConfig.title : config.title;
+  const headerIcon = isShopSubtype && subtypeConfig ? subtypeConfig.icon : config.icon;
+  const headerIconColor =
+    isShopSubtype && subtypeConfig ? subtypeConfig.iconColor : config.iconColor;
+  const emptyText =
+    isShopSubtype && subtypeConfig ? subtypeConfig.emptyText : config.emptyText;
+
+  function handleBack() {
+    if (isShopSubtype) {
+      const dateParams = hasDateFilter ? `&month=${monthParam}&year=${yearParam}` : "";
+      router.replace(`/sales/earnings-breakdown?category=shop${dateParams}` as any);
+    } else {
+      router.back();
+    }
+  }
+
+  function handleSubtypeTap(st: ShopSubtype) {
+    const dateParams = hasDateFilter ? `&month=${monthParam}&year=${yearParam}` : "";
+    router.push(
+      `/sales/earnings-breakdown?category=shop&subtype=${st}${dateParams}` as any
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -142,10 +226,10 @@ export default function EarningsBreakdownScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
+        <Pressable onPress={handleBack} hitSlop={8} style={styles.backBtn}>
           <Feather name="chevron-left" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{config.title}</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{headerTitle}</Text>
         <View style={{ width: 30 }} />
       </View>
 
@@ -165,9 +249,9 @@ export default function EarningsBreakdownScreen() {
             ]}
           >
             <Feather
-              name={config.icon as any}
+              name={headerIcon as any}
               size={20}
-              color={config.iconColor}
+              color={headerIconColor}
               style={{ marginBottom: 6 }}
             />
             <Text style={[styles.totalAmount, { color: colors.foreground }]}>
@@ -183,15 +267,68 @@ export default function EarningsBreakdownScreen() {
             </Text>
           </View>
 
-          {filtered.length === 0 ? (
+          {isShopOverview && (
+            <View style={{ marginBottom: 8 }}>
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                BY TYPE
+              </Text>
+              {SHOP_SUBTYPES.map((st) => {
+                const stEarnings = allEarnings.filter((e) => e.type === st.type);
+                const stTotal = stEarnings.reduce((s, e) => s + e.amount, 0);
+                return (
+                  <Pressable
+                    key={st.type}
+                    onPress={() => handleSubtypeTap(st.type)}
+                    style={({ pressed }) => [
+                      styles.subtypeRow,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[styles.iconCircle, { backgroundColor: colors.secondary }]}
+                    >
+                      <Feather name={st.icon as any} size={16} color={st.iconColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.subtypeTitle, { color: colors.foreground }]}>
+                        {st.title}
+                      </Text>
+                      <Text style={[styles.subtypeCount, { color: colors.mutedForeground }]}>
+                        {stEarnings.length}{" "}
+                        {stEarnings.length === 1 ? "transaction" : "transactions"}
+                      </Text>
+                    </View>
+                    <Text style={[styles.subtypeAmount, { color: colors.primary }]}>
+                      {formatPrice(stTotal)}
+                    </Text>
+                    <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
+          {isShopOverview && filtered.length > 0 && (
+            <Text
+              style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: 8 }]}
+            >
+              ALL TRANSACTIONS
+            </Text>
+          )}
+
+          {filtered.length === 0 && !isShopOverview ? (
             <View style={[styles.center, { paddingTop: 40 }]}>
               <Feather
-                name={config.icon as any}
+                name={headerIcon as any}
                 size={36}
                 color={colors.mutedForeground}
               />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                {config.emptyText}
+                {emptyText}
               </Text>
             </View>
           ) : (
@@ -270,6 +407,25 @@ const styles = StyleSheet.create({
   totalMonth: { fontFamily: "Inter_500Medium", fontSize: 12, marginBottom: 2 },
   totalLabel: { fontFamily: "Inter_400Regular", fontSize: 13 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 8 },
+  sectionLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginLeft: 2,
+  },
+  subtypeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+    marginBottom: 10,
+  },
+  subtypeTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  subtypeCount: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
+  subtypeAmount: { fontFamily: "Inter_700Bold", fontSize: 16, flexShrink: 0 },
   row: {
     flexDirection: "row",
     alignItems: "center",
