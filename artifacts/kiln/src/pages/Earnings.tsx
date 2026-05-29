@@ -268,6 +268,36 @@ export default function Earnings() {
   const [salesSort, setSalesSort]       = useState<"newest" | "oldest">("newest");
   const [salesDateFrom, setSalesDateFrom] = useState("");
   const [salesDateTo, setSalesDateTo]     = useState("");
+  const [salesDatePreset, setSalesDatePreset] = useState<string>("");
+
+  const applySalesPreset = useCallback((preset: "7d" | "month" | "lastMonth" | "year") => {
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const now = new Date();
+    let from: Date;
+    let to: Date;
+    switch (preset) {
+      case "7d":
+        to = now;
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+        break;
+      case "month":
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = now;
+        break;
+      case "lastMonth":
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        to = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case "year":
+        from = new Date(now.getFullYear(), 0, 1);
+        to = now;
+        break;
+    }
+    setSalesDateFrom(fmt(from));
+    setSalesDateTo(fmt(to));
+    setSalesDatePreset(preset);
+  }, []);
 
   const exportSalesCSV = useCallback(() => {
     const needle = salesSearch.trim().toLowerCase();
@@ -1570,26 +1600,46 @@ export default function Earnings() {
                         </select>
                         {(salesSearch || salesStatus !== "all" || salesDateFrom || salesDateTo) && (
                           <button
-                            onClick={() => { setSalesSearch(""); setSalesStatus("all"); setSalesSort("newest"); setSalesDateFrom(""); setSalesDateTo(""); }}
+                            onClick={() => { setSalesSearch(""); setSalesStatus("all"); setSalesSort("newest"); setSalesDateFrom(""); setSalesDateTo(""); setSalesDatePreset(""); }}
                             className="flex items-center gap-1 rounded-lg border border-white/8 px-2 py-1.5 text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
                           >
                             <X size={10} /> Reset
                           </button>
                         )}
                       </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {([
+                          { key: "7d", label: "Last 7 days" },
+                          { key: "month", label: "This month" },
+                          { key: "lastMonth", label: "Last month" },
+                          { key: "year", label: "This year" },
+                        ] as const).map(p => (
+                          <button
+                            key={p.key}
+                            onClick={() => applySalesPreset(p.key)}
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                              salesDatePreset === p.key
+                                ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                                : "border-white/10 bg-stone-800/60 text-stone-400 hover:text-stone-200 hover:border-white/20"
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
                       <div className="flex items-center gap-2">
                         <label className="text-[11px] text-stone-500 shrink-0">From</label>
                         <input
                           type="date"
                           value={salesDateFrom}
-                          onChange={e => setSalesDateFrom(e.target.value)}
+                          onChange={e => { setSalesDateFrom(e.target.value); setSalesDatePreset(""); }}
                           className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none [color-scheme:dark]"
                         />
                         <label className="text-[11px] text-stone-500 shrink-0">To</label>
                         <input
                           type="date"
                           value={salesDateTo}
-                          onChange={e => setSalesDateTo(e.target.value)}
+                          onChange={e => { setSalesDateTo(e.target.value); setSalesDatePreset(""); }}
                           className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-300 focus:border-amber-500/40 focus:outline-none [color-scheme:dark]"
                         />
                       </div>
