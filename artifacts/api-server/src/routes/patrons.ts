@@ -263,7 +263,7 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   );
 
   // Build time-series buckets (only when no specific month/year filter is active)
-  type StreamBucket = { tips: number; subscriptions: number; shopSales: number };
+  type StreamBucket = { tips: number; subscriptions: number; shopSales: number; auctions: number };
 
   const timeSeriesByMonth: Record<string, StreamBucket> = {};
   const timeSeriesByDay: Record<string, StreamBucket> = {};
@@ -273,13 +273,13 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    timeSeriesByMonth[key] = { tips: 0, subscriptions: 0, shopSales: 0 };
+    timeSeriesByMonth[key] = { tips: 0, subscriptions: 0, shopSales: 0, auctions: 0 };
   }
   for (let i = 29; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
-    timeSeriesByDay[key] = { tips: 0, subscriptions: 0, shopSales: 0 };
+    timeSeriesByDay[key] = { tips: 0, subscriptions: 0, shopSales: 0, auctions: 0 };
   }
 
   if (!dateRange) {
@@ -301,8 +301,9 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
       const monthKey = o.createdAt.toISOString().slice(0, 7);
       const dayKey = o.createdAt.toISOString().slice(0, 10);
       const amt = o.amount / 100;
-      if (timeSeriesByMonth[monthKey]) timeSeriesByMonth[monthKey].shopSales += amt;
-      if (timeSeriesByDay[dayKey]) timeSeriesByDay[dayKey].shopSales += amt;
+      const stream = o.type === "auction" ? "auctions" : "shopSales";
+      if (timeSeriesByMonth[monthKey]) timeSeriesByMonth[monthKey][stream] += amt;
+      if (timeSeriesByDay[dayKey]) timeSeriesByDay[dayKey][stream] += amt;
     }
   }
 

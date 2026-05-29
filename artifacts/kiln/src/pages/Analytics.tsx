@@ -79,10 +79,11 @@ interface StreamPoint {
   shopSales: number;
   tips: number;
   subscriptions: number;
+  auctions: number;
 }
 
 function StackedBarChart({ data }: { data: StreamPoint[] }) {
-  const max = Math.max(...data.map(d => d.shopSales + d.tips + d.subscriptions), 1);
+  const max = Math.max(...data.map(d => d.shopSales + d.tips + d.subscriptions + d.auctions), 1);
   const [active, setActive] = useState<number | null>(null);
 
   useEffect(() => {
@@ -96,11 +97,12 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
     <div>
       <div className="flex items-end gap-1 h-28">
         {data.map((d, i) => {
-          const total = d.shopSales + d.tips + d.subscriptions;
+          const total = d.shopSales + d.tips + d.subscriptions + d.auctions;
           const pct = total / max;
           const salesH = (d.shopSales / max) * 100;
           const tipsH = (d.tips / max) * 100;
           const subsH = (d.subscriptions / max) * 100;
+          const auctionsH = (d.auctions / max) * 100;
           const isActive = active === i;
           return (
             <div
@@ -108,7 +110,7 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
               className="flex flex-1 flex-col items-center gap-1 group relative cursor-pointer"
               tabIndex={0}
               role="button"
-              aria-label={`${d.label}: total $${total.toFixed(2)}, sales $${d.shopSales.toFixed(2)}, tips $${d.tips.toFixed(2)}, subscriptions $${d.subscriptions.toFixed(2)}`}
+              aria-label={`${d.label}: total $${total.toFixed(2)}, sales $${d.shopSales.toFixed(2)}, auctions $${d.auctions.toFixed(2)}, tips $${d.tips.toFixed(2)}, subscriptions $${d.subscriptions.toFixed(2)}`}
               onMouseEnter={() => setActive(i)}
               onMouseLeave={() => setActive(a => (a === i ? null : a))}
               onFocus={() => setActive(i)}
@@ -124,6 +126,7 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
                   <div className="space-y-1">
                     {[
                       { color: "#34d399", label: "Shop Sales", value: d.shopSales },
+                      { color: "#a78bfa", label: "Auctions", value: d.auctions },
                       { color: "#f59e0b", label: "Tips", value: d.tips },
                       { color: "#38bdf8", label: "Subscriptions", value: d.subscriptions },
                     ].map(({ color, label, value }) => (
@@ -145,8 +148,11 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
                 {tipsH > 0 && (
                   <div className="w-full" style={{ height: `${tipsH}%`, backgroundColor: "#f59e0b", opacity: 0.75 + pct * 0.25 }} />
                 )}
+                {auctionsH > 0 && (
+                  <div className="w-full" style={{ height: `${auctionsH}%`, backgroundColor: "#a78bfa", opacity: 0.75 + pct * 0.25 }} />
+                )}
                 {salesH > 0 && (
-                  <div className={`w-full ${subsH === 0 && tipsH === 0 ? "rounded-t-sm" : ""}`} style={{ height: `${salesH}%`, backgroundColor: "#34d399", opacity: 0.75 + pct * 0.25 }} />
+                  <div className={`w-full ${subsH === 0 && tipsH === 0 && auctionsH === 0 ? "rounded-t-sm" : ""}`} style={{ height: `${salesH}%`, backgroundColor: "#34d399", opacity: 0.75 + pct * 0.25 }} />
                 )}
                 {total === 0 && (
                   <div className="w-full rounded-t-sm" style={{ height: "4px", backgroundColor: "#292524" }} />
@@ -160,6 +166,7 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
       <div className="mt-3 flex items-center gap-4 flex-wrap">
         {[
           { color: "#34d399", label: "Shop Sales" },
+          { color: "#a78bfa", label: "Auctions" },
           { color: "#f59e0b", label: "Tips" },
           { color: "#38bdf8", label: "Subscriptions" },
         ].map(({ color, label }) => (
@@ -213,6 +220,7 @@ interface StreamBucketMonth {
   tips: number;
   subscriptions: number;
   shopSales: number;
+  auctions: number;
 }
 
 interface StreamBucketDay {
@@ -220,6 +228,7 @@ interface StreamBucketDay {
   tips: number;
   subscriptions: number;
   shopSales: number;
+  auctions: number;
 }
 
 interface EarningTotals {
@@ -349,6 +358,7 @@ export default function Analytics() {
         shopSales: b.shopSales,
         tips: b.tips,
         subscriptions: b.subscriptions,
+        auctions: b.auctions ?? 0,
       }));
     }
     const byMonth = earningTotals?.timeSeriesByMonth ?? [];
@@ -359,10 +369,11 @@ export default function Analytics() {
       shopSales: b.shopSales,
       tips: b.tips,
       subscriptions: b.subscriptions,
+      auctions: b.auctions ?? 0,
     }));
   }, [earningTotals, period]);
 
-  const streamChartTotal = streamChartData.reduce((s, d) => s + d.shopSales + d.tips + d.subscriptions, 0);
+  const streamChartTotal = streamChartData.reduce((s, d) => s + d.shopSales + d.tips + d.subscriptions + d.auctions, 0);
 
   const totalPostActivity = postActivityData.reduce((s, v) => s + v, 0);
   const halfLen = Math.floor(postActivityData.length / 2);
