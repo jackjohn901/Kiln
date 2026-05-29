@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -25,6 +26,9 @@ interface Earning {
   sublabel: string;
   amount: number;
   date: string;
+  fromUserId?: string | null;
+  fromAvatarUrl?: string | null;
+  fromHandle?: string | null;
 }
 
 interface EarningsResponse {
@@ -335,19 +339,46 @@ export default function EarningsBreakdownScreen() {
             filtered.map((earning) => {
               const iconName = TYPE_ICON[earning.type] ?? "dollar-sign";
               const iconColor = TYPE_COLOR[earning.type] ?? colors.primary;
-              return (
-                <View
-                  key={earning.id}
-                  style={[
-                    styles.row,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                  ]}
-                >
-                  <View
-                    style={[styles.iconCircle, { backgroundColor: colors.secondary }]}
-                  >
-                    <Feather name={iconName as any} size={16} color={iconColor} />
-                  </View>
+              const isTip = earning.type === "tip";
+              const tipperName = isTip ? earning.label.replace(/^Tip from\s*/i, "").trim() : "";
+              const tipperInitials = tipperName
+                .split(" ")
+                .filter(Boolean)
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase() || "?";
+              const profileId = isTip ? (earning.fromUserId ?? null) : null;
+
+              const rowInner = (
+                <>
+                  {isTip ? (
+                    <View style={styles.avatarCircle}>
+                      {earning.fromAvatarUrl ? (
+                        <Image
+                          source={{ uri: earning.fromAvatarUrl }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.avatarCircle,
+                            { backgroundColor: colors.secondary, margin: 0 },
+                          ]}
+                        >
+                          <Text style={[styles.avatarInitials, { color: iconColor }]}>
+                            {tipperInitials}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <View
+                      style={[styles.iconCircle, { backgroundColor: colors.secondary }]}
+                    >
+                      <Feather name={iconName as any} size={16} color={iconColor} />
+                    </View>
+                  )}
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text
                       style={[styles.rowLabel, { color: colors.foreground }]}
@@ -368,6 +399,33 @@ export default function EarningsBreakdownScreen() {
                   <Text style={[styles.rowAmount, { color: colors.primary }]}>
                     {formatPrice(earning.amount)}
                   </Text>
+                </>
+              );
+
+              return profileId ? (
+                <Pressable
+                  key={earning.id}
+                  onPress={() => router.push(`/profile/${profileId}` as any)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}
+                >
+                  {rowInner}
+                </Pressable>
+              ) : (
+                <View
+                  key={earning.id}
+                  style={[
+                    styles.row,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
+                >
+                  {rowInner}
                 </View>
               );
             })
@@ -442,6 +500,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  avatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  avatarImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  avatarInitials: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
   },
   rowLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   rowSublabel: { fontFamily: "Inter_400Regular", fontSize: 12 },

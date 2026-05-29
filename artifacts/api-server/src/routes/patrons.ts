@@ -153,11 +153,24 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   }
 
   const [tips, subs, sales] = await Promise.all([
-    db.select().from(tipsTable).where(
-      dateRange
-        ? and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"), gte(tipsTable.createdAt, dateRange.start), lt(tipsTable.createdAt, dateRange.end))
-        : and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"))
-    ).orderBy(desc(tipsTable.createdAt)),
+    db.select({
+      id: tipsTable.id,
+      fromUserId: tipsTable.fromUserId,
+      fromUserName: tipsTable.fromUserName,
+      toUserId: tipsTable.toUserId,
+      amountCents: tipsTable.amountCents,
+      message: tipsTable.message,
+      status: tipsTable.status,
+      createdAt: tipsTable.createdAt,
+      fromAvatarUrl: profilesTable.avatarUrl,
+      fromHandle: profilesTable.handle,
+    }).from(tipsTable)
+      .leftJoin(profilesTable, eq(tipsTable.fromUserId, profilesTable.userId))
+      .where(
+        dateRange
+          ? and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"), gte(tipsTable.createdAt, dateRange.start), lt(tipsTable.createdAt, dateRange.end))
+          : and(eq(tipsTable.toUserId, userId), eq(tipsTable.status, "completed"))
+      ).orderBy(desc(tipsTable.createdAt)),
     // When a date range is given, include subscriptions that were active at any
     // point during the month: started before month-end AND (not cancelled OR
     // cancelled on/after month-start). This approximates monthly patron revenue
@@ -240,7 +253,7 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
 
   type EarningType = "tip" | "subscription" | "listing" | "drop" | "commission" | "workshop";
   const earnings = [
-    ...tips.map(t => ({ id: t.id, type: "tip" as EarningType, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "via Kiln", amount: t.amountCents / 100, date: t.createdAt.toISOString() })),
+    ...tips.map(t => ({ id: t.id, type: "tip" as EarningType, label: `Tip from ${t.fromUserName}`, sublabel: t.message ?? "via Kiln", amount: t.amountCents / 100, date: t.createdAt.toISOString(), fromUserId: t.fromUserId, fromAvatarUrl: t.fromAvatarUrl ?? null, fromHandle: t.fromHandle ?? null })),
     ...subs.map(s => ({ id: s.id, type: "subscription" as EarningType, label: "Patron subscription", sublabel: s.subscriberName ?? "Patron", amount: s.amount / 100, date: s.startedAt.toISOString() })),
     ...sales.map(o => ({ id: o.id, type: (["listing","drop","commission","workshop"].includes(o.type) ? o.type : "listing") as EarningType, label: o.title, sublabel: "Sale", amount: o.amount / 100, date: o.createdAt.toISOString() })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

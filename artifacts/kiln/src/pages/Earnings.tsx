@@ -40,6 +40,9 @@ interface EarningLine {
   sublabel: string;
   amount: number;
   date: string;
+  fromUserId?: string | null;
+  fromAvatarUrl?: string | null;
+  fromHandle?: string | null;
 }
 
 interface SalesByType {
@@ -805,11 +808,31 @@ export default function Earnings() {
                 {earnings.map(line => {
                   const conf = TYPE_CONFIG[line.type] ?? TYPE_CONFIG.tip;
                   const Icon = conf.icon;
-                  return (
-                    <div key={line.id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-stone-900/40 p-3">
-                      <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${conf.bg}`}>
-                        <Icon size={15} className={conf.color} />
-                      </div>
+                  const isTip = line.type === "tip";
+                  const tipperInitials = isTip
+                    ? line.label.replace(/^Tip from\s*/i, "").trim().split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase()
+                    : "";
+                  const profileHref = isTip && line.fromUserId
+                    ? `/artists/${line.fromUserId}`
+                    : null;
+
+                  const rowContent = (
+                    <>
+                      {isTip ? (
+                        <div className="h-9 w-9 flex-shrink-0 rounded-xl overflow-hidden">
+                          {line.fromAvatarUrl ? (
+                            <img src={line.fromAvatarUrl} alt={tipperInitials} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className={`flex h-full w-full items-center justify-center ${conf.bg} text-xs font-bold ${conf.color}`}>
+                              {tipperInitials || "?"}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${conf.bg}`}>
+                          <Icon size={15} className={conf.color} />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-stone-200 leading-tight">{line.label}</p>
                         {line.sublabel && <p className="text-xs text-stone-600 mt-0.5">{line.sublabel}</p>}
@@ -818,6 +841,16 @@ export default function Earnings() {
                         <p className="text-sm font-bold text-emerald-400">+{formatPrice(line.amount)}</p>
                         <p className="text-[10px] text-stone-600">{formatDate(line.date)}</p>
                       </div>
+                    </>
+                  );
+
+                  return profileHref ? (
+                    <Link key={line.id} href={profileHref} className="flex items-center gap-3 rounded-xl border border-white/5 bg-stone-900/40 p-3 hover:bg-stone-900/70 hover:border-white/10 transition-colors cursor-pointer">
+                      {rowContent}
+                    </Link>
+                  ) : (
+                    <div key={line.id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-stone-900/40 p-3">
+                      {rowContent}
                     </div>
                   );
                 })}
