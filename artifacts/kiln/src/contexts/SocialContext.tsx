@@ -277,6 +277,7 @@ interface SocialContextType extends SocialState {
   markAllRead: () => void;
   markTypeRead: (type: KilnNotification["type"]) => void;
   markCommissionPaymentRead: (commissionId: string) => void;
+  markLinkRead: (path: string) => void;
   unreadCount: number;
   unreadWorkshopCount: number;
   unreadCommissionPaymentCount: number;
@@ -686,6 +687,22 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const markLinkRead = useCallback((path: string) => {
+    update((s) => {
+      const toMark = s.notifications.filter((n) => !n.read && n.link === path);
+      toMark.forEach((n) => {
+        fetch(`/api/notifications/${n.id}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
+      });
+      if (toMark.length === 0) return s;
+      return {
+        ...s,
+        notifications: s.notifications.map((n) =>
+          !n.read && n.link === path ? { ...n, read: true } : n
+        ),
+      };
+    });
+  }, []);
+
   const setMyCommissionStatus = useCallback((status: CommissionStatus) => {
     update((s) => ({ ...s, myCommissionStatus: status }));
   }, []);
@@ -949,6 +966,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         markAllRead,
         markTypeRead,
         markCommissionPaymentRead,
+        markLinkRead,
         unreadCount,
         unreadWorkshopCount,
         unreadCommissionPaymentCount,

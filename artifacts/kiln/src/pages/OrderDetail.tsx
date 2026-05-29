@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
+import { useSocial } from "@/contexts/SocialContext";
 
 interface Order {
   id: string;
@@ -170,6 +171,7 @@ interface SellerProfile {
 export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
+  const { markLinkRead } = useSocial();
   const search = useSearch();
   const highlightParam = new URLSearchParams(search).get("highlight");
   const [order, setOrder] = useState<Order | null>(null);
@@ -192,6 +194,10 @@ export default function OrderDetail() {
   const [statusHighlighted, setStatusHighlighted] = useState(
     highlightParam === "shipped" || highlightParam === "delivered",
   );
+
+  useEffect(() => {
+    if (id) markLinkRead(`/orders/${id}`);
+  }, [id, markLinkRead]);
 
   useEffect(() => {
     if (!showUpdateBanner) return;

@@ -6,6 +6,7 @@ import {
   DollarSign, Send, Printer, Download,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import { useSocial } from "@/contexts/SocialContext";
 
 interface Sale {
   id: string;
@@ -93,6 +94,7 @@ async function patchSale(id: string, body: { status?: string; trackingNumber?: s
 export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const { markLinkRead } = useSocial();
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -102,6 +104,10 @@ export default function SaleDetail() {
   const [trackingInput, setTrackingInput] = useState("");
   const [carrierInput, setCarrierInput] = useState("");
   const [showTrackingInput, setShowTrackingInput] = useState(false);
+
+  useEffect(() => {
+    if (id) markLinkRead(`/sales/${id}`);
+  }, [id, markLinkRead]);
 
   useEffect(() => {
     if (!id) return;

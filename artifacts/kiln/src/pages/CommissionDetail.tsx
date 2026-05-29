@@ -66,7 +66,7 @@ function getMilestoneIndex(commission: Commission): number {
 
 export default function CommissionDetail({ params }: { params: { id: string } }) {
   const { id } = params;
-  const { markCommissionPaymentRead } = useSocial();
+  const { markCommissionPaymentRead, markLinkRead } = useSocial();
   const { user } = useAuth();
   const [commission, setCommission] = useState<Commission | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +94,8 @@ export default function CommissionDetail({ params }: { params: { id: string } })
 
   useEffect(() => {
     markCommissionPaymentRead(id);
-  }, [id, markCommissionPaymentRead]);
+    markLinkRead(`/commissions/${id}`);
+  }, [id, markCommissionPaymentRead, markLinkRead]);
 
   useEffect(() => {
     fetch(`/api/commissions/${id}`, { credentials: "include" })
