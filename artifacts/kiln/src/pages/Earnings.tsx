@@ -341,7 +341,13 @@ export default function Earnings() {
     const saved = localStorage.getItem("kiln_balance_refresh_interval");
     return (saved as RefreshInterval | null) ?? "1m";
   });
+  const [earningsRefreshInterval, setEarningsRefreshInterval] = useState<RefreshInterval>(() => {
+    const saved = localStorage.getItem("kiln_earnings_refresh_interval");
+    return (saved as RefreshInterval | null) ?? "1m";
+  });
+  const [earningsRefreshing, setEarningsRefreshing] = useState(false);
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const earningsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chargesEnabledRef = useRef(false);
   const prevTotalsRef = useRef<EarningTotals | null>(null);
 
@@ -558,16 +564,34 @@ export default function Earnings() {
     });
   }, [subscribe, fetchEarnings, fetchMonthlyTrend, fetchSales, fetchBalance, fetchStripeStatus, triggerStatsFlash]);
 
-  useEffect(() => {
-    const POLL_MS = 60_000;
-    const timerId = setInterval(async () => {
+  const handleRefreshEarningsNow = useCallback(async () => {
+    setEarningsRefreshing(true);
+    try {
       const result = await fetchEarnings();
       if (result) triggerStatsFlash();
       void fetchSales();
       if (chargesEnabledRef.current) void fetchBalance(true);
-    }, POLL_MS);
-    return () => clearInterval(timerId);
+    } finally {
+      setEarningsRefreshing(false);
+    }
   }, [fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
+
+  useEffect(() => {
+    localStorage.setItem("kiln_earnings_refresh_interval", earningsRefreshInterval);
+    if (earningsTimerRef.current) clearInterval(earningsTimerRef.current);
+    const ms = REFRESH_MS[earningsRefreshInterval];
+    if (ms !== null) {
+      earningsTimerRef.current = setInterval(async () => {
+        const result = await fetchEarnings();
+        if (result) triggerStatsFlash();
+        void fetchSales();
+        if (chargesEnabledRef.current) void fetchBalance(true);
+      }, ms);
+    }
+    return () => {
+      if (earningsTimerRef.current) clearInterval(earningsTimerRef.current);
+    };
+  }, [earningsRefreshInterval, fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
 
   useEffect(() => {
     if (!statsLastRefreshed) return;
@@ -922,16 +946,45 @@ export default function Earnings() {
               })}
             </div>
 
-            {/* Last refreshed timestamp */}
-            {statsLastRefreshed && (() => {
-              const secs = Math.floor((Date.now() - statsLastRefreshed.getTime()) / 1000);
-              const label = secs < 5 ? "just now" : secs < 60 ? `${secs}s ago` : `${Math.floor(secs / 60)}m ago`;
-              return (
-                <p className="text-[10px] text-stone-600 text-right -mt-3 mb-4 pr-1">
-                  Updated {label}
-                </p>
-              );
-            })()}
+            {/* Last refreshed timestamp + interval picker + manual refresh */}
+            <div className="flex items-center justify-between -mt-3 mb-4 px-1 gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-stone-600">Auto-refresh:</span>
+                <div className="flex gap-0.5">
+                  {(["30s", "1m", "5m", "manual"] as RefreshInterval[]).map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => setEarningsRefreshInterval(opt)}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                        earningsRefreshInterval === opt
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : "text-stone-600 hover:text-stone-400 border border-transparent"
+                      }`}
+                    >
+                      {REFRESH_LABELS[opt]}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => void handleRefreshEarningsNow()}
+                  disabled={earningsRefreshing}
+                  title="Refresh now"
+                  className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-40 transition-colors ml-1"
+                >
+                  <RefreshCw size={10} className={earningsRefreshing ? "animate-spin" : ""} />
+                  Refresh
+                </button>
+              </div>
+              {statsLastRefreshed && (() => {
+                const secs = Math.floor((Date.now() - statsLastRefreshed.getTime()) / 1000);
+                const label = secs < 5 ? "just now" : secs < 60 ? `${secs}s ago` : `${Math.floor(secs / 60)}m ago`;
+                return (
+                  <span className="text-[10px] text-stone-600 shrink-0">
+                    Updated {label}
+                  </span>
+                );
+              })()}
+            </div>
 
             {/* Shop Sales breakdown */}
             {salesBreakdownOpen && (
