@@ -151,6 +151,14 @@ interface GridItem {
   isProcess: boolean;
 }
 
+// Mux serves a poster frame for any video asset at this URL — used as the
+// grid thumbnail for uploaded videos that have no separate thumbnailUrl.
+function muxThumb(playbackId?: string | null): string {
+  return playbackId
+    ? `https://image.mux.com/${playbackId}/thumbnail.jpg?width=640&height=640&fit_mode=crop`
+    : "";
+}
+
 function buildGrid(artist: Artist): GridItem[] {
   const items: GridItem[] = [];
   for (const v of artist.videos) {
@@ -339,6 +347,7 @@ interface DbUserPost {
   caption: string;
   thumbnailUrl: string | null;
   videoUrl: string | null;
+  muxPlaybackId: string | null;
   technique: string | null;
   likeCount: number;
   createdAt: string;
@@ -597,7 +606,7 @@ export default function ArtistProfile() {
 
   const ownLocalGridItems: GridItem[] = localPosts.map((p) => ({
     id: p.id,
-    imageUrl: p.thumbnailUrl || (p.type === "image" ? p.mediaUrl : ""),
+    imageUrl: p.thumbnailUrl || (p.type === "image" ? p.mediaUrl : muxThumb(p.muxPlaybackId)),
     mediaUrl: p.mediaUrl,
     caption: p.caption,
     isVideo: p.type === "video",
@@ -607,7 +616,7 @@ export default function ArtistProfile() {
   // alongside localStorage posts and static artist data.
   const dbGridItems: GridItem[] = allDbPosts.map((p) => ({
     id: `db-${p.id}`,
-    imageUrl: p.thumbnailUrl ?? ``,
+    imageUrl: p.thumbnailUrl || muxThumb(p.muxPlaybackId),
     mediaUrl: p.videoUrl ?? p.thumbnailUrl ?? ``,
     caption: p.caption,
     isVideo: !!p.videoUrl,
@@ -1025,11 +1034,23 @@ export default function ArtistProfile() {
                   {tabItems.map((item) => {
                     const thumb = (
                       <div className="group relative aspect-square overflow-hidden bg-stone-900">
-                        <img
-                          src={item.imageUrl} alt={item.caption}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl} alt={item.caption}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : item.isVideo && item.mediaUrl && !item.mediaUrl.includes(".m3u8") ? (
+                          <video
+                            src={item.mediaUrl}
+                            muted playsInline preload="metadata"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-stone-700">
+                            <Video size={28} />
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/30 flex items-center justify-center">
                           {item.isVideo && <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />}
                         </div>
