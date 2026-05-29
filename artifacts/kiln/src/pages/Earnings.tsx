@@ -475,7 +475,6 @@ export default function Earnings() {
       };
       setTotals(newTotals);
       prevTotalsRef.current = newTotals;
-      setStatsLastRefreshed(new Date());
       return newTotals;
     } catch { /* ignore */ }
     return undefined;
@@ -560,18 +559,8 @@ export default function Earnings() {
   useEffect(() => {
     const POLL_MS = 60_000;
     const timerId = setInterval(async () => {
-      const prev = prevTotalsRef.current;
-      const newTotals = await fetchEarnings();
-      if (
-        newTotals &&
-        prev &&
-        (newTotals.total !== prev.total ||
-          newTotals.tips !== prev.tips ||
-          newTotals.subscriptions !== prev.subscriptions ||
-          newTotals.shopSales !== prev.shopSales)
-      ) {
-        triggerStatsFlash();
-      }
+      const result = await fetchEarnings();
+      if (result) triggerStatsFlash();
       void fetchSales();
       if (chargesEnabledRef.current) void fetchBalance(true);
     }, POLL_MS);
