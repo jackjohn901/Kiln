@@ -19,7 +19,7 @@ interface SavedFormula {
 }
 
 const STORAGE_KEY = "kiln_glaze_oracle_v1";
-const FORMULAS_KEY = "kiln_glaze_formulas_v1";
+const FORMULAS_KEY = "kiln_glaze_formulas_v2";
 
 const STARTER_PROMPTS = [
   "I want a matte, iron-rust surface with flashing in reduction. What glaze do you recommend?",
@@ -30,30 +30,13 @@ const STARTER_PROMPTS = [
   "I want a satin white with blue-purple breaks — how do I get there?",
 ];
 
-const SEED_FORMULAS: SavedFormula[] = [
-  {
-    id: "f-001",
-    name: "Maya's Reduction Celadon",
-    content: `**Cone 10 Reduction Celadon**\nContributed by @maya-chen\n\n- Custer Feldspar: 25%\n- Silica 325: 27%\n- Whiting: 20%\n- EPK Kaolin: 15%\n- Dolomite: 8%\n- Talc: 5%\n\n**Colorant:** Add 1.5% iron oxide for classic jade celadon, 2% for deeper green.\n\n**Notes:** Fire to cone 10 in heavy reduction from cone 08 through cone 10. Slow cool for best results. This glaze pools beautifully in texture.`,
-    savedAt: "2026-04-10T09:00:00Z",
-    contributorName: "Maya Chen",
-  },
-  {
-    id: "f-002",
-    name: "Community Shino Base",
-    content: `**Cone 10 Reduction Shino**\nCommunity verified recipe\n\n- Nepheline Syenite: 75%\n- EPK Kaolin: 20%\n- Soda Ash: 5%\n\n**Carbon trapping colorant:** Add 5–8% red iron oxide for toasty orange-brown tones, or leave uncolored for classic orange-white Shino with carbon flashing.\n\n**Notes:** Apply thick (3–4mm). Fast cooling creates more glassy surface; slow cool gives more matte. Best in anagama or noborigama with natural ash deposit.`,
-    savedAt: "2026-03-22T14:00:00Z",
-    contributorName: "Community",
-  },
-];
-
 function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 
 function readFormulas(): SavedFormula[] {
   try {
     const raw = localStorage.getItem(FORMULAS_KEY);
-    return raw ? JSON.parse(raw) : SEED_FORMULAS;
-  } catch { return SEED_FORMULAS; }
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
 }
 
 function saveFormulas(f: SavedFormula[]) {
@@ -120,7 +103,7 @@ export default function GlazeOracle() {
       .then(r => r.ok ? r.json() : null)
       .then((data: { settings?: Record<string, unknown> } | null) => {
         const saved = data?.settings?.["glazeFormulas"] as SavedFormula[] | undefined;
-        if (Array.isArray(saved) && saved.length > 0) {
+        if (Array.isArray(saved)) {
           setFormulas(saved);
           saveFormulas(saved);
         }
@@ -313,7 +296,7 @@ export default function GlazeOracle() {
 
       {tab === "formulas" && (
         <div className="flex-1 overflow-y-auto px-4 py-5 pb-32">
-          <p className="text-xs text-stone-500 mb-4">Community-contributed and personally saved glaze formulas. Every recipe is attributed to its source.</p>
+          <p className="text-xs text-stone-500 mb-4">Glaze formulas you've saved from your Oracle conversations. Every recipe is attributed to its source.</p>
           {formulas.length === 0 && (
             <div className="py-12 text-center">
               <FlaskConical size={28} className="text-stone-700 mx-auto mb-3" />

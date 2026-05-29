@@ -25,55 +25,6 @@ interface ProvenanceRecord {
   isArtist?: boolean;
 }
 
-const STORAGE_KEY = "kiln_provenance_v1";
-
-const SEED_PIECES: ProvenancePiece[] = [
-  {
-    id: "piece-001",
-    title: "Amber Column #7",
-    artistName: "Alex Bernstein",
-    artistId: "alex-bernstein",
-    medium: "Cast & Carved Glass",
-    year: "2023",
-    imageUrl: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&q=80",
-    royaltyPercent: 10,
-    registeredAt: "2023-09-15T10:00:00Z",
-    chain: [
-      { id: "r-001", ownerName: "Alex Bernstein", ownerId: "alex-bernstein", acquiredAt: "2023-09-15T10:00:00Z", note: "Piece registered at creation", isArtist: true },
-      { id: "r-002", ownerName: "Rachel Osei", ownerId: "rachel-osei", acquiredAt: "2023-11-03T14:20:00Z", acquiredFor: "$4,200", note: "Purchased at Habatat Gallery opening" },
-    ],
-  },
-  {
-    id: "piece-002",
-    title: "Reduction Bowl Series #12",
-    artistName: "Maya Chen",
-    artistId: "maya-chen",
-    medium: "Porcelain, Reduction Fired",
-    year: "2024",
-    imageUrl: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80",
-    royaltyPercent: 8,
-    registeredAt: "2024-02-10T09:00:00Z",
-    chain: [
-      { id: "r-003", ownerName: "Maya Chen", ownerId: "maya-chen", acquiredAt: "2024-02-10T09:00:00Z", note: "Piece registered at creation", isArtist: true },
-      { id: "r-004", ownerName: "James Whitfield", ownerId: "james-whitfield", acquiredAt: "2024-03-22T11:00:00Z", acquiredFor: "$1,800", note: "Acquired at Kiln Spring Drop" },
-      { id: "r-005", ownerName: "Sophia Reyes", ownerId: "sophia-reyes", acquiredAt: "2025-01-10T15:00:00Z", acquiredFor: "$2,400", note: "Private sale, artist received $192 royalty" },
-    ],
-  },
-];
-
-function readPieces(): ProvenancePiece[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : SEED_PIECES;
-  } catch { return SEED_PIECES; }
-}
-
-function savePieces(pieces: ProvenancePiece[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pieces)); } catch {}
-}
-
-function genId() { return `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }

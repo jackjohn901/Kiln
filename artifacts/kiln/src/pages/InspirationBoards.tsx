@@ -14,7 +14,7 @@ import { seedArtists } from "@/data/seedArtists";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
-const BOARDS_KEY = "kiln_boards_v1";
+const BOARDS_KEY = "kiln_boards_v2";
 
 interface BoardItem {
   id: string;
@@ -67,45 +67,17 @@ function buildSeedItems(): BoardItem[] {
   return items;
 }
 
-const SEED_BOARDS: Board[] = [
-  {
-    id: "board-seed-1",
-    name: "Earthy Tones",
-    description: "Wood-fired, shino, and reduction pieces in warm brown and amber glazes.",
-    isPrivate: false,
-    coverUrl: listings[0]?.imageUrl ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=300&fit=crop&seed=earthy",
-    items: buildSeedItems().slice(0, 6),
-    createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
-  },
-  {
-    id: "board-seed-2",
-    name: "Studio Glass Wishlist",
-    description: "Glass work I dream about owning one day.",
-    isPrivate: true,
-    coverUrl: listings[3]?.imageUrl ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=300&fit=crop&seed=glass-wish",
-    items: buildSeedItems().slice(4, 9),
-    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-  },
-];
-
-function initBoards(): Board[] {
-  const stored = readBoards();
-  if (stored.length) return stored;
-  writeBoards(SEED_BOARDS);
-  return SEED_BOARDS;
-}
-
 const DISCOVERY_ITEMS = buildSeedItems().slice(0, 24);
 
 export default function InspirationBoards() {
   const { profile } = useProfile();
-  const [boards, setBoards] = useState<Board[]>(initBoards);
+  const [boards, setBoards] = useState<Board[]>(readBoards);
   const [view, setView] = useState<"boards" | "discover" | "board-detail">("boards");
 
   useEffect(() => {
     fetch("/api/inspiration-boards", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ boards: Board[] }> : null)
-      .then(data => { if (data?.boards?.length) { setBoards(data.boards); writeBoards(data.boards); } })
+      .then(data => { if (data) { setBoards(data.boards ?? []); writeBoards(data.boards ?? []); } })
       .catch(() => {});
   }, []);
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
