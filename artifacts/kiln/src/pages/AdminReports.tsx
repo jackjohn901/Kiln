@@ -95,6 +95,7 @@ export default function AdminReports() {
   const [seedError, setSeedError] = useState<string | null>(null);
   const [newMarkerInput, setNewMarkerInput] = useState("");
   const [advanceResult, setAdvanceResult] = useState<{ newMarkerId: string; users: number; posts: number; listings: number; guilds: number } | null>(null);
+  const [markerMismatch, setMarkerMismatch] = useState<{ dbMarker: string; codeMarker: string } | null>(null);
 
   // Test notification state
   const [notifPreview, setNotifPreview] = useState<NotifPreview | null>(null);
@@ -170,6 +171,7 @@ export default function AdminReports() {
         const data = await res.json() as SeedResult & { dryRun: boolean };
         setSeedResult(data);
         setSeedPreview(null);
+        void checkMarkerSync();
       }
     } catch {
       setSeedError("Network error — please try again");
@@ -199,6 +201,7 @@ export default function AdminReports() {
       setAdvanceResult(data);
       setSeedPreview(null);
       setSeedResult(null);
+      void checkMarkerSync();
     } catch {
       setSeedError("Network error — please try again");
     } finally {
@@ -212,6 +215,24 @@ export default function AdminReports() {
     setSeedError(null);
     setAdvanceResult(null);
     setNewMarkerInput("");
+  }
+
+  async function checkMarkerSync() {
+    try {
+      const res = await fetch("/api/admin/reseed?dry_run=true", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      const data = await res.json() as SeedPreview & { dryRun: boolean };
+      setMarkerMismatch(
+        data.markerUserId !== data.codeMarkerId
+          ? { dbMarker: data.markerUserId, codeMarker: data.codeMarkerId }
+          : null,
+      );
+    } catch {
+      // Best-effort background check — leave the banner state untouched on failure.
+    }
   }
 
   async function runTestNotification(dryRun: boolean) {
@@ -363,6 +384,11 @@ export default function AdminReports() {
       setUpdating(null);
     }
   }
+
+  useEffect(() => {
+    if (section !== "maintenance") return;
+    void checkMarkerSync();
+  }, [section]);
 
   useEffect(() => {
     if (section !== "verifications") return;
@@ -621,6 +647,25 @@ export default function AdminReports() {
         {/* Maintenance section */}
         {section === "maintenance" && (
           <div className="space-y-4">
+            {markerMismatch && (
+              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
+                <AlertTriangle size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-amber-100">Seed marker out of sync</p>
+                  <p className="text-xs text-amber-200/80 leading-relaxed">
+                    The database marker{" "}
+                    <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded">{markerMismatch.dbMarker}</span>{" "}
+                    doesn't match the code constant{" "}
+                    <span className="font-mono bg-stone-800 px-1.5 py-0.5 rounded">{markerMismatch.codeMarker}</span>.
+                    On the next server restart, the seed will run again with{" "}
+                    <span className="font-mono">{markerMismatch.codeMarker}</span> and overwrite the current marker.
+                    Update <span className="font-mono">SEED_MARKER_ID</span> in{" "}
+                    <span className="font-mono">seed.ts</span> to match, or advance the DB marker to keep them in sync.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* System health card */}
             <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
               <div className="flex items-start gap-3">
