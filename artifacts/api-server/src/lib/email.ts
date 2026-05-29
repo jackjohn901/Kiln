@@ -193,6 +193,43 @@ export function shippingNotificationEmail(
   `);
 }
 
+export function trackingUpdateEmail(
+  orderTitle: string,
+  orderId: string,
+  trackingNumber?: string | null,
+  carrier?: string | null,
+): string {
+  const receiptUrl = `${BASE_URL}/orders/${orderId}`;
+
+  let trackingHtml = `<p style="margin:0;color:#78716c;font-size:13px;">The artist has updated your order details.</p>`;
+  if (trackingNumber) {
+    const carrierKey = carrier?.toLowerCase().trim() ?? "";
+    const buildUrl = CARRIER_TRACKING_URLS[carrierKey];
+    const carrierLabel = CARRIER_LABELS[carrierKey] ?? carrier ?? null;
+    const trackingUrl = buildUrl ? buildUrl(trackingNumber) : null;
+
+    const numberHtml = trackingUrl
+      ? `<a href="${trackingUrl}" style="color:#f59e0b;text-decoration:none;font-family:monospace;">${escHtml(trackingNumber)}</a>`
+      : `<strong style="color:#d6d3d1;font-family:monospace;">${escHtml(trackingNumber)}</strong>`;
+
+    trackingHtml = `
+      ${carrierLabel ? `<p style="margin:0 0 6px;color:#a8a29e;font-size:13px;">Carrier: <strong style="color:#d6d3d1;">${escHtml(carrierLabel)}</strong></p>` : ""}
+      <p style="margin:0 0 6px;color:#a8a29e;font-size:13px;">Tracking: ${numberHtml}</p>
+      ${trackingUrl ? `<p style="margin:8px 0 0;"><a href="${trackingUrl}" style="display:inline-block;background:#1c4f8a;color:#93c5fd;padding:7px 16px;border-radius:16px;text-decoration:none;font-size:12px;font-weight:bold;">Track your package →</a></p>` : ""}
+    `;
+  }
+
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Tracking updated 📦</h1>
+    <p style="color:#78716c;margin-bottom:0;">The artist has updated the tracking information for your order.</p>
+    ${card(`
+      <p style="margin:0 0 8px;font-size:15px;"><strong>${escHtml(orderTitle)}</strong></p>
+      ${trackingHtml}
+    `)}
+    ${btn(receiptUrl, "View receipt")}
+  `);
+}
+
 export function deliveryNotificationEmail(
   orderTitle: string,
   orderId: string,

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
-import { sendEmailWithRetry, shippingNotificationEmail, deliveryNotificationEmail } from "../lib/email";
+import { sendEmailWithRetry, shippingNotificationEmail, deliveryNotificationEmail, trackingUpdateEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
@@ -275,7 +275,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
     const [existing] = await db
-      .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, status: ordersTable.status })
+      .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, status: ordersTable.status, trackingNumber: ordersTable.trackingNumber })
       .from(ordersTable)
       .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.sellerId, req.user.id)))
       .limit(1);
@@ -380,6 +380,45 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
           }
         }).catch(() => {});
       }
+    }
+
+    // Notify the buyer when tracking number is updated on an already-shipped order (no status change)
+    const newTracking = trackingNumber !== undefined ? (trackingNumber.trim() || null) : existing.trackingNumber;
+    const trackingChanged = trackingNumber !== undefined && newTracking !== existing.trackingNumber;
+    const statusUnchanged = status === undefined || status === existing.status;
+    if (trackingChanged && statusUnchanged && updated.status === "shipped" && updated.buyerId) {
+      const trackingNotifId = crypto.randomUUID();
+      const orderLink = `/orders/${updated.id}?highlight=tracking`;
+      const trackingText = newTracking ? ` Tracking: ${newTracking}.` : "";
+      db.insert(notificationsTable).values({
+        id: trackingNotifId,
+        userId: updated.buyerId,
+        type: "order_tracking_updated",
+        text: `Tracking updated for "${updated.title ?? "your order"}".${trackingText}`,
+        link: orderLink,
+      }).catch(() => {});
+
+      Promise.all([
+        db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
+        db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
+      ]).then(([[s], [buyer]]) => {
+        const buyerSettings = s?.settings as Record<string, unknown> | null;
+        const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
+        const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_shipped !== false;
+        if (emailSnoozed) {
+          db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, trackingNotifId)).catch(() => {});
+        }
+        if (buyer?.email && wantsEmail) {
+          sendEmailWithRetry(
+            {
+              to: buyer.email,
+              subject: `Tracking updated for your order: ${updated.title}`,
+              html: trackingUpdateEmail(updated.title ?? "Your order", updated.id, newTracking ?? undefined, updated.carrier ?? undefined),
+            },
+            { contextId: updated.id, label: "tracking update notification" },
+          );
+        }
+      }).catch(() => {});
     }
 
     let buyerDisplayName: string | null = null;
