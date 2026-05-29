@@ -6,6 +6,7 @@ import {
   Printer, Star, Mail, Link2, Check, Download, Pencil, X,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import RelativeTime from "@/components/RelativeTime";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 import { useSocial } from "@/contexts/SocialContext";
 
@@ -591,7 +592,7 @@ export default function OrderDetail() {
           <div>
             <p className={`font-semibold text-sm ${statusConf.color}`}>{statusConf.label}</p>
             <p className="text-xs text-stone-500">
-              Placed {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
+              Placed <RelativeTime since={order.createdAt} className="text-xs text-stone-500" />
             </p>
           </div>
         </div>

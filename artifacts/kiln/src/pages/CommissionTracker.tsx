@@ -7,6 +7,7 @@ import {
   FileText,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import RelativeTime from "@/components/RelativeTime";
 import { toast } from "@/hooks/use-toast";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
 import { useSocial } from "@/contexts/SocialContext";
@@ -177,9 +178,6 @@ function useImageUpload() {
 }
 
 function UpdateBubble({ update, isSelf }: { update: CommissionUpdate; isSelf: boolean }) {
-  const time = new Date(update.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const date = new Date(update.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
   return (
     <div className={`flex flex-col gap-1 ${isSelf ? "items-end" : "items-start"}`}>
       {update.milestone && (
@@ -193,7 +191,9 @@ function UpdateBubble({ update, isSelf }: { update: CommissionUpdate; isSelf: bo
         )}
         {update.attachmentUrl && <AttachmentImage url={update.attachmentUrl} />}
       </div>
-      <p className="text-[10px] text-stone-600 px-1">{update.authorName} · {date} {time}</p>
+      <p className="text-[10px] text-stone-600 px-1">
+        {update.authorName} · <RelativeTime since={update.createdAt} className="text-[10px] text-stone-600" />
+      </p>
     </div>
   );
 }
@@ -436,7 +436,7 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
           <div className="mt-3 flex items-center gap-4 text-xs text-stone-600">
             {commission.quotedPrice && <span className="text-amber-400 font-semibold">${commission.quotedPrice.toLocaleString()}</span>}
             {commission.budgetRange && !commission.quotedPrice && <span>{commission.budgetRange}</span>}
-            <span>{new Date(commission.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+            <RelativeTime since={commission.createdAt} className="text-xs text-stone-600" />
             {commission.estimatedDelivery && <span>Est. {new Date(commission.estimatedDelivery).toLocaleDateString("en-US", { month: "short", year: "2-digit" })}</span>}
           </div>
         </div>

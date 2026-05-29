@@ -6,6 +6,7 @@ import {
   Image, Truck, Package, Star, Loader2,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import RelativeTime from "@/components/RelativeTime";
 import { useSocial } from "@/contexts/SocialContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -180,12 +181,7 @@ export default function CommissionDetail({ params }: { params: { id: string } })
                 )}
                 {commission.timeline && <span>Timeline: {commission.timeline}</span>}
                 <span>
-                  Opened{" "}
-                  {new Date(commission.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  Opened <RelativeTime since={commission.createdAt} className="text-xs text-stone-500" />
                 </span>
                 {commission.estimatedDelivery && (
                   <span>
