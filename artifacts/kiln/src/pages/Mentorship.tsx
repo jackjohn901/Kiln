@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Video, MapPin, Clock, Users, CheckCircle, ExternalLink, Mail, Star, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, Video, MapPin, Clock, CheckCircle, ExternalLink, Mail, Star, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
 import { MENTORS, type MentorProfile } from "@/data/mentors";
@@ -41,6 +41,7 @@ export default function Mentorship() {
   const [appliedTo, setAppliedTo] = useState<Set<string>>(new Set());
   const [applyText, setApplyText] = useState("");
   const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [mediumFilter, setMediumFilter] = useState<string>("all");
 
   const mediums = ["all", ...Array.from(new Set(MENTORS.map(m => m.medium.split(" & ")[0])))];
@@ -62,18 +63,23 @@ export default function Mentorship() {
   async function handleApply(mentorId: string) {
     if (!applyText.trim() || applying) return;
     setApplying(true);
+    setApplyError(null);
     try {
-      await fetch("/api/mentorship/apply", {
+      const res = await fetch("/api/mentorship/apply", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mentorId, message: applyText }),
       });
-    } catch {}
-    setAppliedTo(s => new Set([...s, mentorId]));
-    setApplyingTo(null);
-    setApplyText("");
-    setApplying(false);
+      if (!res.ok) throw new Error("request failed");
+      setAppliedTo(s => new Set([...s, mentorId]));
+      setApplyingTo(null);
+      setApplyText("");
+    } catch {
+      setApplyError("Couldn't send your application. Please try again.");
+    } finally {
+      setApplying(false);
+    }
   }
 
   return (
@@ -128,10 +134,12 @@ export default function Mentorship() {
               applyingTo={applyingTo}
               applyText={applyText}
               setApplyText={setApplyText}
-              onStartApply={() => setApplyingTo(mentor.id)}
-              onCancelApply={() => setApplyingTo(null)}
+              onStartApply={() => { setApplyError(null); setApplyingTo(mentor.id); }}
+              onCancelApply={() => { setApplyError(null); setApplyingTo(null); }}
               onApply={() => handleApply(mentor.id)}
               applied={appliedTo.has(mentor.id)}
+              applying={applying}
+              applyError={applyingTo === mentor.id ? applyError : null}
               hasProfile={!!profile}
             />
           ))}
@@ -141,7 +149,7 @@ export default function Mentorship() {
   );
 }
 
-function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setApplyText, onStartApply, onCancelApply, onApply, applied, hasProfile }: {
+function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setApplyText, onStartApply, onCancelApply, onApply, applied, applying, applyError, hasProfile }: {
   mentor: MentorProfile;
   expanded: boolean;
   onExpand: () => void;
@@ -152,6 +160,8 @@ function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setAppl
   onCancelApply: () => void;
   onApply: () => void;
   applied: boolean;
+  applying: boolean;
+  applyError: string | null;
   hasProfile: boolean;
 }) {
   const isApplying = applyingTo === mentor.id;
@@ -175,7 +185,7 @@ function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setAppl
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${AVAIL_COLORS[mentor.availability]}`}>
-                  {mentor.availability === "open" ? `${mentor.spotsAvailable} open` : mentor.availability}
+                  {mentor.availability}
                 </span>
                 {expanded ? <ChevronUp size={14} className="text-stone-600" /> : <ChevronDown size={14} className="text-stone-600" />}
               </div>
@@ -183,7 +193,6 @@ function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setAppl
             <p className="mt-2 text-xs text-stone-400 line-clamp-2 leading-relaxed">{mentor.bio}</p>
             <div className="mt-2.5 flex items-center gap-3 text-[10px] text-stone-600">
               <span className="flex items-center gap-1"><MapPin size={9} /> {mentor.location}</span>
-              <span className="flex items-center gap-1"><Users size={9} /> {mentor.totalMentored} mentored</span>
             </div>
             {/* Format badges */}
             <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -258,9 +267,14 @@ function MentorCard({ mentor, expanded, onExpand, applyingTo, applyText, setAppl
                     placeholder={`Introduce yourself: where you are in your practice, what you're working on, and what you most want to develop. ${mentor.requiresPortfolio ? "Include a portfolio link." : ""}`}
                     className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none resize-none"
                   />
+                  {applyError && (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                      <AlertCircle size={13} className="shrink-0" /> {applyError}
+                    </div>
+                  )}
                   <div className="flex gap-2">
-                    <button onClick={onApply} disabled={!applyText.trim()} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                      Send Application
+                    <button onClick={onApply} disabled={!applyText.trim() || applying} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                      {applying ? "Sending…" : "Send Application"}
                     </button>
                     <button onClick={onCancelApply} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-stone-400 hover:text-stone-200 transition-colors">
                       Cancel

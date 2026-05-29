@@ -1,34 +1,36 @@
 import { useState, useRef } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import {
   ArrowLeft, Play, Video, SplitSquareHorizontal, Upload,
-  Check, Flame,
+  Flame, AlertCircle,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
 import { ALL_REELS } from "@/data/reels";
 import { useProfile } from "@/contexts/ProfileContext";
 import BetaBanner from "@/components/BetaBanner";
 
-type DuetStep = "browse" | "record" | "preview" | "done";
+type DuetStep = "browse" | "record";
 
 export default function DuetStudio() {
   const { reelId } = useParams<{ reelId: string }>();
   const { profile } = useProfile();
+  const [, navigate] = useLocation();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<DuetStep>("browse");
   const [layout, setLayout] = useState<"side-by-side" | "reaction" | "green-screen">("side-by-side");
   const [response, setResponse] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const reel = ALL_REELS.find((r) => r.id === reelId);
 
   async function handlePublish() {
     if (!response.trim() || !profile) return;
     setSubmitting(true);
+    setError(null);
     try {
-      await fetch("/api/posts", {
+      const res = await fetch("/api/posts", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -41,33 +43,23 @@ export default function DuetStudio() {
           duetOfId: reel?.id ?? null,
         }),
       });
-    } catch { /* show done regardless */ }
-    setSubmitting(false);
-    setStep("done");
-  }
-
-  if (step === "done") {
-    return (
-      <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center px-4 text-center">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="space-y-4">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-amber-500/15 border border-amber-500/30">
-            <Check size={28} className="text-amber-400" />
-          </div>
-          <h2 className="font-serif text-2xl text-amber-100">Duet posted!</h2>
-          <p className="text-sm text-stone-500 max-w-xs">Your response is now live alongside the original reel. The artist has been notified.</p>
-          <div className="flex gap-3 justify-center pt-2">
-            <Link href="/">
-              <button className="rounded-full bg-amber-500 px-5 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors">
-                Back to feed
-              </button>
-            </Link>
-            <button onClick={() => { setStep("browse"); setResponse(""); }} className="rounded-full border border-stone-700 px-5 py-2.5 text-sm text-stone-400 hover:text-stone-200 transition-colors">
-              Create another
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
+      if (!res.ok) {
+        setError("We couldn't post your duet. Please try again in a moment.");
+        setSubmitting(false);
+        return;
+      }
+      const created = await res.json().catch(() => null);
+      if (created?.id) {
+        // Success is confirmed only once the post exists — land on it.
+        navigate(`/posts/db-${created.id}`);
+        return;
+      }
+      setError("Something went wrong posting your duet. Please try again.");
+      setSubmitting(false);
+    } catch {
+      setError("Something went wrong posting your duet. Please try again.");
+      setSubmitting(false);
+    }
   }
 
   if (step === "record" && reel) {
@@ -151,6 +143,12 @@ export default function DuetStudio() {
             </div>
           </button>
 
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
           <button
             onClick={handlePublish}
             disabled={!response.trim() || submitting}

@@ -19,7 +19,7 @@ interface LeaderboardProfile {
 
 const MEDIUMS = ["All", "Glass", "Ceramics", "Metal", "Fiber", "Wood", "Stone"];
 const TABS = [
-  { id: "craft", label: "Craft Score", icon: Trophy },
+  { id: "craft", label: "Most Followed", icon: Trophy },
   { id: "streak", label: "Streaks", icon: Flame },
   { id: "city", label: "By City", icon: MapPin },
 ];
@@ -31,7 +31,7 @@ const RANK_CONFIG = [
 ];
 
 function score(p: LeaderboardProfile): number {
-  return p.craftScore ?? (78 + (p.followerCount % 20));
+  return p.followerCount;
 }
 
 interface StreakProfile {
@@ -185,8 +185,8 @@ export default function Leaderboard() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 mr-2">
-                        <p className={`text-lg font-bold ${cfg.color}`}>{score(p)}</p>
-                        <p className="text-[10px] text-stone-500">craft score</p>
+                        <p className={`text-lg font-bold ${cfg.color}`}>{score(p).toLocaleString()}</p>
+                        <p className="text-[10px] text-stone-500">followers</p>
                       </div>
                       <button
                         onClick={() => handleFollow(p.userId)}

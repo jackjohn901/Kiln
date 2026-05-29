@@ -60,7 +60,9 @@ export default function CommissionFlow() {
     contactEmail: "",
     contactName: profile?.name ?? "",
   });
-  const [commissionId] = useState(() => `KCM-${Math.random().toString(36).slice(2, 9).toUpperCase()}`);
+  const [commissionId, setCommissionId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function field(k: keyof typeof form, v: string) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -68,6 +70,8 @@ export default function CommissionFlow() {
 
   async function handleSubmit() {
     if (!artist) return;
+    setSubmitting(true);
+    setSubmitError(null);
     try {
       const r = await fetch("/api/commissions", {
         method: "POST",
@@ -84,25 +88,32 @@ export default function CommissionFlow() {
           referenceUrls: form.referenceUrl ? [form.referenceUrl] : [],
         }),
       });
-      if (r.ok) {
-        if (profile) {
-          sendCommissionInquiry({
-            toArtistId: artist.id,
-            toArtistName: artist.name,
-            fromName: form.contactName || profile.name,
-            fromEmail: form.contactEmail,
-            fromArtistId: profile.id,
-            type: "custom",
-            description: form.description,
-            budget: form.budget,
-            timeline: form.timeline,
-            dimensions: form.dimensions || undefined,
-          });
-        }
-        setStep("submitted");
+      if (!r.ok) {
+        setSubmitError("We couldn't send your brief. Please check your connection and try again.");
+        setSubmitting(false);
+        return;
       }
-    } catch {
+      const created = await r.json().catch(() => null);
+      if (created?.id) setCommissionId(String(created.id));
+      if (profile) {
+        sendCommissionInquiry({
+          toArtistId: artist.id,
+          toArtistName: artist.name,
+          fromName: form.contactName || profile.name,
+          fromEmail: form.contactEmail,
+          fromArtistId: profile.id,
+          type: "custom",
+          description: form.description,
+          budget: form.budget,
+          timeline: form.timeline,
+          dimensions: form.dimensions || undefined,
+        });
+      }
       setStep("submitted");
+      setSubmitting(false);
+    } catch {
+      setSubmitError("Something went wrong sending your brief. Please try again.");
+      setSubmitting(false);
     }
   }
 
@@ -142,7 +153,9 @@ export default function CommissionFlow() {
             <CheckCircle size={36} className="text-emerald-400" />
           </div>
           <h2 className="font-serif text-3xl text-amber-100 mb-2">Brief Sent</h2>
-          <p className="text-stone-500 text-sm mb-1">Commission ID: <span className="font-mono text-amber-300">{commissionId}</span></p>
+          {commissionId && (
+            <p className="text-stone-500 text-sm mb-1">Commission ID: <span className="font-mono text-amber-300">{commissionId}</span></p>
+          )}
           <p className="text-stone-400 text-sm mb-8 max-w-sm mx-auto">
             {artist.name} typically responds within 3–5 business days. You'll receive an email at {form.contactEmail} when they reply.
           </p>
@@ -373,16 +386,23 @@ export default function CommissionFlow() {
                   Submitting this brief does not commit you to a purchase. {artist.name} will review and respond with a quote if they're interested.
                 </div>
 
+                {submitError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                    <Info size={15} className="shrink-0 mt-0.5" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
-                  <button onClick={() => setStep("brief")} className="rounded-full border border-white/10 px-5 py-3 text-sm text-stone-400 hover:border-white/20">
+                  <button onClick={() => setStep("brief")} disabled={submitting} className="rounded-full border border-white/10 px-5 py-3 text-sm text-stone-400 hover:border-white/20 disabled:opacity-40">
                     Edit Brief
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={!canSubmit}
+                    disabled={!canSubmit || submitting}
                     className="flex-1 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
                   >
-                    Send to {artist.name}
+                    {submitting ? "Sending…" : `Send to ${artist.name}`}
                   </button>
                 </div>
               </motion.div>

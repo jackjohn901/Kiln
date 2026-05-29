@@ -20,6 +20,8 @@ export default function ApplyVerified() {
   const { isVerified } = useSocial();
 
   const [step, setStep] = useState<Step>("intro");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState({
     website: "",
     instagram: "",
@@ -33,15 +35,26 @@ export default function ApplyVerified() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitting(true);
+    setSubmitError(null);
     try {
-      await fetch("/api/me/verification-application", {
+      const res = await fetch("/api/me/verification-application", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ ...form, appliedAt: new Date().toISOString() }),
       });
-    } catch {}
-    setStep("submitted");
+      if (!res.ok) {
+        setSubmitError("We couldn't submit your application. Please try again in a moment.");
+        setSubmitting(false);
+        return;
+      }
+      setStep("submitted");
+      setSubmitting(false);
+    } catch {
+      setSubmitError("Something went wrong submitting your application. Please try again.");
+      setSubmitting(false);
+    }
   }
 
   if (!profile) {
@@ -188,19 +201,28 @@ export default function ApplyVerified() {
                 />
               </div>
 
+              {submitError && (
+                <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setStep("intro")}
-                  className="flex-1 rounded-full border border-stone-700 py-3 text-sm font-medium text-stone-400 hover:border-stone-500 hover:text-stone-300 transition-colors"
+                  disabled={submitting}
+                  className="flex-1 rounded-full border border-stone-700 py-3 text-sm font-medium text-stone-400 hover:border-stone-500 hover:text-stone-300 transition-colors disabled:opacity-40"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                  disabled={submitting}
+                  className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
                 >
-                  Submit Application
+                  {submitting ? "Submitting…" : "Submit Application"}
                 </button>
               </div>
             </form>
@@ -213,10 +235,9 @@ export default function ApplyVerified() {
               <Shield size={36} className="text-blue-400" />
             </div>
             <h2 className="mb-2 font-serif text-2xl font-bold text-amber-100">Application submitted</h2>
-            <p className="mb-2 text-stone-400 text-sm leading-relaxed max-w-sm">
+            <p className="mb-8 text-stone-400 text-sm leading-relaxed max-w-sm">
               Thank you, {profile.name}. We'll review your application within 5–10 business days and notify you by email.
             </p>
-            <p className="mb-8 text-xs text-stone-600">Application reference: KLN-{Date.now().toString(36).toUpperCase()}</p>
             <Link href={`/artists/${profile.id}`} className="flex items-center gap-1.5 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
               Back to profile <ExternalLink size={13} />
             </Link>

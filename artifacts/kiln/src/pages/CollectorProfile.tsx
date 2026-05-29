@@ -3,7 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   ChevronLeft, Star, MapPin, Shield, Grid3x3, Heart,
-  MessageCircle, ExternalLink, Package, Users, DollarSign,
+  MessageCircle, ExternalLink,
 } from "lucide-react";
 import { getCollectorById, COLLECTORS } from "@/data/collectors";
 import Nav from "@/components/Nav";
@@ -20,11 +20,6 @@ const MEDIUM_COLORS: Record<string, string> = {
   "Bronze Casting": "bg-yellow-700/20 text-yellow-400 border-yellow-700/30",
 };
 
-function fmt(n: number) {
-  if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `$${(n / 1000).toFixed(0)}k`;
-  return `$${n}`;
-}
 
 function StarRow({ rating }: { rating: number }) {
   return (
@@ -109,21 +104,6 @@ export default function CollectorProfile() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="mb-6 grid grid-cols-3 gap-3">
-          {[
-            { icon: Package, label: "Pieces", value: String(collector.piecesOwned) },
-            { icon: Users, label: "Artists", value: String(collector.artistsFollowed) },
-            { icon: DollarSign, label: "Collected", value: fmt(collector.totalSpent) },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label} className="rounded-xl bg-stone-900 border border-white/5 p-3 text-center">
-              <Icon size={16} className="mx-auto mb-1 text-amber-400" />
-              <p className="text-base font-bold text-white">{value}</p>
-              <p className="text-[10px] text-stone-500">{label}</p>
-            </div>
-          ))}
-        </div>
-
         {/* Tabs */}
         <div className="mb-5 flex gap-1 rounded-xl bg-stone-900 p-1">
           {(["collection", "reviews", "following"] as const).map((tab) => (
@@ -166,11 +146,6 @@ export default function CollectorProfile() {
                         {work.artistName}
                       </Link>
                     </div>
-                    {work.showPrice && work.acquisitionPrice && (
-                      <span className="shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-xs font-bold text-emerald-300">
-                        {fmt(work.acquisitionPrice)}
-                      </span>
-                    )}
                   </div>
                   <p className="mt-1 text-xs text-stone-500">{work.year} · {work.medium}</p>
                   {work.provenance && (
@@ -269,7 +244,7 @@ export default function CollectorProfile() {
               <img src={c.avatarUrl} alt={c.name} className="h-9 w-9 shrink-0 rounded-full object-cover" />
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-stone-200">{c.name}</p>
-                <p className="text-[10px] text-stone-600">{c.piecesOwned} pieces</p>
+                <p className="text-[10px] text-stone-600">{c.location}</p>
               </div>
             </Link>
           ))}

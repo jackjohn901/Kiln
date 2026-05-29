@@ -2,64 +2,14 @@ import { useState } from "react";
 import { Link, useParams } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Mic2, ChevronLeft, Play, Pause, Send, Flame,
-  Users, Sparkles, Video, MessageCircle, Plus, X,
+  Mic2, Play, Send,
+  Sparkles, Video, Plus, X,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { ALL_REELS, getReelById } from "@/data/reels";
-import { getArtistById, artists } from "@/data/artists";
-import { seedArtists } from "@/data/seedArtists";
 import { useProfile } from "@/contexts/ProfileContext";
-import { motion as m } from "framer-motion";
-import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
-
-const ALL_ARTISTS = [...artists, ...seedArtists];
-
-function getAvatar(artistId: string) {
-  const a = getArtistById(artistId) ?? ALL_ARTISTS.find((x) => x.id === artistId);
-  return a?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${artistId}`;
-}
-
-const FEATURED_DIALOGUES = [
-  {
-    id: "dial-001",
-    originalReelId: ALL_REELS[0]?.id ?? "reel1",
-    originalArtistId: ALL_REELS[0]?.artistId ?? "alex-bernstein",
-    originalArtistName: ALL_REELS[0]?.artistName ?? "Alex Bernstein",
-    originalCaption: ALL_REELS[0]?.caption ?? "Optical glass series",
-    originalThumb: ALL_REELS[0]?.thumbnail ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=dial1",
-    responseArtistId: "maya-chen",
-    responseArtistName: "Maya Chen",
-    responseCaption: "Responding to Alex's optical series — trying a similar optical approach in ceramic. The way light refracts through glazed surfaces has always fascinated me.",
-    responseThumb: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=maya-response`,
-    responseVideoId: "dQhKVFbpZoQ",
-    views: 4821,
-    replies: 23,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-  },
-  {
-    id: "dial-002",
-    originalReelId: ALL_REELS[2]?.id ?? "reel3",
-    originalArtistId: ALL_REELS[2]?.artistId ?? "lino-tagliapietra",
-    originalArtistName: ALL_REELS[2]?.artistName ?? "Lino Tagliapietra",
-    originalCaption: ALL_REELS[2]?.caption ?? "Murrine technique",
-    originalThumb: ALL_REELS[2]?.thumbnail ?? "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=dial2",
-    responseArtistId: "dante-marioni",
-    responseArtistName: "Dante Marioni",
-    responseCaption: "Lino's murrine cane technique is the foundation of everything I do. Here's how I've adapted it for blown vessels — the key difference is timing the gather.",
-    responseThumb: `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=dante-response`,
-    responseVideoId: "7xZfRTsNBos",
-    views: 12400,
-    replies: 61,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-  },
-];
 
 const SUGGESTED_REELS = ALL_REELS.slice(0, 8);
-
-function fmt(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-}
 
 
 export default function StudioDialogue() {
@@ -107,95 +57,10 @@ export default function StudioDialogue() {
         </div>
 
         {/* Featured dialogues */}
-        <div className="space-y-4">
-          {FEATURED_DIALOGUES.map((d, i) => (
-            <motion.div
-              key={d.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="rounded-2xl border border-white/8 bg-stone-900/50 overflow-hidden"
-            >
-              {/* Side-by-side thumbnails */}
-              <div className="flex">
-                <div className="relative flex-1 aspect-[9/14] overflow-hidden bg-stone-800">
-                  <img src={d.originalThumb} alt={d.originalCaption}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${d.id}-orig`; }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <img src={getAvatar(d.originalArtistId)} alt={d.originalArtistName}
-                        className="h-5 w-5 rounded-full border border-white/30 object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${d.originalArtistId}`; }}
-                      />
-                      <span className="text-[10px] text-white/80 font-medium">{d.originalArtistName}</span>
-                    </div>
-                    <p className="text-[9px] text-white/60 line-clamp-2">{d.originalCaption}</p>
-                  </div>
-                  <div className="absolute top-2 left-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] text-white/70">
-                    Original
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-px bg-amber-500/30 relative flex items-center justify-center z-10">
-                  <div className="absolute h-8 w-8 rounded-full bg-amber-500 border-2 border-stone-900 flex items-center justify-center shadow-lg">
-                    <Mic2 size={12} className="text-stone-950" />
-                  </div>
-                </div>
-
-                <div className="relative flex-1 aspect-[9/14] overflow-hidden bg-stone-800">
-                  {playingId === d.id ? (
-                    <iframe
-                      src={`https://www.youtube.com/embed/${d.responseVideoId}?autoplay=1&mute=0&controls=0&loop=1&rel=0&playsinline=1&playlist=${d.responseVideoId}`}
-                      className="w-full h-full border-none"
-                      allow="autoplay; encrypted-media"
-                    />
-                  ) : (
-                    <>
-                      <img src={d.responseThumb} alt={d.responseCaption}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=700&fit=crop&seed=${d.id}-resp`; }}
-                      />
-                      <button
-                        onClick={() => setPlayingId(playingId === d.id ? null : d.id)}
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors"
-                      >
-                        <div className="h-12 w-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
-                          <Play size={18} className="text-white ml-1" fill="white" />
-                        </div>
-                      </button>
-                    </>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
-                  <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <img src={getAvatar(d.responseArtistId)} alt={d.responseArtistName}
-                        className="h-5 w-5 rounded-full border border-amber-400/50 object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${d.responseArtistId}`; }}
-                      />
-                      <span className="text-[10px] text-amber-300 font-medium">{d.responseArtistName}</span>
-                    </div>
-                  </div>
-                  <div className="absolute top-2 right-2 rounded-full bg-amber-500/80 px-2 py-0.5 text-[9px] text-stone-950 font-bold">
-                    Response
-                  </div>
-                </div>
-              </div>
-
-              {/* Response caption + stats */}
-              <div className="p-4">
-                <p className="text-sm text-stone-300 leading-relaxed mb-3">{d.responseCaption}</p>
-                <div className="flex items-center gap-4 text-xs text-stone-600">
-                  <span className="flex items-center gap-1"><Flame size={11} className="text-amber-500" /> {fmt(d.views)} views</span>
-                  <span className="flex items-center gap-1"><MessageCircle size={11} /> {d.replies} replies</span>
-                  <RelativeTime since={d.createdAt} className="ml-auto text-xs text-stone-500" />
-                </div>
-              </div>
-            </motion.div>
-          ))}
+        <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-10 text-center">
+          <Mic2 size={26} className="text-stone-600 mx-auto mb-3" />
+          <p className="text-sm font-medium text-stone-300">No dialogues yet</p>
+          <p className="text-xs text-stone-500 mt-1 max-w-xs mx-auto">Be the first to respond to another artist's work and start a studio dialogue.</p>
         </div>
       </div>
 
@@ -227,8 +92,8 @@ export default function StudioDialogue() {
               {submitted ? (
                 <div className="p-10 text-center">
                   <div className="text-4xl mb-3">🔥</div>
-                  <p className="font-semibold text-stone-200 mb-1">Dialogue started!</p>
-                  <p className="text-sm text-stone-500">Your response has been posted alongside the original.</p>
+                  <p className="font-semibold text-stone-200 mb-1">Thanks for trying it out</p>
+                  <p className="text-sm text-stone-500">Studio Dialogue is a preview — video responses aren't live yet, so nothing was posted.</p>
                 </div>
               ) : (
                 <div className="p-5 space-y-4">
