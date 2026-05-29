@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useId } from "react";
 import { Link, useSearch, useLocation } from "wouter";
 import {
   TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
@@ -165,6 +165,9 @@ export default function Earnings() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear]           = useState(now.getFullYear());
+  const monthPickerRef = useRef<HTMLDivElement>(null);
 
   const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
 
@@ -182,6 +185,28 @@ export default function Earnings() {
       return m + 1;
     });
   }
+
+  function openMonthPicker() {
+    setPickerYear(selectedYear);
+    setShowMonthPicker(true);
+  }
+
+  function selectPickerMonth(month: number) {
+    setSelectedMonth(month);
+    setSelectedYear(pickerYear);
+    setShowMonthPicker(false);
+  }
+
+  useEffect(() => {
+    if (!showMonthPicker) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (monthPickerRef.current && !monthPickerRef.current.contains(e.target as Node)) {
+        setShowMonthPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMonthPicker]);
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
   const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, salesByType: { listings: 0, drops: 0, commissions: 0, workshops: 0 }, total: 0 });
@@ -662,7 +687,7 @@ export default function Earnings() {
             ].join(" ")}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-xs uppercase tracking-wider text-stone-500">Earnings Summary</p>
-                <div className="flex items-center gap-1">
+                <div className="relative flex items-center gap-1" ref={monthPickerRef}>
                   <button
                     onClick={goToPrevMonth}
                     className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors"
@@ -670,9 +695,14 @@ export default function Earnings() {
                   >
                     <ChevronLeft size={14} />
                   </button>
-                  <span className="text-xs font-medium text-stone-300 min-w-[110px] text-center tabular-nums">
+                  <button
+                    onClick={openMonthPicker}
+                    className="text-xs font-medium text-stone-300 min-w-[110px] text-center tabular-nums hover:text-amber-300 transition-colors rounded px-1 py-0.5 hover:bg-white/5"
+                    aria-label="Open month picker"
+                    aria-expanded={showMonthPicker}
+                  >
                     {MONTH_NAMES[selectedMonth]} {selectedYear}
-                  </span>
+                  </button>
                   <button
                     onClick={goToNextMonth}
                     disabled={isCurrentMonth}
@@ -681,6 +711,51 @@ export default function Earnings() {
                   >
                     <ChevronRight size={14} />
                   </button>
+                  {showMonthPicker && (
+                    <div className="absolute right-0 top-8 z-50 w-56 rounded-xl border border-white/10 bg-stone-900 shadow-xl p-3 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="flex items-center justify-between mb-3">
+                        <button
+                          onClick={() => setPickerYear(y => y - 1)}
+                          className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors"
+                          aria-label="Previous year"
+                        >
+                          <ChevronLeft size={13} />
+                        </button>
+                        <span className="text-xs font-semibold text-stone-200">{pickerYear}</span>
+                        <button
+                          onClick={() => setPickerYear(y => y + 1)}
+                          disabled={pickerYear >= now.getFullYear()}
+                          className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label="Next year"
+                        >
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {MONTH_NAMES.map((name, idx) => {
+                          const isFuture = pickerYear > now.getFullYear() || (pickerYear === now.getFullYear() && idx > now.getMonth());
+                          const isSelected = idx === selectedMonth && pickerYear === selectedYear;
+                          return (
+                            <button
+                              key={name}
+                              onClick={() => !isFuture && selectPickerMonth(idx)}
+                              disabled={isFuture}
+                              className={[
+                                "rounded-lg py-1.5 text-xs font-medium transition-colors",
+                                isFuture
+                                  ? "text-stone-700 cursor-not-allowed"
+                                  : isSelected
+                                    ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
+                                    : "text-stone-400 hover:bg-white/8 hover:text-stone-200",
+                              ].join(" ")}
+                            >
+                              {name.slice(0, 3)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-0 divide-x divide-white/8">

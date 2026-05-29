@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -112,6 +113,8 @@ export default function SalesScreen() {
   const now = useMemo(() => new Date(), []);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear]           = useState(now.getFullYear());
 
   const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
 
@@ -128,6 +131,17 @@ export default function SalesScreen() {
       if (m === 11) { setSelectedYear(y => y + 1); return 0; }
       return m + 1;
     });
+  }
+
+  function openMonthPicker() {
+    setPickerYear(selectedYear);
+    setShowMonthPicker(true);
+  }
+
+  function selectPickerMonth(month: number) {
+    setSelectedMonth(month);
+    setSelectedYear(pickerYear);
+    setShowMonthPicker(false);
   }
 
   const params = useLocalSearchParams<{ highlight?: string }>();
@@ -249,9 +263,11 @@ export default function SalesScreen() {
                   >
                     <Feather name="chevron-left" size={16} color={colors.mutedForeground} />
                   </Pressable>
-                  <Text style={[styles.monthLabel, { color: colors.foreground }]}>
-                    {MONTH_NAMES[selectedMonth].slice(0, 3)} {selectedYear}
-                  </Text>
+                  <Pressable onPress={openMonthPicker} hitSlop={4}>
+                    <Text style={[styles.monthLabel, { color: colors.primary }]}>
+                      {MONTH_NAMES[selectedMonth].slice(0, 3)} {selectedYear}
+                    </Text>
+                  </Pressable>
                   <Pressable
                     onPress={goToNextMonth}
                     hitSlop={8}
@@ -387,6 +403,64 @@ export default function SalesScreen() {
           })}
         </ScrollView>
       )}
+
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowMonthPicker(false)}
+        >
+          <Pressable style={[styles.pickerSheet, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => {}}>
+            <View style={styles.pickerYearRow}>
+              <Pressable
+                hitSlop={12}
+                onPress={() => setPickerYear(y => y - 1)}
+                style={styles.pickerArrow}
+              >
+                <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
+              </Pressable>
+              <Text style={[styles.pickerYearLabel, { color: colors.foreground }]}>{pickerYear}</Text>
+              <Pressable
+                hitSlop={12}
+                onPress={() => pickerYear < now.getFullYear() && setPickerYear(y => y + 1)}
+                style={[styles.pickerArrow, pickerYear >= now.getFullYear() && { opacity: 0.25 }]}
+                disabled={pickerYear >= now.getFullYear()}
+              >
+                <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+            <View style={styles.monthGrid}>
+              {MONTH_NAMES.map((name, idx) => {
+                const isFuture = pickerYear > now.getFullYear() || (pickerYear === now.getFullYear() && idx > now.getMonth());
+                const isSelected = idx === selectedMonth && pickerYear === selectedYear;
+                return (
+                  <Pressable
+                    key={name}
+                    onPress={() => !isFuture && selectPickerMonth(idx)}
+                    disabled={isFuture}
+                    style={[
+                      styles.monthCell,
+                      isSelected && { backgroundColor: colors.primary + "33", borderColor: colors.primary, borderWidth: 1 },
+                      isFuture && { opacity: 0.25 },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.monthCellText,
+                      { color: isSelected ? colors.primary : colors.foreground },
+                    ]}>
+                      {name.slice(0, 3)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -519,4 +593,37 @@ const styles = StyleSheet.create({
   },
   summaryTotalLabel: { fontFamily: "Inter_500Medium", fontSize: 13 },
   summaryTotalAmount: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  pickerSheet: {
+    width: "100%",
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 20,
+  },
+  pickerYearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  pickerArrow: { padding: 4 },
+  pickerYearLabel: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  monthCell: {
+    width: "30%",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  monthCellText: { fontFamily: "Inter_500Medium", fontSize: 14 },
 });
