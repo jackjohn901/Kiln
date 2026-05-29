@@ -10,6 +10,20 @@ export interface VideoUploadResult {
   playbackId: string;
 }
 
+/** Error thrown by the upload helpers, carrying the HTTP status of the failed
+ *  request so callers can distinguish a genuine auth failure (401) from a
+ *  server/third-party failure (e.g. a 500 when the Mux upload service rejects
+ *  our credentials). Without the status, callers were matching error text and
+ *  mistaking a Mux "401 unauthorized" body for an expired user session. */
+export class UploadError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "UploadError";
+    this.status = status;
+  }
+}
+
 /** Resize and compress images client-side before upload.
  *  Cuts upload size 70-90% for phone photos (typical 4MB → 300KB).
  *  Returns the original file untouched for non-image types. */
@@ -75,7 +89,7 @@ export function useUpload() {
       });
       if (!metaRes.ok) {
         const msg = await metaRes.text().catch(() => "Failed to get upload URL");
-        throw new Error(msg);
+        throw new UploadError(msg, metaRes.status);
       }
       const { uploadURL, objectPath } = (await metaRes.json()) as {
         uploadURL: string;
@@ -103,7 +117,10 @@ export function useUpload() {
         body: JSON.stringify({ objectPath }),
       });
       if (!aclRes.ok) {
-        throw new Error("Upload succeeded but the file couldn't be made readable. Please try again.");
+        throw new UploadError(
+          "Upload succeeded but the file couldn't be made readable. Please try again.",
+          aclRes.status,
+        );
       }
 
       setProgress(100);
@@ -132,7 +149,7 @@ export function useUpload() {
       });
       if (!metaRes.ok) {
         const msg = await metaRes.text().catch(() => "Failed to get Mux upload URL");
-        throw new Error(msg);
+        throw new UploadError(msg, metaRes.status);
       }
       const { uploadUrl, uploadId } = (await metaRes.json()) as {
         uploadUrl: string;
@@ -164,6 +181,10 @@ export function useUpload() {
             playbackId = data.playbackId;
             break;
           }
+        } else if (assetRes.status === 401 || assetRes.status === 403) {
+          // Session expired mid-processing — fail fast with the auth status so the
+          // caller shows a re-login prompt instead of a misleading "timed out".
+          throw new UploadError("Your session has expired. Please sign in again.", assetRes.status);
         }
         setProgress(50 + Math.min(45, Math.floor(elapsed / 2400)));
       }

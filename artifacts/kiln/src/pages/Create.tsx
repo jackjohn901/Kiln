@@ -17,7 +17,7 @@ import { addPost, generateId, saveDraft } from "@/data/posts";
 import { getTrackById, type MusicTrack } from "@/data/music";
 import { createBeatLooper } from "@/lib/beatSynth";
 import { getCommunityBeats } from "@/lib/communityBeats";
-import { useUpload } from "@/hooks/useUpload";
+import { useUpload, UploadError } from "@/hooks/useUpload";
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -358,7 +358,7 @@ export default function Create() {
         });
         if (!storyRes.ok) {
           const err = await storyRes.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to post story.");
+          throw new UploadError(err.error || "Failed to post story.", storyRes.status);
         }
         navigate("/");
         return;
@@ -507,13 +507,19 @@ export default function Create() {
       }
     } catch (err) {
       console.error("Publish flow failed", err);
-      const msg = err instanceof Error ? err.message : "";
-      if (/unauthorized|401/i.test(msg)) {
-        // Session expired mid-flow — surface a clear re-login prompt instead of raw JSON.
+      const status = err instanceof UploadError ? err.status : undefined;
+      if (status === 401) {
+        // A genuine 401 from our own API means the session expired mid-flow.
         setPublishError("Your session has expired. Please sign in again to post.");
         setSessionExpired(true);
+      } else if (status === 429) {
+        setPublishError("You've uploaded a lot recently. Please wait a little while and try again.");
+      } else if (err instanceof UploadError) {
+        // Upload/media-service failure (e.g. the video service is unavailable).
+        // This is NOT a session problem — do not prompt re-login.
+        setPublishError("We couldn't upload your media right now. Please try again in a moment.");
       } else {
-        setPublishError(msg || "Something went wrong while publishing. Please try again.");
+        setPublishError(err instanceof Error ? err.message : "Something went wrong while publishing. Please try again.");
       }
     } finally {
       setPublishing(false);
