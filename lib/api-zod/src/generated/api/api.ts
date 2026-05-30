@@ -8,11 +8,13 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
+ * Public, unauthenticated liveness probe for uptime monitors and deployment checks. Verifies the database is reachable.
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  status: zod.string(),
+  ok: zod.boolean(),
+  db: zod.enum(["ok", "error"]),
+  uptimeSeconds: zod.number(),
 });
 
 /**

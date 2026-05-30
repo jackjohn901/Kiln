@@ -1,11 +1,28 @@
 import { Router, type IRouter } from "express";
-import { HealthCheckResponse } from "@workspace/api-zod";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-router.get("/healthz", (_req, res) => {
-  const data = HealthCheckResponse.parse({ status: "ok" });
-  res.json(data);
+// GET /healthz — public, unauthenticated liveness probe for uptime monitors,
+// deployment pipelines, and external health checks. Verifies DB connectivity.
+// Exposes minimal info only (no seed marker / privileged details).
+router.get("/healthz", async (req, res) => {
+  const uptimeSeconds = Math.floor(process.uptime());
+
+  let dbOk = false;
+  try {
+    await db.execute(sql`SELECT 1`);
+    dbOk = true;
+  } catch (err) {
+    req.log.error({ err }, "healthz DB check failed");
+  }
+
+  res.status(dbOk ? 200 : 503).json({
+    ok: dbOk,
+    db: dbOk ? "ok" : "error",
+    uptimeSeconds,
+  });
 });
 
 export default router;
