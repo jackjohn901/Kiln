@@ -12,6 +12,7 @@ export interface Reel {
   technique: string;
   location: string;
   caption: string;
+  tags?: string[];
   craftScore: number;
   likes: number;
   saves: number;

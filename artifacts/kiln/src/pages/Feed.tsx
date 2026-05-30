@@ -125,6 +125,7 @@ function userPostsToReels(): Reel[] {
       technique: post.tags[0] ?? "Studio Craft",
       location: "",
       caption: post.caption,
+      tags: post.tags ?? [],
       craftScore: 95,
       likes: post.likes,
       saves: post.saves,
@@ -155,6 +156,7 @@ function apiPostToReel(p: any, defaultMusicId: string): Reel {
     technique: p.technique ?? "Studio Craft",
     location: "",
     caption: p.caption ?? "",
+    tags: Array.isArray(p.tags) ? p.tags : [],
     craftScore: Math.min(95, 75 + Math.floor((p.likeCount ?? 0) / 30)),
     likes: p.likeCount ?? 0,
     saves: p.saveCount ?? 0,
@@ -604,10 +606,42 @@ const ReelCard = memo(function ReelCard({
           )}
         </div>
 
-        <ParsedCaption
-          text={reel.caption}
-          className="line-clamp-2 max-w-[78vw] text-sm leading-snug text-stone-200 drop-shadow"
-        />
+        {reel.caption && (
+          <ParsedCaption
+            text={reel.caption}
+            className="line-clamp-2 max-w-[78vw] text-sm leading-snug text-stone-200 drop-shadow"
+          />
+        )}
+
+        {(() => {
+          // Show the post's hashtags as chips. The first tag is usually the
+          // technique (already shown as the 🔥 pill above), so drop it and any
+          // dupes — comparing case-insensitively and ignoring whitespace/`#`
+          // so "Ceramics" and "ceramics" don't both appear.
+          const norm = (t: string) => t.trim().replace(/^#/, "").toLowerCase();
+          const techniqueKey = norm(reel.technique ?? "");
+          const seen = new Set<string>();
+          const hashtags = (reel.tags ?? []).filter((t) => {
+            const key = norm(t);
+            if (!key || key === techniqueKey || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }).slice(0, 4);
+          if (hashtags.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 max-w-[78vw]">
+              {hashtags.map((t) => (
+                <Link
+                  key={t}
+                  href={`/tag/${encodeURIComponent(t)}`}
+                  className="text-[12px] font-semibold text-amber-300/90 hover:text-amber-200 transition-colors drop-shadow"
+                >
+                  #{t.replace(/\s+/g, "")}
+                </Link>
+              ))}
+            </div>
+          );
+        })()}
 
         <div className="pt-1 flex items-center gap-2 flex-wrap">
           {/* Original audio toggle — only relevant when there's actual video content */}
