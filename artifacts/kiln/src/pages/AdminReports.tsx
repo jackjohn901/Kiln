@@ -69,6 +69,12 @@ interface HealthResult {
   checkedAt: string;
 }
 
+interface HealthHistoryEntry {
+  checkedAt: string;
+  latencyMs: number | null;
+  passed: boolean;
+}
+
 interface SeedHistoryEntry {
   id: string;
   operation: string;
@@ -121,6 +127,8 @@ export default function AdminReports() {
   const [healthResult, setHealthResult] = useState<HealthResult | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [healthHistory, setHealthHistory] = useState<HealthHistoryEntry[]>([]);
+  const [healthHistoryOpen, setHealthHistoryOpen] = useState(false);
 
   // Seed history state
   const [seedHistory, setSeedHistory] = useState<SeedHistoryEntry[]>([]);
@@ -301,6 +309,11 @@ export default function AdminReports() {
       }
       const data = await res.json() as HealthResult;
       setHealthResult(data);
+      const passed = data.db.ok && data.seed.markerPresent;
+      setHealthHistory((prev) => [
+        { checkedAt: data.checkedAt, latencyMs: data.db.latencyMs, passed },
+        ...prev,
+      ].slice(0, 5));
     } catch {
       setHealthError("Network error — please try again");
     } finally {
@@ -807,6 +820,49 @@ export default function AdminReports() {
                   {healthLoading ? <RefreshCw size={13} className="animate-spin" /> : <Activity size={13} />}
                   {healthLoading ? "Checking…" : "Run health check"}
                 </button>
+              )}
+
+              {healthHistory.length > 0 && (
+                <div className="border-t border-white/5 pt-3">
+                  <button
+                    onClick={() => setHealthHistoryOpen((o) => !o)}
+                    className="flex w-full items-center justify-between text-[11px] text-stone-500 hover:text-stone-300 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <History size={12} />
+                      Recent checks ({healthHistory.length})
+                    </span>
+                    <span className="text-stone-600">{healthHistoryOpen ? "Hide" : "Show"}</span>
+                  </button>
+
+                  {healthHistoryOpen && (
+                    <ul className="mt-2 space-y-1">
+                      {healthHistory.map((entry, i) => (
+                        <li
+                          key={`${entry.checkedAt}-${i}`}
+                          className="flex items-center justify-between rounded-lg bg-stone-800/50 px-3 py-1.5 text-[11px]"
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className={entry.passed ? "text-emerald-400" : "text-rose-400"}>
+                              {entry.passed ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                            </span>
+                            <span className="text-stone-400">
+                              {new Date(entry.checkedAt).toLocaleTimeString()}
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-3">
+                            <span className="font-mono text-stone-500">
+                              {entry.latencyMs != null ? `${entry.latencyMs}ms` : "—"}
+                            </span>
+                            <span className={entry.passed ? "text-emerald-400" : "text-rose-400"}>
+                              {entry.passed ? "Pass" : "Fail"}
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
 
