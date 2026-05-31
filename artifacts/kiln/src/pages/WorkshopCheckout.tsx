@@ -5,6 +5,7 @@ import Nav from "@/components/Nav";
 import { workshops, type Workshop } from "@/data/workshops";
 import { useProfile } from "@/contexts/ProfileContext";
 import ReviewsSection from "@/components/ReviewsSection";
+import CheckoutErrorNotice from "@/components/CheckoutErrorNotice";
 
 function buildGcalUrl(workshop: Workshop): string {
   const details = `Workshop with ${workshop.artistName} on Kiln.`;
@@ -124,16 +125,18 @@ export default function WorkshopCheckout() {
           },
         }),
       });
-      const data = await res.json();
-      if (data.url) {
+      const data = await res.json().catch(() => ({} as { url?: string; error?: string }));
+      if (res.ok && data.url) {
         window.location.href = data.url;
-      } else {
-        throw new Error(data.error ?? "Checkout failed");
+        return;
       }
-    } catch (err) {
-      setBookingError(err instanceof Error ? err.message : "Checkout failed. Please try again.");
-      setProcessing(false);
+      setBookingError(
+        data.error ?? "We couldn't reserve your spot. This workshop may no longer be available. Please try again or contact support.",
+      );
+    } catch {
+      setBookingError("Something went wrong. Please try again.");
     }
+    setProcessing(false);
   }
 
   if (step === "confirm") {
@@ -284,7 +287,7 @@ export default function WorkshopCheckout() {
               {processing ? "Redirecting to checkout…" : `Pay & Reserve · $${workshop.price}`}
             </button>
             {bookingError && (
-              <p className="text-center text-xs text-rose-400 mt-1">{bookingError}</p>
+              <CheckoutErrorNotice message={bookingError} heading="Reservation couldn't be completed" />
             )}
           </div>
 

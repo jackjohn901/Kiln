@@ -6,6 +6,7 @@ import { listings, formatPrice, type Listing } from "@/data/listings";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { useProfile } from "@/contexts/ProfileContext";
+import CheckoutErrorNotice from "@/components/CheckoutErrorNotice";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -165,12 +166,14 @@ export default function Checkout() {
           cancelPath: `/shop/checkout/${listingId}`,
         }),
       });
-      const data = await res.json();
-      if (data.url) {
+      const data = await res.json().catch(() => ({} as { url?: string; error?: string }));
+      if (res.ok && data.url) {
         window.location.href = data.url;
         return;
       }
-      setCheckoutError(data.error ?? "Checkout failed. Please try again.");
+      setCheckoutError(
+        data.error ?? "We couldn't complete your checkout. This work may no longer be available. Please try again or contact support.",
+      );
     } catch {
       setCheckoutError("Something went wrong. Please try again.");
     }
@@ -273,9 +276,7 @@ export default function Checkout() {
                     </div>
                   </div>
                 </div>
-                {checkoutError && (
-                  <p className="text-sm text-red-400 rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">{checkoutError}</p>
-                )}
+                {checkoutError && <CheckoutErrorNotice message={checkoutError} />}
                 <button
                   onClick={handlePurchase}
                   disabled={processing || !form.name || !form.email || !form.address || !form.city || !form.zip}
