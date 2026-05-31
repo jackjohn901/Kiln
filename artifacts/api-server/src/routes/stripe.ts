@@ -23,6 +23,59 @@ interface CartLineItem {
   price?: number;
 }
 
+// Lightweight pre-checkout validation: given a list of listing IDs, return which
+// ones are sold, unavailable, or deleted. Lets the cart page warn buyers about
+// stale items before they start the checkout flow. Mirrors the availability
+// logic in /stripe/checkout (sold || !available || missing row).
+router.post('/stripe/cart-validate', async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  try {
+    const { listingIds: rawListingIds } = req.body as { listingIds?: unknown };
+
+    if (!Array.isArray(rawListingIds)) {
+      res.status(400).json({ error: 'listingIds must be an array.' }); return;
+    }
+
+    // Dedupe, keep only non-empty strings, and cap to a reasonable size to avoid abuse.
+    const listingIds = [...new Set(
+      rawListingIds.filter((id): id is string => typeof id === 'string' && id.length > 0),
+    )].slice(0, 100);
+
+    if (listingIds.length === 0) {
+      res.json({ unavailableListings: [] }); return;
+    }
+
+    const rows = await db
+      .select({
+        id: listingsTable.id,
+        isSold: listingsTable.isSold,
+        isAvailable: listingsTable.isAvailable,
+        title: listingsTable.title,
+      })
+      .from(listingsTable)
+      .where(inArray(listingsTable.id, listingIds));
+
+    const unavailableListings: Array<{ id: string; title: string }> = [];
+    const foundIds = new Set(rows.map((r) => r.id));
+    for (const row of rows) {
+      if (row.isSold || !row.isAvailable) {
+        unavailableListings.push({ id: row.id, title: row.title });
+      }
+    }
+    // IDs not returned by the query have been deleted from the catalogue.
+    for (const id of listingIds) {
+      if (!foundIds.has(id)) {
+        unavailableListings.push({ id, title: 'This item' });
+      }
+    }
+
+    res.json({ unavailableListings });
+  } catch (err: unknown) {
+    logger.error({ err }, 'Stripe cart-validate error');
+    res.status(500).json({ error: 'Failed to validate cart.' });
+  }
+});
+
 router.post('/stripe/checkout', async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Unauthorized' }); return; }
   try {

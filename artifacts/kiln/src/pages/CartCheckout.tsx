@@ -123,6 +123,7 @@ export default function CartCheckout() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [unavailableItems, setUnavailableItems] = useState<Array<{ id: string; title: string }>>([]);
+  const [staleItems, setStaleItems] = useState<Array<{ id: string; title: string }>>([]);
   const [noPayoutMethod, setNoPayoutMethod] = useState(false);
   const [noPayoutMethodCount, setNoPayoutMethodCount] = useState(1);
   const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
@@ -277,6 +278,30 @@ export default function CartCheckout() {
       setStep("done");
     }
   }, []);
+
+  // Validate cart availability on mount (and whenever items change) so buyers are
+  // warned about sold/deleted listings before they start the checkout flow.
+  useEffect(() => {
+    if (!isAuthenticated) { setStaleItems([]); return; }
+    const listingIds = items.map(i => i.listing.id as string).filter(Boolean);
+    if (listingIds.length === 0) { setStaleItems([]); return; }
+    let cancelled = false;
+    fetch("/api/stripe/cart-validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ listingIds }),
+    })
+      .then(r => r.ok ? r.json() as Promise<{ unavailableListings: Array<{ id: string; title: string }> }> : null)
+      .then(data => {
+        if (cancelled || !data) return;
+        // Only flag IDs that are actually still in the cart (it may have changed).
+        const inCart = new Set(items.map(i => i.listing.id as string));
+        setStaleItems((data.unavailableListings ?? []).filter(it => inCart.has(it.id)));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [items, isAuthenticated]);
 
   // Build artist groups when entering pay step — fetch real payment settings from API
   useEffect(() => {
@@ -539,6 +564,43 @@ export default function CartCheckout() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Pre-checkout stale-item warning — surfaces sold/deleted listings before
+            the buyer fills in their address or starts the checkout flow. */}
+        {step !== "done" && staleItems.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/8 px-4 py-3.5"
+          >
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-rose-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-rose-300 mb-1">
+                  {staleItems.length === 1
+                    ? "An item in your cart is no longer available"
+                    : `${staleItems.length} items in your cart are no longer available`}
+                </p>
+                <ul className="space-y-0.5 mb-2">
+                  {staleItems.map((item) => (
+                    <li key={item.id} className="text-xs text-rose-200/70">
+                      {item.title === "This item" ? "A deleted listing" : `“${item.title}”`}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => {
+                    staleItems.forEach((item) => removeItem(item.id));
+                    setStaleItems([]);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500 transition-colors"
+                >
+                  Remove unavailable {staleItems.length === 1 ? "item" : "items"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         <div className="flex flex-col lg:flex-row gap-6">
