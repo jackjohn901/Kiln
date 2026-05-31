@@ -473,6 +473,11 @@ router.post("/me/orders", async (req, res): Promise<void> => {
       }
 
       if (orderIds.length === 0) {
+        const missingListingIds = verified.listingIds.filter((id) => !listingMap.has(id));
+        logger.warn(
+          { stripeSessionId, userId, missingListingIds },
+          "Order creation failed: no valid listings found for session",
+        );
         res.status(422).json({ error: "No valid listings found for this session." }); return;
       }
 
@@ -544,8 +549,13 @@ router.post("/me/orders/bulk", async (req, res): Promise<void> => {
     }
 
     if (allOrders.length === 0) {
-      // Webhook hasn't created orders yet (or creation failed). Return a 202 so the
-      // success page can degrade gracefully rather than showing an error.
+      // Webhook hasn't created orders yet (or creation failed). Log a structured
+      // warning so support can trace the incident to a Stripe session, then return
+      // a 202 so the success page can degrade gracefully rather than showing an error.
+      logger.warn(
+        { stripeSessionId, userId, missingListingIds: verified.listingIds },
+        "Order creation failed: no orders found for session after retries",
+      );
       res.status(202).json({ orderIds: [], sellerIds: [], processingWindowDays: null, processingWindowLabel: null, perSellerWindows: [] });
       return;
     }
