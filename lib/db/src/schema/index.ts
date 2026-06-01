@@ -74,3 +74,4 @@ export * from "./platform_tokens";
 export * from "./review_votes";
 export * from "./failed_emails";
 export * from "./seed_history";
+export * from "./server_config";

@@ -10,8 +10,11 @@ import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
 import { startStoryExpiry } from "./lib/storyExpiry";
 import { startDropCountdownScheduler } from "./lib/dropCountdown";
 import { startWorkshopReminders } from "./lib/workshopReminders";
+import { db, serverConfigTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const WEBHOOK_RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const WEBHOOK_URL_CONFIG_KEY = "stripe_webhook_url";
 
 let webhookRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -20,6 +23,25 @@ function cancelWebhookRetry() {
     clearTimeout(webhookRetryTimer);
     webhookRetryTimer = null;
   }
+}
+
+async function persistWebhookUrl(webhookUrl: string): Promise<void> {
+  await db
+    .insert(serverConfigTable)
+    .values({ key: WEBHOOK_URL_CONFIG_KEY, value: webhookUrl })
+    .onConflictDoUpdate({
+      target: serverConfigTable.key,
+      set: { value: webhookUrl, updatedAt: new Date() },
+    });
+}
+
+async function getPersistedWebhookUrl(): Promise<string | null> {
+  const rows = await db
+    .select()
+    .from(serverConfigTable)
+    .where(eq(serverConfigTable.key, WEBHOOK_URL_CONFIG_KEY))
+    .limit(1);
+  return rows[0]?.value ?? null;
 }
 
 function scheduleWebhookRetry(
@@ -32,6 +54,7 @@ function scheduleWebhookRetry(
     try {
       await stripeSync.findOrCreateManagedWebhook(webhookUrl);
       logger.info("Stripe webhook configured (retry succeeded)");
+      await persistWebhookUrl(webhookUrl);
     } catch (err: any) {
       logger.warn(
         { err: err.message },
@@ -72,15 +95,33 @@ async function initStripe() {
     : "";
 
   if (webhookBase) {
+    const webhookUrl = `${webhookBase}/api/stripe/webhook`;
+
+    // Check whether we already registered this exact URL on a previous run.
+    let alreadyRegistered = false;
     try {
-      await stripeSync.findOrCreateManagedWebhook(`${webhookBase}/api/stripe/webhook`);
-      logger.info("Stripe webhook configured");
+      const persistedUrl = await getPersistedWebhookUrl();
+      if (persistedUrl === webhookUrl) {
+        alreadyRegistered = true;
+        logger.info({ webhookUrl }, "Stripe webhook already registered — skipping round-trip");
+      }
     } catch (err: any) {
-      logger.warn(
-        { err: err.message },
-        "Stripe webhook registration failed — will retry every 5 minutes",
-      );
-      scheduleWebhookRetry(stripeSync, `${webhookBase}/api/stripe/webhook`);
+      // DB read failure is non-fatal — fall through and re-register to be safe.
+      logger.warn({ err: err.message }, "Could not read persisted webhook URL — will re-register");
+    }
+
+    if (!alreadyRegistered) {
+      try {
+        await stripeSync.findOrCreateManagedWebhook(webhookUrl);
+        logger.info("Stripe webhook configured");
+        await persistWebhookUrl(webhookUrl);
+      } catch (err: any) {
+        logger.warn(
+          { err: err.message },
+          "Stripe webhook registration failed — will retry every 5 minutes",
+        );
+        scheduleWebhookRetry(stripeSync, webhookUrl);
+      }
     }
   }
 
