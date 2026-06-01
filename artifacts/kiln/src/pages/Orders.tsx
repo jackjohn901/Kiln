@@ -10,6 +10,7 @@ interface Order {
   description: string | null;
   sellerId: string;
   amount: number;
+  quantity: number;
   status: string;
   imageUrl: string | null;
   trackingNumber: string | null;
@@ -410,6 +411,9 @@ export default function Orders() {
                         <span className="text-sm font-semibold text-amber-300">{formatPrice(combinedAmount)}</span>
                         {isGroup && groupOrders.length > 1 && (
                           <span className="text-[10px] text-stone-500">{groupOrders.length} items</span>
+                        )}
+                        {primary.quantity > 1 && (!isGroup || groupOrders.length === 1) && (
+                          <span className="text-[10px] text-stone-500">× {primary.quantity}</span>
                         )}
                       </span>
                       <span className="flex items-center gap-1">
