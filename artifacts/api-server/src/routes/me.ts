@@ -475,6 +475,29 @@ router.post("/me/orders", async (req, res): Promise<void> => {
 
       const listingMap = new Map(listings.map((l) => [l.id, l]));
 
+      // Fetch each seller's processing window so it can be stamped on every order row.
+      const sellerIds = [...new Set(listings.map((l) => l.artistId))];
+      const paymentSettingsRows = sellerIds.length > 0
+        ? await db
+            .select({ userId: userSettingsTable.userId, paymentSettings: userSettingsTable.paymentSettings })
+            .from(userSettingsTable)
+            .where(inArray(userSettingsTable.userId, sellerIds))
+        : [];
+      const processingWindowMap = new Map<string, number | null>();
+      const processingWindowLabelMap = new Map<string, string | null>();
+      for (const row of paymentSettingsRows) {
+        const ps = row.paymentSettings as Record<string, unknown> | null;
+        processingWindowMap.set(
+          row.userId,
+          ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null,
+        );
+        const label =
+          ps && typeof ps.processingWindowLabel === "string" && ps.processingWindowLabel.trim()
+            ? ps.processingWindowLabel.trim()
+            : null;
+        processingWindowLabelMap.set(row.userId, label);
+      }
+
       // Reconcile: server-derived total must match Stripe-confirmed amount_total.
       let expectedCents = 0;
       for (let i = 0; i < verified.listingIds.length; i++) {
@@ -509,6 +532,8 @@ router.post("/me/orders", async (req, res): Promise<void> => {
           currency: "USD",
           status: "confirmed",
           shippingAddress: buyerShippingAddress,
+          processingWindowDays: processingWindowMap.get(listing.artistId) ?? null,
+          processingWindowLabel: processingWindowLabelMap.get(listing.artistId) ?? null,
           // INVARIANT: notes must always equal the dedupeKey so every row in a session
           // can be grouped and deduplicated. Never omit this field on any insert path.
           notes: dedupeKey,
