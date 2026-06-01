@@ -352,7 +352,7 @@ export class WebhookHandlers {
             {
               to: email,
               subject: `Your Kiln order #${orderId} is confirmed`,
-              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined, shippingAddress, perArtistShipping),
+              html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined, shippingAddress, perArtistShipping, session.id),
             },
             { contextId: session.id, label: 'order confirmation' },
           );

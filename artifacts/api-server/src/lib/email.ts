@@ -552,6 +552,7 @@ export function manualPayoutReceiptEmail(
   orderId?: string | null,
   shippingAddress?: string | null,
   perArtistShipping?: PerArtistShippingLine[] | null,
+  cartSessionKey?: string | null,
 ): string {
   const itemRows = items
     .map(
@@ -634,7 +635,14 @@ export function manualPayoutReceiptEmail(
         ? `<p style="margin:8px 0 0;color:#a8a29e;font-size:13px;">The artist typically processes orders within <strong style="color:#d6d3d1;">${processingWindowDays} business day${processingWindowDays === 1 ? '' : 's'}</strong>.</p>`
         : ''}
     `)}
-    ${btn(orderId ? `${BASE_URL}/orders/${orderId}` : `${BASE_URL}/orders`, "View full receipt")}
+    ${btn(
+      cartSessionKey
+        ? `${BASE_URL}/orders/cart/${encodeURIComponent(cartSessionKey)}`
+        : orderId
+          ? `${BASE_URL}/orders/${orderId}`
+          : `${BASE_URL}/orders`,
+      "View your receipt",
+    )}
   `);
 }
 
