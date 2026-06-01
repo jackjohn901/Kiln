@@ -18,6 +18,10 @@ export const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 
 export interface SessionData {
   user: AuthUser;
+  // The authenticated owner (root) identity id. Stays constant while the active
+  // `user` can be switched to any account the owner controls. Missing on legacy
+  // sessions — treat as equal to user.id (single-account owner).
+  ownerId?: string;
   access_token: string;
   refresh_token?: string;
   expires_at?: number;

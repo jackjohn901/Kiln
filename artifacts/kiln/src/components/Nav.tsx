@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone, AlertTriangle, X } from "lucide-react";
+import { Plus, User, Flame, Bell, Inbox, MessageCircle, Bookmark, ChevronDown, LogOut, BarChart2, Package, ShoppingBag, Clock, Shield, DollarSign, Edit3, Search, MapPin, Trophy, Users, Briefcase, BookOpen, FlaskConical, CalendarDays, MessageSquare, GraduationCap, ShoppingCart, Settings, TrendingUp, Sparkles, UsersRound, PenLine, FileText, Store, Home, Mail, Medal, Share2, Link2, Repeat2, Megaphone, AlertTriangle, Check, UserPlus, Loader2, X } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
@@ -24,6 +24,80 @@ export default function Nav() {
   const [showSearch, setShowSearch] = useState(false);
   const [messagePulse, setMessagePulse] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  interface SwitchAccount {
+    id: string;
+    displayName: string | null;
+    handle: string | null;
+    avatarUrl: string | null;
+    isOwner: boolean;
+    isActive: boolean;
+  }
+  const [accounts, setAccounts] = useState<SwitchAccount[]>([]);
+  const [accountActionId, setAccountActionId] = useState<string | null>(null);
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showProfileMenu) return;
+    let cancelled = false;
+    fetch("/api/me/accounts", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { accounts?: SwitchAccount[] } | null) => {
+        if (!cancelled && data?.accounts) setAccounts(data.accounts);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showProfileMenu]);
+
+  async function switchAccount(id: string) {
+    if (accountActionId) return;
+    setAccountActionId(id);
+    setAccountError(null);
+    try {
+      const r = await fetch(`/api/me/accounts/${id}/switch`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null);
+        throw new Error(d?.error || "Could not switch account");
+      }
+      localStorage.removeItem("kiln_profile");
+      window.location.reload();
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : "Could not switch account");
+      setAccountActionId(null);
+    }
+  }
+
+  async function createAccount() {
+    const name = newAccountName.trim();
+    if (!name || creatingAccount) return;
+    setCreatingAccount(true);
+    setAccountError(null);
+    try {
+      const r = await fetch("/api/me/accounts", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: name }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null);
+        throw new Error(d?.error || "Could not create account");
+      }
+      localStorage.removeItem("kiln_profile");
+      window.location.reload();
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : "Could not create account");
+      setCreatingAccount(false);
+    }
+  }
 
   useEffect(() => {
     if (!lastNewMessagePing) return;
@@ -327,6 +401,75 @@ export default function Nav() {
 
                     {/* Menu items */}
                     <div className="py-1 overflow-y-auto flex-1 overscroll-contain">
+                      {/* Account switcher */}
+                      {accounts.length > 0 && (
+                        <div className="border-b border-white/8 pb-1 mb-1">
+                          <p className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500">Your Accounts</p>
+                          {accounts.map((acc) => (
+                            <button
+                              key={acc.id}
+                              disabled={acc.isActive || accountActionId !== null}
+                              onClick={() => switchAccount(acc.id)}
+                              className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-stone-300 transition-colors hover:bg-white/5 disabled:cursor-default disabled:hover:bg-transparent"
+                            >
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-800 text-xs font-bold text-amber-300">
+                                {acc.avatarUrl ? (
+                                  <img src={acc.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  (acc.displayName || acc.handle || "?").charAt(0).toUpperCase()
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1 text-left">
+                                <p className="truncate text-amber-100">{acc.displayName || (acc.handle ? `@${acc.handle}` : "Untitled")}</p>
+                                {acc.handle && <p className="truncate text-[11px] text-stone-500">@{acc.handle}</p>}
+                              </div>
+                              {accountActionId === acc.id ? (
+                                <Loader2 size={14} className="shrink-0 animate-spin text-amber-300" />
+                              ) : acc.isActive ? (
+                                <Check size={15} className="shrink-0 text-amber-400" />
+                              ) : null}
+                            </button>
+                          ))}
+                          {accountError && <p className="px-4 py-1 text-[11px] text-rose-400">{accountError}</p>}
+                          {accounts.length < 10 &&
+                            (showAddAccount ? (
+                              <div className="px-3 py-2">
+                                <input
+                                  value={newAccountName}
+                                  onChange={(e) => setNewAccountName(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") createAccount(); }}
+                                  placeholder="New account name"
+                                  autoFocus
+                                  maxLength={80}
+                                  className="w-full rounded-lg border border-white/10 bg-stone-900 px-2.5 py-1.5 text-sm text-amber-100 placeholder:text-stone-600 focus:border-amber-400 focus:outline-none"
+                                />
+                                <div className="mt-1.5 flex gap-1.5">
+                                  <button
+                                    onClick={createAccount}
+                                    disabled={!newAccountName.trim() || creatingAccount}
+                                    className="flex-1 rounded-lg bg-amber-500 px-2 py-1.5 text-xs font-semibold text-stone-900 transition-colors hover:bg-amber-400 disabled:opacity-50"
+                                  >
+                                    {creatingAccount ? "Creating…" : "Create"}
+                                  </button>
+                                  <button
+                                    onClick={() => { setShowAddAccount(false); setNewAccountName(""); setAccountError(null); }}
+                                    className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-stone-400 transition-colors hover:bg-white/5"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setShowAddAccount(true)}
+                                className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-amber-300 transition-colors hover:bg-white/5"
+                              >
+                                <UserPlus size={14} className="text-amber-400" />
+                                Add account
+                              </button>
+                            ))}
+                        </div>
+                      )}
                       <Link
                         href={`/artists/${profile.id}`}
                         onClick={() => setShowProfileMenu(false)}

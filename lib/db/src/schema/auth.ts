@@ -15,6 +15,10 @@ export const sessionsTable = pgTable(
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const usersTable = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // For multi-account support: the authenticated owner (root) identity that owns
+  // this account. Null for root accounts (where id == the Replit identity);
+  // set to the owner's id for additional accounts the owner created.
+  ownerId: varchar("owner_id"),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
