@@ -191,9 +191,10 @@ export default function SaleDetail() {
     const unitPrice = qty > 1 ? formatPrice(sale.amount / qty) : null;
 
     const buyerName = sale.buyerDisplayName?.trim() || (sale.buyerHandle ? `@${sale.buyerHandle}` : null);
+    const sectionLabel = sale.shippingAddress ? "Ship to" : "Buyer";
     const buyerSection = (buyerName || sale.shippingAddress) ? `
       <div style="margin-top:24px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Ship to</p>
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">${sectionLabel}</p>
         ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
         ${sale.shippingAddress ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(sale.shippingAddress)}</p>` : ""}
       </div>
@@ -321,9 +322,10 @@ export default function SaleDetail() {
     const unitPrice = qty > 1 ? formatPrice(sale.amount / qty) : null;
 
     const buyerName = sale.buyerDisplayName?.trim() || (sale.buyerHandle ? `@${sale.buyerHandle}` : null);
+    const sectionLabel = sale.shippingAddress ? "Ship to" : "Buyer";
     const buyerSection = (buyerName || sale.shippingAddress) ? `
       <div style="margin-top:24px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Ship to</p>
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">${sectionLabel}</p>
         ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
         ${sale.shippingAddress ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(sale.shippingAddress)}</p>` : ""}
       </div>
