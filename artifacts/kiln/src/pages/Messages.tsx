@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useParams } from "wouter";
-import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X, ImagePlus, Loader2, ShoppingBag } from "lucide-react";
+import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X, ImagePlus, Loader2, ShoppingBag, Store } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type MessageThread } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
+import { listings as staticListings } from "@/data/listings";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -111,6 +112,84 @@ function AttachmentImage({ url }: { url: string }) {
         onError={() => setErrored(true)}
       />
     </a>
+  );
+}
+
+interface ApiListing {
+  id: string;
+  title: string;
+  price: number;
+  imageUrl: string | null;
+  currency?: string | null;
+}
+
+function SellerListingsCarousel({ artistId }: { artistId: string }) {
+  const [listings, setListings] = useState<ApiListing[]>([]);
+
+  useEffect(() => {
+    if (!artistId) return;
+    setListings([]);
+
+    fetch(`/api/shop/listings?artistId=${encodeURIComponent(artistId)}&available=true&limit=3`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { listings?: ApiListing[] } | null) => {
+        if (Array.isArray(d?.listings) && d.listings.length > 0) {
+          setListings(d.listings.slice(0, 3));
+        } else {
+          // Fall back to static data for seed/demo artists
+          const fallback = staticListings
+            .filter(l => l.artistId === artistId && l.available)
+            .slice(0, 3)
+            .map(l => ({ id: l.id, title: l.title, price: l.price, imageUrl: l.imageUrl ?? null, currency: l.currency ?? null }));
+          setListings(fallback);
+        }
+      })
+      .catch(() => {
+        const fallback = staticListings
+          .filter(l => l.artistId === artistId && l.available)
+          .slice(0, 3)
+          .map(l => ({ id: l.id, title: l.title, price: l.price, imageUrl: l.imageUrl ?? null, currency: l.currency ?? null }));
+        setListings(fallback);
+      });
+  }, [artistId]);
+
+  if (listings.length === 0) return null;
+
+  return (
+    <div className="border-b border-white/10 bg-stone-900/40 px-3 py-2">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Store size={11} className="text-stone-500 shrink-0" />
+        <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wide">Available works</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
+        {listings.map(l => (
+          <Link key={l.id} href={`/shop/${l.id}`}>
+            <div className="flex-shrink-0 w-24 rounded-lg overflow-hidden border border-white/10 bg-stone-800 hover:border-amber-500/40 transition-colors cursor-pointer group">
+              <div className="h-16 bg-stone-700 overflow-hidden">
+                {l.imageUrl ? (
+                  <img
+                    src={l.imageUrl}
+                    alt={l.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Store size={16} className="text-stone-600" />
+                  </div>
+                )}
+              </div>
+              <div className="px-1.5 py-1">
+                <p className="text-[9px] text-stone-300 leading-tight line-clamp-1 font-medium">{l.title}</p>
+                <p className="text-[9px] text-amber-400 mt-0.5">
+                  {(l.currency && l.currency !== "USD") ? l.currency + " " : "$"}
+                  {l.price.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -808,6 +887,7 @@ export default function Messages() {
                   </div>
                 </Link>
               )}
+              <SellerListingsCarousel artistId={pendingRecipient.id} />
 
               {/* Empty state */}
               <div className="flex-1 flex flex-col items-center justify-center gap-2 p-8 text-center">
@@ -859,6 +939,7 @@ export default function Messages() {
                   </div>
                 </Link>
               )}
+              <SellerListingsCarousel artistId={activeApiThread.otherUserId} />
 
               {/* Messages */}
               <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -974,6 +1055,7 @@ export default function Messages() {
                   </div>
                 </Link>
               )}
+              <SellerListingsCarousel artistId={activeThread!.participantId} />
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
