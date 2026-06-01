@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
 import { db } from "@workspace/db";
 import { ordersTable, profilesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -43,6 +43,7 @@ router.get("/orders/cart/:sessionKey", cartReceiptLimiter, async (req, res): Pro
       description: ordersTable.description,
       imageUrl: ordersTable.imageUrl,
       amount: ordersTable.amount,
+      quantity: ordersTable.quantity,
       currency: ordersTable.currency,
       status: ordersTable.status,
       sellerId: ordersTable.sellerId,
@@ -66,30 +67,50 @@ router.get("/orders/cart/:sessionKey", cartReceiptLimiter, async (req, res): Pro
 
     const order = siblingOrders[0]!;
 
-    const sellerProfile = order.sellerId
+    // Collect unique seller IDs across all sibling orders for profile + window lookups.
+    const allSellerIds = [...new Set(siblingOrders.map((o) => o.sellerId).filter((id): id is string => !!id))];
+
+    const allSellerProfileRows = allSellerIds.length > 0
       ? await db.select({
+          userId: profilesTable.userId,
           displayName: profilesTable.displayName,
           handle: profilesTable.handle,
           avatarUrl: profilesTable.avatarUrl,
         })
           .from(profilesTable)
-          .where(eq(profilesTable.userId, order.sellerId))
-          .limit(1)
-          .then(r => r[0] ?? null)
+          .where(inArray(profilesTable.userId, allSellerIds))
+      : [];
+
+    const sellerProfileMap = new Map(allSellerProfileRows.map((p) => [p.userId, p]));
+    const primarySellerRow = order.sellerId ? (sellerProfileMap.get(order.sellerId) ?? null) : null;
+
+    const sellerProfile = primarySellerRow
+      ? {
+          displayName: primarySellerRow.displayName ?? null,
+          handle: primarySellerRow.handle ?? null,
+          avatarUrl: primarySellerRow.avatarUrl ?? null,
+        }
       : null;
+
+    // Build per-seller processing windows for multi-seller cart display. This is
+    // non-PII (seller-facing public info) so it is safe to expose on the shared link.
+    const seenCartSellerIds = new Set<string>();
+    const perSellerWindows = siblingOrders
+      .filter((o): o is typeof o & { sellerId: string } =>
+        typeof o.sellerId === "string" && !seenCartSellerIds.has(o.sellerId) && !!(seenCartSellerIds.add(o.sellerId) || true))
+      .map((o) => {
+        const p = sellerProfileMap.get(o.sellerId);
+        const sellerName = p?.displayName?.trim() || (p?.handle ? `@${p.handle}` : o.sellerId);
+        return { sellerName, days: o.processingWindowDays ?? null, label: o.processingWindowLabel ?? null };
+      });
 
     res.json({
       order,
       siblingOrders,
       buyerProfile: null,
-      sellerProfile: sellerProfile
-        ? {
-            displayName: sellerProfile.displayName ?? null,
-            handle: sellerProfile.handle ?? null,
-            avatarUrl: sellerProfile.avatarUrl ?? null,
-          }
-        : null,
+      sellerProfile,
       buyerEmail: null,
+      perSellerWindows,
       isPublicView: true,
     });
   } catch (err) {
