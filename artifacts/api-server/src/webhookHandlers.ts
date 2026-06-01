@@ -3,8 +3,9 @@ import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPay
 import { buildReceiptPdf, sessionReceiptId, ordinalId, fmtDate, STATUS_LABELS, TYPE_LABELS, type ReceiptData } from './lib/receiptPdf';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
-import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable } from '@workspace/db';
+import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable, digitalDownloadPurchasesTable } from '@workspace/db';
 import { eq, and, sql, inArray } from 'drizzle-orm';
+import { getDigitalProduct } from './lib/digitalProducts';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
 
@@ -404,6 +405,47 @@ export class WebhookHandlers {
           activatePatronSubscription(meta.tierId, meta.userId).catch((err) =>
             logger.error({ err }, 'Failed to activate patron subscription from webhook'),
           );
+        }
+
+        if (session.mode === 'payment' && meta.type === 'digital' && meta.productId && meta.userId) {
+          const product = getDigitalProduct(meta.productId);
+          if (!product) {
+            logger.warn({ productId: meta.productId, sessionId: session.id }, 'Digital download webhook: unknown productId — entitlement skipped');
+          } else {
+            const paidCents = session.amount_total ?? 0;
+            const expectedCents = Math.round(product.priceUsd * 100);
+            if (Math.abs(expectedCents - paidCents) > 1) {
+              logger.warn(
+                { productId: meta.productId, sessionId: session.id, expectedCents, paidCents },
+                'Digital download webhook: amount mismatch — entitlement skipped',
+              );
+            } else {
+              const [existing] = await db
+                .select({ id: digitalDownloadPurchasesTable.id })
+                .from(digitalDownloadPurchasesTable)
+                .where(
+                  and(
+                    eq(digitalDownloadPurchasesTable.userId, meta.userId),
+                    eq(digitalDownloadPurchasesTable.productId, meta.productId),
+                  ),
+                )
+                .limit(1);
+
+              if (existing) {
+                logger.info({ productId: meta.productId, userId: meta.userId, sessionId: session.id }, 'Digital download entitlement already exists — skipping insert');
+              } else {
+                await db.insert(digitalDownloadPurchasesTable).values({
+                  id: crypto.randomUUID(),
+                  userId: meta.userId,
+                  productId: meta.productId,
+                  productTitle: product.title,
+                  amountCents: paidCents,
+                  downloadUrl: product.downloadUrl,
+                });
+                logger.info({ productId: meta.productId, userId: meta.userId, sessionId: session.id }, 'Digital download entitlement granted');
+              }
+            }
+          }
         }
       }
     } catch (err) {
