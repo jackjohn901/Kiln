@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy, Sparkles, ChevronRight } from "lucide-react";
+import { Search, MapPin, CheckCircle, Clock, Lock, Users, Hammer, X, TrendingUp, Flame, Trophy, Sparkles, ChevronRight, ShoppingBag, Gavel, Zap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
@@ -255,8 +255,48 @@ export default function Discover() {
       <div className="pt-16 pb-8">
         <div className="max-w-5xl mx-auto px-4">
           <div className="py-8">
-            <h1 className="text-2xl font-bold text-stone-100 mb-1">Discover Artists</h1>
-            <p className="text-sm text-stone-400">Find craft artists by technique, location, or commission availability</p>
+            <h1 className="text-2xl font-bold text-stone-100 mb-1">Discover</h1>
+            <p className="text-sm text-stone-400">Shop original works, bid on live auctions, and find craft artists</p>
+          </div>
+
+          {/* Marketplace */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <ShoppingBag size={14} className="text-amber-400" />
+              <h2 className="text-sm font-semibold text-stone-300">Shop the marketplace</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link href="/shop" className="group relative overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-br from-amber-500/10 to-stone-900 p-4 hover:border-amber-500/40 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300"><ShoppingBag size={18} /></div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-100">Shop</p>
+                    <p className="text-[11px] text-stone-400">Browse works for sale</p>
+                  </div>
+                  <ChevronRight size={16} className="ml-auto shrink-0 text-stone-600 group-hover:text-amber-400 transition-colors" />
+                </div>
+              </Link>
+              <Link href="/auctions" className="group relative overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-br from-amber-500/10 to-stone-900 p-4 hover:border-amber-500/40 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300"><Gavel size={18} /></div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-100">Auctions</p>
+                    <p className="text-[11px] text-stone-400">Bid on live, one-of-a-kind pieces</p>
+                  </div>
+                  <ChevronRight size={16} className="ml-auto shrink-0 text-stone-600 group-hover:text-amber-400 transition-colors" />
+                </div>
+              </Link>
+              <Link href="/drops" className="group relative overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-br from-amber-500/10 to-stone-900 p-4 hover:border-amber-500/40 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300"><Zap size={18} /></div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-100">Drops</p>
+                    <p className="text-[11px] text-stone-400">Limited-edition timed releases</p>
+                  </div>
+                  <ChevronRight size={16} className="ml-auto shrink-0 text-stone-600 group-hover:text-amber-400 transition-colors" />
+                </div>
+              </Link>
+            </div>
           </div>
 
           {/* Popular techniques */}

@@ -122,6 +122,7 @@ export default function Nav() {
   const links = [
     { href: "/", label: "Home" },
     { href: "/discover", label: "Discover" },
+    { href: "/shop", label: "Shop" },
     { href: "/gallery", label: "Gallery" },
     { href: "/community", label: "Community" },
     { href: "/drops", label: "Drops" },

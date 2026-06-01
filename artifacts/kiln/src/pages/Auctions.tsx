@@ -46,20 +46,21 @@ function formatPrice(n: number) {
 function getTimeLeft(endDate: string): string {
   const diff = new Date(endDate).getTime() - Date.now();
   if (diff <= 0) return "Ended";
-  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
-  if (h > 24) return `${Math.floor(h / 24)}d ${h % 24}h left`;
-  if (h > 0) return `${h}h ${m}m left`;
-  if (diff < 60000) return `${s}s left`;
-  return `${m}m left`;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (d > 0) return `${d}d ${h}h ${pad(m)}m`;
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
 }
 
 function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBid: (a: Auction) => void; currentUserId?: string }) {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(auction.endDate));
   const [isCritical, setIsCritical] = useState(() => {
     const diff = new Date(auction.endDate).getTime() - Date.now();
-    return diff > 0 && diff <= 10000;
+    return auction.status === "live" && diff > 0 && diff <= 60000;
   });
   const [paying, setPaying] = useState(false);
   useEffect(() => {
@@ -68,10 +69,10 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
     function tick() {
       const diff = new Date(auction.endDate).getTime() - Date.now();
       setTimeLeft(getTimeLeft(auction.endDate));
-      setIsCritical(diff > 0 && diff <= 10000);
+      setIsCritical(auction.status === "live" && diff > 0 && diff <= 60000);
       if (diff <= 0) return;
-      // 1-second ticks in final minute, 30-second ticks otherwise
-      handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
+      // Tick every second while seconds are shown (under a day), slower otherwise
+      handle = setTimeout(tick, diff < 86400000 ? 1000 : 30000);
     }
 
     function onVisibilityChange() {
@@ -82,7 +83,7 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
 
     const diff = new Date(auction.endDate).getTime() - Date.now();
     if (diff <= 0) return;
-    handle = setTimeout(tick, diff < 60000 ? 1000 : 30000);
+    handle = setTimeout(tick, diff < 86400000 ? 1000 : 30000);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       clearTimeout(handle);
@@ -148,14 +149,14 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
           </div>
           <div className="text-right">
             <p className="text-[10px] text-stone-500">{auction.bidCount} bid{auction.bidCount !== 1 ? "s" : ""}</p>
-            <p className={`text-xs font-medium flex items-center gap-1 justify-end transition-colors ${
+            <p className={`text-sm font-bold font-mono tabular-nums flex items-center gap-1 justify-end transition-colors ${
               isCritical
                 ? "text-red-500 animate-pulse"
                 : isLive
                   ? "text-amber-400"
                   : "text-stone-500"
             }`}>
-              <Clock size={10} /> {timeLeft}
+              <Clock size={11} /> {timeLeft}
             </p>
           </div>
         </div>

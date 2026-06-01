@@ -48,13 +48,14 @@ function formatPrice(n: number) {
 function getTimeLeft(endDate: string): string {
   const diff = new Date(endDate).getTime() - Date.now();
   if (diff <= 0) return "Ended";
-  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
-  if (h > 24) return `${Math.floor(h / 24)}d ${h % 24}h left`;
-  if (h > 0) return `${h}h ${m}m left`;
-  if (diff < 60000) return `${s}s left`;
-  return `${m}m left`;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (d > 0) return `${d}d ${h}h ${pad(m)}m`;
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+  return `${pad(m)}:${pad(s)}`;
 }
 
 export default function AuctionDetail() {
@@ -123,6 +124,7 @@ export default function AuctionDetail() {
   const isOwner = !!auction && !!profile && auction.artistId === profile.id;
   const alreadyPaid = auction?.status === "paid";
   const displayBid = auction ? (auction.currentBid > 0 ? auction.currentBid : auction.startingPrice) : 0;
+  const endingSoon = !!auction && isLive && new Date(auction.endDate).getTime() - Date.now() <= 60000;
 
   const handleBid = async () => {
     if (!auction) return;
@@ -254,8 +256,11 @@ export default function AuctionDetail() {
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-stone-500">{auction.bidCount} bid{auction.bidCount !== 1 ? "s" : ""}</p>
-                  <p className={`text-xs font-medium flex items-center gap-1 justify-end ${isLive ? "text-amber-400" : "text-stone-500"}`}>
-                    <Clock size={10} /> {timeLeft}
+                  {isLive && <p className="text-[9px] uppercase tracking-wider text-stone-500 mt-1">Ends in</p>}
+                  <p className={`font-mono text-xl font-bold tabular-nums flex items-center gap-1.5 justify-end ${
+                    !isLive ? "text-stone-500" : endingSoon ? "text-red-500 animate-pulse" : "text-amber-300"
+                  }`}>
+                    <Clock size={14} /> {timeLeft}
                   </p>
                 </div>
               </div>
