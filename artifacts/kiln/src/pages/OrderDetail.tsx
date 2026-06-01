@@ -779,13 +779,7 @@ export default function OrderDetail() {
                     <li key={i} className="flex items-center justify-between text-xs">
                       <span className="text-stone-300 font-medium">{w.sellerName}</span>
                       <span className="text-stone-400 tabular-nums">
-                        {w.label
-                          ? w.label
-                          : w.days === null
-                            ? "Not specified"
-                            : w.days === 1
-                              ? "1 business day"
-                              : `${w.days} business days`}
+                        {formatProcessingWindowLabel(w.days, w.label) ?? "Not specified"}
                       </span>
                     </li>
                   ))}

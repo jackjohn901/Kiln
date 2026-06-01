@@ -14,6 +14,7 @@ import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import {
   readPaymentSettings, venmoUrl, cashAppUrl, paypalMeUrl,
+  formatProcessingWindowLabel,
   type ArtistPayments,
 } from "@/utils/paymentSettings";
 
@@ -814,14 +815,8 @@ export default function CartCheckout() {
                           <div>
                             <p className="text-xs font-semibold text-amber-300 mb-0.5">Manual payout artist</p>
                             <p className="text-xs text-amber-200/70">
-                              This artist manages payouts manually. Your order will be processed within{" "}
-                              {processingWindowLabel
-                                ? processingWindowLabel
-                                : processingWindowDays !== null
-                                  ? processingWindowDays === 1
-                                    ? "1 business day"
-                                    : `${processingWindowDays} business days`
-                                  : "3–5 business days"}.
+                              This artist manages payouts manually. Your order will be processed{" "}
+                              {formatProcessingWindowLabel(processingWindowDays, processingWindowLabel) ?? "within 3–5 business days"}.
                             </p>
                           </div>
                         </div>
@@ -1121,13 +1116,9 @@ export default function CartCheckout() {
                       </div>
                       {(processingWindowLabel !== null || processingWindowDays !== null) && (
                         <div className="flex justify-between">
-                          <span className="flex items-center gap-1"><Package size={11} /> Delivery estimate</span>
+                          <span className="flex items-center gap-1"><Package size={11} /> Ships</span>
                           <span className="text-amber-300">
-                            {processingWindowLabel
-                              ? processingWindowLabel
-                              : processingWindowDays === 1
-                                ? "1 business day"
-                                : `${processingWindowDays} business days`}
+                            {formatProcessingWindowLabel(processingWindowDays, processingWindowLabel) ?? "—"}
                           </span>
                         </div>
                       )}
@@ -1271,17 +1262,13 @@ export default function CartCheckout() {
                   <div className="border-t border-white/8 pt-3 space-y-1">
                     <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                       <Clock size={10} className="text-amber-400 shrink-0" />
-                      <span>Processing time</span>
+                      <span>Ships within</span>
                     </div>
                     {Array.from(processingWindows.entries()).map(([aid, { days, label, artistName }]) => (
                       <div key={aid} className="flex justify-between pl-3 text-xs">
                         <span className="text-stone-600 truncate max-w-[130px]">{artistName}</span>
                         <span className="text-amber-300">
-                          {label
-                            ? label
-                            : days === 1
-                              ? "1 business day"
-                              : `${days} business days`}
+                          {formatProcessingWindowLabel(days, label) ?? "—"}
                         </span>
                       </div>
                     ))}
@@ -1290,13 +1277,9 @@ export default function CartCheckout() {
                   <div className="border-t border-white/8 pt-3 flex items-start gap-2">
                     <Clock size={12} className="text-amber-400 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 mb-0.5">Processing time</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 mb-0.5">Ships within</p>
                       <p className="text-xs text-amber-300">
-                        {processingWindowLabel
-                          ? processingWindowLabel
-                          : processingWindowDays === 1
-                            ? "1 business day"
-                            : `${processingWindowDays} business days`}
+                        {formatProcessingWindowLabel(processingWindowDays, processingWindowLabel) ?? "—"}
                       </p>
                     </div>
                   </div>
