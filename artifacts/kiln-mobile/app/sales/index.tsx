@@ -58,6 +58,19 @@ function formatDate(iso: string) {
   });
 }
 
+function isOrderOverdue(sale: Sale): boolean {
+  if (sale.status !== "in_progress" || !sale.processingWindowDays) return false;
+  const deadline = new Date(sale.createdAt);
+  deadline.setDate(deadline.getDate() + sale.processingWindowDays);
+  return new Date() > deadline;
+}
+
+function overdueDeadline(sale: Sale): string {
+  const deadline = new Date(sale.createdAt);
+  deadline.setDate(deadline.getDate() + (sale.processingWindowDays ?? 0));
+  return deadline.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 const STATUS_COLOR: Record<string, string> = {
   pending: "#8A7E75",
   inquiry: "#8A7E75",
@@ -364,6 +377,7 @@ export default function SalesScreen() {
             const typeIconName = (TYPE_ICON[sale.type] ?? "shopping-bag") as any;
             const buyerName = sale.buyerDisplayName ?? sale.buyerHandle ?? "Unknown buyer";
             const isHighlighted = highlightId === sale.id;
+            const overdue = isOrderOverdue(sale);
 
             return (
               <Pressable
@@ -372,16 +386,29 @@ export default function SalesScreen() {
                   styles.card,
                   {
                     backgroundColor: colors.card,
-                    borderColor: isHighlighted ? colors.primary : colors.border,
+                    borderColor: overdue
+                      ? "#D97706"
+                      : isHighlighted
+                        ? colors.primary
+                        : colors.border,
                   },
-                  isHighlighted && styles.cardHighlighted,
+                  isHighlighted && !overdue && styles.cardHighlighted,
+                  overdue && styles.cardOverdue,
                 ]}
                 onPress={() => router.push(`/sales/${sale.id}` as any)}
               >
-                {isHighlighted && (
+                {isHighlighted && !overdue && (
                   <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
                     <Text style={[styles.newBadgeText, { color: colors.primaryForeground }]}>
                       New
+                    </Text>
+                  </View>
+                )}
+                {overdue && (
+                  <View style={styles.overdueBadge}>
+                    <Feather name="alert-triangle" size={11} color="#D97706" />
+                    <Text style={styles.overdueBadgeText}>
+                      Overdue – expected to ship by {overdueDeadline(sale)}
                     </Text>
                   </View>
                 )}
@@ -541,6 +568,9 @@ const styles = StyleSheet.create({
   cardHighlighted: {
     borderWidth: 1.5,
   },
+  cardOverdue: {
+    borderWidth: 1.5,
+  },
   newBadge: {
     alignSelf: "flex-start",
     borderRadius: 8,
@@ -549,6 +579,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   newBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  overdueBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#FEF3C7",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+  },
+  overdueBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "#D97706",
+  },
   cardRow: { flexDirection: "row", gap: 12 },
   thumb: {
     width: 54,

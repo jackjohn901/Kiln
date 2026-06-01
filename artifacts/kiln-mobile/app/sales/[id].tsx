@@ -64,6 +64,19 @@ function formatTime(iso: string) {
   });
 }
 
+function isOrderOverdue(sale: Sale): boolean {
+  if (sale.status !== "in_progress" || !sale.processingWindowDays) return false;
+  const deadline = new Date(sale.createdAt);
+  deadline.setDate(deadline.getDate() + sale.processingWindowDays);
+  return new Date() > deadline;
+}
+
+function overdueDeadline(sale: Sale): string {
+  const deadline = new Date(sale.createdAt);
+  deadline.setDate(deadline.getDate() + (sale.processingWindowDays ?? 0));
+  return deadline.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
 function ordinalId(id: string) {
   return "KLN-" + id.slice(0, 8).toUpperCase();
 }
@@ -255,6 +268,7 @@ export default function SaleDetailScreen() {
       : `${sale.processingWindowDays} business days`;
   const deliveryEstimateText = `Ships within ${baseEstimate}`;
   const statusActions = getStatusActions(sale.status);
+  const overdue = isOrderOverdue(sale);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -345,11 +359,26 @@ export default function SaleDetailScreen() {
 
         {(isActive || hasDeliveryEstimate) && (
           <View
-            style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}
+            style={[
+              styles.section,
+              {
+                backgroundColor: colors.card,
+                borderColor: overdue ? "#D97706" : colors.border,
+                borderWidth: overdue ? 1.5 : StyleSheet.hairlineWidth,
+              },
+            ]}
           >
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
               FULFILLMENT
             </Text>
+            {overdue && (
+              <View style={styles.overdueRow}>
+                <Feather name="alert-triangle" size={14} color="#D97706" />
+                <Text style={styles.overdueText}>
+                  Overdue — expected to ship by {overdueDeadline(sale)}
+                </Text>
+              </View>
+            )}
             {hasDeliveryEstimate && (
               <View style={styles.infoRow}>
                 <Feather name="clock" size={14} color={colors.primary} />
@@ -649,6 +678,21 @@ const styles = StyleSheet.create({
   },
   statusLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   statusDate: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
+  overdueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FEF3C7",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  overdueText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#D97706",
+    flex: 1,
+  },
   section: {
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
