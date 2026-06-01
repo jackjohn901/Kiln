@@ -80,6 +80,127 @@ function ordinalId(id: string) {
   return "KLN-" + id.slice(0, 8).toUpperCase();
 }
 
+function esc(text: string | null | undefined): string {
+  if (text == null) return "";
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildPackingSlipHtml(sale: Sale, windowText: string | null): string {
+  const refNum = esc(ordinalId(sale.id));
+  const dateStr = esc(formatDate(sale.createdAt));
+  const statusLabel = esc(STATUS_CONFIG[sale.status]?.label ?? sale.status);
+  const typeLabel = esc(TYPE_CONFIG[sale.type]?.label ?? sale.type);
+  const qty = sale.quantity ?? 1;
+  const unitPrice = qty > 1 ? formatPrice(sale.amount / qty) : null;
+
+  const buyerName = sale.buyerDisplayName?.trim() || (sale.buyerHandle ? `@${sale.buyerHandle}` : null);
+  const sectionLabel = sale.shippingAddress ? "Ship to" : "Buyer";
+  const buyerSection = (buyerName || sale.shippingAddress) ? `
+      <div style="margin-top:24px;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">${sectionLabel}</p>
+        ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
+        ${sale.shippingAddress ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(sale.shippingAddress)}</p>` : ""}
+      </div>
+    ` : "";
+
+  const processingWindowSection = windowText ? `
+      <div style="margin-top:16px;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Processing time</p>
+        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(windowText)}</p>
+      </div>
+    ` : "";
+
+  const trackingSection = sale.trackingNumber ? `
+      <div style="margin-top:16px;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Tracking</p>
+        <p style="font-size:13px;color:#2c2621;margin:0;font-family:monospace;">${esc(sale.trackingNumber)}</p>
+      </div>
+    ` : "";
+
+  const notesSection = sale.notes && !sale.notes.startsWith("stripe:") ? `
+      <div style="margin-top:16px;">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Notes</p>
+        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(sale.notes)}</p>
+      </div>
+    ` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Packing Slip ${refNum}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fff; color: #2c2621; padding: 48px; max-width: 600px; margin: 0 auto; }
+    @media print { body { padding: 24px; } }
+  </style>
+</head>
+<body>
+  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
+    <div>
+      <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
+    </div>
+    <div style="text-align:right;">
+      <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">Packing Slip</p>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;margin-bottom:28px;gap:24px;">
+    <div>
+      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Date</p>
+      <p style="font-size:13px;">${dateStr}</p>
+    </div>
+    <div>
+      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Status</p>
+      <p style="font-size:13px;">${statusLabel}</p>
+    </div>
+    <div style="text-align:right;">
+      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Order type</p>
+      <p style="font-size:13px;">${typeLabel}</p>
+    </div>
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+    <thead>
+      <tr>
+        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
+        ${qty > 1 ? `<th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:center;">Qty</th>` : ""}
+        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(sale.title)}${sale.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(sale.description)}</span>` : ""}${unitPrice ? `<br><span style="font-size:11px;color:#8a7e74;">${unitPrice} each</span>` : ""}</td>
+        ${qty > 1 ? `<td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:center;font-size:13px;color:#2c2621;">${qty}</td>` : ""}
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(sale.amount)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="display:flex;justify-content:flex-end;padding-top:12px;border-top:2px solid #2c2621;margin-top:4px;">
+    <div style="text-align:right;">
+      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Total</p>
+      <p style="font-size:20px;font-weight:700;">${formatPrice(sale.amount)}</p>
+    </div>
+  </div>
+
+  ${buyerSection}${processingWindowSection}${trackingSection}${notesSection}
+
+  <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
+    <p style="font-size:11px;color:#8a7e74;">Kiln — kilnfire.replit.app &nbsp;·&nbsp; Thank you for creating.</p>
+  </div>
+</body>
+</html>`;
+}
+
 async function patchSale(id: string, body: { status?: string; trackingNumber?: string; carrier?: string }) {
   const res = await fetch(`/api/me/sales/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -199,126 +320,8 @@ export default function SaleDetail() {
 
   function handlePrintPackingSlip() {
     if (!sale) return;
-
-    function esc(text: string | null | undefined): string {
-      if (text == null) return "";
-      return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
+    const html = buildPackingSlipHtml(sale, windowText);
     const refNum = esc(ordinalId(sale.id));
-    const dateStr = esc(formatDate(sale.createdAt));
-    const statusLabel = esc(STATUS_CONFIG[sale.status]?.label ?? sale.status);
-    const typeLabel = esc(TYPE_CONFIG[sale.type]?.label ?? sale.type);
-    const qty = sale.quantity ?? 1;
-    const unitPrice = qty > 1 ? formatPrice(sale.amount / qty) : null;
-
-    const buyerName = sale.buyerDisplayName?.trim() || (sale.buyerHandle ? `@${sale.buyerHandle}` : null);
-    const sectionLabel = sale.shippingAddress ? "Ship to" : "Buyer";
-    const buyerSection = (buyerName || sale.shippingAddress) ? `
-      <div style="margin-top:24px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">${sectionLabel}</p>
-        ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
-        ${sale.shippingAddress ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(sale.shippingAddress)}</p>` : ""}
-      </div>
-    ` : "";
-
-    const processingWindowSection = windowText ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Processing time</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(windowText)}</p>
-      </div>
-    ` : "";
-
-    const trackingSection = sale.trackingNumber ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Tracking</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;font-family:monospace;">${esc(sale.trackingNumber)}</p>
-      </div>
-    ` : "";
-
-    const notesSection = sale.notes && !sale.notes.startsWith("stripe:") ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Notes</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(sale.notes)}</p>
-      </div>
-    ` : "";
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Packing Slip ${refNum}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fff; color: #2c2621; padding: 48px; max-width: 600px; margin: 0 auto; }
-    @media print { body { padding: 24px; } }
-  </style>
-</head>
-<body>
-  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
-    <div>
-      <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
-    </div>
-    <div style="text-align:right;">
-      <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">Packing Slip</p>
-    </div>
-  </div>
-
-  <div style="display:flex;justify-content:space-between;margin-bottom:28px;gap:24px;">
-    <div>
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Date</p>
-      <p style="font-size:13px;">${dateStr}</p>
-    </div>
-    <div>
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Status</p>
-      <p style="font-size:13px;">${statusLabel}</p>
-    </div>
-    <div style="text-align:right;">
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Order type</p>
-      <p style="font-size:13px;">${typeLabel}</p>
-    </div>
-  </div>
-
-  <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
-    <thead>
-      <tr>
-        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
-        ${qty > 1 ? `<th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:center;">Qty</th>` : ""}
-        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(sale.title)}${sale.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(sale.description)}</span>` : ""}${unitPrice ? `<br><span style="font-size:11px;color:#8a7e74;">${unitPrice} each</span>` : ""}</td>
-        ${qty > 1 ? `<td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:center;font-size:13px;color:#2c2621;">${qty}</td>` : ""}
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(sale.amount)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div style="display:flex;justify-content:flex-end;padding-top:12px;border-top:2px solid #2c2621;margin-top:4px;">
-    <div style="text-align:right;">
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Total</p>
-      <p style="font-size:20px;font-weight:700;">${formatPrice(sale.amount)}</p>
-    </div>
-  </div>
-
-  ${buyerSection}${processingWindowSection}${trackingSection}${notesSection}
-
-  <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
-    <p style="font-size:11px;color:#8a7e74;">Kiln — kilnfire.replit.app &nbsp;·&nbsp; Thank you for creating.</p>
-  </div>
-</body>
-</html>`;
-
     const win = window.open("", "_blank", "width=700,height=900");
     if (!win) return;
     win.document.write(html);
