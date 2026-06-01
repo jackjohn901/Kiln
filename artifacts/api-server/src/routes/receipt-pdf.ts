@@ -12,6 +12,7 @@ import {
   TYPE_LABELS,
   type ReceiptData,
 } from "../lib/receiptPdf";
+import { packingSlipEmail, sendEmailWithRetry } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -226,6 +227,81 @@ router.get("/me/sales/:id/packing-slip.pdf", async (req, res): Promise<void> => 
   } catch (err) {
     logger.error({ err }, "me/sales/:id/packing-slip.pdf GET error");
     res.status(500).json({ error: "Failed to generate packing slip PDF" });
+  }
+});
+
+// ─── Route: email packing slip to buyer ─────────────────────────────────────
+// POST /me/sales/:id/packing-slip/email
+router.post("/me/sales/:id/packing-slip/email", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    const rows = await db.select(ORDER_COLS).from(ordersTable)
+      .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.sellerId, req.user.id)))
+      .limit(1);
+
+    if (rows.length === 0) { res.status(404).json({ error: "Sale not found" }); return; }
+
+    const order = rows[0]!;
+
+    const [buyerUserRow, sellerProfileRow] = await Promise.all([
+      order.buyerId
+        ? db.select({ email: usersTable.email })
+            .from(usersTable).where(eq(usersTable.id, order.buyerId)).limit(1).then(r => r[0] ?? null)
+        : Promise.resolve(null),
+      db.select({ displayName: profilesTable.displayName })
+          .from(profilesTable).where(eq(profilesTable.userId, req.user.id)).limit(1).then(r => r[0] ?? null),
+    ]);
+
+    const buyerEmail = buyerUserRow?.email ?? null;
+    if (!buyerEmail) {
+      res.status(422).json({ error: "Buyer email not available" });
+      return;
+    }
+
+    const refNum = ordinalId(order.id);
+
+    const processingWindowText = order.processingWindowLabel
+      ? `Ships ${order.processingWindowLabel}`
+      : order.processingWindowDays !== null
+        ? `Ships within ${order.processingWindowDays} business day${order.processingWindowDays === 1 ? "" : "s"}`
+        : null;
+
+    const buyerNotes = order.notes && !order.notes.startsWith("stripe:") ? order.notes : null;
+
+    const html = packingSlipEmail({
+      orderTitle:       order.title,
+      orderId:          order.id,
+      refNum,
+      dateStr:          fmtDate(order.createdAt),
+      statusLabel:      STATUS_LABELS[order.status] ?? order.status,
+      quantity:         order.quantity ?? 1,
+      amount:           order.amount,
+      shippingAddress:  order.shippingAddress ?? null,
+      trackingNumber:   order.trackingNumber ?? null,
+      processingWindow: processingWindowText,
+      notes:            buyerNotes,
+      sellerName:       sellerProfileRow?.displayName ?? null,
+    });
+
+    const sent = await sendEmailWithRetry(
+      {
+        to:      buyerEmail,
+        subject: `Packing slip for your order — ${refNum}`,
+        html,
+      },
+      { contextId: order.id, label: "packing slip" },
+    );
+
+    if (!sent) {
+      res.status(502).json({ error: "Failed to send email. Please try again." });
+      return;
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "me/sales/:id/packing-slip/email POST error");
+    res.status(500).json({ error: "Failed to send packing slip email" });
   }
 });
 

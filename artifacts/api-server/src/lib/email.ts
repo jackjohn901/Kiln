@@ -909,6 +909,66 @@ export function weeklyDigestEmail(stats: {
   `);
 }
 
+export function packingSlipEmail(opts: {
+  orderTitle: string;
+  orderId: string;
+  refNum: string;
+  dateStr: string;
+  statusLabel: string;
+  quantity: number;
+  amount: number;
+  shippingAddress: string | null;
+  trackingNumber: string | null;
+  processingWindow: string | null;
+  notes: string | null;
+  sellerName: string | null;
+}): string {
+  const orderUrl = `${BASE_URL}/orders/${opts.orderId}`;
+
+  const qty = opts.quantity ?? 1;
+  const unitPrice = qty > 1
+    ? (opts.amount / qty).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+    : null;
+  const totalStr = opts.amount.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+  const shippingHtml = opts.shippingAddress
+    ? `<p style="margin:4px 0 0;font-size:12px;color:#a8a29e;white-space:pre-line;">${escHtml(opts.shippingAddress)}</p>`
+    : "";
+
+  const trackingHtml = opts.trackingNumber
+    ? `<p style="margin:12px 0 0;font-size:12px;color:#a8a29e;">Tracking: <strong style="color:#d6d3d1;font-family:monospace;">${escHtml(opts.trackingNumber)}</strong></p>`
+    : "";
+
+  const windowHtml = opts.processingWindow
+    ? `<p style="margin:8px 0 0;font-size:12px;color:#a8a29e;">${escHtml(opts.processingWindow)}</p>`
+    : "";
+
+  const notesHtml = opts.notes
+    ? `<p style="margin:12px 0 0;font-size:12px;color:#a8a29e;">Note: <span style="color:#d6d3d1;">${escHtml(opts.notes)}</span></p>`
+    : "";
+
+  const sellerLine = opts.sellerName
+    ? `<p style="margin:0;color:#78716c;font-size:13px;">Sent by <strong style="color:#a8a29e;">${escHtml(opts.sellerName)}</strong></p>`
+    : `<p style="margin:0;color:#78716c;font-size:13px;">Your seller has sent you a packing slip for this order.</p>`;
+
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Packing slip enclosed 📦</h1>
+    ${sellerLine}
+    ${card(`
+      <p style="margin:0 0 4px;font-size:15px;"><strong>${escHtml(opts.orderTitle)}</strong></p>
+      <p style="margin:0;font-size:12px;color:#78716c;">Ref: <span style="font-family:monospace;color:#a8a29e;">${escHtml(opts.refNum)}</span> &middot; ${escHtml(opts.dateStr)} &middot; ${escHtml(opts.statusLabel)}</p>
+      <p style="margin:10px 0 0;font-size:13px;color:#d6d3d1;">
+        ${qty > 1 ? `Qty ${qty} &times; ${escHtml(unitPrice!)} = ` : ""}<strong>${escHtml(totalStr)}</strong>
+      </p>
+      ${shippingHtml}
+      ${trackingHtml}
+      ${windowHtml}
+      ${notesHtml}
+    `)}
+    ${btn(orderUrl, "View your order")}
+  `);
+}
+
 function escHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")

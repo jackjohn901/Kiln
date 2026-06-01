@@ -3,10 +3,11 @@ import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  DollarSign, Send, Printer, Download, Lock,
+  DollarSign, Send, Printer, Download, Lock, Mail,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
+import { toast } from "@/hooks/use-toast";
 
 interface Sale {
   id: string;
@@ -107,6 +108,8 @@ export default function SaleDetail() {
   const [carrierInput, setCarrierInput] = useState("");
   const [showTrackingInput, setShowTrackingInput] = useState(false);
   const [lockingAddress, setLockingAddress] = useState(false);
+  const [emailingSlip, setEmailingSlip] = useState(false);
+  const [emailSlipSuccess, setEmailSlipSuccess] = useState(false);
 
   useEffect(() => {
     if (id) markLinkRead(`/sales/${id}`);
@@ -328,6 +331,29 @@ export default function SaleDetail() {
   function handleDownloadPackingSlipPDF() {
     if (!sale) return;
     window.location.href = `/api/me/sales/${encodeURIComponent(sale.id)}/packing-slip.pdf`;
+  }
+
+  async function handleEmailPackingSlip() {
+    if (!sale || emailingSlip) return;
+    setEmailingSlip(true);
+    setEmailSlipSuccess(false);
+    try {
+      const r = await fetch(`/api/me/sales/${encodeURIComponent(sale.id)}/packing-slip/email`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Failed to send email");
+      }
+      setEmailSlipSuccess(true);
+      setTimeout(() => setEmailSlipSuccess(false), 4000);
+      toast({ title: "Packing slip sent", description: "The buyer has been emailed their packing slip." });
+    } catch (err) {
+      toast({ title: "Couldn't send packing slip", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setEmailingSlip(false);
+    }
   }
 
   if (loading) {
@@ -739,14 +765,27 @@ export default function SaleDetail() {
               className="flex-1 flex items-center justify-center gap-2 rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
             >
               <Printer size={15} />
-              Print packing slip
+              Print
             </button>
             <button
               onClick={handleDownloadPackingSlipPDF}
               className="flex-1 flex items-center justify-center gap-2 rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
             >
               <Download size={15} />
-              Download packing slip
+              Download
+            </button>
+            <button
+              onClick={() => { void handleEmailPackingSlip(); }}
+              disabled={emailingSlip}
+              className="flex-1 flex items-center justify-center gap-2 rounded-full border border-white/10 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 hover:text-amber-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {emailingSlip
+                ? <Loader2 size={15} className="animate-spin" />
+                : emailSlipSuccess
+                  ? <Mail size={15} className="text-emerald-400" />
+                  : <Mail size={15} />
+              }
+              {emailSlipSuccess ? "Sent!" : "Email"}
             </button>
           </div>
           <Link href="/earnings">
