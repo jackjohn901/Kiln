@@ -7,7 +7,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Music2, Truck, Sparkles, ShoppingCart,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Music2, Truck, Sparkles, ShoppingCart, Gavel,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -711,6 +711,9 @@ export default function ArtistProfile() {
                 <Link href="/create-listing" className="flex items-center gap-1.5 rounded-full border border-amber-500/40 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors">
                   <ShoppingBag size={12} /> List
                 </Link>
+                <Link href="/create-auction" className="flex items-center gap-1.5 rounded-full border border-amber-500/40 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors">
+                  <Gavel size={12} /> Auction
+                </Link>
                 <Link href="/create-drop" className="flex items-center gap-1.5 rounded-full border border-orange-500/40 px-3 py-1.5 text-xs font-medium text-orange-400 hover:bg-orange-500/10 transition-colors">
                   <Zap size={12} /> Drop
                 </Link>
@@ -1161,12 +1164,21 @@ export default function ArtistProfile() {
                     return (
                       <div className="py-16 text-center space-y-4">
                         <p className="text-stone-500 text-sm">You haven't listed any works yet.</p>
-                        <Link
-                          href="/create-listing"
-                          className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-                        >
-                          <Plus size={14} /> List a piece
-                        </Link>
+                        <p className="text-stone-600 text-xs max-w-xs mx-auto">Posts share your process — to sell a piece, list it for a fixed price or put it up for auction.</p>
+                        <div className="flex flex-wrap items-center justify-center gap-2.5">
+                          <Link
+                            href="/create-listing"
+                            className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                          >
+                            <Plus size={14} /> List a piece
+                          </Link>
+                          <Link
+                            href="/create-auction"
+                            className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 px-5 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/10 transition-colors"
+                          >
+                            <Gavel size={14} /> Auction off a piece
+                          </Link>
+                        </div>
                       </div>
                     );
                   }

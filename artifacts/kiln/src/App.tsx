@@ -112,6 +112,7 @@ import TasteGraph from "@/pages/TasteGraph";
 import CraftHours from "@/pages/CraftHours";
 import TechniqueGenetics from "@/pages/TechniqueGenetics";
 import CreateListing from "@/pages/CreateListing";
+import CreateAuction from "@/pages/CreateAuction";
 import CreateDrop from "@/pages/CreateDrop";
 import CreateWorkshop from "@/pages/CreateWorkshop";
 import EditWorkshop from "@/pages/EditWorkshop";
@@ -414,6 +415,7 @@ function Router() {
       <Route path="/craft-hours" component={CraftHours} />
       <Route path="/technique-genetics" component={TechniqueGenetics} />
       <Route path="/create-listing" component={CreateListing} />
+      <Route path="/create-auction" component={CreateAuction} />
       <Route path="/create-drop" component={CreateDrop} />
       <Route path="/create-workshop" component={CreateWorkshop} />
       <Route path="/workshops/:id/edit" component={EditWorkshop} />

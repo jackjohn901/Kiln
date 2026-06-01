@@ -4,7 +4,7 @@ import {
   Upload, Video, ImageIcon, ChevronRight, ChevronLeft, ShoppingBag,
   X, Music, Flame, Check, Tag, Loader2, Layers, Zap, Calendar, Users,
   Sparkles, Share2, Plus, Crown, Heart, MessageCircle, Bookmark, Images,
-  Play, Pause,
+  Play, Pause, Gavel,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { type FilterSettings } from "@/components/ImageEditor";
@@ -55,6 +55,7 @@ export default function Create() {
   const { upload, uploadVideo, uploading, progress } = useUpload();
 
   const [step, setStep] = useState<Step>("upload");
+  const [publishedPostId, setPublishedPostId] = useState<string | null>(null);
   const [postType, setPostType] = useState<"post" | "story">("post");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -501,10 +502,9 @@ export default function Create() {
       sessionStorage.setItem("kiln_just_posted", "true");
       const createdPost = await postRes.json().catch(() => null);
       if (createdPost?.id) {
-        navigate(`/posts/db-${createdPost.id}`);
-      } else {
-        navigate("/");
+        setPublishedPostId(`db-${createdPost.id}`);
       }
+      setStep("done");
     } catch (err) {
       console.error("Publish flow failed", err);
       const status = err instanceof UploadError ? err.status : undefined;
@@ -556,6 +556,7 @@ export default function Create() {
           <button
             onClick={() => {
               setStep("upload");
+              setPublishedPostId(null);
               setFile(null);
               setPreviewUrl("");
               setCaption("");
@@ -626,13 +627,32 @@ export default function Create() {
 
           {/* CTA buttons */}
           <div className="w-full max-w-sm mt-4 space-y-2.5">
-            {/* Primary — go see the post on profile */}
+            {/* Primary — go see the post live (falls back to profile) */}
             <button
-              onClick={() => navigate(`/artists/${profile?.id}`)}
+              onClick={() => navigate(publishedPostId ? `/posts/${publishedPostId}` : `/artists/${profile?.id}`)}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 py-3 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
             >
-              View on your profile
+              {publishedPostId ? "View your post" : "View on your profile"}
             </button>
+
+            {/* Sell this piece — posts don't go in the shop, so make selling discoverable */}
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2.5">
+              <p className="text-xs text-stone-400 text-center">Want to sell this piece? A post shares your process — list it or auction it to sell.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate("/create-listing")}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber-500/90 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+                >
+                  <ShoppingBag size={13} /> List for sale
+                </button>
+                <button
+                  onClick={() => navigate("/create-auction")}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-amber-500/40 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/10 transition-colors"
+                >
+                  <Gavel size={13} /> Auction it
+                </button>
+              </div>
+            </div>
 
             {/* Secondary row */}
             <div className="flex gap-2">

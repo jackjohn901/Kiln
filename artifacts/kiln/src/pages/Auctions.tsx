@@ -377,17 +377,27 @@ export default function Auctions() {
     <div className="min-h-screen bg-[#12100e] text-stone-100">
       <Nav />
       <div className="mx-auto max-w-4xl px-4 pb-20 pt-6">
-        <div className="mb-6">
-          <div className="mb-1 flex items-center gap-2">
-            <Gavel size={20} className="text-amber-400" />
-            <h1 className="font-serif text-2xl text-amber-100">Auctions</h1>
-            {liveCount > 0 && (
-              <span className="ml-1 flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
-                <TrendingUp size={9} /> {liveCount} live
-              </span>
-            )}
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <Gavel size={20} className="text-amber-400" />
+              <h1 className="font-serif text-2xl text-amber-100">Auctions</h1>
+              {liveCount > 0 && (
+                <span className="ml-1 flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                  <TrendingUp size={9} /> {liveCount} live
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-stone-500">Bid on one-of-a-kind works directly from the artists.</p>
           </div>
-          <p className="text-sm text-stone-500">Bid on one-of-a-kind works directly from the artists.</p>
+          {profile && (
+            <Link
+              href="/create-auction"
+              className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
+            >
+              <Gavel size={14} /> Start an auction
+            </Link>
+          )}
         </div>
 
         <div className="mb-6 flex gap-1 rounded-xl bg-stone-900/50 p-1 border border-white/5">
