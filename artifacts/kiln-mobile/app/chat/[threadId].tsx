@@ -79,7 +79,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { threadId, orderRef } = useLocalSearchParams<{ threadId: string; orderRef?: string }>();
+  const { threadId, orderRef, orderId } = useLocalSearchParams<{ threadId: string; orderRef?: string; orderId?: string }>();
   const { user } = useAuth();
 
   const [draft, setDraft] = useState("");
@@ -87,6 +87,9 @@ export default function ChatScreen() {
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [contextRef, setContextRef] = useState<string | undefined>(
     orderRef ? String(orderRef) : undefined
+  );
+  const [contextOrderId, setContextOrderId] = useState<string | undefined>(
+    orderId ? String(orderId) : undefined
   );
   const flatRef = useRef<FlatList>(null);
   const typingDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -265,14 +268,29 @@ export default function ChatScreen() {
             ]}
           >
             <Feather name="tag" size={13} color={colors.primary} />
-            <Text
-              style={[styles.contextChipText, { color: colors.foreground }]}
-              numberOfLines={1}
-            >
-              Re: {contextRef}
-            </Text>
             <Pressable
-              onPress={() => setContextRef(undefined)}
+              onPress={() =>
+                contextOrderId
+                  ? router.push({
+                      pathname: "/orders/[id]" as any,
+                      params: { id: contextOrderId },
+                    })
+                  : undefined
+              }
+              style={styles.contextChipLabel}
+            >
+              <Text
+                style={[styles.contextChipText, { color: colors.foreground }]}
+                numberOfLines={1}
+              >
+                Re: {contextRef}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setContextRef(undefined);
+                setContextOrderId(undefined);
+              }}
               hitSlop={8}
               style={styles.contextChipDismiss}
             >
@@ -361,10 +379,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     maxWidth: "90%",
   },
+  contextChipLabel: {
+    flex: 1,
+  },
   contextChipText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    flex: 1,
   },
   contextChipDismiss: {
     marginLeft: 2,
