@@ -307,21 +307,32 @@ export default function Orders() {
                         </p>
                         {isGroup && groupOrders.length > 1 && (() => {
                           const MAX_SHOWN = 2;
-                          const titles = groupOrders.map(o => o.title);
-                          const shown = titles.slice(0, MAX_SHOWN);
-                          const remaining = titles.length - MAX_SHOWN;
+                          const shown = groupOrders.slice(0, MAX_SHOWN);
+                          const remaining = groupOrders.length - MAX_SHOWN;
                           return (
-                            <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">
-                              {shown.map((t, i) => (
-                                <span key={i}>
-                                  <span className="truncate inline-block max-w-[160px] align-bottom">{t}</span>
-                                  {i < shown.length - 1 || remaining > 0 ? ", " : ""}
-                                </span>
-                              ))}
+                            <div className="mt-1 flex flex-col gap-1">
+                              {shown.map((o, i) => {
+                                const itemConf = TYPE_CONFIG[o.type] ?? TYPE_CONFIG.inquiry!;
+                                const ItemIcon = itemConf.icon;
+                                return (
+                                  <div key={i} className="flex items-center gap-1.5">
+                                    <div className="h-5 w-5 flex-shrink-0 overflow-hidden rounded-md bg-stone-800">
+                                      {o.imageUrl ? (
+                                        <img src={o.imageUrl} alt="" className="h-full w-full object-cover" />
+                                      ) : (
+                                        <div className={`h-full w-full flex items-center justify-center rounded-md ${itemConf.color}`}>
+                                          <ItemIcon size={11} />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="truncate max-w-[180px] text-[11px] text-stone-400">{o.title}</span>
+                                  </div>
+                                );
+                              })}
                               {remaining > 0 && (
-                                <span className="text-stone-500">+{remaining} more</span>
+                                <span className="pl-[26px] text-[11px] text-stone-500">+{remaining} more</span>
                               )}
-                            </p>
+                            </div>
                           );
                         })()}
                         <p className="text-xs text-stone-500 mt-0.5">{formatDate(primary.createdAt)}</p>
