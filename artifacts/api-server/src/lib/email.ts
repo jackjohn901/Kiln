@@ -54,6 +54,12 @@ export async function sendEmailWithRetry(
   ctx?: EmailRetryContext,
   maxAttempts = 3,
 ): Promise<boolean> {
+  // Never retry or queue fake/seed addresses — they can never be delivered.
+  if (isFakeAddress(payload.to)) {
+    logger.debug({ to: payload.to, subject: payload.subject }, "Email skipped — fake/seed address (not queued)");
+    return false;
+  }
+
   const delays = [1_000, 2_000];
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const ok = await sendEmail(payload);
@@ -78,10 +84,18 @@ export async function sendEmailWithRetry(
 // Known fake/internal domains used in seed data — never attempt real sends to these
 const FAKE_DOMAINS = [".kiln", ".internal", ".test", ".example", ".invalid", ".localhost"];
 
+/**
+ * Returns true if the recipient address belongs to a fake/seed domain that can
+ * never receive real mail. Such addresses must never be sent, retried, or queued.
+ */
+export function isFakeAddress(to: string): boolean {
+  const domain = to.slice(to.lastIndexOf("@") + 1).toLowerCase();
+  return FAKE_DOMAINS.some((d) => domain.endsWith(d)) || domain === "example.com";
+}
+
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   // Skip fake seed addresses silently — they always fail and flood the logs
-  const domain = payload.to.slice(payload.to.lastIndexOf("@") + 1).toLowerCase();
-  if (FAKE_DOMAINS.some((d) => domain.endsWith(d)) || domain === "example.com") {
+  if (isFakeAddress(payload.to)) {
     logger.debug({ to: payload.to }, "Email skipped — fake/seed address");
     return false;
   }

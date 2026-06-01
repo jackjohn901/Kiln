@@ -1,6 +1,6 @@
 import { db, failedEmailsTable } from "@workspace/db";
 import { and, eq, lte } from "drizzle-orm";
-import { sendEmail, type EmailPayload } from "./email";
+import { sendEmail, isFakeAddress, type EmailPayload } from "./email";
 import { logger } from "./logger";
 
 export type FailedEmailRow = typeof failedEmailsTable.$inferSelect;
@@ -84,6 +84,24 @@ export async function drainEmailQueue(): Promise<void> {
   logger.info({ count: rows.length }, "Email queue drain: processing pending emails");
 
   for (const row of rows) {
+    // Defensively skip any rows that slipped in for fake/seed addresses — they
+    // can never be delivered, so mark them terminal instead of retrying forever.
+    if (isFakeAddress(row.to)) {
+      try {
+        await db
+          .update(failedEmailsTable)
+          .set({ status: "skipped", lastError: "Skipped — fake/seed address (undeliverable)" })
+          .where(eq(failedEmailsTable.id, row.id));
+        logger.debug(
+          { id: row.id, to: row.to, subject: row.subject },
+          "Email queue: skipped fake/seed address",
+        );
+      } catch (err) {
+        logger.error({ err, id: row.id }, "Email queue: failed to mark fake/seed row as skipped");
+      }
+      continue;
+    }
+
     const payload: EmailPayload = {
       to: row.to,
       subject: row.subject,
