@@ -1,3 +1,21 @@
+// ─── PAIRED WITH artifacts/kiln/src/lib/receiptHtml.ts ───────────────────────
+// This file builds the server-side downloadable PDF receipt.
+// `receiptHtml.ts` builds the client-side print / browser-window receipt (HTML).
+// Both implement the SAME layout. When you add, remove, or rename a section
+// here, mirror the change in receiptHtml.ts — and vice versa.
+//
+// SECTION CHECKLIST (must be present in both templates):
+//   1. Header            — Kiln logo | receipt number + title
+//   2. Meta row          — Date | Status | Order type   (omit Status/Type when unavailable)
+//   3. Line items table  — title, optional description, optional qty × unit price, price
+//   4. Total             — right-aligned bold amount
+//   5. Billed to         — buyerName + buyerAddress
+//   6. Processing time   — processingWindow text
+//   7. Tracking          — trackingNumber
+//   8. Notes             — buyer-supplied or order notes
+//   9. Receipt emailed to — buyerEmail
+//  10. Footer            — thank-you line + support URL
+// ─────────────────────────────────────────────────────────────────────────────
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 const DARK   = rgb(0.173, 0.149, 0.129);

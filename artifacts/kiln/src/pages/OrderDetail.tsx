@@ -11,6 +11,7 @@ import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 import { useSocial } from "@/contexts/SocialContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { buildReceiptHtml, ordinalId } from "@/lib/receiptHtml";
 
 interface Order {
   id: string;
@@ -78,10 +79,6 @@ function formatDate(iso: string) {
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-function ordinalId(id: string) {
-  return "KLN-" + id.slice(0, 8).toUpperCase();
 }
 
 function ReviewForm({ order }: { order: Order }) {
@@ -460,140 +457,31 @@ export default function OrderDetail() {
   function handlePrint() {
     if (!order) return;
 
-    function esc(text: string | null | undefined): string {
-      if (text == null) return "";
-      return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
     const items = isCartOrder ? siblingOrders : [order];
     const total = isCartOrder ? cartTotal : order.amount;
+    const refNum = isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id);
 
-    const lineItems = items.map(item => {
-      const qty = (item as Order).quantity ?? 1;
-      const unitPrice = qty > 1 ? item.amount / qty : item.amount;
-      const qtyNote = qty > 1 ? `<br><span style="font-size:11px;color:#8a7e74;">Qty: ${qty} &times; ${formatPrice(unitPrice)}</span>` : "";
-      return `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(item.title)}${item.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(item.description)}</span>` : ""}${qtyNote}</td>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(item.amount)}</td>
-      </tr>
-    `;
-    }).join("");
-
-    const buyerName = buyerProfile?.displayName ?? null;
-    const addressText = order.shippingAddress ?? buyerProfile?.location ?? null;
-
-    const buyerRow = (buyerName || addressText) ? `
-      <div style="margin-top:24px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Billed to</p>
-        ${buyerName ? `<p style="font-size:13px;font-weight:600;color:#2c2621;margin:0 0 2px;">${esc(buyerName)}</p>` : ""}
-        ${addressText ? `<p style="font-size:12px;color:#8a7e74;white-space:pre-line;margin:0;">${esc(addressText)}</p>` : ""}
-      </div>
-    ` : "";
-
-
-    const trackingRow = order.trackingNumber ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Tracking</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;font-family:monospace;">${esc(order.trackingNumber)}</p>
-      </div>
-    ` : "";
-
-    const notesRow = order.notes && !order.notes.startsWith("stripe:") ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Notes</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(order.notes)}</p>
-      </div>
-    ` : "";
-
-    const processingWindowRow = hasDeliveryEstimate ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Processing time</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(shipsWithinText)}</p>
-      </div>
-    ` : "";
-
-    const emailRow = buyerEmail ? `
-      <div style="margin-top:16px;">
-        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin:0 0 6px;">Receipt emailed to</p>
-        <p style="font-size:13px;color:#2c2621;margin:0;">${esc(buyerEmail)}</p>
-      </div>
-    ` : "";
-
-    const statusLabel = esc(STATUS_CONFIG[order.status]?.label ?? order.status);
-    const typeLabel = esc(TYPE_CONFIG[order.type]?.label ?? order.type);
-    const refNum = esc(isCartOrder ? sessionReceiptId(order.notes) : ordinalId(order.id));
-    const receiptTitle = isCartOrder ? "Cart Receipt" : "Order Receipt";
-    const dateStr = esc(formatDate(order.createdAt));
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Receipt ${refNum}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #fff; color: #2c2621; padding: 48px; max-width: 600px; margin: 0 auto; }
-    @media print { body { padding: 24px; } }
-  </style>
-</head>
-<body>
-  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
-    <div>
-      <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
-    </div>
-    <div style="text-align:right;">
-      <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">${receiptTitle}</p>
-    </div>
-  </div>
-
-  <div style="display:flex;justify-content:space-between;margin-bottom:28px;gap:24px;">
-    <div>
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Date</p>
-      <p style="font-size:13px;">${dateStr}</p>
-    </div>
-    <div>
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Status</p>
-      <p style="font-size:13px;">${statusLabel}</p>
-    </div>
-    <div style="text-align:right;">
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Order type</p>
-      <p style="font-size:13px;">${typeLabel}</p>
-    </div>
-  </div>
-
-  <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
-    <thead>
-      <tr>
-        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
-        <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
-      </tr>
-    </thead>
-    <tbody>${lineItems}</tbody>
-  </table>
-
-  <div style="display:flex;justify-content:flex-end;padding-top:12px;border-top:2px solid #2c2621;margin-top:4px;">
-    <div style="text-align:right;">
-      <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;margin-bottom:4px;">Total</p>
-      <p style="font-size:20px;font-weight:700;">${formatPrice(total)}</p>
-    </div>
-  </div>
-
-  ${buyerRow}${processingWindowRow}${trackingRow}${notesRow}${emailRow}
-
-  <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
-    <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages</p>
-  </div>
-</body>
-</html>`;
+    const html = buildReceiptHtml({
+      refNum,
+      receiptTitle: isCartOrder ? "Cart Receipt" : "Order Receipt",
+      dateStr: formatDate(order.createdAt),
+      statusLabel: STATUS_CONFIG[order.status]?.label ?? order.status,
+      typeLabel: TYPE_CONFIG[order.type]?.label ?? order.type,
+      lines: items.map(item => ({
+        title: item.title,
+        description: item.description ?? null,
+        amount: item.amount,
+        quantity: (item as Order).quantity ?? 1,
+      })),
+      total,
+      formatPrice,
+      buyerName: buyerProfile?.displayName ?? null,
+      buyerAddress: order.shippingAddress ?? buyerProfile?.location ?? null,
+      buyerEmail: buyerEmail ?? null,
+      trackingNumber: order.trackingNumber ?? null,
+      processingWindow: hasDeliveryEstimate ? shipsWithinText : null,
+      notes: order.notes && !order.notes.startsWith("stripe:") ? order.notes : null,
+    });
 
     openReceiptWindow(html, `Receipt_${refNum}`, false);
   }
