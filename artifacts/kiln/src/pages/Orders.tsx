@@ -424,6 +424,38 @@ export default function Orders() {
                       </span>
                     </div>
                     {(() => {
+                      if (isGroup && groupOrders.length > 1) {
+                        const seen = new Set<string>();
+                        const sellerEntries = groupOrders
+                          .filter(o => o.sellerId && !seen.has(o.sellerId) && seen.add(o.sellerId) !== undefined)
+                          .map(o => ({
+                            days: o.processingWindowDays ?? sellerWindows[o.sellerId]?.processingWindowDays ?? null,
+                            label: o.processingWindowLabel ?? sellerWindows[o.sellerId]?.processingWindowLabel ?? null,
+                          }));
+                        const withWindows = sellerEntries.filter(s => s.days != null || s.label != null);
+                        if (withWindows.length === 0) return null;
+                        if (withWindows.length === 1) {
+                          const s = withWindows[0]!;
+                          return (
+                            <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
+                              <Clock size={10} className="text-amber-500/70 flex-shrink-0" />
+                              Processing:{" "}
+                              <span className="text-amber-400/80">
+                                {s.label ? s.label : s.days === 1 ? "1 business day" : `${s.days} business days`}
+                              </span>
+                            </p>
+                          );
+                        }
+                        const maxDays = Math.max(...withWindows.map(s => s.days ?? 0));
+                        return (
+                          <p className="mt-1.5 flex items-center gap-1 text-[11px] text-stone-500">
+                            <Clock size={10} className="text-amber-500/70 flex-shrink-0" />
+                            <span className="text-amber-400/80">
+                              {withWindows.length} artists · up to {maxDays} day{maxDays !== 1 ? "s" : ""}
+                            </span>
+                          </p>
+                        );
+                      }
                       const label = primary.processingWindowLabel ?? sellerWindows[primary.sellerId]?.processingWindowLabel ?? null;
                       const days = primary.processingWindowDays ?? sellerWindows[primary.sellerId]?.processingWindowDays ?? null;
                       if (label == null && days == null) return null;
