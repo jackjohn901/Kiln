@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History, Inbox } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,6 +75,27 @@ interface HealthHistoryEntry {
   passed: boolean;
 }
 
+interface FailedEmail {
+  id: number;
+  to: string;
+  from: string | null;
+  subject: string;
+  contextId: string | null;
+  label: string | null;
+  attempts: number;
+  lastError: string | null;
+  status: string;
+  nextRetryAt: string;
+  deliveredAt: string | null;
+  createdAt: string;
+}
+
+interface FailedEmailCounts {
+  pending: number;
+  delivered: number;
+  failed: number;
+}
+
 interface SeedHistoryEntry {
   id: string;
   operation: string;
@@ -142,6 +163,15 @@ export default function AdminReports() {
   const [broadcastResult, setBroadcastResult] = useState<{ recipientCount: number; sent: number; failed: number } | null>(null);
   const [broadcastLoading, setBroadcastLoading] = useState(false);
   const [broadcastError, setBroadcastError] = useState<string | null>(null);
+
+  // Failed email queue state
+  const [failedEmails, setFailedEmails] = useState<FailedEmail[]>([]);
+  const [failedEmailCounts, setFailedEmailCounts] = useState<FailedEmailCounts>({ pending: 0, delivered: 0, failed: 0 });
+  const [failedEmailFilter, setFailedEmailFilter] = useState("pending");
+  const [failedEmailLoading, setFailedEmailLoading] = useState(false);
+  const [failedEmailError, setFailedEmailError] = useState<string | null>(null);
+  const [retryingEmail, setRetryingEmail] = useState<number | null>(null);
+  const [retryNotice, setRetryNotice] = useState<{ id: number; delivered: boolean } | null>(null);
 
   async function runBackfill(dryRun: boolean) {
     setBackfillLoading(true);
@@ -405,6 +435,50 @@ export default function AdminReports() {
     setBroadcastError(null);
   }
 
+  async function loadFailedEmails(status: string) {
+    setFailedEmailLoading(true);
+    setFailedEmailError(null);
+    try {
+      const res = await fetch(`/api/admin/failed-emails?status=${status}`, { credentials: "include" });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        setFailedEmailError(data?.error ?? "Request failed");
+        return;
+      }
+      const data = await res.json() as { emails?: FailedEmail[]; counts?: FailedEmailCounts };
+      setFailedEmails(data.emails ?? []);
+      setFailedEmailCounts(data.counts ?? { pending: 0, delivered: 0, failed: 0 });
+    } catch {
+      setFailedEmailError("Network error — please try again");
+    } finally {
+      setFailedEmailLoading(false);
+    }
+  }
+
+  async function retryFailedEmail(id: number) {
+    setRetryingEmail(id);
+    setFailedEmailError(null);
+    setRetryNotice(null);
+    try {
+      const res = await fetch(`/api/admin/failed-emails/${id}/retry`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json() as { delivered?: boolean; email?: FailedEmail | null; error?: string };
+      if (!res.ok) {
+        setFailedEmailError(data?.error ?? "Retry failed");
+        return;
+      }
+      setRetryNotice({ id, delivered: data.delivered ?? false });
+      // Reload so counts and the row's new state/attempt count are accurate.
+      void loadFailedEmails(failedEmailFilter);
+    } catch {
+      setFailedEmailError("Network error — please try again");
+    } finally {
+      setRetryingEmail(null);
+    }
+  }
+
   useEffect(() => {
     setLoading(true);
     fetch(`/api/admin/reports?status=${filter}`, { credentials: "include" })
@@ -440,7 +514,13 @@ export default function AdminReports() {
     if (section !== "maintenance") return;
     void checkMarkerSync();
     void loadSeedHistory();
+    void loadFailedEmails(failedEmailFilter);
   }, [section]);
+
+  useEffect(() => {
+    if (section !== "maintenance") return;
+    void loadFailedEmails(failedEmailFilter);
+  }, [failedEmailFilter]);
 
   useEffect(() => {
     if (section !== "verifications") return;
@@ -717,6 +797,140 @@ export default function AdminReports() {
                 </div>
               </div>
             )}
+
+            {/* Failed email queue card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <Inbox size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h2 className="text-sm font-semibold text-amber-100">Failed email queue</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Emails that couldn't be delivered are saved here and retried automatically with backoff. Investigate the last error, attempt count, and next retry — or force an immediate retry.
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadFailedEmails(failedEmailFilter)}
+                  disabled={failedEmailLoading}
+                  className="shrink-0 text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-40"
+                  title="Refresh queue"
+                >
+                  <RefreshCw size={14} className={failedEmailLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+
+              {/* Status filters with counts */}
+              <div className="flex gap-2 flex-wrap">
+                {(["pending", "failed", "delivered", "all"] as const).map((f) => {
+                  const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
+                  const badge = f === "all"
+                    ? failedEmailCounts.pending + failedEmailCounts.delivered + failedEmailCounts.failed
+                    : failedEmailCounts[f];
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setFailedEmailFilter(f)}
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                        failedEmailFilter === f
+                          ? "bg-amber-500 text-stone-950"
+                          : "border border-white/10 bg-stone-800 text-stone-400 hover:text-stone-200"
+                      }`}
+                    >
+                      {label}
+                      <span className={`text-[10px] ${failedEmailFilter === f ? "text-stone-800" : "text-stone-500"}`}>{badge}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {failedEmailError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {failedEmailError}
+                </div>
+              )}
+
+              {retryNotice && (
+                <div className={`rounded-xl border px-4 py-3 text-xs ${retryNotice.delivered ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-amber-500/20 bg-amber-500/5 text-amber-300"}`}>
+                  {retryNotice.delivered
+                    ? "Retry succeeded — the email was delivered."
+                    : "Retry attempted but delivery failed again. The next automatic retry has been rescheduled."}
+                </div>
+              )}
+
+              {failedEmailLoading && failedEmails.length === 0 && (
+                <div className="flex flex-col gap-2">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-20 rounded-xl bg-stone-800 animate-pulse" />
+                  ))}
+                </div>
+              )}
+
+              {!failedEmailLoading && failedEmails.length === 0 && !failedEmailError && (
+                <p className="text-xs text-stone-600">
+                  {failedEmailFilter === "pending"
+                    ? "No emails waiting to retry — the queue is clear."
+                    : `No ${failedEmailFilter === "all" ? "" : failedEmailFilter + " "}emails in the queue.`}
+                </p>
+              )}
+
+              {failedEmails.length > 0 && (
+                <ul className="space-y-2">
+                  {failedEmails.map((em) => {
+                    const statusColor = em.status === "delivered"
+                      ? "bg-emerald-500/15 text-emerald-400"
+                      : em.status === "failed"
+                        ? "bg-rose-500/15 text-rose-400"
+                        : "bg-amber-500/15 text-amber-400";
+                    return (
+                      <li key={em.id} className="rounded-xl border border-white/5 bg-stone-950/40 px-4 py-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm text-stone-200 truncate">{em.subject}</p>
+                            <p className="text-[11px] text-stone-500 truncate">
+                              to <span className="text-stone-400">{em.to}</span>
+                              {em.label && <span className="text-stone-600"> · {em.label}</span>}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full ${statusColor}`}>
+                            {em.status}
+                          </span>
+                        </div>
+
+                        {em.lastError && (
+                          <p className="text-[11px] text-rose-300/80 bg-rose-500/5 border border-rose-500/10 rounded-lg px-2 py-1.5 break-words">
+                            {em.lastError}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-[10px] text-stone-600">
+                            {em.attempts} {em.attempts === 1 ? "attempt" : "attempts"}
+                            {em.status === "pending" && (
+                              <> · next retry {new Date(em.nextRetryAt).toLocaleString()}</>
+                            )}
+                            {em.status === "delivered" && em.deliveredAt && (
+                              <> · delivered {new Date(em.deliveredAt).toLocaleString()}</>
+                            )}
+                            {em.status === "failed" && (
+                              <> · gave up after max attempts</>
+                            )}
+                          </p>
+                          {em.status !== "delivered" && (
+                            <button
+                              onClick={() => retryFailedEmail(em.id)}
+                              disabled={retryingEmail === em.id}
+                              className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                            >
+                              {retryingEmail === em.id ? <RefreshCw size={10} className="animate-spin" /> : <Send size={10} />}
+                              {retryingEmail === em.id ? "Retrying…" : "Retry now"}
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
 
             {/* System health card */}
             <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">

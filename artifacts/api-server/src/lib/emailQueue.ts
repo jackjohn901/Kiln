@@ -3,6 +3,14 @@ import { and, eq, lte } from "drizzle-orm";
 import { sendEmail, type EmailPayload } from "./email";
 import { logger } from "./logger";
 
+export type FailedEmailRow = typeof failedEmailsTable.$inferSelect;
+
+export interface RetryFailedEmailResult {
+  found: boolean;
+  delivered: boolean;
+  row?: FailedEmailRow;
+}
+
 const MAX_PERSISTENT_ATTEMPTS = 10;
 
 const BACKOFF_DELAYS_MS = [
@@ -133,4 +141,71 @@ export async function drainEmailQueue(): Promise<void> {
       logger.error({ err, id: row.id }, "Email queue: failed to update retry schedule");
     }
   }
+}
+
+/**
+ * Forces an immediate delivery attempt for a single queued email, bypassing the
+ * backoff schedule. Used by the admin dashboard. Mirrors the per-row state
+ * transitions in drainEmailQueue (delivered / failed / rescheduled) but acts on
+ * one row regardless of its nextRetryAt.
+ */
+export async function retryFailedEmail(id: number): Promise<RetryFailedEmailResult> {
+  let row: FailedEmailRow | undefined;
+  try {
+    [row] = await db.select().from(failedEmailsTable).where(eq(failedEmailsTable.id, id)).limit(1);
+  } catch (err) {
+    logger.error({ err, id }, "Email queue retry: failed to load row");
+    throw err;
+  }
+
+  if (!row) return { found: false, delivered: false };
+
+  const payload: EmailPayload = {
+    to: row.to,
+    subject: row.subject,
+    html: row.html,
+    ...(row.from ? { from: row.from } : {}),
+  };
+
+  const ok = await sendEmail(payload);
+  const newAttempts = row.attempts + 1;
+
+  if (ok) {
+    const [updated] = await db
+      .update(failedEmailsTable)
+      .set({ status: "delivered", attempts: newAttempts, deliveredAt: new Date() })
+      .where(eq(failedEmailsTable.id, row.id))
+      .returning();
+    logger.info(
+      { id: row.id, to: row.to, subject: row.subject, contextId: row.contextId, label: row.label },
+      "Email queue retry: manual retry delivered successfully",
+    );
+    return { found: true, delivered: true, ...(updated ? { row: updated } : {}) };
+  }
+
+  if (newAttempts >= MAX_PERSISTENT_ATTEMPTS) {
+    const [updated] = await db
+      .update(failedEmailsTable)
+      .set({ status: "failed", attempts: newAttempts, lastError: "Max persistent retry attempts exhausted" })
+      .where(eq(failedEmailsTable.id, row.id))
+      .returning();
+    logger.error(
+      { id: row.id, to: row.to, subject: row.subject, attempts: newAttempts },
+      "Email queue retry: manual retry exhausted max attempts",
+    );
+    return { found: true, delivered: false, ...(updated ? { row: updated } : {}) };
+  }
+
+  const delayMs = nextRetryDelay(newAttempts);
+  const nextRetryAt = new Date(Date.now() + delayMs);
+  const [updated] = await db
+    .update(failedEmailsTable)
+    .set({ attempts: newAttempts, nextRetryAt, lastError: "Manual retry attempt failed" })
+    .where(eq(failedEmailsTable.id, row.id))
+    .returning();
+  logger.warn(
+    { id: row.id, to: row.to, subject: row.subject, attempts: newAttempts, nextRetryAt },
+    "Email queue retry: manual retry failed, rescheduled",
+  );
+  return { found: true, delivered: false, ...(updated ? { row: updated } : {}) };
 }

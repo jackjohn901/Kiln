@@ -3,12 +3,13 @@ import {
   db, reportsTable, verificationApplicationsTable, profilesTable,
   postsTable, followsTable, likesTable, ordersTable,
   commissionsTable, workshopsTable, workshopBookingsTable, usersTable,
-  notificationsTable,
+  notificationsTable, failedEmailsTable,
 } from "@workspace/db";
 import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker, getSeedHistory } from "../lib/seed";
 import { sendEmail, broadcastEmail } from "../lib/email";
+import { retryFailedEmail } from "../lib/emailQueue";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -591,6 +592,101 @@ router.post("/admin/broadcast-email", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.broadcastEmail error");
     res.status(500).json({ error: "Failed to send broadcast email" });
+  }
+});
+
+// GET /admin/failed-emails?status=pending|delivered|failed|all
+// Lists rows from the email retry queue so admins can investigate stuck deliveries.
+router.get("/admin/failed-emails", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const status = String(req.query["status"] ?? "pending");
+  const validStatuses = ["pending", "delivered", "failed", "all"];
+  if (!validStatuses.includes(status)) {
+    res.status(400).json({ error: "status must be one of: " + validStatuses.join(", ") });
+    return;
+  }
+  const limit = Math.min(Number(req.query["limit"] ?? 100), 500);
+
+  try {
+    const rows = await db
+      .select()
+      .from(failedEmailsTable)
+      .where(status === "all" ? undefined : eq(failedEmailsTable.status, status))
+      .orderBy(desc(failedEmailsTable.createdAt))
+      .limit(limit);
+
+    // Aggregate counts per status so the UI can show queue totals at a glance.
+    const countRows = await db
+      .select({ status: failedEmailsTable.status, count: sql<number>`count(*)::int` })
+      .from(failedEmailsTable)
+      .groupBy(failedEmailsTable.status);
+
+    const counts = { pending: 0, delivered: 0, failed: 0 } as Record<string, number>;
+    for (const c of countRows) counts[c.status] = c.count;
+
+    res.json({
+      counts,
+      emails: rows.map((r) => ({
+        id: r.id,
+        to: r.to,
+        from: r.from,
+        subject: r.subject,
+        contextId: r.contextId,
+        label: r.label,
+        attempts: r.attempts,
+        lastError: r.lastError,
+        status: r.status,
+        nextRetryAt: r.nextRetryAt.toISOString(),
+        deliveredAt: r.deliveredAt ? r.deliveredAt.toISOString() : null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin.getFailedEmails error");
+    res.status(500).json({ error: "Failed to fetch failed emails" });
+  }
+});
+
+// POST /admin/failed-emails/:id/retry — force an immediate delivery attempt for one row
+router.post("/admin/failed-emails/:id/retry", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid email id" });
+    return;
+  }
+
+  try {
+    const result = await retryFailedEmail(id);
+    if (!result.found) { res.status(404).json({ error: "Email not found" }); return; }
+
+    const r = result.row;
+    res.json({
+      delivered: result.delivered,
+      email: r
+        ? {
+            id: r.id,
+            to: r.to,
+            from: r.from,
+            subject: r.subject,
+            contextId: r.contextId,
+            label: r.label,
+            attempts: r.attempts,
+            lastError: r.lastError,
+            status: r.status,
+            nextRetryAt: r.nextRetryAt.toISOString(),
+            deliveredAt: r.deliveredAt ? r.deliveredAt.toISOString() : null,
+            createdAt: r.createdAt.toISOString(),
+          }
+        : null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin.retryFailedEmail error");
+    res.status(500).json({ error: "Failed to retry email" });
   }
 });
 
