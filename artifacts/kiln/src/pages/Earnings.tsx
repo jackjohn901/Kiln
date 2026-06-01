@@ -10,6 +10,7 @@ import {
 
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useSettings } from "@/contexts/SettingsContext";
+import { readPaymentSettings } from "@/utils/paymentSettings";
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -234,6 +235,21 @@ export default function Earnings() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMonthPicker]);
+
+  // Delivery-estimate callout
+  const [deliveryCalloutDismissed, setDeliveryCalloutDismissed] = useState(() => {
+    try { return localStorage.getItem("kiln:earnings:deliveryCalloutDismissed") === "1"; } catch { return false; }
+  });
+  const [paymentSettingsSnap] = useState(() => readPaymentSettings());
+  const missingDeliveryEstimate =
+    !deliveryCalloutDismissed &&
+    !paymentSettingsSnap.processingWindow &&
+    !(paymentSettingsSnap.processingWindowLabel?.trim());
+
+  function dismissDeliveryCallout() {
+    try { localStorage.setItem("kiln:earnings:deliveryCalloutDismissed", "1"); } catch {}
+    setDeliveryCalloutDismissed(true);
+  }
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
   const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, salesByType: { listings: 0, drops: 0, commissions: 0, workshops: 0 }, total: 0 });
@@ -754,6 +770,31 @@ export default function Earnings() {
               <button
                 onClick={dismissBanner}
                 className="shrink-0 rounded-full p-1 text-amber-500/40 hover:text-amber-400 transition-colors"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Delivery estimate callout */}
+        {missingDeliveryEstimate && (
+          <div className="mb-4 rounded-xl border border-stone-600/40 bg-stone-800/60 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <Clock size={16} className="shrink-0 text-amber-400 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-stone-200">Set your delivery estimate</p>
+                <p className="text-xs text-stone-400 mt-0.5">Buyers see a generic default right now. Add a processing window so they know when to expect their order.</p>
+              </div>
+              <Link
+                href="/settings?section=payments"
+                className="shrink-0 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+              >
+                Set estimate
+              </Link>
+              <button
+                onClick={dismissDeliveryCallout}
+                className="shrink-0 rounded-full p-1 text-stone-600 hover:text-stone-400 transition-colors"
               >
                 <X size={13} />
               </button>
