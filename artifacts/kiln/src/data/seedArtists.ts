@@ -302,8 +302,8 @@ export const seedArtists: Artist[] = [
     collections: ["New Mexico Museum of Art", "Heard Museum, Phoenix", "Oaxacan State Museum of Art"],
     videos: [
       { id: "KRamQuxIN7I", title: "Rafael Santos — Building the Wax Model" },
-      { id: "mTgjZe8O3bY", title: "Pour Day: Molten Bronze at 2000°F" },
-      { id: "BTsxMcNbNNk", title: "Chasing and Patina: Final Finish" },
+      { id: "7xZfRTsNBos", title: "Pour Day: Molten Bronze at 2000°F" },
+      { id: "nYorOV7sOW4", title: "Chasing and Patina: Final Finish" },
     ],
     images: [
       { url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&h=1000&fit=crop&seed=rafael-santos-1", caption: "Desert Saint No. 4" },
@@ -336,9 +336,9 @@ export const seedArtists: Artist[] = [
     ],
     collections: ["Brooklyn Museum", "Museum of Arts and Design, New York", "Muzeum Tatrzańskie, Zakopane"],
     videos: [
-      { id: "Z2ym1JmRHUI", title: "Anna Kowalski — Wet Felting: First Layer" },
-      { id: "z8_CVRiCjfY", title: "Needle Felting: Building Density" },
-      { id: "YphCOb5XT0A", title: "Górale No. 8: Complete Process" },
+      { id: "luU1mlCZc8U", title: "Anna Kowalski — Wet Felting: First Layer" },
+      { id: "7qt8-5Vx1HA", title: "Needle Felting: Building Density" },
+      { id: "lvOjWStv_Q0", title: "Górale No. 8: Complete Process" },
     ],
     images: [
       { url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&h=1200&fit=crop&seed=anna-kowalski-1", caption: "Flock installation (detail)" },
@@ -408,7 +408,7 @@ export const seedArtists: Artist[] = [
     videos: [
       { id: "Chqo2VIKhHA", title: "Yuki Nakamura — Throwing Thin Walls" },
       { id: "lvOjWStv_Q0", title: "Wood Firing: The Mountain Kiln" },
-      { id: "knlD4-jWANE", title: "Celadon Glaze: Mixing and Application" },
+      { id: "rgohJBBto-U", title: "Celadon Glaze: Mixing and Application" },
     ],
     images: [
       { url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=900&fit=crop&seed=yuki-nakamura-1", caption: "Mountain Water No. 14" },
@@ -688,7 +688,7 @@ export const seedArtists: Artist[] = [
     videos: [
       { id: "Bzs_Jc9tgeo", title: "Nadia Volkov — Plique-à-Jour: Building the Cells" },
       { id: "KRamQuxIN7I", title: "Enamel Fill: One Cell at a Time" },
-      { id: "mTgjZe8O3bY", title: "Kiln Firing: The Moment of Truth" },
+      { id: "7xZfRTsNBos", title: "Kiln Firing: The Moment of Truth" },
     ],
     images: [
       { url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=900&fit=crop&seed=nadia-volkov-1", caption: "Bohemian Forest: Fern pendant" },
@@ -721,9 +721,9 @@ export const seedArtists: Artist[] = [
     ],
     collections: ["Renwick Gallery", "Arkansas Arts Center", "Arrowmont School Collection"],
     videos: [
-      { id: "BTsxMcNbNNk", title: "Leo Adkins — Turning Thin: Can You Hear the Wall?" },
-      { id: "Z2ym1JmRHUI", title: "Burl Discovery: Opening an Unknown Log" },
-      { id: "z8_CVRiCjfY", title: "Vermont Burl No. 14: Complete Turn" },
+      { id: "nYorOV7sOW4", title: "Leo Adkins — Turning Thin: Can You Hear the Wall?" },
+      { id: "luU1mlCZc8U", title: "Burl Discovery: Opening an Unknown Log" },
+      { id: "7qt8-5Vx1HA", title: "Vermont Burl No. 14: Complete Turn" },
     ],
     images: [
       { url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=900&fit=crop&seed=leo-adkins-1", caption: "Vermont Burl No. 14" },
@@ -756,7 +756,7 @@ export const seedArtists: Artist[] = [
     ],
     collections: ["Museo Nazionale del Bargello", "Museo della Ceramica, Faenza", "Galleria Continua"],
     videos: [
-      { id: "YphCOb5XT0A", title: "Chiara Ricci — Building the Armature" },
+      { id: "lvOjWStv_Q0", title: "Chiara Ricci — Building the Armature" },
       { id: "3Kfj7BvzuZw", title: "Votive No. 9: Coiling to Scale" },
       { id: "qSGKEfFDU_E", title: "Kiln Loading: Large-Scale Bisque Fire" },
     ],

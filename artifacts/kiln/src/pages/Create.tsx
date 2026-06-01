@@ -645,7 +645,7 @@ export default function Create() {
 
             {/* Sell this piece — posts don't go in the shop, so make selling discoverable */}
             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2.5">
-              <p className="text-xs text-stone-400 text-center">Want to sell this piece? A post shares your process — list it or auction it to sell.</p>
+              <p className="text-xs text-stone-400 text-center">Want to sell this piece? A post shares your process — list it or auction it to sell. <button type="button" onClick={() => navigate("/selling")} className="text-amber-400 hover:text-amber-300 underline underline-offset-2">How selling works</button></p>
               <div className="flex gap-2">
                 <button
                   onClick={() => navigate("/create-listing")}
@@ -1144,6 +1144,35 @@ export default function Create() {
               </div>
             )}
 
+            {/* Tips to get seen — coach the behaviors the feed rewards */}
+            {showRankTips && (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Flame size={13} className="text-amber-400" />
+                    <p className="text-xs font-semibold text-amber-200">Tips to get seen</p>
+                  </div>
+                  <button onClick={dismissRankTips} className="text-stone-500 hover:text-stone-300" aria-label="Dismiss tips">
+                    <X size={13} />
+                  </button>
+                </div>
+                <ul className="space-y-1.5">
+                  <li className="flex items-start gap-2 text-[11px] text-stone-400">
+                    <MessageCircle size={12} className="mt-0.5 shrink-0 text-amber-400/80" />
+                    <span><span className="font-medium text-stone-300">Ask a question</span> in your caption — comments boost your ranking the most.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-stone-400">
+                    <Bookmark size={12} className="mt-0.5 shrink-0 text-amber-400/80" />
+                    <span><span className="font-medium text-stone-300">Make it save-worthy</span> — a strong first frame keeps people coming back.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-stone-400">
+                    <Tag size={12} className="mt-0.5 shrink-0 text-amber-400/80" />
+                    <span><span className="font-medium text-stone-300">Tag your craft</span> — it surfaces your work to the right people.</span>
+                  </li>
+                </ul>
+              </div>
+            )}
+
             {/* Caption */}
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
@@ -1191,35 +1220,6 @@ export default function Create() {
                 </div>
               )}
             </div>
-
-            {/* Tips to get seen — coach the behaviors the feed rewards */}
-            {showRankTips && (
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Flame size={13} className="text-amber-400" />
-                    <p className="text-xs font-semibold text-amber-200">Tips to get seen</p>
-                  </div>
-                  <button onClick={dismissRankTips} className="text-stone-500 hover:text-stone-300" aria-label="Dismiss tips">
-                    <X size={13} />
-                  </button>
-                </div>
-                <ul className="space-y-1.5">
-                  <li className="flex items-start gap-2 text-[11px] text-stone-400">
-                    <MessageCircle size={12} className="mt-0.5 shrink-0 text-amber-400/80" />
-                    <span><span className="font-medium text-stone-300">Ask a question</span> in your caption — comments boost your ranking the most.</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[11px] text-stone-400">
-                    <Bookmark size={12} className="mt-0.5 shrink-0 text-amber-400/80" />
-                    <span><span className="font-medium text-stone-300">Make it save-worthy</span> — a strong first frame keeps people coming back.</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[11px] text-stone-400">
-                    <Tag size={12} className="mt-0.5 shrink-0 text-amber-400/80" />
-                    <span><span className="font-medium text-stone-300">Tag your craft</span> — it surfaces your work to the right people.</span>
-                  </li>
-                </ul>
-              </div>
-            )}
 
             {postType === "post" && <>
             {/* Process stage */}

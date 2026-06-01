@@ -76,7 +76,7 @@ export default function ResaleMarket() {
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">
       <Nav />
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-28 md:pb-8">
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">

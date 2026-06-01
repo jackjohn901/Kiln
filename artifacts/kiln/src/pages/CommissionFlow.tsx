@@ -221,8 +221,8 @@ export default function CommissionFlow() {
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <button onClick={() => navigate(-1 as never)} className="mb-6 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors">
+      <div className="mx-auto max-w-4xl px-4 py-8 pb-28 md:pb-8">
+        <button onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/"))} className="mb-6 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors">
           <ArrowLeft size={14} /> Back
         </button>
 

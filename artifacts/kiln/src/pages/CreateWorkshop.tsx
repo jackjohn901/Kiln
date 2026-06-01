@@ -146,9 +146,9 @@ export default function CreateWorkshop() {
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
-      <div className="mx-auto max-w-xl px-4 py-10">
+      <div className="mx-auto max-w-xl px-4 py-10 pb-28 md:pb-10">
         <button
-          onClick={() => navigate(-1 as never)}
+          onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/workshops"))}
           className="mb-6 flex items-center gap-1 text-sm text-stone-500 hover:text-amber-300 transition-colors"
         >
           <ChevronLeft size={16} /> Back

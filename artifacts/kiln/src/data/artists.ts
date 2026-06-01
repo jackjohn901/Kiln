@@ -107,7 +107,7 @@ export const artists: Artist[] = [
       { id: "luU1mlCZc8U", title: "Glass Masters at Work: Lino Tagliapietra" },
       { id: "7qt8-5Vx1HA", title: "Large Blown Glass Piece Shatters — Rare Lino Tagliapietra Footage" },
       { id: "sWcwdlTqk2I", title: "Celebrating Lino Tagliapietra | The Maestro's Last Demonstration at The Museum" },
-      { id: "knlD4-jWANE", title: "Lino Tagliapietra — Artist Profile" },
+      { id: "rgohJBBto-U", title: "Lino Tagliapietra — Artist Profile" },
     ],
     images: [
       { url: "https://www.linotagliapietra.com/sites/default/files/styles/video_teaser/public/images/showrooms/lino-bio-1.jpg", caption: "Lino shaping a piece at the Museum of Glass, February 2020" },
@@ -391,9 +391,9 @@ export const artists: Artist[] = [
       "200+ museum collections worldwide",
     ],
     videos: [
-      { id: "mTgjZe8O3bY", title: "Chihuly — A Life in Glass" },
-      { id: "BTsxMcNbNNk", title: "Dale Chihuly — Glass Artist Documentary" },
-      { id: "Z2ym1JmRHUI", title: "Chihuly at the V&A" },
+      { id: "7xZfRTsNBos", title: "Chihuly — A Life in Glass" },
+      { id: "nYorOV7sOW4", title: "Dale Chihuly — Glass Artist Documentary" },
+      { id: "luU1mlCZc8U", title: "Chihuly at the V&A" },
     ],
     images: [
       { url: "https://www.chihuly.com/sites/default/files/images/M14120s5_01_nw-1600-3.jpg", caption: "Indigo Gold Leaf Seaform Set with Midnight Lip Wraps, 2014" },
@@ -433,8 +433,8 @@ export const artists: Artist[] = [
       "Victoria & Albert Museum, London",
     ],
     videos: [
-      { id: "z8_CVRiCjfY", title: "Toots Zynsky — Filet de Verre Technique" },
-      { id: "YphCOb5XT0A", title: "Toots Zynsky — Artist Profile" },
+      { id: "7qt8-5Vx1HA", title: "Toots Zynsky — Filet de Verre Technique" },
+      { id: "lvOjWStv_Q0", title: "Toots Zynsky — Artist Profile" },
     ],
     images: [
       { url: "https://d3zr9vspdnjxi.cloudfront.net/sites/tootszy1/sm/10665383_transformations-banner.jpg?6ec942d316ddfbdd57be039fa1ba408f", caption: "Transformations series" },

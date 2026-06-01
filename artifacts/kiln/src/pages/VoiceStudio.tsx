@@ -122,7 +122,7 @@ export default function VoiceStudio() {
 
         <div className="mb-6 flex items-center gap-3">
           <button
-            onClick={() => navigate(-1 as never)}
+            onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/create"))}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors"
           >
             <ChevronLeft size={16} />

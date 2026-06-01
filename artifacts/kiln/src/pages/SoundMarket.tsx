@@ -364,7 +364,7 @@ export default function SoundMarket() {
       {/* ── Header ── */}
       <div className="sticky top-0 z-20 border-b border-white/5 bg-stone-950/95 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => setLocation(-1 as never)} className="text-stone-400 hover:text-stone-200 transition-colors">
+          <button onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/"))} className="text-stone-400 hover:text-stone-200 transition-colors">
             <ChevronLeft size={22} />
           </button>
           <div className="flex items-center gap-2 flex-1">

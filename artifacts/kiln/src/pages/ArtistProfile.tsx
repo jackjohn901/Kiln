@@ -762,7 +762,7 @@ export default function ArtistProfile() {
       <div className="min-h-screen bg-[#12100e]">
         <Nav />
         <div className="mx-auto max-w-4xl px-4 py-6">
-          <button onClick={() => navigate(-1 as never)} className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors">
+          <button onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/discover"))} className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors">
             <ChevronLeft size={15} /> Back
           </button>
 

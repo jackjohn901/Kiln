@@ -1763,8 +1763,8 @@ export default function Feed() {
       ) : (
         <div
           ref={containerRef}
-          className="h-full overflow-y-scroll snap-y snap-mandatory"
-          style={{ scrollbarWidth: "none" }}
+          className="h-full overflow-y-scroll snap-y snap-mandatory overscroll-y-contain"
+          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
           onClick={() => { if (!musicUnlocked) unlockMusic(); }}
         >
           {reels.map((reel, i) => (

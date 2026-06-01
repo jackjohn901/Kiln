@@ -172,7 +172,7 @@ export default function PostDetail() {
         <Nav />
         <div className="mx-auto max-w-5xl px-4 py-6">
           <button
-            onClick={() => navigate(-1 as never)}
+            onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/"))}
             className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors"
           >
             <ArrowLeft size={15} /> Back
@@ -363,7 +363,7 @@ export default function PostDetail() {
       <Nav />
       <div className="mx-auto max-w-5xl px-4 py-6">
         <button
-          onClick={() => navigate(-1 as never)}
+          onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/"))}
           className="mb-4 flex items-center gap-1.5 text-sm text-stone-500 hover:text-amber-300 transition-colors"
         >
           <ArrowLeft size={15} /> Back

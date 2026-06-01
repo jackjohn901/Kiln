@@ -158,6 +158,7 @@ import MyProjects from "@/pages/MyProjects";
 import ReserveList from "@/pages/ReserveList";
 import StudioOpenDays from "@/pages/StudioOpenDays";
 import CreateStudioEvent from "@/pages/CreateStudioEvent";
+import SellingGuide from "@/pages/SellingGuide";
 import PushPrompt from "@/components/PushPrompt";
 import OnboardingModal from "@/components/OnboardingModal";
 import SaleNotificationListener from "@/components/SaleNotificationListener";
@@ -465,6 +466,7 @@ function Router() {
       <Route path="/artists/:id/reserve" component={ReserveList} />
       <Route path="/studio-open-days" component={StudioOpenDays} />
       <Route path="/create-studio-event" component={CreateStudioEvent} />
+      <Route path="/selling" component={SellingGuide} />
       <Route component={NotFound} />
       </Switch>
       <PushPrompt />

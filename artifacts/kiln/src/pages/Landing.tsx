@@ -77,6 +77,12 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-3">
             <Link
+              href="/?skipLanding=true"
+              className="text-sm font-medium text-stone-300 hover:text-amber-300 transition-colors"
+            >
+              Explore
+            </Link>
+            <Link
               href="/setup"
               className="rounded-full bg-amber-500 px-4 py-1.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
             >
@@ -108,12 +114,12 @@ export default function Landing() {
           </Link>
           <Link
             href="/?skipLanding=true"
-            className="rounded-full border border-white/15 px-6 py-3 text-base font-medium text-stone-400 hover:border-amber-500/40 hover:text-stone-200 transition-colors"
+            className="rounded-full border border-amber-500/40 px-6 py-3 text-base font-medium text-amber-200 hover:border-amber-400 hover:text-amber-100 transition-colors"
           >
-            Explore works
+            Explore the feed — no account needed
           </Link>
         </div>
-        <p className="mt-4 text-xs text-stone-600">Free to join · No listing fees · Cancel anytime</p>
+        <p className="mt-4 text-xs text-stone-600">Look around first · Free to join · No listing fees · Cancel anytime</p>
       </section>
 
       {/* Discipline pills */}
@@ -272,6 +278,7 @@ export default function Landing() {
             <Link href="/privacy" className="hover:text-stone-400 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-stone-400 transition-colors">Terms</Link>
             <Link href="/help" className="hover:text-stone-400 transition-colors">Help</Link>
+            <Link href="/selling" className="hover:text-stone-400 transition-colors">Selling on Kiln</Link>
             <Link href="/techniques" className="hover:text-stone-400 transition-colors">Techniques</Link>
             <Link href="/opportunities" className="hover:text-stone-400 transition-colors">Opportunities</Link>
           </div>
