@@ -843,12 +843,20 @@ export default function ListingDetail() {
                     </Link>
                   </div>
                 </div>
-                {artist.location && (
-                  <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-white/5">
-                    <MapPin size={11} className="text-stone-600" />
-                    <span className="text-xs text-stone-600">{artist.location}</span>
-                  </div>
-                )}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                  {artist.location ? (
+                    <div className="flex items-center gap-1.5">
+                      <MapPin size={11} className="text-stone-600" />
+                      <span className="text-xs text-stone-600">{artist.location}</span>
+                    </div>
+                  ) : <span />}
+                  <button
+                    onClick={() => navigate(`/messages/${listing.artistId}?prefill=${encodeURIComponent(`Hi, I'm interested in "${listing.title}" — `)}`)}
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-stone-400 hover:border-amber-500/30 hover:text-amber-400 transition-all"
+                  >
+                    <MessageSquare size={11} /> Message artist
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>
