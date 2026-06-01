@@ -51,7 +51,7 @@ function getTimeLeft(endDate: string): string {
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
   const pad = (n: number) => String(n).padStart(2, "0");
-  if (d > 0) return `${d}d ${h}h ${pad(m)}m`;
+  if (d > 0) return `${d}d ${h}h ${pad(m)}m ${pad(s)}s`;
   if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
   return `${pad(m)}:${pad(s)}`;
 }
