@@ -10,6 +10,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker, getSeedHistory } from "../lib/seed";
 import { sendEmail, broadcastEmail } from "../lib/email";
 import { retryFailedEmail } from "../lib/emailQueue";
+import { getWebhookState } from "../lib/webhookState";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -690,7 +691,7 @@ router.post("/admin/failed-emails/:id/retry", async (req, res): Promise<void> =>
   }
 });
 
-// GET /admin/health — DB connectivity, API uptime, and seed marker status
+// GET /admin/health — DB connectivity, API uptime, seed marker status, and webhook state
 router.get("/admin/health", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -723,10 +724,14 @@ router.get("/admin/health", async (req, res): Promise<void> => {
     // non-fatal
   }
 
+  // Stripe webhook registration state
+  const webhookState = getWebhookState();
+
   res.json({
     db: { ok: dbOk, latencyMs: dbLatencyMs, error: dbError },
     api: { uptimeSeconds },
     seed: { markerPresent: seedMarkerPresent, markerUserId: seedMarkerUserId, codeMarkerId: seedCodeMarkerId },
+    webhook: webhookState,
     checkedAt: new Date().toISOString(),
   });
 });
