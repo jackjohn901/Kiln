@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import Nav from "@/components/Nav";
 
 interface Order {
@@ -13,6 +13,7 @@ interface Order {
   status: string;
   imageUrl: string | null;
   trackingNumber: string | null;
+  carrier: string | null;
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
   manualPayout: boolean;
@@ -21,6 +22,23 @@ interface Order {
   sellerDisplayName: string | null;
   sellerHandle: string | null;
   sellerAvatarUrl: string | null;
+}
+
+const CARRIER_LABELS: Record<string, string> = {
+  usps: "USPS",
+  ups: "UPS",
+  fedex: "FedEx",
+  dhl: "DHL",
+};
+
+function getTrackingUrl(carrier: string | null, trackingNumber: string): string | null {
+  switch (carrier?.toLowerCase()) {
+    case "usps":  return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(trackingNumber)}`;
+    case "ups":   return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+    case "fedex": return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+    case "dhl":   return `https://www.dhl.com/en/express/tracking.html?AWB=${encodeURIComponent(trackingNumber)}`;
+    default:      return null;
+  }
 }
 
 interface SellerProcessingWindow {
@@ -415,11 +433,34 @@ export default function Orders() {
                         </p>
                       );
                     })()}
-                    {primary.trackingNumber && (
-                      <p className="mt-1.5 text-[11px] text-stone-600">
-                        Tracking: <span className="text-stone-400 font-mono">{primary.trackingNumber}</span>
-                      </p>
-                    )}
+                    {primary.trackingNumber && (() => {
+                      const url = getTrackingUrl(primary.carrier, primary.trackingNumber);
+                      const carrierLabel = primary.carrier ? (CARRIER_LABELS[primary.carrier.toLowerCase()] ?? primary.carrier.toUpperCase()) : null;
+                      const chip = (
+                        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 font-medium">
+                          <Truck size={10} />
+                          {carrierLabel ? `Track via ${carrierLabel}` : "Track package"}
+                          {url && <ExternalLink size={9} className="opacity-70" />}
+                        </span>
+                      );
+                      return (
+                        <div className="mt-1.5" onClick={e => e.preventDefault()}>
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex hover:opacity-80 transition-opacity"
+                            >
+                              {chip}
+                            </a>
+                          ) : (
+                            chip
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 {isManualGroup && <ManualReceiptSection orders={groupOrders} />}
