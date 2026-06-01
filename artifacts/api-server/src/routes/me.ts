@@ -133,6 +133,7 @@ router.get("/me/orders/cart/:sessionKey", async (req, res): Promise<void> => {
       processingWindowDays: ordersTable.processingWindowDays,
       processingWindowLabel: ordersTable.processingWindowLabel,
       manualPayout: ordersTable.manualPayout,
+      addressLocked: ordersTable.addressLocked,
       createdAt: ordersTable.createdAt,
       updatedAt: ordersTable.updatedAt,
     } as const;
@@ -233,6 +234,7 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
       processingWindowDays: ordersTable.processingWindowDays,
       processingWindowLabel: ordersTable.processingWindowLabel,
       manualPayout: ordersTable.manualPayout,
+      addressLocked: ordersTable.addressLocked,
       createdAt: ordersTable.createdAt,
       updatedAt: ordersTable.updatedAt,
     } as const;
@@ -355,7 +357,7 @@ router.patch("/me/orders/:id/shipping-address", async (req, res): Promise<void> 
 
   try {
     const rows = await db
-      .select({ id: ordersTable.id, buyerId: ordersTable.buyerId, sellerId: ordersTable.sellerId, status: ordersTable.status, title: ordersTable.title })
+      .select({ id: ordersTable.id, buyerId: ordersTable.buyerId, sellerId: ordersTable.sellerId, status: ordersTable.status, title: ordersTable.title, addressLocked: ordersTable.addressLocked })
       .from(ordersTable)
       .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.buyerId, req.user.id)))
       .limit(1);
@@ -366,6 +368,9 @@ router.patch("/me/orders/:id/shipping-address", async (req, res): Promise<void> 
     const EDITABLE_STATUSES = ["pending", "in_progress", "confirmed"];
     if (!EDITABLE_STATUSES.includes(order.status)) {
       res.status(409).json({ error: "Shipping address cannot be changed once the order has shipped" }); return;
+    }
+    if (order.addressLocked) {
+      res.status(409).json({ error: "The seller has locked the shipping address for this order" }); return;
     }
 
     await db

@@ -20,6 +20,7 @@ export const ordersTable = pgTable("orders", {
   processingWindowDays: integer("processing_window_days"),
   processingWindowLabel: text("processing_window_label"),
   manualPayout: boolean("manual_payout").notNull().default(false),
+  addressLocked: boolean("address_locked").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  DollarSign, Send, Printer, Download,
+  DollarSign, Send, Printer, Download, Lock,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
@@ -25,6 +25,7 @@ interface Sale {
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
   manualPayout: boolean;
+  addressLocked: boolean;
   quantity: number;
   createdAt: string;
   updatedAt: string;
@@ -105,6 +106,7 @@ export default function SaleDetail() {
   const [trackingInput, setTrackingInput] = useState("");
   const [carrierInput, setCarrierInput] = useState("");
   const [showTrackingInput, setShowTrackingInput] = useState(false);
+  const [lockingAddress, setLockingAddress] = useState(false);
 
   useEffect(() => {
     if (id) markLinkRead(`/sales/${id}`);
@@ -145,6 +147,28 @@ export default function SaleDetail() {
       setUpdateError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function handleLockAddress() {
+    if (!sale) return;
+    setUpdateError(null);
+    setLockingAddress(true);
+    try {
+      const res = await fetch(`/api/me/sales/${encodeURIComponent(sale.id)}/lock-address`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setUpdateError((data as { error?: string }).error ?? "Failed to lock address");
+      } else {
+        setSale(s => s ? { ...s, addressLocked: true } : s);
+      }
+    } catch {
+      setUpdateError("Network error — please try again.");
+    } finally {
+      setLockingAddress(false);
     }
   }
 
@@ -678,6 +702,24 @@ export default function SaleDetail() {
                   {updating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   Mark as Delivered
                 </button>
+              )}
+
+              {sale.shippingAddress && !sale.addressLocked && ["pending", "confirmed", "in_progress"].includes(sale.status) && (
+                <button
+                  onClick={handleLockAddress}
+                  disabled={lockingAddress || updating}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/8 px-4 py-2.5 text-sm text-stone-400 hover:text-amber-300 hover:border-amber-500/30 transition-colors disabled:opacity-50"
+                >
+                  {lockingAddress ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                  Lock shipping address
+                </button>
+              )}
+
+              {sale.addressLocked && (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/8 px-4 py-2.5">
+                  <Lock size={13} className="text-amber-400 shrink-0" />
+                  <p className="text-xs text-amber-300">Shipping address is locked — buyer cannot edit it</p>
+                </div>
               )}
 
               {canUpdateTracking && !showTrackingInput && (

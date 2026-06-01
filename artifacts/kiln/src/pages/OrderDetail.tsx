@@ -3,7 +3,7 @@ import { Link, useLocation, useParams, useSearch } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn,
+  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn, Lock,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
@@ -33,6 +33,7 @@ interface Order {
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
   manualPayout: boolean;
+  addressLocked: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -351,7 +352,7 @@ export default function OrderDetail() {
   const shipsWithinText = `Ships ${deliveryEstimateText}`;
 
   const isActive = !["delivered", "cancelled"].includes(order.status);
-  const canEditAddress = ["pending", "in_progress", "confirmed"].includes(order.status) && !sessionKey;
+  const canEditAddress = ["pending", "in_progress", "confirmed"].includes(order.status) && !sessionKey && !order.addressLocked;
 
   const isCartOrder = siblingOrders.length > 1;
 
@@ -963,7 +964,12 @@ export default function OrderDetail() {
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Ship to</p>
-              {canEditAddress && !editingAddress && (
+              {order.addressLocked ? (
+                <span className="flex items-center gap-1 text-xs text-amber-500/80">
+                  <Lock size={10} />
+                  Locked by seller
+                </span>
+              ) : canEditAddress && !editingAddress ? (
                 <button
                   onClick={() => {
                     setAddressDraft(order.shippingAddress ?? "");
@@ -975,7 +981,7 @@ export default function OrderDetail() {
                   <Pencil size={11} />
                   Edit
                 </button>
-              )}
+              ) : null}
             </div>
             {editingAddress ? (
               <div className="space-y-2">

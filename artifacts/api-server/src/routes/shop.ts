@@ -253,6 +253,7 @@ router.get("/me/sales/:id", async (req, res): Promise<void> => {
         processingWindowDays: ordersTable.processingWindowDays,
         processingWindowLabel: ordersTable.processingWindowLabel,
         manualPayout: ordersTable.manualPayout,
+        addressLocked: ordersTable.addressLocked,
         quantity: ordersTable.quantity,
         createdAt: ordersTable.createdAt,
         updatedAt: ordersTable.updatedAt,
@@ -462,6 +463,35 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "me/sales/:id PATCH error");
     res.status(500).json({ error: "Failed to update sale" });
+  }
+});
+
+// PATCH /me/sales/:id/lock-address — seller locks the shipping address to prevent buyer edits
+router.patch("/me/sales/:id/lock-address", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [existing] = await db
+      .select({ id: ordersTable.id, sellerId: ordersTable.sellerId, status: ordersTable.status, addressLocked: ordersTable.addressLocked })
+      .from(ordersTable)
+      .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.sellerId, req.user.id)))
+      .limit(1);
+
+    if (!existing) { res.status(404).json({ error: "Sale not found" }); return; }
+
+    const LOCKABLE_STATUSES = ["pending", "confirmed", "in_progress"];
+    if (!LOCKABLE_STATUSES.includes(existing.status)) {
+      res.status(409).json({ error: "Address can only be locked while the order is pending or in progress" }); return;
+    }
+
+    await db
+      .update(ordersTable)
+      .set({ addressLocked: true })
+      .where(eq(ordersTable.id, existing.id));
+
+    res.json({ ok: true, addressLocked: true });
+  } catch (err) {
+    req.log.error({ err }, "me/sales/:id/lock-address PATCH error");
+    res.status(500).json({ error: "Failed to lock address" });
   }
 });
 
