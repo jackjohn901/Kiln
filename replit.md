@@ -79,7 +79,8 @@ All seed data uses IDs prefixed `seed-`:
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- User is non-technical — explain things plainly, avoid jargon.
+- Always prompt the user to republish when a chunk of work is finished (they want a clear "good time to publish now" nudge each time, since edits only reach the live site on republish).
 
 ## Pointers
 
