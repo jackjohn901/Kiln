@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable, cartItemsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
 import { sendEmailWithRetry, shippingNotificationEmail, deliveryNotificationEmail, trackingUpdateEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
@@ -108,6 +108,11 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);
   if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
   const [updated] = await db.update(listingsTable).set(updates).where(eq(listingsTable.id, req.params.id)).returning();
+  // If the listing is no longer purchasable, drop it from everyone's server-side cart.
+  if (updated.isSold || !updated.isAvailable) {
+    db.delete(cartItemsTable).where(eq(cartItemsTable.listingId, updated.id))
+      .catch((err) => req.log.error({ err }, "cart cleanup on listing update failed"));
+  }
   res.json({ listing: { ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() } });
 });
 
@@ -136,6 +141,9 @@ router.delete("/listings/:id", async (req, res): Promise<void> => {
   const [listing] = await db.select({ artistId: listingsTable.artistId }).from(listingsTable).where(eq(listingsTable.id, req.params.id));
   if (!listing || listing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(listingsTable).where(eq(listingsTable.id, req.params.id));
+  // Drop the deleted listing from everyone's server-side cart so no ghost rows remain.
+  db.delete(cartItemsTable).where(eq(cartItemsTable.listingId, req.params.id))
+    .catch((err) => req.log.error({ err }, "cart cleanup on listing delete failed"));
   res.json({ success: true });
 });
 

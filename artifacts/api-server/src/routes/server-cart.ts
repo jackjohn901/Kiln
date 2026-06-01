@@ -1,17 +1,39 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { cartItemsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { cartItemsTable, listingsTable } from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
 import crypto from "crypto";
 
 const router = Router();
 
 // GET /me/cart
+// Returns the user's server-side cart, filtering out (and cleaning up) any rows
+// whose listing has been deleted or is no longer purchasable (sold/unavailable).
 router.get("/me/cart", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.json({ items: [] }); return; }
-  const items = await db.select().from(cartItemsTable)
+  const rows = await db
+    .select({
+      id: cartItemsTable.id,
+      listingId: cartItemsTable.listingId,
+      quantity: cartItemsTable.quantity,
+      isSold: listingsTable.isSold,
+      isAvailable: listingsTable.isAvailable,
+    })
+    .from(cartItemsTable)
+    .leftJoin(listingsTable, eq(cartItemsTable.listingId, listingsTable.id))
     .where(eq(cartItemsTable.userId, req.user.id));
-  res.json({ items });
+
+  const valid = rows.filter((r) => r.isAvailable === true && r.isSold === false);
+  const staleIds = rows.filter((r) => !(r.isAvailable === true && r.isSold === false)).map((r) => r.id);
+
+  // Best-effort cleanup of orphaned/unavailable rows so the cart self-heals.
+  if (staleIds.length > 0) {
+    db.delete(cartItemsTable)
+      .where(and(eq(cartItemsTable.userId, req.user.id), inArray(cartItemsTable.id, staleIds)))
+      .catch((err) => req.log.error({ err }, "me/cart cleanup error"));
+  }
+
+  res.json({ items: valid.map((r) => ({ id: r.id, listingId: r.listingId, quantity: r.quantity })) });
 });
 
 // POST /me/cart — add item
