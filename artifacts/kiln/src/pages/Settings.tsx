@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearch } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin, AlertCircle, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
@@ -52,7 +52,20 @@ type MobileTab = "All" | "Profile" | "Selling" | "Preferences";
 export default function Settings() {
   const { profile, logout } = useProfile();
   const { settings, settingsLoaded, updateSetting, patchSettings } = useSettings();
-  const { bannerDismissed, resetDismissal } = useStripeConnect();
+  const { status: stripeStatus, loading: stripeLoading, bannerDismissed, resetDismissal } = useStripeConnect();
+  const [connectingStripe, setConnectingStripe] = useState(false);
+
+  async function handleConnectStripe() {
+    setConnectingStripe(true);
+    try {
+      const r = await fetch("/api/me/stripe/connect", { method: "POST", credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const { url } = await r.json() as { url: string };
+      window.location.href = url;
+    } catch {
+      setConnectingStripe(false);
+    }
+  }
   const search = useSearch();
   const [section, setSection] = useState<Section | null>(() => {
     const params = new URLSearchParams(search);
@@ -948,6 +961,120 @@ export default function Settings() {
                   </button>
                 )}
               </div>
+
+              {/* Stripe Connect status panel */}
+              {stripeLoading ? (
+                <div className="flex justify-center py-2">
+                  <Loader2 size={15} className="animate-spin text-stone-600" />
+                </div>
+              ) : stripeStatus?.connected ? (
+                <div>
+                  {(() => {
+                    const isRestricted = !!stripeStatus.disabledReason;
+                    const deadline = stripeStatus.requirementsCurrentDeadline;
+                    const nowMs = Date.now();
+                    const deadlineMs = deadline != null ? deadline * 1000 : null;
+                    const isOverdue = deadlineMs != null && deadlineMs < nowMs;
+                    const isFutureDeadline = deadlineMs != null && deadlineMs >= nowMs;
+                    const daysRemaining = isFutureDeadline
+                      ? Math.ceil((deadlineMs! - nowMs) / 86400000)
+                      : null;
+                    const eventuallyDue = stripeStatus.requirementsEventuallyDue ?? 0;
+                    const pastDue = stripeStatus.requirementsPastDue ?? 0;
+                    const needsUrgentAction = isRestricted || isOverdue || pastDue > 0;
+                    const needsUpcomingAction = !needsUrgentAction && (isFutureDeadline || eventuallyDue > 0);
+                    const deadlineLabel = deadlineMs
+                      ? new Date(deadlineMs).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                      : null;
+
+                    return (
+                      <>
+                        {needsUrgentAction && (
+                          <div className="mb-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-rose-400" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-rose-300">
+                                  {isRestricted ? "Your Stripe account is restricted" : "Verification required"}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-rose-400/80">
+                                  {isRestricted
+                                    ? "Payouts are paused. Complete verification to restore access."
+                                    : `Action required${deadlineLabel ? ` by ${deadlineLabel}` : ""}. Complete verification to avoid interruptions.`}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleConnectStripe}
+                              disabled={connectingStripe}
+                              className="mt-2 flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-2.5 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/25 disabled:opacity-50 transition-colors"
+                            >
+                              {connectingStripe ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                              {connectingStripe ? "Redirecting…" : "Complete verification"}
+                            </button>
+                          </div>
+                        )}
+
+                        {needsUpcomingAction && (
+                          <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-amber-400" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-amber-300">
+                                  Action needed
+                                  {daysRemaining != null && ` — ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-amber-400/80">
+                                  {eventuallyDue > 0
+                                    ? `${eventuallyDue} verification item${eventuallyDue === 1 ? "" : "s"} due${deadlineLabel ? ` by ${deadlineLabel}` : ""}. Complete now to keep payouts running smoothly.`
+                                    : `Verification required by ${deadlineLabel}. Complete now to keep payouts running smoothly.`}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleConnectStripe}
+                              disabled={connectingStripe}
+                              className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-colors"
+                            >
+                              {connectingStripe ? <Loader2 size={11} className="animate-spin" /> : <ExternalLink size={11} />}
+                              {connectingStripe ? "Redirecting…" : "Complete verification"}
+                            </button>
+                          </div>
+                        )}
+
+                        {!needsUrgentAction && !needsUpcomingAction && (
+                          <div className="flex items-center gap-2 py-1.5">
+                            <CheckCircle size={14} className="text-emerald-400 shrink-0" />
+                            <div>
+                              <p className="text-xs text-stone-200">
+                                {stripeStatus.chargesEnabled ? "Connected & active" : "Connected — pending verification"}
+                              </p>
+                              {stripeStatus.status && (
+                                <p className="text-[10px] text-stone-600 capitalize">{stripeStatus.status}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {(needsUrgentAction || needsUpcomingAction) && (
+                          <div className="flex items-center gap-2 py-1">
+                            <AlertCircle size={14} className={needsUrgentAction ? "text-rose-400 shrink-0" : "text-amber-400 shrink-0"} />
+                            <p className="text-xs text-stone-300">
+                              {stripeStatus.chargesEnabled ? "Connected — action needed" : "Connected — pending verification"}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 py-1.5 text-xs text-stone-500">
+                  <AlertCircle size={14} className="shrink-0 text-stone-600" />
+                  <span>Not connected — <Link href="/earnings" className="text-indigo-400 hover:text-indigo-300 transition-colors">go to Earnings</Link> to connect Stripe.</span>
+                </div>
+              )}
+
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-1">How it works</p>
                 <p className="text-xs text-stone-500 leading-relaxed">
