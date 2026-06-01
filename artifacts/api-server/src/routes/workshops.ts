@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { workshopsTable, workshopBookingsTable, notificationsTable, usersTable, userSettingsTable, profilesTable } from "@workspace/db";
 import { eq, and, desc, sql, gte, isNull } from "drizzle-orm";
 import crypto from "crypto";
-import { sendEmail, workshopReminderEmail, workshopBookingEmail, newWorkshopBookingArtistEmail } from "../lib/email";
+import { sendEmailWithRetry, workshopReminderEmail, workshopBookingEmail, newWorkshopBookingArtistEmail } from "../lib/email";
 
 const router = Router();
 
@@ -113,7 +113,7 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
         ? w.startDate.toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })
         : "Date TBD";
       const html = workshopBookingEmail(w.title, w.artistName, startLabel, calParams, { isOnline: w.isOnline, location: w.location ?? null, meetingUrl: w.meetingUrl ?? null });
-      sendEmail({ to: user.email, subject: `Booking confirmed: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "workshopBookingEmail send failed"); });
+      sendEmailWithRetry({ to: user.email, subject: `Booking confirmed: "${w.title}"`, html }, { label: "workshop booking confirmation", contextId: w.id }).catch((err: unknown) => { req.log.error({ err }, "workshopBookingEmail send failed"); });
     }
 
     const [[artistUser], [artistSettings], [studentProfile]] = await Promise.all([
@@ -126,7 +126,7 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
     if (artistUser?.email && artistWantsEmail) {
       const studentName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "A student";
       const html = newWorkshopBookingArtistEmail(studentName, user.email ?? "", w.title, 0, calParams, studentProfile?.handle ?? null, userId);
-      sendEmail({ to: artistUser.email, subject: `New booking: "${w.title}"`, html }).catch((err: unknown) => { req.log.error({ err }, "newWorkshopBookingArtistEmail send failed"); });
+      sendEmailWithRetry({ to: artistUser.email, subject: `New booking: "${w.title}"`, html }, { label: "new workshop booking (artist)", contextId: w.id }).catch((err: unknown) => { req.log.error({ err }, "newWorkshopBookingArtistEmail send failed"); });
     }
 
     res.status(201).json({ booking: { ...booking, createdAt: booking.createdAt.toISOString() }, spotsLeft: w.maxSpots - w.spotsBooked - 1 });
@@ -239,11 +239,14 @@ router.post("/workshops/:id/reminders/send", async (req, res): Promise<void> => 
         : "Soon";
 
       const html = workshopReminderEmail(workshop.title, workshop.artistName, startLabel, workshop.id);
-      const ok = await sendEmail({
-        to: booking.userEmail,
-        subject: `Reminder: "${workshop.title}" is coming up`,
-        html,
-      });
+      const ok = await sendEmailWithRetry(
+        {
+          to: booking.userEmail,
+          subject: `Reminder: "${workshop.title}" is coming up`,
+          html,
+        },
+        { label: "workshop reminder", contextId: workshop.id },
+      );
 
       if (ok) {
         await db
