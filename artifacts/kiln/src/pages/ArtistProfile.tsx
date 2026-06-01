@@ -401,7 +401,16 @@ export default function ArtistProfile() {
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/users/${id}/profile`)
+    // Reset route-scoped state and abort in-flight fetches on id change/unmount so a
+    // slow response for a previously-viewed profile can't clobber the current route
+    // (storefrontArtistId is derived from dbProfile, so a stale profile would
+    // resolve listings/auctions to the wrong artist).
+    const ac = new AbortController();
+    setDbProfile(null);
+    setDbPosts([]);
+    setCollabPosts([]);
+    setDbProfileLoading(true);
+    fetch(`/api/users/${id}/profile`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data && data.userId) {
@@ -411,48 +420,80 @@ export default function ArtistProfile() {
         }
       })
       .catch(() => {})
-      .finally(() => setDbProfileLoading(false));
-    fetch(`/api/users/${id}/posts`)
+      .finally(() => { if (!ac.signal.aborted) setDbProfileLoading(false); });
+    fetch(`/api/users/${id}/posts`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : { posts: [] })
       .then((data) => setDbPosts(data.posts ?? []))
       .catch(() => {});
-    fetch(`/api/users/${id}/collab-posts`)
+    fetch(`/api/users/${id}/collab-posts`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : { posts: [] })
       .then((data) => setCollabPosts(data.posts ?? []))
       .catch(() => {});
-    fetch(`/api/users/${id}/streak`)
+    fetch(`/api/users/${id}/streak`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setProfileStreak(data); })
       .catch(() => {});
-    fetch(`/api/users/${id}/badges`)
+    fetch(`/api/users/${id}/badges`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.badges) setProfileBadges(data.badges); })
       .catch(() => {});
-    fetch(`/api/artists/${id}/reservations`)
+    fetch(`/api/artists/${id}/reservations`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : { reservations: [] })
       .then((data) => setHasReservations(data.reservations && data.reservations.length > 0))
       .catch(() => {});
-    fetch(`/api/artists/${id}/shipping`)
+    fetch(`/api/artists/${id}/shipping`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setShipping(data); })
       .catch(() => {});
-    fetch(`/api/listings?artistId=${encodeURIComponent(id ?? "")}&available=true&limit=100`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
-      .catch(() => {});
-    fetch(`/api/auctions?artistId=${encodeURIComponent(id ?? "")}`)
+    return () => ac.abort();
+  }, [id]);
+
+  // Storefront listings + auctions are keyed by the artist's REAL user id, but the
+  // URL param may be a handle (e.g. for real users handle !== user id). Resolve it:
+  // own profile -> our own id; others -> the id returned by the profile endpoint,
+  // falling back to the raw param (correct for seed artists where handle === id).
+  // Only trust dbProfile.userId once it belongs to the CURRENT route param — during
+  // a route transition the previous profile may still be in state, which would
+  // otherwise resolve to the wrong artist's listings/auctions.
+  const dbProfileMatchesRoute = !!dbProfile && (dbProfile.userId === id || dbProfile.handle === id);
+  const storefrontArtistId = isOwn
+    ? (profile?.id ?? id ?? "")
+    : (dbProfileMatchesRoute ? dbProfile!.userId : (id ?? ""));
+  useEffect(() => {
+    if (!storefrontArtistId) return;
+    // Reset so stale items from a previously-viewed artist never linger, and abort
+    // in-flight fetches on re-run/unmount so a late stale response can't clobber a
+    // newer one (e.g. a handle-keyed [] resolving after the resolved-id result, or
+    // the public fetch resolving after /me/listings when isOwn flips false->true).
+    const ac = new AbortController();
+    // Clear first so a previously-viewed artist's items never linger while the new
+    // ones load (the SPA reuses this component across /artists/:id navigations).
+    setApiAuctions([]);
+    setApiListings(null);
+    fetch(`/api/auctions?artistId=${encodeURIComponent(storefrontArtistId)}`, { signal: ac.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (Array.isArray(data?.auctions)) setApiAuctions(data.auctions); })
       .catch(() => {});
-  }, [id]);
+    // Own profile uses the authenticated /me/listings below (always accurate); skip
+    // the public fetch here so an empty handle-keyed result can't clobber it.
+    if (!isOwn) {
+      fetch(`/api/listings?artistId=${encodeURIComponent(storefrontArtistId)}&available=true&limit=100`, { signal: ac.signal })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
+        .catch(() => {});
+    }
+    return () => ac.abort();
+  }, [storefrontArtistId, isOwn]);
 
   // When viewing own profile, use the authenticated endpoint so listings always appear
   useEffect(() => {
     if (!isOwn) return;
-    fetch("/api/me/listings", { credentials: "include" })
+    const ac = new AbortController();
+    fetch("/api/me/listings", { credentials: "include", signal: ac.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
       .catch(() => {});
+    return () => ac.abort();
   }, [isOwn]);
 
   async function handleDbFollow() {
