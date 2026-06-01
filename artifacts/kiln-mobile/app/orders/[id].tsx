@@ -456,22 +456,63 @@ export default function OrderDetailScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          <Pressable
-            style={[styles.actionBtn, styles.actionBtnOutline, { borderColor: colors.border }]}
-            onPress={() =>
-              router.push({
-                pathname: "/chat/user/[userId]" as any,
-                params: {
-                  userId: order.sellerId,
-                  orderRef: order.title,
-                  orderId: order.id,
-                },
-              })
-            }
-          >
-            <Feather name="message-square" size={15} color={colors.foreground} />
-            <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Message artist</Text>
-          </Pressable>
+          {isCartOrder ? (() => {
+            const seen = new Set<string>();
+            const uniqueSellers = siblings.filter(s => {
+              if (seen.has(s.sellerId)) return false;
+              seen.add(s.sellerId);
+              return true;
+            });
+            return (
+              <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 0 }]}>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CONTACT ARTISTS</Text>
+                {uniqueSellers.map((seller, idx) => (
+                  <Pressable
+                    key={seller.sellerId}
+                    style={[
+                      styles.infoRow,
+                      { alignItems: "center" },
+                      idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 12, marginTop: 4 },
+                    ]}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/chat/user/[userId]" as any,
+                        params: {
+                          userId: seller.sellerId,
+                          orderRef: order.title,
+                          orderId: order.id,
+                        },
+                      })
+                    }
+                    hitSlop={4}
+                  >
+                    <Feather name="message-square" size={14} color={colors.primary} />
+                    <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, flex: 1, color: colors.foreground }}>
+                      {seller.sellerName ?? seller.sellerId}
+                    </Text>
+                    <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
+                  </Pressable>
+                ))}
+              </View>
+            );
+          })() : (
+            <Pressable
+              style={[styles.actionBtn, styles.actionBtnOutline, { borderColor: colors.border }]}
+              onPress={() =>
+                router.push({
+                  pathname: "/chat/user/[userId]" as any,
+                  params: {
+                    userId: order.sellerId,
+                    orderRef: order.title,
+                    orderId: order.id,
+                  },
+                })
+              }
+            >
+              <Feather name="message-square" size={15} color={colors.foreground} />
+              <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Message artist</Text>
+            </Pressable>
+          )}
           <Pressable
             style={[styles.actionBtn, { backgroundColor: colors.secondary }]}
             onPress={() => router.push("/orders" as any)}

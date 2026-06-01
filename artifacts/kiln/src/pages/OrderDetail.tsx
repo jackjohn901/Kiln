@@ -24,6 +24,8 @@ interface Order {
   currency: string;
   status: string;
   sellerId: string;
+  sellerName?: string | null;
+  sellerHandle?: string | null;
   shippingAddress: string | null;
   trackingNumber: string | null;
   notes: string | null;
@@ -1097,17 +1099,45 @@ export default function OrderDetail() {
         {order.status === "delivered" && <ReviewForm order={order} />}
 
         <div className="mt-6 space-y-3">
-          <button
-            onClick={() => {
-              const prefill = encodeURIComponent(`Re: ${order.title} (${ordinalId(order.id)})`);
-              const sellerRef = sellerProfile?.handle ?? order.sellerId;
-              navigate(`/messages/${sellerRef}?prefill=${prefill}&orderId=${order.id}`);
-            }}
-            className="w-full flex items-center justify-center gap-2 rounded-full bg-stone-800 border border-white/10 py-2.5 text-sm text-stone-200 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
-          >
-            <MessageSquare size={15} />
-            Message artist
-          </button>
+          {isCartOrder ? (() => {
+            const seen = new Set<string>();
+            const uniqueSellers = siblingOrders.filter(s => {
+              if (seen.has(s.sellerId)) return false;
+              seen.add(s.sellerId);
+              return true;
+            });
+            return (
+              <div className="space-y-2">
+                {uniqueSellers.map(seller => {
+                  const label = seller.sellerName?.trim() || seller.sellerId;
+                  const ref = seller.sellerHandle ?? seller.sellerId;
+                  const prefill = encodeURIComponent(`Re: order ${sessionReceiptId(order.notes)} — ${label}`);
+                  return (
+                    <button
+                      key={seller.sellerId}
+                      onClick={() => navigate(`/messages/${ref}?prefill=${prefill}&orderId=${order.id}`)}
+                      className="w-full flex items-center justify-center gap-2 rounded-full bg-stone-800 border border-white/10 py-2.5 text-sm text-stone-200 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
+                    >
+                      <MessageSquare size={15} />
+                      Message {label}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })() : (
+            <button
+              onClick={() => {
+                const prefill = encodeURIComponent(`Re: ${order.title} (${ordinalId(order.id)})`);
+                const sellerRef = sellerProfile?.handle ?? order.sellerId;
+                navigate(`/messages/${sellerRef}?prefill=${prefill}&orderId=${order.id}`);
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-full bg-stone-800 border border-white/10 py-2.5 text-sm text-stone-200 hover:border-amber-500/40 hover:text-amber-200 transition-colors"
+            >
+              <MessageSquare size={15} />
+              Message artist
+            </button>
+          )}
           <div className="flex gap-3">
             <button
               onClick={handlePrint}
