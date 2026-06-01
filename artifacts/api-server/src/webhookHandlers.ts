@@ -1,5 +1,6 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, type PerArtistShippingLine, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
+import { buildReceiptPdf, sessionReceiptId, ordinalId, fmtDate, STATUS_LABELS, TYPE_LABELS, type ReceiptData } from './lib/receiptPdf';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable } from '@workspace/db';
@@ -348,11 +349,52 @@ export class WebhookHandlers {
             }
           }
 
+          // Generate receipt PDF to attach to the confirmation email.
+          // A failure here is non-fatal — the email still goes out without the attachment.
+          let receiptAttachment: { filename: string; content: string } | null = null;
+          if (sessionOrders.length > 0) {
+            try {
+              const isCart = sessionOrders.length > 1;
+              const refNum = isCart
+                ? sessionReceiptId(session.id)
+                : ordinalId(webhookCreatedOrders[0]?.orderId ?? session.id);
+              const processingWindowText = processingWindowDays !== null
+                ? `Ships within ${processingWindowDays} business day${processingWindowDays === 1 ? '' : 's'}`
+                : null;
+              const receiptData: ReceiptData = {
+                refNum,
+                receiptTitle:     isCart ? 'Cart Receipt' : 'Order Receipt',
+                dateStr:          fmtDate(new Date()),
+                statusLabel:      STATUS_LABELS['confirmed'] ?? 'Confirmed',
+                typeLabel:        TYPE_LABELS['listing'] ?? 'Shop',
+                lines:            sessionOrders.map((o) => ({
+                  title:       o.title ?? 'Item',
+                  description: null,
+                  amount:      o.amount ?? 0,
+                })),
+                total:            sessionOrders.reduce((s, o) => s + (o.amount ?? 0), 0),
+                buyerName:        session.customer_details?.name ?? null,
+                buyerAddress:     shippingAddress,
+                buyerEmail:       email,
+                trackingNumber:   null,
+                processingWindow: processingWindowText,
+              };
+              const pdfBytes = await buildReceiptPdf(receiptData);
+              receiptAttachment = {
+                filename: `Kiln_Receipt_${refNum}.pdf`,
+                content:  Buffer.from(pdfBytes).toString('base64'),
+              };
+            } catch (pdfErr) {
+              logger.warn({ err: pdfErr, sessionId: session.id }, 'Receipt PDF generation failed — sending email without attachment');
+            }
+          }
+
           await sendEmailWithRetry(
             {
               to: email,
               subject: `Your Kiln order #${orderId} is confirmed`,
               html: manualPayoutReceiptEmail(orderId, amount, items, processingWindowDays, receiptOrderId ?? undefined, shippingAddress, perArtistShipping, session.id),
+              ...(receiptAttachment ? { attachments: [receiptAttachment] } : {}),
             },
             { contextId: session.id, label: 'order confirmation' },
           );

@@ -29,11 +29,18 @@ async function getResendApiKey(): Promise<string | null> {
   return process.env.RESEND_API_KEY ?? null;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  /** Base64-encoded file content */
+  content: string;
+}
+
 export interface EmailPayload {
   to: string;
   subject: string;
   html: string;
   from?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailRetryContext {
@@ -119,6 +126,9 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
         to: [payload.to],
         subject: payload.subject,
         html: payload.html,
+        ...(payload.attachments && payload.attachments.length > 0
+          ? { attachments: payload.attachments }
+          : {}),
       }),
     });
 
