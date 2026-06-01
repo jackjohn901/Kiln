@@ -228,11 +228,12 @@ export default function OrderDetailScreen() {
   const windowLabel = order.processingWindowLabel ?? sellerWindow?.processingWindowLabel ?? null;
   const windowDays = order.processingWindowDays ?? sellerWindow?.processingWindowDays ?? null;
   const hasDeliveryEstimate = windowLabel !== null || windowDays !== null;
-  const deliveryEstimateText = windowLabel
+  const baseEstimate = windowLabel
     ? windowLabel
     : windowDays === 1
       ? "1 business day"
       : `${windowDays} business days`;
+  const deliveryEstimateText = `Ships within ${baseEstimate}`;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -410,7 +411,7 @@ export default function OrderDetailScreen() {
               <View style={styles.infoRow}>
                 <Feather name="clock" size={14} color={colors.primary} />
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
-                  Delivery estimate:{" "}
+                  Processing time:{" "}
                   <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>
                     {deliveryEstimateText}
                   </Text>
