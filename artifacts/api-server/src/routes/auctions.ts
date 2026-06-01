@@ -15,8 +15,11 @@ const router = Router();
 // GET /auctions
 router.get("/auctions", async (req, res): Promise<void> => {
   try {
+    const artistId = typeof req.query.artistId === "string" ? req.query.artistId : undefined;
     const [auctions, latestBids] = await Promise.all([
-      db.select().from(auctionsTable).orderBy(desc(auctionsTable.endDate)),
+      db.select().from(auctionsTable)
+        .where(artistId ? eq(auctionsTable.artistId, artistId) : undefined)
+        .orderBy(desc(auctionsTable.endDate)),
       db.select({ auctionId: auctionBidsTable.auctionId, lastBidAt: max(auctionBidsTable.createdAt) })
         .from(auctionBidsTable)
         .groupBy(auctionBidsTable.auctionId),
@@ -66,6 +69,7 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   if (!auction) { res.status(404).json({ error: "Not found" }); return; }
   if (auction.status !== "live") { res.status(400).json({ error: "Auction is not live" }); return; }
   if (new Date() > auction.endDate) { res.status(400).json({ error: "Auction has ended" }); return; }
+  if (auction.artistId === req.user.id) { res.status(400).json({ error: "You can't bid on your own auction" }); return; }
   const { amount } = req.body;
   const bidAmount = Number(amount);
   const minBid = auction.currentBid > 0 ? auction.currentBid + 50 : auction.startingPrice;

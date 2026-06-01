@@ -120,6 +120,7 @@ export default function AuctionDetail() {
   const reserveMet = !!auction && (auction.reservePrice === null || auction.currentBid >= auction.reservePrice);
   const isEnded = !!auction && !isLive;
   const isWinner = isEnded && !!auction.currentBidderId && auction.currentBidderId === profile?.id;
+  const isOwner = !!auction && !!profile && auction.artistId === profile.id;
   const alreadyPaid = auction?.status === "paid";
   const displayBid = auction ? (auction.currentBid > 0 ? auction.currentBid : auction.startingPrice) : 0;
 
@@ -277,7 +278,20 @@ export default function AuctionDetail() {
 
             {/* CTA */}
             <div className="mt-6">
-              {isLive && (
+              {isLive && isOwner && (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-center space-y-1.5">
+                  <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-amber-300">
+                    <Gavel size={14} /> This is your auction
+                  </p>
+                  <p className="text-xs text-stone-400">
+                    {auction.bidCount > 0
+                      ? `${auction.bidCount} bid${auction.bidCount !== 1 ? "s" : ""} so far · highest ${formatPrice(displayBid)}`
+                      : "No bids yet — share it so collectors can find it."}
+                  </p>
+                  <p className="text-[11px] text-stone-500">You can't bid on your own piece.</p>
+                </div>
+              )}
+              {isLive && !isOwner && (
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs text-stone-500 mb-1.5 block">Your bid amount (min {formatPrice(minBid)})</label>

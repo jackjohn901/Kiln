@@ -303,7 +303,7 @@ function CommissionStatusSelector() {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = "posts" | "process" | "portfolio" | "shop" | "workshops" | "drops" | "bio" | "cv" | "sold" | "sounds";
+type Tab = "posts" | "process" | "portfolio" | "shop" | "auctions" | "workshops" | "drops" | "bio" | "cv" | "sold" | "sounds";
 
 // ── Mini beat grid for Sounds tab ─────────────────────────────────────────────
 const BEAT_TRACK_COLORS = ["bg-amber-500","bg-orange-500","bg-yellow-400","bg-lime-500","bg-teal-500","bg-sky-500"];
@@ -382,6 +382,7 @@ export default function ArtistProfile() {
 
   const [shipping, setShipping] = useState<ArtistShipping | null>(null);
   const [apiListings, setApiListings] = useState<{ id: string; title: string; medium: string | null; price: number; imageUrl: string | null; isPinned: boolean; sortOrder: number }[] | null>(null);
+  const [apiAuctions, setApiAuctions] = useState<{ id: string; title: string; medium: string | null; imageUrl: string | null; currentBid: number; startingPrice: number; bidCount: number; status: string; endDate: string }[]>([]);
 
   const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
   const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
@@ -438,6 +439,10 @@ export default function ArtistProfile() {
     fetch(`/api/listings?artistId=${encodeURIComponent(id ?? "")}&available=true&limit=100`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (Array.isArray(data?.listings)) setApiListings(data.listings); })
+      .catch(() => {});
+    fetch(`/api/auctions?artistId=${encodeURIComponent(id ?? "")}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (Array.isArray(data?.auctions)) setApiAuctions(data.auctions); })
       .catch(() => {});
   }, [id]);
 
@@ -998,6 +1003,7 @@ export default function ArtistProfile() {
               { key: "process", icon: Video, label: "Process" },
               { key: "portfolio", icon: Image, label: "Portfolio" },
               { key: "shop", icon: ShoppingBag, label: "Shop" },
+              ...((apiAuctions.length > 0 || isOwn) ? [{ key: "auctions", icon: Gavel, label: "Auctions" }] : []),
               ...(workshops.length > 0 ? [{ key: "workshops", icon: Hammer, label: "Workshops" }] : []),
               ...(drops.length > 0 ? [{ key: "drops", icon: Zap, label: "Drops" }] : []),
               { key: "sold", icon: CheckCircle, label: "Sold" },
@@ -1247,6 +1253,66 @@ export default function ArtistProfile() {
                   </>
                 );
               })()}
+            </div>
+          )}
+
+          {/* Auctions */}
+          {tab === "auctions" && (
+            <div>
+              {apiAuctions.length === 0 ? (
+                isOwn ? (
+                  <div className="py-16 text-center space-y-4">
+                    <p className="text-stone-500 text-sm">You haven't put any pieces up for auction yet.</p>
+                    <p className="text-stone-600 text-xs max-w-xs mx-auto">Auction off a one-of-a-kind work and let collectors bid in real time.</p>
+                    <Link
+                      href="/create-auction"
+                      className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 px-5 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/10 transition-colors"
+                    >
+                      <Gavel size={14} /> Auction off a piece
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="py-16 text-center text-stone-600 text-sm">No auctions yet.</div>
+                )
+              ) : (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {apiAuctions.map((a) => {
+                    const live = a.status === "live" && new Date(a.endDate) > new Date();
+                    const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
+                    return (
+                      <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
+                        <div className="aspect-square overflow-hidden">
+                          {a.imageUrl ? (
+                            <img src={a.imageUrl} alt={a.title}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-stone-800">
+                              <Gavel size={28} className="text-stone-700" />
+                            </div>
+                          )}
+                          <div className="absolute top-2 left-2">
+                            {live ? (
+                              <span className="flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[9px] font-bold text-stone-950">
+                                <span className="h-1 w-1 rounded-full bg-stone-950 animate-pulse" /> LIVE
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-stone-700/90 px-2 py-0.5 text-[9px] font-medium text-stone-400">Ended</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <p className="font-medium text-stone-200 text-sm line-clamp-1">{a.title}</p>
+                          <p className="mt-0.5 text-xs text-stone-500">{a.medium}</p>
+                          <div className="mt-2 flex items-baseline justify-between">
+                            <p className="font-bold text-amber-400">{formatPrice(bid)}</p>
+                            <p className="text-[10px] text-stone-500">{a.bidCount} bid{a.bidCount !== 1 ? "s" : ""}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

@@ -95,6 +95,7 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
   const displayBid = auction.currentBid > 0 ? auction.currentBid : auction.startingPrice;
   const isEnded = !isLive;
   const isWinner = isEnded && !!auction.currentBidderId && auction.currentBidderId === currentUserId;
+  const isOwner = !!currentUserId && auction.artistId === currentUserId;
   const alreadyPaid = auction.status === "paid";
 
   async function handlePayNow() {
@@ -180,7 +181,12 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
           <p className="text-[11px] text-stone-600">{auction.medium}{auction.dimensions ? ` · ${auction.dimensions}` : ""}</p>
         )}
 
-        {isLive && (
+        {isLive && isOwner && (
+          <div className="rounded-full border border-amber-500/20 bg-amber-500/5 py-2.5 text-center text-xs text-amber-300/90">
+            Your auction · {auction.bidCount} bid{auction.bidCount !== 1 ? "s" : ""}
+          </div>
+        )}
+        {isLive && !isOwner && (
           <button onClick={() => onBid(auction)}
             className="w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
             <Gavel size={14} /> Place Bid

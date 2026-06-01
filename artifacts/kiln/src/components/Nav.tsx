@@ -51,6 +51,7 @@ export default function Nav() {
     { href: "/gallery", label: "Gallery" },
     { href: "/community", label: "Community" },
     { href: "/drops", label: "Drops" },
+    { href: "/auctions", label: "Auctions" },
     { href: "/workshops", label: "Workshops" },
     { href: "/techniques", label: "Techniques" },
     { href: "/challenges", label: "Challenges", icon: Trophy },
