@@ -25,6 +25,7 @@ interface Sale {
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
   manualPayout: boolean;
+  quantity: number;
   createdAt: string;
   updatedAt: string;
   buyerDisplayName: string | null;
@@ -186,6 +187,8 @@ export default function SaleDetail() {
     const dateStr = esc(formatDate(sale.createdAt));
     const statusLabel = esc(STATUS_CONFIG[sale.status]?.label ?? sale.status);
     const typeLabel = esc(TYPE_CONFIG[sale.type]?.label ?? sale.type);
+    const qty = sale.quantity ?? 1;
+    const unitPrice = qty > 1 ? formatPrice(sale.amount / qty) : null;
 
     const buyerName = sale.buyerDisplayName?.trim() || (sale.buyerHandle ? `@${sale.buyerHandle}` : null);
     const buyerSection = (buyerName || sale.shippingAddress) ? `
@@ -260,12 +263,14 @@ export default function SaleDetail() {
     <thead>
       <tr>
         <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
+        ${qty > 1 ? `<th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:center;">Qty</th>` : ""}
         <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(sale.title)}${sale.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(sale.description)}</span>` : ""}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(sale.title)}${sale.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(sale.description)}</span>` : ""}${unitPrice ? `<br><span style="font-size:11px;color:#8a7e74;">${unitPrice} each</span>` : ""}</td>
+        ${qty > 1 ? `<td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:center;font-size:13px;color:#2c2621;">${qty}</td>` : ""}
         <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(sale.amount)}</td>
       </tr>
     </tbody>
@@ -312,6 +317,8 @@ export default function SaleDetail() {
     const dateStr = esc(formatDate(sale.createdAt));
     const statusLabel = esc(STATUS_CONFIG[sale.status]?.label ?? sale.status);
     const typeLabel = esc(TYPE_CONFIG[sale.type]?.label ?? sale.type);
+    const qty = sale.quantity ?? 1;
+    const unitPrice = qty > 1 ? formatPrice(sale.amount / qty) : null;
 
     const buyerName = sale.buyerDisplayName?.trim() || (sale.buyerHandle ? `@${sale.buyerHandle}` : null);
     const buyerSection = (buyerName || sale.shippingAddress) ? `
@@ -394,12 +401,14 @@ export default function SaleDetail() {
     <thead>
       <tr>
         <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:left;">Item</th>
+        ${qty > 1 ? `<th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:center;">Qty</th>` : ""}
         <th style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a7e74;padding-bottom:8px;border-bottom:1px solid #e7e3dc;text-align:right;">Price</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(sale.title)}${sale.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(sale.description)}</span>` : ""}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;font-size:13px;color:#2c2621;">${esc(sale.title)}${sale.description ? `<br><span style="font-size:11px;color:#8a7e74;">${esc(sale.description)}</span>` : ""}${unitPrice ? `<br><span style="font-size:11px;color:#8a7e74;">${unitPrice} each</span>` : ""}</td>
+        ${qty > 1 ? `<td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:center;font-size:13px;color:#2c2621;">${qty}</td>` : ""}
         <td style="padding:10px 0;border-bottom:1px solid #e7e3dc;text-align:right;font-size:13px;font-weight:600;color:#2c2621;white-space:nowrap;">${formatPrice(sale.amount)}</td>
       </tr>
     </tbody>
@@ -535,7 +544,14 @@ export default function SaleDetail() {
               )}
               <div className="mt-2 flex items-center justify-between">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
-                <span className="text-base font-bold text-emerald-400">+{formatPrice(sale.amount)}</span>
+                <div className="text-right">
+                  {sale.quantity > 1 && (
+                    <p className="text-[11px] text-stone-500">
+                      Qty: {sale.quantity} × {formatPrice(sale.amount / sale.quantity)}
+                    </p>
+                  )}
+                  <span className="text-base font-bold text-emerald-400">+{formatPrice(sale.amount)}</span>
+                </div>
               </div>
             </div>
           </div>

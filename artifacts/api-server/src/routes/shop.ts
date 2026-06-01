@@ -250,6 +250,7 @@ router.get("/me/sales/:id", async (req, res): Promise<void> => {
         processingWindowDays: ordersTable.processingWindowDays,
         processingWindowLabel: ordersTable.processingWindowLabel,
         manualPayout: ordersTable.manualPayout,
+        quantity: ordersTable.quantity,
         createdAt: ordersTable.createdAt,
         updatedAt: ordersTable.updatedAt,
         buyerDisplayName: profilesTable.displayName,
