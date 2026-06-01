@@ -217,6 +217,8 @@ export default function OrderDetail() {
   const [addressDraft, setAddressDraft] = useState("");
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
+  const [savedDefaultAddress, setSavedDefaultAddress] = useState<string | null>(null);
+  const [savedAddressLoaded, setSavedAddressLoaded] = useState(false);
   const [orderThread, setOrderThread] = useState<OrderThreadInfo | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
   const [replySending, setReplySending] = useState(false);
@@ -285,6 +287,37 @@ export default function OrderDetail() {
 
     void load();
   }, [id, sessionKey]);
+
+  // Fetch the buyer's saved default address once when they open the edit form.
+  useEffect(() => {
+    if (!editingAddress || savedAddressLoaded) return;
+    let cancelled = false;
+    async function loadSavedAddress() {
+      try {
+        const r = await fetch("/api/me/settings", { credentials: "include" });
+        if (!r.ok || cancelled) return;
+        const data = await r.json() as { defaultShippingAddress?: { street?: string; city?: string; state?: string; zip?: string; country?: string } | null };
+        if (cancelled) return;
+        const addr = data.defaultShippingAddress;
+        if (addr) {
+          const parts = [
+            addr.street,
+            addr.city && addr.state
+              ? `${addr.city}, ${addr.state}${addr.zip ? " " + addr.zip : ""}`
+              : addr.city || (addr.state ? (addr.zip ? `${addr.state} ${addr.zip}` : addr.state) : null),
+            addr.country,
+          ].filter(Boolean);
+          setSavedDefaultAddress(parts.join("\n"));
+        }
+      } catch {
+        // ignore — button just won't appear
+      } finally {
+        if (!cancelled) setSavedAddressLoaded(true);
+      }
+    }
+    void loadSavedAddress();
+    return () => { cancelled = true; };
+  }, [editingAddress, savedAddressLoaded]);
 
   // Load the order's message thread (latest artist message) so the buyer can
   // glance at it and reply inline. Only for authenticated single-order views.
@@ -985,6 +1018,16 @@ export default function OrderDetail() {
             </div>
             {editingAddress ? (
               <div className="space-y-2">
+                {savedDefaultAddress && (
+                  <button
+                    type="button"
+                    onClick={() => setAddressDraft(savedDefaultAddress)}
+                    className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/8 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/15 transition-colors"
+                  >
+                    <MapPin size={11} />
+                    Use my saved address
+                  </button>
+                )}
                 <textarea
                   rows={3}
                   value={addressDraft}
