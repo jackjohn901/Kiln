@@ -13,3 +13,4 @@
 - [Mixed-content http assets](mixed-content-http-assets.md) — embedded media URLs must be https or they break on the prod https site; outbound link hrefs are exempt.
 - [Kiln multi-account owner model](kiln-multi-account-owner-model.md) — one Replit login owns ≤10 accounts; active = session.user, owner = session.ownerId; switch swaps session.user; content scopes by req.user.id.
 - [Create-flow navigation](create-flow-navigation.md) — after create POST, navigate directly to the new item's detail (/auctions/:id, /listings/:id) using the returned id; interstitials + Live-tab filters cause "nothing showed up".
+- [Auth redirect smoothing](auth-redirect-smoothing.md) — omit OIDC `prompt: login consent` so returning users glide through; show branded AuthSplash, never blank, during redirect/isLoading.

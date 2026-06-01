@@ -4,6 +4,7 @@ import { Switch, Route, Router as WouterRouter, useLocation, useSearch } from "w
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/contexts/ProfileContext";
 import Landing from "@/pages/Landing";
+import AuthSplash from "@/components/AuthSplash";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -296,7 +297,7 @@ function RootPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const search = useSearch();
   const skip = new URLSearchParams(search).get("skipLanding") === "true";
-  if (isLoading) return null;
+  if (isLoading) return <AuthSplash label="Warming up…" />;
   if (isAuthenticated || skip) return <Feed />;
   return <Landing />;
 }
