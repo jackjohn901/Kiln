@@ -28,6 +28,8 @@ interface Order {
   currency: string;
   status: string;
   sellerId: string;
+  sellerName?: string | null;
+  sellerHandle?: string | null;
   shippingAddress: string | null;
   trackingNumber: string | null;
   notes: string | null;
@@ -303,6 +305,14 @@ export default function OrderDetailScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.lineTitle, { color: colors.foreground }]} numberOfLines={2}>{item.title}</Text>
+                      {item.sellerName ? (
+                        <Pressable
+                          onPress={() => router.push(`/profile/${item.sellerId}` as any)}
+                          hitSlop={4}
+                        >
+                          <Text style={[styles.lineDesc, { color: colors.primary }]}>by {item.sellerName}</Text>
+                        </Pressable>
+                      ) : null}
                       {item.description ? (
                         <Text style={[styles.lineDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
                       ) : null}

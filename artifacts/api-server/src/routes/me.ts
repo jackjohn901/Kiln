@@ -189,7 +189,17 @@ router.get("/me/orders/cart/:sessionKey", async (req, res): Promise<void> => {
         return { sellerName, days: o.processingWindowDays ?? null, label: o.processingWindowLabel ?? null };
       });
 
-    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
+    // Annotate each sibling order with the seller's display name and handle for the buyer receipt UI.
+    const enrichedSiblingOrders = siblingOrders.map((o) => {
+      const p = o.sellerId ? sellerProfileMap.get(o.sellerId) : null;
+      return {
+        ...o,
+        sellerName: p?.displayName?.trim() || (p?.handle ? `@${p.handle}` : null),
+        sellerHandle: p?.handle ?? null,
+      };
+    });
+
+    res.json({ order, siblingOrders: enrichedSiblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
   } catch (err) {
     logger.error({ err }, "me/orders/cart/:sessionKey GET error");
     res.status(500).json({ error: "Failed to load cart receipt" });
@@ -309,7 +319,17 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
           })
       : [];
 
-    res.json({ order, siblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
+    // Annotate each sibling order with the seller's display name and handle for the buyer receipt UI.
+    const enrichedSiblingOrders = siblingOrders.map((o) => {
+      const p = o.sellerId ? sellerProfileMap.get(o.sellerId) : null;
+      return {
+        ...o,
+        sellerName: p?.displayName?.trim() || (p?.handle ? `@${p.handle}` : null),
+        sellerHandle: p?.handle ?? null,
+      };
+    });
+
+    res.json({ order, siblingOrders: enrichedSiblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });
