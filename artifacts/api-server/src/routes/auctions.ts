@@ -52,7 +52,9 @@ router.post("/auctions", async (req, res): Promise<void> => {
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
   const now = new Date();
   const sd = new Date(startDate);
-  const status = sd > now ? "upcoming" : "live";
+  // Treat a start time at (or within a minute of) "now" as live, so client/server
+  // clock skew can't leave a just-created auction stuck in "upcoming" and hidden.
+  const status = sd.getTime() > now.getTime() + 60_000 ? "upcoming" : "live";
   const [auction] = await db.insert(auctionsTable).values({ id: crypto.randomUUID(), artistId: user.id, artistName: name, artistAvatarUrl: user.profileImageUrl ?? null, title, description, imageUrl, medium, dimensions, startingPrice: Number(startingPrice), reservePrice: reservePrice ? Number(reservePrice) : null, currentBid: 0, startDate: sd, endDate: new Date(endDate), status, tags: tags ?? [] }).returning();
   res.status(201).json({ ...auction, bids: [], startDate: auction.startDate.toISOString(), endDate: auction.endDate.toISOString(), createdAt: auction.createdAt.toISOString() });
 });

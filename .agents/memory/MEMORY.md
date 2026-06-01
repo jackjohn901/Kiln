@@ -11,3 +11,4 @@
 - [Kiln video uploads → Mux](kiln-video-upload-mux.md) — user videos must upload via Mux (uploadVideo), persist muxPlaybackId + Mux thumbnail to localStorage AND DB; object-storage MP4s render black on grid/mobile.
 - [Composite lib decl drift](composite-lib-decl-drift.md) — new export in a lib/* is invisible to consumers until `typecheck:libs` rebuilds its .d.ts; "no exported member X" despite source having it.
 - [Mixed-content http assets](mixed-content-http-assets.md) — embedded media URLs must be https or they break on the prod https site; outbound link hrefs are exempt.
+- [Create-flow navigation](create-flow-navigation.md) — after create POST, navigate directly to the new item's detail (/auctions/:id, /listings/:id) using the returned id; interstitials + Live-tab filters cause "nothing showed up".

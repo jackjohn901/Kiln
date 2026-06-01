@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, Gavel, Check, ImageIcon, X, Plus } from "lucide-react";
+import { ChevronLeft, Gavel, ImageIcon, X, Plus } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -40,7 +40,6 @@ export default function CreateAuction() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
   function set(key: keyof typeof form, value: string | string[]) {
@@ -118,47 +117,13 @@ export default function CreateAuction() {
         const d = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error ?? "Failed to start auction");
       }
-      setDone(true);
+      const created = (await res.json().catch(() => null)) as { id?: string } | null;
+      navigate(created?.id ? `/auctions/${created.id}` : "/auctions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (done) {
-    return (
-      <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="h-16 w-16 flex items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/40">
-          <Check size={28} className="text-amber-400" />
-        </div>
-        <h2 className="font-serif text-2xl text-amber-100">Auction Live</h2>
-        <p className="text-stone-400 max-w-sm">Your piece is now up for bidding. Collectors can place bids until it ends.</p>
-        {imagePreview && (
-          <div className="h-32 w-32 overflow-hidden rounded-2xl border border-white/10">
-            <img src={imagePreview} alt="" className="h-full w-full object-cover" />
-          </div>
-        )}
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate("/auctions")}
-            className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-          >
-            View live auctions
-          </button>
-          <button
-            onClick={() => {
-              setDone(false);
-              setForm({ title: "", description: "", medium: "", dimensions: "", startingPrice: "", reservePrice: "", tags: [] });
-              setImagePreview(""); setImageFile(null);
-            }}
-            className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors"
-          >
-            Start another
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (

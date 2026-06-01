@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ChevronLeft, ShoppingBag, Check, Loader2, Plus, X, ImageIcon, Sparkles } from "lucide-react";
+import { ChevronLeft, ShoppingBag, Loader2, Plus, X, ImageIcon, Sparkles } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useUpload } from "@/hooks/useUpload";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -111,7 +111,6 @@ export default function CreateListing() {
   const [filterSettings, setFilterSettings] = useState<FilterSettings | null>(null);
   const [filterCss, setFilterCss] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
   function set(key: keyof typeof form, value: string | string[]) {
@@ -193,43 +192,13 @@ export default function CreateListing() {
         const d = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error ?? "Failed to create listing");
       }
-      setDone(true);
+      const data = (await res.json().catch(() => null)) as { listing?: { id?: string } } | null;
+      navigate(data?.listing?.id ? `/listings/${data.listing.id}` : (profile ? `/artists/${profile.id}?tab=shop` : "/shop"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (done) {
-    return (
-      <div className="min-h-screen bg-[#12100e] flex flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="h-16 w-16 flex items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40">
-          <Check size={28} className="text-emerald-400" />
-        </div>
-        <h2 className="font-serif text-2xl text-amber-100">Listing Live</h2>
-        <p className="text-stone-400 max-w-sm">Your piece is now visible in the Kiln shop for collectors to discover.</p>
-        {imagePreview && (
-          <div className="h-32 w-32 overflow-hidden rounded-2xl border border-white/10">
-            <img src={imagePreview} alt="" className="h-full w-full object-cover" />
-          </div>
-        )}
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate(profile ? `/artists/${profile.id}?tab=shop` : "/shop")}
-            className="rounded-full bg-amber-500 px-6 py-2.5 font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
-          >
-            View your shop
-          </button>
-          <button
-            onClick={() => { setDone(false); setForm({ title: "", description: "", medium: "", technique: "", dimensions: "", weight: "", year: new Date().getFullYear().toString(), edition: "", price: "", shipsFrom: "", shipsTo: [], tags: [], imageUrl: "" }); setImagePreview(""); setImageFile(null); }}
-            className="rounded-full border border-white/10 px-6 py-2.5 text-sm text-stone-300 hover:border-amber-500/40 transition-colors"
-          >
-            Add Another
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
