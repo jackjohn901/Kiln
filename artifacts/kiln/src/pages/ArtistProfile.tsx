@@ -467,6 +467,181 @@ export default function ArtistProfile() {
 
   const allDbPosts = [...dbPosts, ...collabPosts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  // Storefront summary ("Available now"): for-sale listings, auctions, drops and
+  // workshops shown on an artist's home view. Rendered in BOTH the DB-profile
+  // branch (seed/real artists) and the static-artist main return below, so it
+  // must not depend on `artist`/`listings`/`drops`/`workshops` (declared later).
+  const renderStorefront = (cfg: {
+    displayName: string;
+    ownerView: boolean;
+    artistId: string;
+    drops?: Drop[];
+    workshops?: ReturnType<typeof getWorkshopsByArtist>;
+    staticListings?: Listing[];
+    hasTabs?: boolean;
+  }) => {
+    const hasTabs = cfg.hasTabs ?? false;
+    const staticL = cfg.staticListings ?? [];
+    const shopListings = apiListings ?? staticL;
+    const dropsList = cfg.drops ?? [];
+    const workshopsList = cfg.workshops ?? [];
+    const firstName = cfg.displayName.split(" ")[0];
+    const hasAnything = shopListings.length > 0 || apiAuctions.length > 0 || dropsList.length > 0 || workshopsList.length > 0;
+    if (!hasAnything) {
+      if (!cfg.ownerView) return null;
+      return (
+        <div className="mt-8 border-t border-white/8 pt-8">
+          <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-6 text-center space-y-3">
+            <p className="text-sm font-medium text-stone-300">Your storefront is empty</p>
+            <p className="mx-auto max-w-xs text-xs text-stone-500">List a piece for sale, auction off a one-of-a-kind work, or schedule a workshop — everything you offer shows up here so visitors can buy and bid right from your page.</p>
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+              <Link href="/create-listing" className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-stone-950 transition-colors hover:bg-amber-400"><Plus size={14} /> List a piece</Link>
+              <Link href="/create-auction" className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 px-4 py-2 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-500/10"><Gavel size={14} /> Start an auction</Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="mt-8 space-y-8 border-t border-white/8 pt-8">
+        <p className="text-[11px] uppercase tracking-wide text-stone-500">
+          {cfg.ownerView ? "Available from your studio · visitors can buy & bid right here" : `Available from ${firstName}`}
+        </p>
+
+        {/* For sale */}
+        {shopListings.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><ShoppingBag size={14} className="text-amber-400" /> For sale</h3>
+              {hasTabs && <button onClick={() => setTab("shop")} className="text-xs text-amber-400 hover:text-amber-300">View all ({shopListings.length}) →</button>}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {shopListings.slice(0, 6).map((l) => (
+                <div key={l.id} className="group relative overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
+                  <Link href={`/listings/${l.id}`} className="block">
+                    <div className="aspect-square overflow-hidden">
+                      <img src={l.imageUrl ?? undefined} alt={l.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    </div>
+                    <div className="p-2">
+                      <p className="line-clamp-1 text-xs font-medium text-stone-200">{l.title}</p>
+                      <p className="mt-1 text-sm font-bold text-amber-400">{formatPrice(l.price)}</p>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? cfg.artistId, title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
+                    className={`absolute bottom-[44px] right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
+                    title={isInCart(l.id) ? "In cart" : "Add to cart"}
+                  >
+                    <ShoppingCart size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Up for auction */}
+        {apiAuctions.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Gavel size={14} className="text-amber-400" /> Up for auction</h3>
+              {hasTabs && <button onClick={() => setTab("auctions")} className="text-xs text-amber-400 hover:text-amber-300">View all ({apiAuctions.length}) →</button>}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {apiAuctions.slice(0, 6).map((a) => {
+                const live = a.status === "live" && new Date(a.endDate) > new Date();
+                const upcoming = a.status === "upcoming" || a.status === "scheduled";
+                const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
+                return (
+                  <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
+                    <div className="aspect-square overflow-hidden">
+                      {a.imageUrl ? (
+                        <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-stone-800"><Gavel size={24} className="text-stone-700" /></div>
+                      )}
+                      <div className="absolute left-1.5 top-1.5">
+                        {live ? (
+                          <span className="flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[9px] font-bold text-stone-950"><span className="h-1 w-1 animate-pulse rounded-full bg-stone-950" /> LIVE</span>
+                        ) : upcoming ? (
+                          <span className="rounded-full bg-stone-700/90 px-2 py-0.5 text-[9px] font-medium text-amber-300">Upcoming</span>
+                        ) : (
+                          <span className="rounded-full bg-stone-700/90 px-2 py-0.5 text-[9px] font-medium text-stone-400">Ended</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <p className="line-clamp-1 text-xs font-medium text-stone-200">{a.title}</p>
+                      <div className="mt-1 flex items-baseline justify-between">
+                        <p className="text-sm font-bold text-amber-400">{formatPrice(bid)}</p>
+                        <p className="text-[10px] text-stone-500">{a.bidCount} bid{a.bidCount !== 1 ? "s" : ""}</p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Drops */}
+        {dropsList.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Sparkles size={14} className="text-amber-400" /> Drops</h3>
+              {hasTabs && <button onClick={() => setTab("drops")} className="text-xs text-amber-400 hover:text-amber-300">View all ({dropsList.length}) →</button>}
+            </div>
+            <div className="space-y-2">
+              {dropsList.slice(0, 3).map((drop) => (
+                <button
+                  key={drop.id}
+                  onClick={() => drop.status !== "sold" && setSelectedDrop(drop)}
+                  className={`flex w-full gap-3 overflow-hidden rounded-2xl border border-white/10 bg-stone-900/60 p-3 text-left transition-all ${drop.status !== "sold" ? "hover:border-amber-500/30" : "opacity-60"}`}
+                >
+                  <img src={drop.imageUrl} alt={drop.title} className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-1 text-sm font-medium text-amber-100">{drop.title}</p>
+                      {drop.status === "live" && <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Live</span>}
+                      {drop.status === "upcoming" && <span className="shrink-0 text-xs font-medium text-amber-300">{getTimeUntilDrop(drop.dropDate)}</span>}
+                      {drop.status === "sold" && <span className="shrink-0 text-xs text-stone-500">Sold out</span>}
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-amber-300">${drop.price.toLocaleString()}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Workshops */}
+        {workshopsList.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Users size={14} className="text-amber-400" /> Workshops</h3>
+              {hasTabs && <button onClick={() => setTab("workshops")} className="text-xs text-amber-400 hover:text-amber-300">View all ({workshopsList.length}) →</button>}
+            </div>
+            <div className="space-y-2">
+              {workshopsList.slice(0, 3).map((w) => (
+                <div key={w.id} className="flex gap-3 overflow-hidden rounded-2xl border border-white/8 bg-stone-900/60 p-3">
+                  <img src={w.imageUrl} alt={w.title} className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-1 text-sm font-medium leading-snug text-stone-200">{w.title}</p>
+                      <span className="shrink-0 text-sm font-bold text-amber-400">${w.price}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-stone-500">{w.startDate} · {w.location}</p>
+                    <p className="mt-1 text-xs text-stone-400">{w.spotsLeft > 0 ? `${w.spotsLeft} spots left` : "Sold out"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!artist) {
     if (dbProfileLoading) {
       return (
@@ -588,6 +763,8 @@ export default function ArtistProfile() {
               <p className="text-stone-500 text-sm">No posts yet</p>
             </div>
           )}
+
+          {renderStorefront({ displayName: name, ownerView: isOwn, artistId: id ?? "" })}
         </div>
       </div>
     );
@@ -1099,161 +1276,7 @@ export default function ArtistProfile() {
             </>
           )}
 
-          {/* Available now — storefront summary shown below the grid on the home view */}
-          {tab === "posts" && (() => {
-            const shopListings = apiListings ?? listings;
-            const hasAnything = shopListings.length > 0 || apiAuctions.length > 0 || drops.length > 0 || workshops.length > 0;
-            if (!hasAnything) {
-              if (!isOwn) return null;
-              return (
-                <div className="mt-8 border-t border-white/8 pt-8">
-                  <div className="rounded-2xl border border-white/8 bg-stone-900/40 p-6 text-center space-y-3">
-                    <p className="text-sm font-medium text-stone-300">Your storefront is empty</p>
-                    <p className="mx-auto max-w-xs text-xs text-stone-500">List a piece for sale, auction off a one-of-a-kind work, or schedule a workshop — everything you offer shows up here so visitors can buy and bid right from your page.</p>
-                    <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
-                      <Link href="/create-listing" className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-stone-950 transition-colors hover:bg-amber-400"><Plus size={14} /> List a piece</Link>
-                      <Link href="/create-auction" className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 px-4 py-2 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-500/10"><Gavel size={14} /> Start an auction</Link>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <div className="mt-8 space-y-8 border-t border-white/8 pt-8">
-                <p className="text-[11px] uppercase tracking-wide text-stone-500">
-                  {isOwn ? "Available from your studio · visitors can buy & bid right here" : `Available from ${artist.name.split(" ")[0]}`}
-                </p>
-
-                {/* For sale */}
-                {shopListings.length > 0 && (
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><ShoppingBag size={14} className="text-amber-400" /> For sale</h3>
-                      <button onClick={() => setTab("shop")} className="text-xs text-amber-400 hover:text-amber-300">View all ({shopListings.length}) →</button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {shopListings.slice(0, 6).map((l) => (
-                        <div key={l.id} className="group relative overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
-                          <Link href={`/listings/${l.id}`} className="block">
-                            <div className="aspect-square overflow-hidden">
-                              <img src={l.imageUrl ?? undefined} alt={l.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                            </div>
-                            <div className="p-2">
-                              <p className="line-clamp-1 text-xs font-medium text-stone-200">{l.title}</p>
-                              <p className="mt-1 text-sm font-bold text-amber-400">{formatPrice(l.price)}</p>
-                            </div>
-                          </Link>
-                          <button
-                            onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
-                            className={`absolute bottom-[44px] right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
-                            title={isInCart(l.id) ? "In cart" : "Add to cart"}
-                          >
-                            <ShoppingCart size={13} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Up for auction */}
-                {apiAuctions.length > 0 && (
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Gavel size={14} className="text-amber-400" /> Up for auction</h3>
-                      <button onClick={() => setTab("auctions")} className="text-xs text-amber-400 hover:text-amber-300">View all ({apiAuctions.length}) →</button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {apiAuctions.slice(0, 6).map((a) => {
-                        const live = a.status === "live" && new Date(a.endDate) > new Date();
-                        const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
-                        return (
-                          <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
-                            <div className="aspect-square overflow-hidden">
-                              {a.imageUrl ? (
-                                <img src={a.imageUrl} alt={a.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center bg-stone-800"><Gavel size={24} className="text-stone-700" /></div>
-                              )}
-                              <div className="absolute left-1.5 top-1.5">
-                                {live ? (
-                                  <span className="flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[9px] font-bold text-stone-950"><span className="h-1 w-1 animate-pulse rounded-full bg-stone-950" /> LIVE</span>
-                                ) : (
-                                  <span className="rounded-full bg-stone-700/90 px-2 py-0.5 text-[9px] font-medium text-stone-400">Ended</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="p-2">
-                              <p className="line-clamp-1 text-xs font-medium text-stone-200">{a.title}</p>
-                              <div className="mt-1 flex items-baseline justify-between">
-                                <p className="text-sm font-bold text-amber-400">{formatPrice(bid)}</p>
-                                <p className="text-[10px] text-stone-500">{a.bidCount} bid{a.bidCount !== 1 ? "s" : ""}</p>
-                              </div>
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Drops */}
-                {drops.length > 0 && (
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Sparkles size={14} className="text-amber-400" /> Drops</h3>
-                      <button onClick={() => setTab("drops")} className="text-xs text-amber-400 hover:text-amber-300">View all ({drops.length}) →</button>
-                    </div>
-                    <div className="space-y-2">
-                      {drops.slice(0, 3).map((drop) => (
-                        <button
-                          key={drop.id}
-                          onClick={() => drop.status !== "sold" && setSelectedDrop(drop)}
-                          className={`flex w-full gap-3 overflow-hidden rounded-2xl border border-white/10 bg-stone-900/60 p-3 text-left transition-all ${drop.status !== "sold" ? "hover:border-amber-500/30" : "opacity-60"}`}
-                        >
-                          <img src={drop.imageUrl} alt={drop.title} className="h-14 w-14 shrink-0 rounded-xl object-cover" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="line-clamp-1 text-sm font-medium text-amber-100">{drop.title}</p>
-                              {drop.status === "live" && <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Live</span>}
-                              {drop.status === "upcoming" && <span className="shrink-0 text-xs font-medium text-amber-300">{getTimeUntilDrop(drop.dropDate)}</span>}
-                              {drop.status === "sold" && <span className="shrink-0 text-xs text-stone-500">Sold out</span>}
-                            </div>
-                            <p className="mt-1 text-sm font-semibold text-amber-300">${drop.price.toLocaleString()}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Workshops */}
-                {workshops.length > 0 && (
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Users size={14} className="text-amber-400" /> Workshops</h3>
-                      <button onClick={() => setTab("workshops")} className="text-xs text-amber-400 hover:text-amber-300">View all ({workshops.length}) →</button>
-                    </div>
-                    <div className="space-y-2">
-                      {workshops.slice(0, 3).map((w) => (
-                        <div key={w.id} className="flex gap-3 overflow-hidden rounded-2xl border border-white/8 bg-stone-900/60 p-3">
-                          <img src={w.imageUrl} alt={w.title} className="h-14 w-14 shrink-0 rounded-xl object-cover" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="line-clamp-1 text-sm font-medium leading-snug text-stone-200">{w.title}</p>
-                              <span className="shrink-0 text-sm font-bold text-amber-400">${w.price}</span>
-                            </div>
-                            <p className="mt-0.5 text-xs text-stone-500">{w.startDate} · {w.location}</p>
-                            <p className="mt-1 text-xs text-stone-400">{w.spotsLeft > 0 ? `${w.spotsLeft} spots left` : "Sold out"}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          {tab === "posts" && renderStorefront({ displayName: artist.name, ownerView: isOwn, artistId: artist.id, drops, workshops, staticListings: listings, hasTabs: true })}
 
           {/* Portfolio */}
           {tab === "portfolio" && (
