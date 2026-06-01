@@ -19,6 +19,7 @@ export interface Listing {
   currency?: string;
   bundleMinQty?: number | null;
   bundleDiscountPct?: number | null;
+  stockCount?: number | null;
 }
 
 export const listings: Listing[] = [

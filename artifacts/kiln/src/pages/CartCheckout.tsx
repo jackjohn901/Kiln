@@ -124,6 +124,7 @@ export default function CartCheckout() {
   const [checkoutError, setCheckoutError] = useState("");
   const [unavailableItems, setUnavailableItems] = useState<Array<{ id: string; title: string }>>([]);
   const [staleItems, setStaleItems] = useState<Array<{ id: string; title: string }>>([]);
+  const [overStockItems, setOverStockItems] = useState<Array<{ id: string; title: string; available: number; requested: number }>>([]);
   const [noPayoutMethod, setNoPayoutMethod] = useState(false);
   const [noPayoutMethodCount, setNoPayoutMethodCount] = useState(1);
   const [pendingCheckoutUrl, setPendingCheckoutUrl] = useState<string | null>(null);
@@ -286,18 +287,20 @@ export default function CartCheckout() {
     const listingIds = items.map(i => i.listing.id as string).filter(Boolean);
     if (listingIds.length === 0) { setStaleItems([]); return; }
     let cancelled = false;
+    const listingQtys = items.map(i => ({ id: i.listing.id as string, qty: i.quantity }));
     fetch("/api/stripe/cart-validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ listingIds }),
+      body: JSON.stringify({ listingIds, listingQtys }),
     })
-      .then(r => r.ok ? r.json() as Promise<{ unavailableListings: Array<{ id: string; title: string }> }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ unavailableListings: Array<{ id: string; title: string }>; overStockListings?: Array<{ id: string; title: string; available: number; requested: number }> }> : null)
       .then(data => {
         if (cancelled || !data) return;
         // Only flag IDs that are actually still in the cart (it may have changed).
         const inCart = new Set(items.map(i => i.listing.id as string));
         setStaleItems((data.unavailableListings ?? []).filter(it => inCart.has(it.id)));
+        setOverStockItems((data.overStockListings ?? []).filter(it => inCart.has(it.id)));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -390,6 +393,7 @@ export default function CartCheckout() {
       }).catch(() => {});
     }
     setNoPayoutMethod(false);
+    setOverStockItems([]);
     try {
       const cartItems = items.map(({ listing, quantity }) => ({
         name: listing.title as string,
@@ -478,6 +482,9 @@ export default function CartCheckout() {
         } else if (data.code === "items_unavailable" && Array.isArray(data.unavailableListings)) {
           setUnavailableItems(data.unavailableListings as Array<{ id: string; title: string }>);
           setCheckingOut(false);
+        } else if (data.code === "over_stock" && Array.isArray(data.overStockListings)) {
+          setOverStockItems(data.overStockListings as Array<{ id: string; title: string; available: number; requested: number }>);
+          setCheckingOut(false);
         } else {
           throw new Error(data.error ?? "Checkout failed");
         }
@@ -564,6 +571,38 @@ export default function CartCheckout() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Over-stock warning — surfaces when the requested quantity exceeds available stock */}
+        {step !== "done" && overStockItems.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3.5"
+          >
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-300 mb-1">
+                  {overStockItems.length === 1
+                    ? "One item in your cart exceeds available stock"
+                    : `${overStockItems.length} items in your cart exceed available stock`}
+                </p>
+                <ul className="space-y-1 mb-2">
+                  {overStockItems.map((item) => (
+                    <li key={item.id} className="text-xs text-amber-200/70">
+                      <span className="font-medium text-amber-200">&ldquo;{item.title}&rdquo;</span>
+                      {" — "}
+                      {item.available === 0
+                        ? "sold out"
+                        : `only ${item.available} available (you requested ${item.requested})`}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-amber-200/50">Reduce the quantity in your cart before checking out.</p>
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Pre-checkout stale-item warning — surfaces sold/deleted listings before

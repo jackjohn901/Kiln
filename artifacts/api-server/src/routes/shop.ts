@@ -52,7 +52,7 @@ router.get("/listings/:id", async (req, res): Promise<void> => {
 // POST /listings — create listing (authenticated)
 router.post("/listings", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { title, description, medium, technique, dimensions, weight, year, edition, imageUrl, imageUrls, price, shipsFrom, shipsTo, tags, isResale, originalArtistId, originalArtistName, originalListingId, royaltyPercent, bundleMinQty, bundleDiscountPct } = req.body;
+  const { title, description, medium, technique, dimensions, weight, year, edition, imageUrl, imageUrls, price, shipsFrom, shipsTo, tags, isResale, originalArtistId, originalArtistName, originalListingId, royaltyPercent, bundleMinQty, bundleDiscountPct, stockCount } = req.body;
   if (!title || !price) { res.status(400).json({ error: "title and price required" }); return; }
   try {
     const user = req.user;
@@ -68,6 +68,7 @@ router.post("/listings", async (req, res): Promise<void> => {
       royaltyPercent: royaltyPercent ? Number(royaltyPercent) : 10,
       bundleMinQty: bundleMinQty ? Number(bundleMinQty) : null,
       bundleDiscountPct: bundleDiscountPct ? Number(bundleDiscountPct) : null,
+      stockCount: stockCount !== undefined && stockCount !== null ? Number(stockCount) : null,
     }).returning();
 
     const caption = [title, description, technique ? `Technique: ${technique}` : null, medium ? `Medium: ${medium}` : null].filter(Boolean).join("\n");
@@ -89,11 +90,12 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, req.params.id));
   if (!listing || listing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { title, price, isAvailable, isSold, medium, dimensions, description, bundleMinQty, bundleDiscountPct, isPinned, sortOrder } = req.body as {
+  const { title, price, isAvailable, isSold, medium, dimensions, description, bundleMinQty, bundleDiscountPct, isPinned, sortOrder, stockCount } = req.body as {
     title?: string; price?: number; isAvailable?: boolean; isSold?: boolean;
     medium?: string; dimensions?: string; description?: string;
     bundleMinQty?: number | null; bundleDiscountPct?: number | null;
     isPinned?: boolean; sortOrder?: number;
+    stockCount?: number | null;
   };
   const updates: Partial<typeof listing> = { updatedAt: new Date() };
   if (title !== undefined) updates.title = title;
@@ -107,6 +109,7 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (bundleDiscountPct !== undefined) updates.bundleDiscountPct = bundleDiscountPct ? Number(bundleDiscountPct) : null;
   if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);
   if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
+  if (stockCount !== undefined) updates.stockCount = stockCount !== null ? Number(stockCount) : null;
   const [updated] = await db.update(listingsTable).set(updates).where(eq(listingsTable.id, req.params.id)).returning();
   // If the listing is no longer purchasable, drop it from everyone's server-side cart.
   if (updated.isSold || !updated.isAvailable) {

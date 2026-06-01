@@ -2,10 +2,11 @@ import { Router, type IRouter } from 'express';
 import { db } from "@workspace/db";
 import {
   listingsTable,
+  ordersTable,
   profilesTable,
   userSettingsTable,
 } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and, sql } from "drizzle-orm";
 import { getUncachableStripeClient } from '../stripeClient';
 import { logger } from '../lib/logger';
 import { getDigitalProduct } from '../lib/digitalProducts';
@@ -51,15 +52,66 @@ router.post('/stripe/cart-validate', async (req, res): Promise<void> => {
         isSold: listingsTable.isSold,
         isAvailable: listingsTable.isAvailable,
         title: listingsTable.title,
+        stockCount: listingsTable.stockCount,
       })
       .from(listingsTable)
       .where(inArray(listingsTable.id, listingIds));
 
     const unavailableListings: Array<{ id: string; title: string }> = [];
+    const overStockListings: Array<{ id: string; title: string; available: number; requested: number }> = [];
     const foundIds = new Set(rows.map((r) => r.id));
+
+    // Aggregate requested quantities per listing ID (sum duplicates so a buyer
+    // cannot split the same listing across multiple line items to evade the stock cap).
+    const requestedQtyMap = new Map<string, number>();
+    if (Array.isArray((req.body as { listingIds?: unknown; listingQtys?: unknown }).listingQtys)) {
+      const qtys = (req.body as { listingQtys: Array<{ id: string; qty: number }> }).listingQtys;
+      for (const { id, qty } of qtys) {
+        if (typeof id === 'string' && typeof qty === 'number') {
+          requestedQtyMap.set(id, (requestedQtyMap.get(id) ?? 0) + qty);
+        }
+      }
+    }
+
+    // For listings with a stockCount, query the orders table to compute already-purchased
+    // quantities so that "remaining" reflects true available inventory, not just the static max.
+    const stockedRows = rows.filter((r) => r.stockCount !== null && r.stockCount !== undefined && !r.isSold && r.isAvailable);
+    const consumedQtyMap = new Map<string, number>();
+    if (stockedRows.length > 0) {
+      const stockedIds = stockedRows.map((r) => r.id);
+      // Allowlist-based status filter: only count statuses that represent a real paid/active
+      // order. "inquiry" and "cancelled" must NOT consume stock; future unknown statuses
+      // are also excluded by default (allowlist is safer than denylist here).
+      const STOCK_CONSUMING_STATUSES = ['pending', 'confirmed', 'in_progress', 'shipped', 'delivered'];
+      const consumedRows = await db
+        .select({
+          refId: ordersTable.refId,
+          totalQty: sql<number>`coalesce(sum(${ordersTable.quantity}), 0)`,
+        })
+        .from(ordersTable)
+        .where(
+          and(
+            eq(ordersTable.type, 'listing'),
+            inArray(ordersTable.status, STOCK_CONSUMING_STATUSES),
+            inArray(ordersTable.refId, stockedIds),
+          ),
+        )
+        .groupBy(ordersTable.refId);
+      for (const cr of consumedRows) {
+        if (cr.refId) consumedQtyMap.set(cr.refId, Number(cr.totalQty));
+      }
+    }
+
     for (const row of rows) {
       if (row.isSold || !row.isAvailable) {
         unavailableListings.push({ id: row.id, title: row.title });
+      } else if (row.stockCount !== null && row.stockCount !== undefined) {
+        const consumed = consumedQtyMap.get(row.id) ?? 0;
+        const remaining = row.stockCount - consumed;
+        const requested = requestedQtyMap.get(row.id) ?? 1;
+        if (requested > remaining) {
+          overStockListings.push({ id: row.id, title: row.title, available: Math.max(0, remaining), requested });
+        }
       }
     }
     // IDs not returned by the query have been deleted from the catalogue.
@@ -69,7 +121,7 @@ router.post('/stripe/cart-validate', async (req, res): Promise<void> => {
       }
     }
 
-    res.json({ unavailableListings });
+    res.json({ unavailableListings, overStockListings });
   } catch (err: unknown) {
     logger.error({ err }, 'Stripe cart-validate error');
     res.status(500).json({ error: 'Failed to validate cart.' });
@@ -111,6 +163,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
           artistId: listingsTable.artistId,
           title: listingsTable.title,
           imageUrl: listingsTable.imageUrl,
+          stockCount: listingsTable.stockCount,
         })
         .from(listingsTable)
         .where(inArray(listingsTable.id, listingIds));
@@ -118,18 +171,76 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       // Collect every unavailable or deleted listing before returning so the
       // client can surface all problem items in one pass (not just the first).
       const unavailableListings: Array<{ id: string; title: string }> = [];
+      const overStockListings: Array<{ id: string; title: string; available: number; requested: number }> = [];
 
       const foundIds = new Set(rows.map((r) => r.id));
+
+      // Build an aggregated quantity map from the incoming items for stock validation.
+      // Summing rather than overwriting prevents a buyer from splitting the same listing
+      // across multiple line items to evade the stock cap via direct API calls.
+      const requestedQtyByListingId = new Map<string, number>();
+      for (const item of items) {
+        if (item.listingId) {
+          requestedQtyByListingId.set(item.listingId, (requestedQtyByListingId.get(item.listingId) ?? 0) + item.quantity);
+        }
+      }
+
+      // For listings with a stockCount, query the orders table to compute already-purchased
+      // quantities so that "remaining" reflects true available inventory, not just the static max.
+      const checkoutStockedRows = rows.filter((r) => r.stockCount !== null && r.stockCount !== undefined && !r.isSold && r.isAvailable);
+      const checkoutConsumedQtyMap = new Map<string, number>();
+      if (checkoutStockedRows.length > 0) {
+        const checkoutStockedIds = checkoutStockedRows.map((r) => r.id);
+        // Allowlist-based status filter: only count statuses that represent a real paid/active
+        // order. "inquiry" and "cancelled" must NOT consume stock; future unknown statuses
+        // are also excluded by default (allowlist is safer than denylist here).
+        const STOCK_CONSUMING_STATUSES = ['pending', 'confirmed', 'in_progress', 'shipped', 'delivered'];
+        const consumedRows = await db
+          .select({
+            refId: ordersTable.refId,
+            totalQty: sql<number>`coalesce(sum(${ordersTable.quantity}), 0)`,
+          })
+          .from(ordersTable)
+          .where(
+            and(
+              eq(ordersTable.type, 'listing'),
+              inArray(ordersTable.status, STOCK_CONSUMING_STATUSES),
+              inArray(ordersTable.refId, checkoutStockedIds),
+            ),
+          )
+          .groupBy(ordersTable.refId);
+        for (const cr of consumedRows) {
+          if (cr.refId) checkoutConsumedQtyMap.set(cr.refId, Number(cr.totalQty));
+        }
+      }
+
       for (const row of rows) {
         if (row.isSold || !row.isAvailable) {
           unavailableListings.push({ id: row.id, title: row.title });
         } else {
-          listingPriceMap.set(row.id, {
-            price: row.price,
-            artistId: row.artistId,
-            title: row.title,
-            imageUrl: row.imageUrl,
-          });
+          // Check available stock before accepting the item, accounting for prior orders.
+          if (row.stockCount !== null && row.stockCount !== undefined) {
+            const consumed = checkoutConsumedQtyMap.get(row.id) ?? 0;
+            const remaining = row.stockCount - consumed;
+            const requested = requestedQtyByListingId.get(row.id) ?? 1;
+            if (requested > remaining) {
+              overStockListings.push({ id: row.id, title: row.title, available: Math.max(0, remaining), requested });
+            } else {
+              listingPriceMap.set(row.id, {
+                price: row.price,
+                artistId: row.artistId,
+                title: row.title,
+                imageUrl: row.imageUrl,
+              });
+            }
+          } else {
+            listingPriceMap.set(row.id, {
+              price: row.price,
+              artistId: row.artistId,
+              title: row.title,
+              imageUrl: row.imageUrl,
+            });
+          }
         }
       }
       // IDs not returned by the query have been deleted from the catalogue.
@@ -144,6 +255,15 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
           error: "Some items in your cart are no longer available.",
           code: "items_unavailable",
           unavailableListings,
+        });
+        return;
+      }
+
+      if (overStockListings.length > 0) {
+        res.status(400).json({
+          error: "Some items in your cart exceed the available stock.",
+          code: "over_stock",
+          overStockListings,
         });
         return;
       }
