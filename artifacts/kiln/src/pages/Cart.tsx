@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck } from "lucide-react";
+import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
@@ -32,11 +32,17 @@ function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDo
   return rate + perItem;
 }
 
+interface ProcessingWindow {
+  days: number | null;
+  label: string | null;
+}
+
 export default function Cart() {
   const { items, itemCount, subtotal, removeItem, updateQty, clearCart } = useCart();
   const [bundleApplied, setBundleApplied] = useState(false);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
   const [isDomestic, setIsDomestic] = useState(true);
+  const [processingWindows, setProcessingWindows] = useState<Map<string, ProcessingWindow>>(new Map());
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
@@ -64,6 +70,34 @@ export default function Cart() {
     Promise.all(artistIds.map(aid => fetchArtistShipping(aid).then(info => ({ aid, info }))))
       .then(results => setShippingRates(new Map(results.map(r => [r.aid, r.info]))))
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistIdsKey]);
+
+  useEffect(() => {
+    if (artistIds.length === 0) {
+      setProcessingWindows(new Map());
+      return;
+    }
+    Promise.all(
+      artistIds.map(aid =>
+        fetch(`/api/users/${aid}/payment-settings`, { credentials: "include" })
+          .then(r => r.ok ? r.json() as Promise<Record<string, unknown>> : null)
+          .catch(() => null)
+          .then(ps => ({ aid, ps }))
+      )
+    ).then(results => {
+      const perArtist = new Map<string, ProcessingWindow>();
+      for (const { aid, ps } of results) {
+        const days = ps && typeof ps.processingWindow === "number" ? ps.processingWindow : null;
+        const label = ps && typeof ps.processingWindowLabel === "string" && (ps.processingWindowLabel as string).trim()
+          ? (ps.processingWindowLabel as string).trim()
+          : null;
+        if (days !== null || label !== null) {
+          perArtist.set(aid, { days, label });
+        }
+      }
+      setProcessingWindows(perArtist);
+    }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artistIdsKey]);
 
@@ -200,6 +234,21 @@ export default function Cart() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-amber-100 leading-snug line-clamp-2">{listing.title}</p>
                       <p className="text-xs text-stone-500 mt-0.5">{listing.artistId}</p>
+                      {(() => {
+                        const pw = processingWindows.get(listing.artistId as string);
+                        if (!pw) return null;
+                        const text = pw.label
+                          ? pw.label
+                          : pw.days === 1
+                            ? "Ships within 1 business day"
+                            : `Ships within ${pw.days} business days`;
+                        return (
+                          <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-amber-400">
+                            <Clock size={10} className="shrink-0" />
+                            {text}
+                          </span>
+                        );
+                      })()}
                       <div className="mt-2 flex items-center justify-between">
                         <p className="text-sm font-bold text-amber-400">{formatPrice(listing.price)}</p>
                         <div className="flex items-center gap-2">
