@@ -118,7 +118,7 @@ export function defaultSettings(): KilnSettings {
     display_dark_mode: true,
     display_compact: false,
     display_autoplay: true,
-    display_sound: false,
+    display_sound: true,
     earnings_flash_ms: 2000,
   };
 }

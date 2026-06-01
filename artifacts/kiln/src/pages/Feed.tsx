@@ -1480,23 +1480,31 @@ export default function Feed() {
     setMusicUnlocked(true);
   }, []);
 
-  // Unlock video audio on first user interaction — scroll, touch, or tap.
-  // Browsers block all audio until a gesture; this mirrors how TikTok/Reels
-  // work: sound kicks in the moment you start scrolling, no button needed.
-  // Music plays as soon as the user unlocks audio with their first interaction.
+  // Unlock video audio as early as possible so sound plays right away — like
+  // TikTok/Reels. If the user already interacted with the page (e.g. tapped a
+  // link to get here), the browser grants audio for this document immediately,
+  // so we unlock on mount. Otherwise the very first gesture ANYWHERE on the
+  // page (not just the feed) unlocks it — no dedicated button needed.
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    if (musicUnlocked) return;
+    // Same-document user activation persists across SPA navigation: if they
+    // clicked their way to the feed, sound can start without waiting.
+    const activated = (navigator as Navigator & { userActivation?: { hasBeenActive?: boolean } })
+      .userActivation?.hasBeenActive;
+    if (activated) { unlockMusic(); return; }
     const unlock = () => unlockMusic();
-    el.addEventListener("touchstart", unlock, { once: true, passive: true });
-    el.addEventListener("pointerdown", unlock, { once: true, passive: true });
-    el.addEventListener("scroll", unlock, { once: true, passive: true });
+    const opts = { once: true, passive: true } as const;
+    document.addEventListener("touchstart", unlock, opts);
+    document.addEventListener("pointerdown", unlock, opts);
+    document.addEventListener("keydown", unlock, opts);
+    document.addEventListener("scroll", unlock, { ...opts, capture: true });
     return () => {
-      el.removeEventListener("touchstart", unlock);
-      el.removeEventListener("pointerdown", unlock);
-      el.removeEventListener("scroll", unlock);
+      document.removeEventListener("touchstart", unlock);
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("scroll", unlock, { capture: true } as EventListenerOptions);
     };
-  }, [unlockMusic]);
+  }, [unlockMusic, musicUnlocked]);
 
   const handleToggleMusic = useCallback(() => {
     if (!musicUnlocked) {
