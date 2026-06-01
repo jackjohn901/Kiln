@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, likesTable, savesTable, followsTable, userSettingsTable, streaksTable } from "@workspace/db";
+import { postsTable, likesTable, savesTable, followsTable, userSettingsTable, streaksTable, profilesTable } from "@workspace/db";
 import { desc, lt, eq, and, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -54,12 +54,27 @@ router.get("/feed", async (req, res) => {
       .orderBy(desc(postsTable.createdAt))
       .limit(POOL_SIZE);
 
+    // Newcomer boost: give low-follower artists a bounded head start so their
+    // posts aren't buried before they can accrue engagement. The bonus fades
+    // linearly to 0 once an artist passes NEWCOMER_FOLLOWER_THRESHOLD followers,
+    // and is capped so recency + engagement still dominate the ranking.
+    const NEWCOMER_FOLLOWER_THRESHOLD = 50;
+    const NEWCOMER_MAX_BONUS = 0.5;
+    const poolAuthorIds = [...new Set(pool.map((p) => p.authorId))];
+    const followerRows = poolAuthorIds.length
+      ? await db.select({ userId: profilesTable.userId, followerCount: profilesTable.followerCount })
+          .from(profilesTable).where(inArray(profilesTable.userId, poolAuthorIds))
+      : [];
+    const followerMap = new Map(followerRows.map((r) => [r.userId, r.followerCount ?? 0]));
+
     const scored = pool.map((p) => {
       const technique = p.technique?.toLowerCase() ?? "";
       const tasteBonus = preferredTechniques.some(
         (t) => technique.includes(t.toLowerCase()),
       ) ? 0.25 : 0;
-      return { ...p, _score: hotnessScore(p.likeCount, p.commentCount, p.saveCount, p.createdAt, tasteBonus) };
+      const followers = followerMap.get(p.authorId) ?? 0;
+      const newcomerBonus = Math.max(0, Math.min(1, (NEWCOMER_FOLLOWER_THRESHOLD - followers) / NEWCOMER_FOLLOWER_THRESHOLD)) * NEWCOMER_MAX_BONUS;
+      return { ...p, _score: hotnessScore(p.likeCount, p.commentCount, p.saveCount, p.createdAt, tasteBonus + newcomerBonus) };
     }).sort((a, b) => b._score - a._score);
 
     const slice = scored.slice(page * limit, (page + 1) * limit);

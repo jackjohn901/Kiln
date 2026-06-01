@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { profilesTable, followsTable, streaksTable } from "@workspace/db";
-import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
+import { profilesTable, followsTable, streaksTable, postsTable } from "@workspace/db";
+import { desc, eq, and, inArray, isNotNull, gte, sql } from "drizzle-orm";
 import { publicProfileFields } from "../lib/publicFields";
 
 const router = Router();
@@ -93,6 +93,83 @@ router.get("/leaderboard/cities", async (req, res): Promise<void> => {
       }));
     res.json({ cities });
   } catch (err) { req.log.error({ err }, "cityLeaderboard error"); res.status(500).json({ error: "Failed" }); }
+});
+
+// GET /discover/rising-artists — new / low-follower artists who are actively
+// posting, so newcomers get discovered before they build a following.
+router.get("/discover/rising-artists", async (req, res): Promise<void> => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 12, 50);
+    const RISING_FOLLOWER_CAP = 500;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // Aggregate per-author over the FULL 30-day window (one row per active
+    // author) so a low-follower maker with a single older-but-recent post is
+    // still considered — not just authors in the newest slice of posts.
+    const recent = await db
+      .select({
+        authorId: postsTable.authorId,
+        count: sql<number>`count(*)::int`,
+        last: sql<string>`max(${postsTable.createdAt})`,
+      })
+      .from(postsTable)
+      .where(and(eq(postsTable.isDraft, false), gte(postsTable.createdAt, since)))
+      .groupBy(postsTable.authorId)
+      .orderBy(desc(sql`max(${postsTable.createdAt})`))
+      .limit(500);
+    if (!recent.length) { res.json({ artists: [] }); return; }
+
+    const activity = new Map<string, { count: number; last: Date }>(
+      recent.map((r) => [r.authorId, { count: r.count, last: new Date(r.last) }]),
+    );
+    const authorIds = [...activity.keys()];
+
+    const profiles = await db.select({
+      userId: profilesTable.userId,
+      handle: profilesTable.handle,
+      displayName: profilesTable.displayName,
+      avatarUrl: profilesTable.avatarUrl,
+      medium: profilesTable.medium,
+      bio: profilesTable.bio,
+      location: profilesTable.location,
+      followerCount: profilesTable.followerCount,
+    }).from(profilesTable)
+      .where(and(inArray(profilesTable.userId, authorIds), isNotNull(profilesTable.displayName)));
+
+    const ranked = profiles
+      .filter((p) => (p.followerCount ?? 0) < RISING_FOLLOWER_CAP)
+      .map((p) => ({ p, act: activity.get(p.userId)! }))
+      .sort((a, b) => {
+        // Newcomers first (fewest followers), then most active, then most recent.
+        if ((a.p.followerCount ?? 0) !== (b.p.followerCount ?? 0)) return (a.p.followerCount ?? 0) - (b.p.followerCount ?? 0);
+        if (a.act.count !== b.act.count) return b.act.count - a.act.count;
+        return b.act.last.getTime() - a.act.last.getTime();
+      })
+      .slice(0, limit);
+
+    const viewerId = req.isAuthenticated() ? req.user.id : null;
+    let followingIds = new Set<string>();
+    if (viewerId && ranked.length) {
+      const ids = ranked.map((r) => r.p.userId);
+      const follows = await db.select({ followingId: followsTable.followingId }).from(followsTable)
+        .where(and(eq(followsTable.followerId, viewerId), inArray(followsTable.followingId, ids)));
+      followingIds = new Set(follows.map((f) => f.followingId));
+    }
+
+    res.json({
+      artists: ranked.map(({ p, act }) => ({
+        userId: p.userId,
+        handle: p.handle,
+        displayName: p.displayName,
+        avatarUrl: p.avatarUrl,
+        medium: p.medium,
+        bio: p.bio,
+        location: p.location,
+        followerCount: p.followerCount ?? 0,
+        recentPosts: act.count,
+        isFollowing: followingIds.has(p.userId),
+      })),
+    });
+  } catch (err) { req.log.error({ err }, "risingArtists error"); res.status(500).json({ error: "Failed to load rising artists" }); }
 });
 
 // GET /followers/:userId — who follows this user

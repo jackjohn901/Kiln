@@ -92,6 +92,44 @@ export default function Discover() {
       .catch(() => {});
   }, []);
 
+  interface TrendingTag { tag: string; count: number; weeklyGrowth: number; imageUrl: string | null; }
+  const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
+  useEffect(() => {
+    fetch("/api/trending-posts?limit=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.trendingTags?.length) setTrendingTags(data.trendingTags); })
+      .catch(() => {});
+  }, []);
+
+  interface RisingArtist {
+    userId: string; handle: string | null; displayName: string | null;
+    avatarUrl: string | null; medium: string | null; followerCount: number;
+    recentPosts: number; isFollowing: boolean;
+  }
+  const [risingArtists, setRisingArtists] = useState<RisingArtist[]>([]);
+  useEffect(() => {
+    fetch("/api/discover/rising-artists?limit=12")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.artists?.length) setRisingArtists(data.artists); })
+      .catch(() => {});
+  }, []);
+
+  interface StreakLeader {
+    userId: string; currentStreak: number; longestStreak: number;
+    handle: string | null; displayName: string | null; avatarUrl: string | null; medium: string | null;
+  }
+  const [streakLeaders, setStreakLeaders] = useState<StreakLeader[]>([]);
+  useEffect(() => {
+    fetch("/api/leaderboard/streaks")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.profiles?.length) {
+          setStreakLeaders((data.profiles as StreakLeader[]).filter((p) => p.currentStreak > 0));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   interface ApiArtist {
     id: string; displayName: string | null; handle: string | null;
     bio: string | null; avatarUrl: string | null; medium: string | null;
@@ -182,6 +220,25 @@ export default function Discover() {
     }));
   }, [leaderboardArtists]);
 
+  // "New & rising" rail: real low-follower active artists from the API, with a
+  // soft fallback to the leaderboard list when no rising data is available yet.
+  const risingDisplay = useMemo(() => {
+    if (risingArtists.length > 0) {
+      return risingArtists.map((a) => ({
+        id: a.userId,
+        name: a.displayName ?? a.handle ?? "Artist",
+        avatar: a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${a.userId}`,
+        medium: a.medium ?? "",
+      }));
+    }
+    return combinedArtists.slice(0, 8).map((a) => ({
+      id: a.id,
+      name: a.name,
+      avatar: a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${a.id}`,
+      medium: a.medium,
+    }));
+  }, [risingArtists, combinedArtists]);
+
   const suggestions = useMemo(() => {
     if (query.length < 2) return { artists: [], techniques: [] };
     const q = query.toLowerCase();
@@ -258,6 +315,33 @@ export default function Discover() {
             <h1 className="text-2xl font-bold text-stone-100 mb-1">Discover</h1>
             <p className="text-sm text-stone-400">Shop original works, bid on live auctions, and find craft artists</p>
           </div>
+
+          {/* Trending now — real engagement-ranked tags from the platform */}
+          {trendingTags.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp size={14} className="text-amber-400" />
+                <h2 className="text-sm font-semibold text-stone-300">Trending now</h2>
+                <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-400">THIS WEEK</span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                {trendingTags.slice(0, 12).map((t) => (
+                  <Link key={t.tag} href={`/tag/${encodeURIComponent(t.tag)}`}>
+                    <div className="group shrink-0 flex items-center gap-2 rounded-xl border border-white/8 bg-stone-900/60 px-3 py-2 hover:border-amber-500/30 hover:bg-stone-900 transition-all cursor-pointer">
+                      {t.imageUrl && <img src={t.imageUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />}
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-stone-200 truncate">#{t.tag}</p>
+                        <p className="text-[10px] text-stone-500">
+                          {t.count} {t.count === 1 ? "post" : "posts"}
+                          {t.weeklyGrowth > 0 && <span className="ml-1 text-emerald-400">▲ {t.weeklyGrowth}%</span>}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Marketplace */}
           <div className="mb-8">
@@ -352,25 +436,24 @@ export default function Discover() {
               </div>
             )}
 
-            {/* Rising artists */}
+            {/* New & rising artists — real low-follower active makers */}
             <div className="flex items-center gap-2 mb-3">
               <Flame size={13} className="text-amber-400" />
-              <h2 className="text-sm font-semibold text-stone-300">Rising artists</h2>
+              <h2 className="text-sm font-semibold text-stone-300">New &amp; rising artists</h2>
+              <span className="rounded-full bg-stone-800 border border-stone-700 px-2 py-0.5 text-[9px] text-stone-500">Fresh on Kiln</span>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-              {combinedArtists.slice(0, 8).map((a) => {
-                const avatar = a.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${a.id}`;
-                return (
-                  <Link key={a.id} href={`/artists/${a.id}`}>
-                    <div className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer group">
-                      <div className="relative h-14 w-14 rounded-full overflow-hidden border-2 border-amber-500/30 group-hover:border-amber-400/70 transition-colors">
-                        <img src={avatar} alt={a.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
-                      </div>
-                      <p className="text-[10px] text-stone-400 group-hover:text-amber-300 transition-colors text-center max-w-[60px] truncate">{a.name.split(" ")[0]}</p>
+              {risingDisplay.map((a) => (
+                <Link key={a.id} href={`/artists/${a.id}`}>
+                  <div className="shrink-0 flex flex-col items-center gap-1 cursor-pointer group w-16">
+                    <div className="relative h-14 w-14 rounded-full overflow-hidden border-2 border-amber-500/30 group-hover:border-amber-400/70 transition-colors">
+                      <img src={a.avatar} alt={a.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                     </div>
-                  </Link>
-                );
-              })}
+                    <p className="text-[10px] text-stone-400 group-hover:text-amber-300 transition-colors text-center max-w-[60px] truncate">{a.name.split(" ")[0]}</p>
+                    {a.medium && <p className="text-[9px] text-stone-600 text-center max-w-[60px] truncate">{a.medium}</p>}
+                  </div>
+                </Link>
+              ))}
             </div>
 
             {/* Weekly challenge callout */}
@@ -420,6 +503,36 @@ export default function Discover() {
                         <p className="text-xs text-stone-400 leading-relaxed">
                           {followerLabel}{artist.location ? ` · ${artist.location}` : ""}
                         </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* On a streak — makers posting consistently right now */}
+          {streakLeaders.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <Flame size={14} className="text-amber-400" />
+                <h2 className="text-sm font-semibold text-stone-300">On a streak</h2>
+                <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[9px] font-bold text-amber-400">POSTING DAILY</span>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                {streakLeaders.slice(0, 12).map((s) => {
+                  const name = s.displayName ?? s.handle ?? "Artist";
+                  const avatar = s.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${s.userId}`;
+                  return (
+                    <Link key={s.userId} href={`/artists/${s.userId}`}>
+                      <div className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer group w-16">
+                        <div className="relative h-14 w-14 rounded-full overflow-hidden border-2 border-amber-500/40 group-hover:border-amber-400/70 transition-colors">
+                          <img src={avatar} alt={name} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                          <div className="absolute -bottom-0.5 -right-0.5 rounded-full bg-amber-500 px-1 py-0.5 text-[8px] font-bold text-stone-950">
+                            🔥{s.currentStreak}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-stone-400 group-hover:text-amber-300 transition-colors text-center max-w-[60px] truncate">{name.split(" ")[0]}</p>
                       </div>
                     </Link>
                   );
