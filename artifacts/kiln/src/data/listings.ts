@@ -173,7 +173,7 @@ export const listings: Listing[] = [
     medium: "Leaded glass shards",
     dimensions: "Life size — 30 × 52 × 18 inches",
     price: 38000,
-    imageUrl: "http://martaklonowska.com/wp-content/uploads/2018/04/11a_luchs-500x330.jpg",
+    imageUrl: "https://pixel77.com/wp-content/uploads/2013/02/Amazing-glass-shard-sculptures-Marta-Klonowska-2.jpg",
     available: false,
   },
   {

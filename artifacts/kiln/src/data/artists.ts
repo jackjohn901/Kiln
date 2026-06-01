@@ -310,7 +310,7 @@ export const artists: Artist[] = [
       { id: "x7twVLxYe3w", title: "Glass Lynx — Marta Klonowska" },
     ],
     images: [
-      { url: "http://martaklonowska.com/wp-content/uploads/2018/04/11a_luchs-500x330.jpg", caption: "Lynx, 2009 — after Albrecht Dürer" },
+      { url: "https://pixel77.com/wp-content/uploads/2013/02/Amazing-glass-shard-sculptures-Marta-Klonowska-2.jpg", caption: "Lynx, 2009 — after Albrecht Dürer" },
       { url: "https://www.habatat.com/wp-content/uploads/2014/09/artist.png", caption: "Marta Klonowska — Habatat Galleries" },
     ],
     website: "http://martaklonowska.com",

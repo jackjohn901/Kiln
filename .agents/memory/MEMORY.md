@@ -9,3 +9,5 @@
 - [Fabricated-data rule](kiln-fabricated-data-hotspots.md) — never render fabricated numbers/activity as real; demo *content* datasets stay, their fake *stats* go; success only on `res.ok`.
 - [Kiln mutation error handling](kiln-mutation-error-handling.md) — user-initiated mutation fetches must gate on r.ok + toast + revert optimistic UI; mark-read/like/follow/cart-sync intentionally stay silent.
 - [Kiln video uploads → Mux](kiln-video-upload-mux.md) — user videos must upload via Mux (uploadVideo), persist muxPlaybackId + Mux thumbnail to localStorage AND DB; object-storage MP4s render black on grid/mobile.
+- [Composite lib decl drift](composite-lib-decl-drift.md) — new export in a lib/* is invisible to consumers until `typecheck:libs` rebuilds its .d.ts; "no exported member X" despite source having it.
+- [Mixed-content http assets](mixed-content-http-assets.md) — embedded media URLs must be https or they break on the prod https site; outbound link hrefs are exempt.
