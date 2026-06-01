@@ -43,11 +43,18 @@ interface Order {
 interface OrderDetailResponse {
   order: Order;
   siblingOrders?: Order[];
+  perSellerWindows?: PerSellerWindow[];
 }
 
 interface SellerProcessingWindow {
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
+}
+
+interface PerSellerWindow {
+  sellerName: string;
+  days: number | null;
+  label: string | null;
 }
 
 function formatPrice(n: number) {
@@ -212,6 +219,7 @@ export default function OrderDetailScreen() {
   const order = data.order;
   const siblings: Order[] = (data.siblingOrders && data.siblingOrders.length > 1) ? data.siblingOrders : [];
   const isCartOrder = siblings.length > 1;
+  const perSellerWindows: PerSellerWindow[] = data.perSellerWindows ?? [];
   const cartTotal = isCartOrder ? siblings.reduce((sum, o) => sum + o.amount, 0) : order.amount;
   const statusColor = STATUS_COLOR[order.status] ?? "#8A7E75";
   const statusLabel = STATUS_LABEL[order.status] ?? "Pending";
@@ -353,6 +361,47 @@ export default function OrderDetailScreen() {
             </View>
           )}
         </View>
+
+        {isCartOrder && perSellerWindows.length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>PROCESSING TIMES</Text>
+            {perSellerWindows.map((w, idx) => {
+              const windowText = w.label
+                ? w.label
+                : w.days === 1
+                  ? "1 business day"
+                  : w.days !== null
+                    ? `${w.days} business days`
+                    : null;
+              return (
+                <View
+                  key={idx}
+                  style={[
+                    styles.infoRow,
+                    { alignItems: "center" },
+                    idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 12, marginTop: 4 },
+                  ]}
+                >
+                  <Feather name="clock" size={14} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.infoText, { color: colors.foreground, marginBottom: 0 }]}>
+                      {w.sellerName}
+                    </Text>
+                    {windowText ? (
+                      <Text style={[styles.infoText, { color: colors.primary, fontFamily: "Inter_600SemiBold", marginTop: 1 }]}>
+                        {windowText}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.infoText, { color: colors.mutedForeground, marginTop: 1 }]}>
+                        No estimate provided
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {(isActive || (!isCartOrder && hasDeliveryEstimate)) && (
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
