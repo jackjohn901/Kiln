@@ -11,6 +11,11 @@ import { drainEmailQueue } from "./lib/emailQueue";
 
 const app: Express = express();
 
+// Trust the platform reverse proxy so `req.ip` reflects the real client IP from
+// X-Forwarded-For. Required for per-IP rate limiting (see orders cart receipt
+// limiter) to identify callers instead of the shared proxy address.
+app.set("trust proxy", true);
+
 app.use(
   pinoHttp({
     logger,
