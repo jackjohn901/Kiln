@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable, usersTable } from "@workspace/db";
+import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, inArray, and } from "drizzle-orm";
 import crypto from "crypto";
 import { logger } from "../lib/logger";
@@ -355,7 +355,7 @@ router.patch("/me/orders/:id/shipping-address", async (req, res): Promise<void> 
 
   try {
     const rows = await db
-      .select({ id: ordersTable.id, buyerId: ordersTable.buyerId, status: ordersTable.status })
+      .select({ id: ordersTable.id, buyerId: ordersTable.buyerId, sellerId: ordersTable.sellerId, status: ordersTable.status, title: ordersTable.title })
       .from(ordersTable)
       .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.buyerId, req.user.id)))
       .limit(1);
@@ -372,6 +372,22 @@ router.patch("/me/orders/:id/shipping-address", async (req, res): Promise<void> 
       .update(ordersTable)
       .set({ shippingAddress: trimmed })
       .where(eq(ordersTable.id, order.id));
+
+    // Notify the seller that the buyer updated their shipping address.
+    const buyer = req.user;
+    const buyerName = [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || "A buyer";
+    db.insert(notificationsTable).values({
+      id: crypto.randomUUID(),
+      userId: order.sellerId,
+      type: "address_updated",
+      fromId: buyer.id,
+      fromName: buyerName,
+      fromAvatarUrl: buyer.profileImageUrl ?? null,
+      text: `${buyerName} updated their shipping address for "${order.title}"`,
+      link: `/sales/${order.id}`,
+    }).catch((err: unknown) => {
+      logger.warn({ err, orderId: order.id }, "Failed to insert address_updated notification for seller");
+    });
 
     res.json({ ok: true, shippingAddress: trimmed });
   } catch (err) {

@@ -794,7 +794,12 @@ export default function SaleDetail() {
 
         {sale.shippingAddress && (
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">Ship to</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Ship to</p>
+              <p className="text-xs text-stone-600" title={new Date(sale.updatedAt).toLocaleString("en-US")}>
+                Updated {formatDate(sale.updatedAt)}
+              </p>
+            </div>
             <div className="flex items-start gap-2">
               <MapPin size={14} className="text-stone-500 shrink-0 mt-0.5" />
               <div>
