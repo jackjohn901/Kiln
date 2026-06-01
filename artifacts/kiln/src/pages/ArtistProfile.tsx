@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import QABlock from "@/components/QABlock";
 import { useParams, Link, useLocation, useSearch } from "wouter";
+import { toast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ExternalLink, Heart, Bookmark, Share2, Ban, Trash2, BellOff, Bell, MoreHorizontal,
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
@@ -382,7 +383,23 @@ export default function ArtistProfile() {
 
   const [shipping, setShipping] = useState<ArtistShipping | null>(null);
   const [apiListings, setApiListings] = useState<{ id: string; title: string; medium: string | null; price: number; imageUrl: string | null; isPinned: boolean; sortOrder: number }[] | null>(null);
-  const [apiAuctions, setApiAuctions] = useState<{ id: string; title: string; medium: string | null; imageUrl: string | null; currentBid: number; startingPrice: number; bidCount: number; status: string; endDate: string }[]>([]);
+  const [apiAuctions, setApiAuctions] = useState<{ id: string; title: string; medium: string | null; imageUrl: string | null; currentBid: number; startingPrice: number; reservePrice: number | null; currentBidderId: string | null; bidCount: number; status: string; endDate: string }[]>([]);
+  const [relistingId, setRelistingId] = useState<string | null>(null);
+  async function relistAuction(auctionId: string) {
+    if (relistingId) return;
+    setRelistingId(auctionId);
+    try {
+      const r = await fetch(`/api/auctions/${auctionId}/relist`, { method: "POST", credentials: "include" });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(d?.error || "Could not re-auction this piece.");
+      toast({ title: "Back up for auction!", description: "Your piece is live again." });
+      navigate(`/auctions/${d.id}`);
+    } catch (e) {
+      toast({ title: "Couldn’t re-auction", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setRelistingId(null);
+    }
+  }
 
   const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
   const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
@@ -592,6 +609,9 @@ export default function ArtistProfile() {
               {apiAuctions.slice(0, 6).map((a) => {
                 const live = a.status === "live" && new Date(a.endDate) > new Date();
                 const upcoming = a.status === "upcoming" || a.status === "scheduled";
+                const ended = new Date(a.endDate) < new Date();
+                const reserveMet = a.reservePrice == null || a.currentBid >= a.reservePrice;
+                const passed = ended && a.status !== "relisted" && !(a.currentBidderId && reserveMet);
                 const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
                 return (
                   <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
@@ -617,6 +637,11 @@ export default function ArtistProfile() {
                         <p className="text-sm font-bold text-amber-400">{formatPrice(bid)}</p>
                         <p className="text-[10px] text-stone-500">{a.bidCount} bid{a.bidCount !== 1 ? "s" : ""}</p>
                       </div>
+                      {isOwn && passed && (
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); relistAuction(a.id); }} disabled={relistingId === a.id} className="mt-1.5 w-full rounded-lg bg-amber-500/90 px-2 py-1 text-[10px] font-semibold text-stone-950 transition-colors hover:bg-amber-400 disabled:opacity-60">
+                          {relistingId === a.id ? "Re-auctioning…" : "Re-auction"}
+                        </button>
+                      )}
                     </div>
                   </Link>
                 );
@@ -1498,6 +1523,9 @@ export default function ArtistProfile() {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   {apiAuctions.map((a) => {
                     const live = a.status === "live" && new Date(a.endDate) > new Date();
+                    const ended = new Date(a.endDate) < new Date();
+                    const reserveMet = a.reservePrice == null || a.currentBid >= a.reservePrice;
+                    const passed = ended && a.status !== "relisted" && !(a.currentBidderId && reserveMet);
                     const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
                     return (
                       <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
@@ -1527,6 +1555,11 @@ export default function ArtistProfile() {
                             <p className="font-bold text-amber-400">{formatPrice(bid)}</p>
                             <p className="text-[10px] text-stone-500">{a.bidCount} bid{a.bidCount !== 1 ? "s" : ""}</p>
                           </div>
+                          {isOwn && passed && (
+                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); relistAuction(a.id); }} disabled={relistingId === a.id} className="mt-2 w-full rounded-lg bg-amber-500/90 px-2 py-1.5 text-[11px] font-semibold text-stone-950 transition-colors hover:bg-amber-400 disabled:opacity-60">
+                              {relistingId === a.id ? "Re-auctioning…" : "Re-auction"}
+                            </button>
+                          )}
                         </div>
                       </Link>
                     );

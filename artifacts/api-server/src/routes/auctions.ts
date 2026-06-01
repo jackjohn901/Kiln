@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { auctionsTable, auctionBidsTable, notificationsTable, usersTable, userSettingsTable, profilesTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
-import { eq, desc, and, gt, max } from "drizzle-orm";
+import { eq, desc, and, gt, max, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
 import { sendEmailWithRetry, outbidEmail } from "../lib/email";
@@ -62,6 +62,78 @@ router.post("/auctions", async (req, res): Promise<void> => {
   res.status(201).json({ ...auction, bids: [], startDate: auction.startDate.toISOString(), endDate: auction.endDate.toISOString(), createdAt: auction.createdAt.toISOString() });
 });
 
+// POST /auctions/:id/relist — re-auction a piece whose auction ended without
+// selling ("passed": no bids, or the reserve was never met). Owner only. Starts a
+// fresh live auction now, for the same duration and same starting/reserve price.
+router.post("/auctions/:id/relist", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+  try {
+    // Serialize per source-auction with an advisory lock and re-read inside the
+    // transaction so concurrent requests (multi-tab, retries) can't spawn multiple
+    // clones. The source is flagged "relisted" once consumed (idempotency guard).
+    type RelistResult =
+      | { error: "notfound" | "forbidden" | "already" | "live" | "sold" }
+      | { created: typeof auctionsTable.$inferSelect };
+    const result: RelistResult = await db.transaction(async (tx): Promise<RelistResult> => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${req.params.id}))`);
+      const [auction] = await tx.select().from(auctionsTable).where(eq(auctionsTable.id, req.params.id));
+      if (!auction) return { error: "notfound" as const };
+      if (auction.artistId !== userId) return { error: "forbidden" as const };
+      if (auction.status === "relisted") return { error: "already" as const };
+      if (new Date() <= auction.endDate) return { error: "live" as const };
+      const reserveMet = auction.reservePrice == null || auction.currentBid >= auction.reservePrice;
+      if (auction.currentBidderId && reserveMet) return { error: "sold" as const };
+      // Preserve the original auction length; fall back to 3 days if it was zero/invalid.
+      const durationMs = auction.endDate.getTime() - auction.startDate.getTime();
+      const start = new Date();
+      const end = new Date(start.getTime() + (durationMs > 0 ? durationMs : 3 * 86_400_000));
+      const [created] = await tx.insert(auctionsTable).values({
+        id: crypto.randomUUID(),
+        artistId: auction.artistId,
+        artistName: auction.artistName,
+        artistAvatarUrl: auction.artistAvatarUrl,
+        title: auction.title,
+        description: auction.description,
+        imageUrl: auction.imageUrl,
+        medium: auction.medium,
+        dimensions: auction.dimensions,
+        startingPrice: auction.startingPrice,
+        reservePrice: auction.reservePrice,
+        currentBid: 0,
+        currentBidderId: null,
+        currentBidderName: null,
+        bidCount: 0,
+        currency: auction.currency,
+        status: "live",
+        startDate: start,
+        endDate: end,
+        winnerId: null,
+        tags: auction.tags ?? [],
+      }).returning();
+      await tx.update(auctionsTable).set({ status: "relisted" }).where(eq(auctionsTable.id, auction.id));
+      return { created };
+    });
+    if ("error" in result) {
+      const map = {
+        notfound: [404, "Not found"],
+        forbidden: [403, "You can only re-auction your own pieces"],
+        already: [409, "This piece has already been re-auctioned"],
+        live: [400, "This auction hasn't ended yet"],
+        sold: [400, "This auction sold — it can't be re-auctioned"],
+      } as const;
+      const [code, message] = map[result.error];
+      res.status(code).json({ error: message });
+      return;
+    }
+    const created = result.created;
+    res.status(201).json({ ...created, bids: [], startDate: created.startDate.toISOString(), endDate: created.endDate.toISOString(), createdAt: created.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error({ err }, "relistAuction error");
+    res.status(500).json({ error: "Failed to re-auction" });
+  }
+});
+
 // POST /auctions/:id/bid — place a bid
 router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -112,6 +184,9 @@ router.post("/auctions/:id/checkout", async (req, res): Promise<void> => {
   if (new Date() < auction.endDate) { res.status(400).json({ error: "Auction is still live" }); return; }
   if (!auction.currentBidderId) { res.status(400).json({ error: "No winning bid on this auction" }); return; }
   if (auction.currentBidderId !== req.user.id) { res.status(403).json({ error: "You are not the winning bidder" }); return; }
+  // Reserve must be met for a sale — keeps "sold" consistent with the relist rule,
+  // so a reserve-not-met (relistable) auction can never also be checked out.
+  if (auction.reservePrice != null && auction.currentBid < auction.reservePrice) { res.status(400).json({ error: "The reserve price was not met on this auction" }); return; }
   try {
     const stripe = await getUncachableStripeClient();
     const baseUrl = process.env.REPLIT_DOMAINS
