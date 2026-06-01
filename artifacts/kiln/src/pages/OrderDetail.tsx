@@ -37,8 +37,9 @@ interface Order {
 function itemDetailHref(type: string, refId: string | null): string | null {
   if (!refId) return null;
   if (type === "listing") return `/listings/${refId}`;
-  if (type === "drop") return `/drops`;
-  if (type === "workshop") return `/workshops`;
+  if (type === "drop") return `/drops/${refId}`;
+  if (type === "workshop") return `/workshops/${refId}`;
+  if (type === "commission") return `/commissions/${refId}`;
   return null;
 }
 

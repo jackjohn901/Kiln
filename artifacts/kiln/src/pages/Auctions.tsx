@@ -115,9 +115,9 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       className={`overflow-hidden rounded-2xl border bg-stone-900/60 transition-all ${isLive ? "border-amber-500/20 hover:border-amber-500/40" : "border-white/8 opacity-75"}`}>
-      <div className="relative aspect-[4/3] overflow-hidden bg-stone-800">
+      <Link href={`/auctions/${auction.id}`} className="relative block aspect-[4/3] overflow-hidden bg-stone-800 group/img">
         {auction.imageUrl ? (
-          <img src={auction.imageUrl} alt={auction.title} className="h-full w-full object-cover" />
+          <img src={auction.imageUrl} alt={auction.title} className="h-full w-full object-cover transition-transform duration-300 group-hover/img:scale-105" />
         ) : (
           <div className="h-full w-full flex items-center justify-center">
             <Gavel size={32} className="text-stone-600" />
@@ -137,7 +137,7 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
           <p className="font-serif text-base font-medium text-white leading-tight">{auction.title}</p>
           <p className="text-xs text-stone-400">{auction.artistName}</p>
         </div>
-      </div>
+      </Link>
 
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">

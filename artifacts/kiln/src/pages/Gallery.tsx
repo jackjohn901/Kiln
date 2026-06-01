@@ -311,14 +311,15 @@ function GalleryTile({
             </div>
           </Link>
 
-          {/* View this post button */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          {/* View this post */}
+          <Link
+            href={`/posts/${item.postId}`}
+            onClick={(e) => e.stopPropagation()}
             className="shrink-0 rounded-full bg-amber-500 p-1.5 hover:bg-amber-400 transition-colors"
             title="View post"
           >
             <ExternalLink size={11} className="text-stone-950" />
-          </button>
+          </Link>
         </div>
       </div>
 

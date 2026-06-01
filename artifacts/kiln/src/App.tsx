@@ -29,6 +29,10 @@ import Workshops from "@/pages/Workshops";
 import Inbox from "@/pages/Inbox";
 import Messages from "@/pages/Messages";
 import Drops from "@/pages/Drops";
+import DropsDetail from "@/pages/DropsDetail";
+import ChallengeDetail from "@/pages/ChallengeDetail";
+import AuctionDetail from "@/pages/AuctionDetail";
+import WorkshopDetail from "@/pages/WorkshopDetail";
 import Techniques from "@/pages/Techniques";
 import Subscribe from "@/pages/Subscribe";
 import Notifications from "@/pages/Notifications";
@@ -317,6 +321,7 @@ function Router() {
       <Route path="/artists/:id/following" component={FollowerList} />
       <Route path="/shop" component={Shop} />
       <Route path="/workshops" component={Workshops} />
+      <Route path="/workshops/:id" component={WorkshopDetail} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/setup" component={Setup} />
       <Route path="/create" component={Create} />
@@ -324,6 +329,7 @@ function Router() {
       <Route path="/messages" component={Messages} />
       <Route path="/messages/:participantId" component={Messages} />
       <Route path="/drops" component={Drops} />
+      <Route path="/drops/:id" component={DropsDetail} />
       <Route path="/techniques" component={Techniques} />
       <Route path="/techniques/:id" component={Techniques} />
       <Route path="/subscribe/:artistId" component={Subscribe} />
@@ -341,6 +347,7 @@ function Router() {
       <Route path="/tag/:tag" component={TagFeed} />
       <Route path="/posts/:id" component={PostDetail} />
       <Route path="/challenges" component={Challenges} />
+      <Route path="/challenges/:id" component={ChallengeDetail} />
       <Route path="/shop/checkout/:listingId" component={Checkout} />
       <Route path="/workshops/book/:workshopId" component={WorkshopCheckout} />
       <Route path="/live/:artistId" component={LiveStudio} />
@@ -387,6 +394,7 @@ function Router() {
       <Route path="/audience" component={Audience} />
       <Route path="/coa" component={CertificateOfAuthenticity} />
       <Route path="/auctions" component={Auctions} />
+      <Route path="/auctions/:id" component={AuctionDetail} />
       <Route path="/embed/:artistId" component={EmbedPortfolio} />
       <Route path="/commission-contract" component={CommissionContract} />
       <Route path="/commission-contract/:artistId" component={CommissionContract} />
