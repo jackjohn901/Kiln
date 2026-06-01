@@ -400,6 +400,8 @@ export default function CartCheckout() {
 
     // Save address in the background — fire-and-forget, never block checkout on it
     if (saveAddress && addr.address && addr.city) {
+      // Optimistically update the summary card so it reflects the address being saved
+      setSavedAddress({ street: addr.address, city: addr.city, state: addr.state, zip: addr.zip, country: addr.country });
       fetch("/api/me/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
