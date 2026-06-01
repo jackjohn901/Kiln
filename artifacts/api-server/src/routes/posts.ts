@@ -452,6 +452,23 @@ router.post("/me/drafts/:id/publish", async (req, res): Promise<void> => {
   } catch (err) { req.log.error({ err }, "publishDraft error"); res.status(500).json({ error: "Failed to publish draft" }); }
 });
 
+// DELETE /me/posts/:id — delete one of the caller's own published posts and its
+// likes/saves/comments. Owner only.
+router.delete("/me/posts/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [existing] = await db.select({ authorId: postsTable.authorId }).from(postsTable)
+      .where(eq(postsTable.id, req.params.id));
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    if (existing.authorId !== req.user.id) { res.status(403).json({ error: "You can only remove your own posts" }); return; }
+    await db.delete(likesTable).where(eq(likesTable.postId, req.params.id));
+    await db.delete(savesTable).where(eq(savesTable.postId, req.params.id));
+    await db.delete(commentsTable).where(eq(commentsTable.postId, req.params.id));
+    await db.delete(postsTable).where(eq(postsTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) { req.log.error({ err }, "deletePost error"); res.status(500).json({ error: "Failed to delete post" }); }
+});
+
 // DELETE /me/drafts/:id — delete a draft
 router.delete("/me/drafts/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

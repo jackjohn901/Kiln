@@ -400,6 +400,23 @@ export default function ArtistProfile() {
       setRelistingId(null);
     }
   }
+  const [deletingAuctionId, setDeletingAuctionId] = useState<string | null>(null);
+  async function deleteAuction(auctionId: string) {
+    if (deletingAuctionId) return;
+    if (!confirm("Remove this auction? This can’t be undone.")) return;
+    setDeletingAuctionId(auctionId);
+    try {
+      const r = await fetch(`/api/auctions/${auctionId}`, { method: "DELETE", credentials: "include" });
+      const d = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(d?.error || "Could not remove this auction.");
+      setApiAuctions((prev) => prev.filter((a) => a.id !== auctionId));
+      toast({ title: "Auction removed" });
+    } catch (e) {
+      toast({ title: "Couldn’t remove auction", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setDeletingAuctionId(null);
+    }
+  }
 
   const [dbProfile, setDbProfile] = useState<DbUserProfile | null>(null);
   const [dbProfileLoading, setDbProfileLoading] = useState(!artist);
@@ -612,6 +629,7 @@ export default function ArtistProfile() {
                 const ended = new Date(a.endDate) < new Date();
                 const reserveMet = a.reservePrice == null || a.currentBid >= a.reservePrice;
                 const passed = ended && a.status !== "relisted" && !(a.currentBidderId && reserveMet);
+                const sold = ended && !!a.currentBidderId && reserveMet;
                 const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
                 return (
                   <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
@@ -640,6 +658,11 @@ export default function ArtistProfile() {
                       {isOwn && passed && (
                         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); relistAuction(a.id); }} disabled={relistingId === a.id} className="mt-1.5 w-full rounded-lg bg-amber-500/90 px-2 py-1 text-[10px] font-semibold text-stone-950 transition-colors hover:bg-amber-400 disabled:opacity-60">
                           {relistingId === a.id ? "Re-auctioning…" : "Re-auction"}
+                        </button>
+                      )}
+                      {isOwn && !sold && (
+                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteAuction(a.id); }} disabled={deletingAuctionId === a.id} className="mt-1.5 w-full rounded-lg border border-red-500/40 px-2 py-1 text-[10px] font-semibold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-60">
+                          {deletingAuctionId === a.id ? "Removing…" : "Remove"}
                         </button>
                       )}
                     </div>
@@ -851,6 +874,31 @@ export default function ArtistProfile() {
       window.removeEventListener("storage", reload);
     };
   }, [isOwn, profile?.id, id]);
+
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  async function deleteGridPost(itemId: string) {
+    if (deletingPostId) return;
+    if (!confirm("Delete this post? This can’t be undone.")) return;
+    if (itemId.startsWith("db-")) {
+      const realId = itemId.slice(3);
+      setDeletingPostId(itemId);
+      try {
+        const r = await fetch(`/api/me/posts/${realId}`, { method: "DELETE", credentials: "include" });
+        const d = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(d?.error || "Could not delete this post.");
+        setDbPosts((prev) => prev.filter((p) => p.id !== realId));
+        setCollabPosts((prev) => prev.filter((p) => p.id !== realId));
+        toast({ title: "Post deleted" });
+      } catch (e) {
+        toast({ title: "Couldn’t delete post", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      } finally {
+        setDeletingPostId(null);
+      }
+    } else {
+      deletePost(itemId);
+      setLocalPosts((prev) => prev.filter((p) => p.id !== itemId));
+    }
+  }
 
   const ownLocalGridItems: GridItem[] = localPosts.map((p) => ({
     id: p.id,
@@ -1307,16 +1355,11 @@ export default function ArtistProfile() {
                           {item.isVideo && <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />}
                         </div>
                         {item.isVideo && <div className="absolute right-1.5 top-1.5"><Video size={11} className="text-white drop-shadow" /></div>}
-                        {isOwn && item.id.startsWith("post-") && (
+                        {isOwn && (item.id.startsWith("post-") || item.id.startsWith("db-")) && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm("Delete this post?")) {
-                                deletePost(item.id);
-                                setLocalPosts((prev) => prev.filter((p) => p.id !== item.id));
-                              }
-                            }}
-                            className="absolute left-1 top-1 z-10 rounded-full bg-black/60 p-1 opacity-60 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteGridPost(item.id); }}
+                            disabled={deletingPostId === item.id}
+                            className="absolute left-1 top-1 z-10 rounded-full bg-black/60 p-1 opacity-60 group-hover:opacity-100 transition-opacity disabled:opacity-40"
                             aria-label="Delete post"
                           >
                             <Trash2 size={12} className="text-white" />
@@ -1526,6 +1569,7 @@ export default function ArtistProfile() {
                     const ended = new Date(a.endDate) < new Date();
                     const reserveMet = a.reservePrice == null || a.currentBid >= a.reservePrice;
                     const passed = ended && a.status !== "relisted" && !(a.currentBidderId && reserveMet);
+                    const sold = ended && !!a.currentBidderId && reserveMet;
                     const bid = a.currentBid > 0 ? a.currentBid : a.startingPrice;
                     return (
                       <Link key={a.id} href={`/auctions/${a.id}`} className="group relative block overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
@@ -1558,6 +1602,11 @@ export default function ArtistProfile() {
                           {isOwn && passed && (
                             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); relistAuction(a.id); }} disabled={relistingId === a.id} className="mt-2 w-full rounded-lg bg-amber-500/90 px-2 py-1.5 text-[11px] font-semibold text-stone-950 transition-colors hover:bg-amber-400 disabled:opacity-60">
                               {relistingId === a.id ? "Re-auctioning…" : "Re-auction"}
+                            </button>
+                          )}
+                          {isOwn && !sold && (
+                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteAuction(a.id); }} disabled={deletingAuctionId === a.id} className="mt-2 w-full rounded-lg border border-red-500/40 px-2 py-1.5 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-60">
+                              {deletingAuctionId === a.id ? "Removing…" : "Remove"}
                             </button>
                           )}
                         </div>

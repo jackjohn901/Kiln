@@ -134,6 +134,21 @@ router.post("/auctions/:id/relist", async (req, res): Promise<void> => {
   }
 });
 
+// DELETE /auctions/:id — remove the caller's own auction (and its bids). Sold
+// auctions are kept so the sale/payout record can't be erased.
+router.delete("/auctions/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [auction] = await db.select().from(auctionsTable).where(eq(auctionsTable.id, req.params.id));
+  if (!auction) { res.status(404).json({ error: "Not found" }); return; }
+  if (auction.artistId !== req.user.id) { res.status(403).json({ error: "You can only remove your own auctions" }); return; }
+  const ended = new Date() > auction.endDate;
+  const reserveMet = auction.reservePrice == null || auction.currentBid >= auction.reservePrice;
+  if (ended && auction.currentBidderId && reserveMet) { res.status(400).json({ error: "This auction sold — it can't be removed" }); return; }
+  await db.delete(auctionBidsTable).where(eq(auctionBidsTable.auctionId, auction.id));
+  await db.delete(auctionsTable).where(eq(auctionsTable.id, auction.id));
+  res.json({ success: true });
+});
+
 // POST /auctions/:id/bid — place a bid
 router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
