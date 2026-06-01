@@ -3,12 +3,13 @@ import { Link, useLocation, useParams, useSearch } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send,
+  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 import { useSocial } from "@/contexts/SocialContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
 interface Order {
@@ -193,6 +194,7 @@ export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
   const { markLinkRead } = useSocial();
+  const { login } = useAuth();
   const search = useSearch();
   const highlightParam = new URLSearchParams(search).get("highlight");
   const [order, setOrder] = useState<Order | null>(null);
@@ -201,6 +203,7 @@ export default function OrderDetail() {
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [buyerEmail, setBuyerEmail] = useState<string | null>(null);
   const [perSellerWindows, setPerSellerWindows] = useState<{ sellerName: string; days: number | null; label: string | null }[]>([]);
+  const [isPublicView, setIsPublicView] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -264,6 +267,7 @@ export default function OrderDetail() {
         if (data.buyerProfile) setBuyerProfile(data.buyerProfile as BuyerProfile);
         if (data.sellerProfile) setSellerProfile(data.sellerProfile as SellerProfile);
         if (data.buyerEmail) setBuyerEmail(data.buyerEmail as string);
+        setIsPublicView(data.isPublicView === true);
         if (Array.isArray(data.perSellerWindows) && data.perSellerWindows.length > 0) {
           setPerSellerWindows(data.perSellerWindows as { sellerName: string; days: number | null; label: string | null }[]);
         }
@@ -645,6 +649,21 @@ export default function OrderDetail() {
             )}
           </div>
         </div>
+
+        {isPublicView && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-stone-900/50 px-4 py-3">
+            <LogIn size={15} className="text-amber-400 shrink-0" />
+            <p className="flex-1 text-xs text-stone-400 leading-relaxed">
+              <button
+                onClick={login}
+                className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2 transition-colors"
+              >
+                Sign in
+              </button>{" "}
+              to see your full receipt details, including billing name, email, and address.
+            </p>
+          </div>
+        )}
 
         {showUpdateBanner && (
           <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300">
