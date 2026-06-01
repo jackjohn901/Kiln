@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -186,8 +186,10 @@ export default function CartCheckout() {
   const tax = Math.round(subtotal * 0.0875 * 100) / 100;
   const total = subtotal + shipping + tax;
 
-  // Pre-fill address from buyer's saved default shipping address
-  useEffect(() => {
+  // Pre-fill address from buyer's saved default shipping address.
+  // Extracted as a callback so it can be called on mount AND on window focus
+  // (in case the buyer edits their address in Settings mid-session).
+  const fetchSavedAddress = useCallback(() => {
     fetch("/api/me/settings", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ defaultShippingAddress?: { street?: string; city?: string; state?: string; zip?: string; country?: string } | null }> : null)
       .then(data => {
@@ -221,6 +223,27 @@ export default function CartCheckout() {
       })
       .catch(() => { setSavedAddress(null); });
   }, []);
+
+  useEffect(() => {
+    fetchSavedAddress();
+  }, [fetchSavedAddress]);
+
+  // Re-fetch the saved address whenever the buyer returns to this tab so that
+  // any edits made in Settings (in another tab) are picked up automatically.
+  useEffect(() => {
+    function handleFocus() {
+      if (step === "address") fetchSavedAddress();
+    }
+    function handleVisibility() {
+      if (document.visibilityState === "visible" && step === "address") fetchSavedAddress();
+    }
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchSavedAddress, step]);
 
   // Fetch shipping rates for each unique artist in the cart
   useEffect(() => {
