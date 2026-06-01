@@ -25,6 +25,7 @@ export interface ReceiptLine {
   title:       string;
   description: string | null;
   amount:      number;
+  quantity?:   number | null;
 }
 
 export interface ReceiptData {
@@ -40,6 +41,7 @@ export interface ReceiptData {
   buyerEmail:       string | null;
   trackingNumber:   string | null;
   processingWindow: string | null;
+  notes?:           string | null;
 }
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -135,6 +137,13 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Uint8Array> {
       page.drawText(desc, { x: ML, y, font: normal, size: 8, color: MID });
     }
 
+    if (line.quantity && line.quantity > 1) {
+      const unitPrice = usdDollars(line.amount / line.quantity);
+      const qtyStr = `Qty: ${line.quantity}  ×  ${unitPrice} each`;
+      y -= 13;
+      page.drawText(qtyStr, { x: ML, y, font: normal, size: 8, color: MID });
+    }
+
     y -= 10;
     page.drawLine({ start: { x: ML, y }, end: { x: ML + CW, y }, thickness: 0.5, color: RULE });
     y -= 16;
@@ -189,6 +198,10 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Uint8Array> {
 
   if (data.trackingNumber) {
     drawMeta("Tracking", data.trackingNumber);
+  }
+
+  if (data.notes) {
+    drawMeta("Notes", data.notes);
   }
 
   if (data.buyerEmail) {

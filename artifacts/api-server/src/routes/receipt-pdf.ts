@@ -31,6 +31,7 @@ const ORDER_COLS = {
   processingWindowLabel:ordersTable.processingWindowLabel,
   buyerId:              ordersTable.buyerId,
   createdAt:            ordersTable.createdAt,
+  quantity:             ordersTable.quantity,
 } as const;
 
 // ─── Route: single order or its siblings ────────────────────────────────────
@@ -167,6 +168,64 @@ router.get("/me/orders/cart/:sessionKey/receipt.pdf", async (req, res): Promise<
   } catch (err) {
     logger.error({ err }, "me/orders/cart/:sessionKey/receipt.pdf GET error");
     res.status(500).json({ error: "Failed to generate cart receipt PDF" });
+  }
+});
+
+// ─── Route: seller packing slip PDF ─────────────────────────────────────────
+// GET /me/sales/:id/packing-slip.pdf
+router.get("/me/sales/:id/packing-slip.pdf", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    const rows = await db.select(ORDER_COLS).from(ordersTable)
+      .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.sellerId, req.user.id)))
+      .limit(1);
+
+    if (rows.length === 0) { res.status(404).json({ error: "Sale not found" }); return; }
+
+    const order = rows[0]!;
+
+    const buyerProfileRow = order.buyerId
+      ? await db.select({ displayName: profilesTable.displayName })
+          .from(profilesTable).where(eq(profilesTable.userId, order.buyerId)).limit(1).then(r => r[0] ?? null)
+      : null;
+
+    const refNum = ordinalId(order.id);
+
+    const processingWindowText = order.processingWindowLabel
+      ? `Ships ${order.processingWindowLabel}`
+      : order.processingWindowDays !== null
+        ? `Ships within ${order.processingWindowDays} business day${order.processingWindowDays === 1 ? "" : "s"}`
+        : null;
+
+    const buyerNotes = order.notes && !order.notes.startsWith("stripe:") ? order.notes : null;
+
+    const data: ReceiptData = {
+      refNum,
+      receiptTitle:     "Packing Slip",
+      dateStr:          fmtDate(order.createdAt),
+      statusLabel:      STATUS_LABELS[order.status] ?? order.status,
+      typeLabel:        TYPE_LABELS[order.type]     ?? order.type,
+      lines:            [{ title: order.title, description: order.description ?? null, amount: order.amount, quantity: order.quantity ?? 1 }],
+      total:            order.amount,
+      buyerName:        buyerProfileRow?.displayName ?? null,
+      buyerAddress:     order.shippingAddress ?? null,
+      buyerEmail:       null,
+      trackingNumber:   order.trackingNumber ?? null,
+      processingWindow: processingWindowText,
+      notes:            buyerNotes,
+    };
+
+    const pdf      = await buildReceiptPdf(data);
+    const filename = `Kiln_PackingSlip_${refNum}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdf.length);
+    res.end(Buffer.from(pdf));
+  } catch (err) {
+    logger.error({ err }, "me/sales/:id/packing-slip.pdf GET error");
+    res.status(500).json({ error: "Failed to generate packing slip PDF" });
   }
 });
 
