@@ -269,3 +269,9 @@ id = "xyY6rc1DWscwFIHg-W7r2"
 uri = "file://attached_assets/kiln_ad_glass.png"
 type = "image"
 title = "Glass Blowers"
+
+[[outputs]]
+id = "A11KpBa0-ZE2E2xMN2RMz"
+uri = "file://kiln-soft-launch-testing-checklist.md"
+type = "text"
+title = "Kiln Soft Launch Testing Checklist"
