@@ -6,6 +6,7 @@ import { logger } from "../lib/logger";
 import {
   buildReceiptPdf,
   fmtDate,
+  formatProcessingWindowLabel,
   ordinalId,
   sessionReceiptId,
   STATUS_LABELS,
@@ -87,11 +88,8 @@ router.get("/me/orders/:id/receipt.pdf", async (req, res): Promise<void> => {
       ? sessionReceiptId(order.notes!.slice(7))
       : ordinalId(order.id);
 
-    const processingWindowText = order.processingWindowLabel
-      ? `Ships ${order.processingWindowLabel}`
-      : order.processingWindowDays !== null
-        ? `Ships within ${order.processingWindowDays} business day${order.processingWindowDays === 1 ? "" : "s"}`
-        : null;
+    const fmtLabel = formatProcessingWindowLabel(order.processingWindowDays, order.processingWindowLabel);
+    const processingWindowText = fmtLabel ? `Ships ${fmtLabel}` : null;
 
     const data: ReceiptData = {
       refNum,
@@ -135,12 +133,54 @@ router.get("/me/orders/cart/:sessionKey/receipt.pdf", async (req, res): Promise<
 
     const order = siblings[0]!;
 
-    const [buyerProfileRow, buyerUserRow] = await Promise.all([
+    // Collect unique seller IDs so we can fetch their display names for per-seller
+    // processing windows and resolve their profile names for the receipt.
+    const uniqueSellerIds = [...new Set(siblings.map(o => o.sellerId).filter((id): id is string => id != null))];
+
+    const [buyerProfileRow, buyerUserRow, ...sellerProfileRows] = await Promise.all([
       db.select({ displayName: profilesTable.displayName, location: profilesTable.location })
         .from(profilesTable).where(eq(profilesTable.userId, req.user.id)).limit(1).then(r => r[0] ?? null),
       db.select({ email: usersTable.email })
         .from(usersTable).where(eq(usersTable.id, req.user.id)).limit(1).then(r => r[0] ?? null),
+      ...uniqueSellerIds.map(sid =>
+        db.select({ userId: profilesTable.userId, displayName: profilesTable.displayName, handle: profilesTable.handle })
+          .from(profilesTable).where(eq(profilesTable.userId, sid)).limit(1)
+          .then(r => r[0] ?? null),
+      ),
     ]);
+
+    const sellerProfileMap = new Map(
+      sellerProfileRows
+        .filter((p): p is { userId: string; displayName: string | null; handle: string | null } => p != null)
+        .map(p => [p.userId, p]),
+    );
+
+    // Build a processing-window string for the PDF.
+    // For single-seller carts produce "Ships within X business days".
+    // For multi-seller carts produce "Name: within X days · Name: within Y days".
+    // Uses formatProcessingWindowLabel (mirrors the frontend utility) for consistent phrasing.
+    let processingWindow: string | null = null;
+    if (uniqueSellerIds.length === 1) {
+      // Single seller — use that order's window (may be null if not set)
+      const rep = siblings.find(o => o.sellerId === uniqueSellerIds[0]);
+      if (rep) {
+        const lbl = formatProcessingWindowLabel(rep.processingWindowDays, rep.processingWindowLabel);
+        processingWindow = lbl ? `Ships ${lbl}` : null;
+      }
+    } else if (uniqueSellerIds.length > 1) {
+      // Multiple sellers — show one entry per seller
+      const parts: string[] = [];
+      for (const sid of uniqueSellerIds) {
+        const rep  = siblings.find(o => o.sellerId === sid);
+        if (!rep) continue;
+        const lbl  = formatProcessingWindowLabel(rep.processingWindowDays, rep.processingWindowLabel);
+        if (!lbl) continue;
+        const prof = sellerProfileMap.get(sid);
+        const name = prof?.displayName?.trim() || (prof?.handle ? `@${prof.handle}` : sid);
+        parts.push(`${name}: ${lbl}`);
+      }
+      if (parts.length > 0) processingWindow = parts.join(" · ");
+    }
 
     const refNum = sessionReceiptId(req.params.sessionKey);
 
@@ -156,7 +196,7 @@ router.get("/me/orders/cart/:sessionKey/receipt.pdf", async (req, res): Promise<
       buyerAddress:  order.shippingAddress ?? buyerProfileRow?.location ?? null,
       buyerEmail:    buyerUserRow?.email ?? null,
       trackingNumber:order.trackingNumber ?? null,
-      processingWindow: null,
+      processingWindow,
     };
 
     const pdf      = await buildReceiptPdf(data);
@@ -193,11 +233,8 @@ router.get("/me/sales/:id/packing-slip.pdf", async (req, res): Promise<void> => 
 
     const refNum = ordinalId(order.id);
 
-    const processingWindowText = order.processingWindowLabel
-      ? `Ships ${order.processingWindowLabel}`
-      : order.processingWindowDays !== null
-        ? `Ships within ${order.processingWindowDays} business day${order.processingWindowDays === 1 ? "" : "s"}`
-        : null;
+    const slipLabel = formatProcessingWindowLabel(order.processingWindowDays, order.processingWindowLabel);
+    const processingWindowText = slipLabel ? `Ships ${slipLabel}` : null;
 
     const buyerNotes = order.notes && !order.notes.startsWith("stripe:") ? order.notes : null;
 
@@ -261,11 +298,8 @@ router.post("/me/sales/:id/packing-slip/email", async (req, res): Promise<void> 
 
     const refNum = ordinalId(order.id);
 
-    const processingWindowText = order.processingWindowLabel
-      ? `Ships ${order.processingWindowLabel}`
-      : order.processingWindowDays !== null
-        ? `Ships within ${order.processingWindowDays} business day${order.processingWindowDays === 1 ? "" : "s"}`
-        : null;
+    const emailLabel = formatProcessingWindowLabel(order.processingWindowDays, order.processingWindowLabel);
+    const processingWindowText = emailLabel ? `Ships ${emailLabel}` : null;
 
     const buyerNotes = order.notes && !order.notes.startsWith("stripe:") ? order.notes : null;
 

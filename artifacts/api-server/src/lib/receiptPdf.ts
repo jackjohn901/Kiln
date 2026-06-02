@@ -81,6 +81,21 @@ export const TYPE_LABELS: Record<string, string> = {
   inquiry:    "Inquiry",
 };
 
+/**
+ * Server-side mirror of the frontend `formatProcessingWindowLabel` utility.
+ * Returns a buyer-friendly delivery estimate string, or null when neither
+ * days nor a custom label is available.
+ * IMPORTANT: keep output format in sync with artifacts/kiln/src/utils/paymentSettings.ts.
+ */
+export function formatProcessingWindowLabel(
+  days: number | null | undefined,
+  label: string | null | undefined,
+): string | null {
+  if (label && label.trim()) return label.trim();
+  if (days == null) return null;
+  return days === 1 ? "within 1 business day" : `within ${days} business days`;
+}
+
 export async function buildReceiptPdf(data: ReceiptData): Promise<Uint8Array> {
   const doc    = await PDFDocument.create();
   const bold   = await doc.embedFont(StandardFonts.HelveticaBold);
