@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
 import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin, AlertCircle, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -81,6 +81,8 @@ export default function Settings() {
   const [shippingSaved, setShippingSaved] = useState(false);
   const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
   const [samplePrice, setSamplePrice] = useState<number>(45);
+  const prevSamplePriceRef = useRef(samplePrice);
+  const [freeShipUnlocked, setFreeShipUnlocked] = useState(false);
   const [contactEmail, setContactEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState(false);
@@ -120,6 +122,19 @@ export default function Settings() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const prev = prevSamplePriceRef.current;
+    prevSamplePriceRef.current = samplePrice;
+    if (shipping.freeThreshold <= 0 || shipping.offerFreeShipping) return;
+    const crossed =
+      (prev < shipping.freeThreshold && samplePrice >= shipping.freeThreshold) ||
+      (prev >= shipping.freeThreshold && samplePrice < shipping.freeThreshold);
+    if (!crossed) return;
+    setFreeShipUnlocked(true);
+    const t = setTimeout(() => setFreeShipUnlocked(false), 2500);
+    return () => clearTimeout(t);
+  }, [samplePrice, shipping.freeThreshold, shipping.offerFreeShipping]);
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
@@ -1361,6 +1376,18 @@ export default function Settings() {
                   onChange={(e) => setSamplePrice(Number(e.target.value))}
                   className="w-full h-1.5 mb-3 rounded-full appearance-none cursor-pointer accent-amber-500 bg-stone-700"
                 />
+                <div
+                  className={`overflow-hidden transition-all duration-300 ${freeShipUnlocked ? "max-h-12 opacity-100 mb-2" : "max-h-0 opacity-0 mb-0"}`}
+                >
+                  <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                    <span className="text-sm leading-none">🎉</span>
+                    <p className="text-[11px] font-medium text-emerald-400">
+                      {samplePrice >= shipping.freeThreshold
+                        ? "Buyer just unlocked free shipping!"
+                        : "Buyer dropped below free-shipping threshold"}
+                    </p>
+                  </div>
+                </div>
                 <div className="rounded-xl border border-white/8 bg-stone-800/40 overflow-hidden divide-y divide-white/5">
                   {(
                     [

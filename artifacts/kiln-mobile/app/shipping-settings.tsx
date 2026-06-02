@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -84,6 +85,9 @@ export default function ShippingSettingsScreen() {
   const [saved, setSaved] = useState(false);
   const [avgListingPrice, setAvgListingPrice] = useState<number | null>(null);
   const [samplePrice, setSamplePrice] = useState<number>(45);
+  const prevSamplePriceRef = useRef(samplePrice);
+  const freeShipAnim = useRef(new Animated.Value(0)).current;
+  const [freeShipVisible, setFreeShipVisible] = useState(false);
 
   useEffect(() => {
     apiGet<{ shippingSettings?: Partial<ShippingSettings> }>("/api/me/settings")
@@ -108,6 +112,22 @@ export default function ShippingSettingsScreen() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const prev = prevSamplePriceRef.current;
+    prevSamplePriceRef.current = samplePrice;
+    if (shipping.freeThreshold <= 0 || shipping.offerFreeShipping) return;
+    const crossed =
+      (prev < shipping.freeThreshold && samplePrice >= shipping.freeThreshold) ||
+      (prev >= shipping.freeThreshold && samplePrice < shipping.freeThreshold);
+    if (!crossed) return;
+    setFreeShipVisible(true);
+    Animated.sequence([
+      Animated.timing(freeShipAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1800),
+      Animated.timing(freeShipAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => setFreeShipVisible(false));
+  }, [samplePrice, shipping.freeThreshold, shipping.offerFreeShipping]);
 
   const saveShipping = async () => {
     setSaving(true);
@@ -264,6 +284,31 @@ export default function ShippingSettingsScreen() {
                   </View>
                 </View>
               </View>
+              {freeShipVisible && (
+                <Animated.View
+                  style={{
+                    opacity: freeShipAnim,
+                    transform: [{ translateY: freeShipAnim.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }],
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    borderWidth: 1,
+                    borderColor: "rgba(52,211,153,0.3)",
+                    backgroundColor: "rgba(52,211,153,0.1)",
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 14 }}>🎉</Text>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "#34D399", flex: 1 }}>
+                    {samplePrice >= shipping.freeThreshold
+                      ? "Buyer just unlocked free shipping!"
+                      : "Buyer dropped below free-shipping threshold"}
+                  </Text>
+                </Animated.View>
+              )}
               <View style={[styles.previewCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
                 {(
                   [
