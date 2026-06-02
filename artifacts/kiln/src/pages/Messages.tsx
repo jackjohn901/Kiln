@@ -75,7 +75,7 @@ function ThreadItem({ thread, active, onClick }: { thread: MessageThread; active
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5">
-          <span className={`text-sm font-medium truncate ${unread > 0 ? "text-amber-100" : "text-stone-300"}`}>
+          <span className={`text-sm truncate ${unread > 0 ? "font-semibold text-amber-100" : "font-medium text-stone-300"}`}>
             {thread.participantName}
           </span>
           <span className="text-[10px] text-stone-600 shrink-0 ml-2">{timeShort(thread.lastMessageAt)}</span>
@@ -835,7 +835,7 @@ export default function Messages() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className={`text-sm font-medium truncate ${t.unreadCount > 0 ? "text-amber-100" : "text-stone-300"}`}>
+                    <span className={`text-sm truncate ${t.unreadCount > 0 ? "font-semibold text-amber-100" : "font-medium text-stone-300"}`}>
                       {t.otherUserName}
                     </span>
                     <span className="text-[10px] text-stone-600 shrink-0 ml-2">{timeShort(t.lastMessageAt)}</span>
