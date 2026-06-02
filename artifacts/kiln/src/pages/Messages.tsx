@@ -675,7 +675,7 @@ export default function Messages() {
         setApiMessages(prev => [...prev, msg]);
         setApiThreads(prev => prev.map(t =>
           t.id === activeApiThread.id
-            ? { ...t, lastMessageText: text || null, lastMessageAttachmentUrl: attachmentUrl ?? null, lastMessageAt: new Date().toISOString() }
+            ? { ...t, lastMessageText: msg.text || null, lastMessageAttachmentUrl: msg.attachmentUrl ?? null, lastMessageAt: msg.createdAt }
             : t
         ));
       }
