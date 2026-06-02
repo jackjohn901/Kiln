@@ -206,6 +206,7 @@ interface SocialContextType extends SocialState {
   clearNewMessagePing: () => void;
   lastTypingPing: { threadId: string; userId: string } | null;
   clearTypingPing: () => void;
+  lastNewInquiryPing: number | null;
   setActiveMessageThreadId: (id: string | null) => void;
   quoteInquiry: (id: string, quote: CommissionQuote) => void;
   addReview: (review: Omit<ShopReview, "id" | "createdAt">) => void;
@@ -349,6 +350,19 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     threadId: string;
     userId: string;
   } | null>(null);
+
+  // Track new commission inquiry pings so Nav can animate the Inbox icon.
+  // Fires whenever the count of pending received inquiries increases (e.g. a
+  // new inquiry arrives via page refresh or WS notification push).
+  const [lastNewInquiryPing, setLastNewInquiryPing] = useState<number | null>(null);
+  const prevPendingInquiryCountRef = useRef<number>(0);
+  useEffect(() => {
+    const pending = state.receivedInquiries.filter((i) => i.status === "pending").length;
+    if (pending > prevPendingInquiryCountRef.current) {
+      setLastNewInquiryPing(Date.now());
+    }
+    prevPendingInquiryCountRef.current = pending;
+  }, [state.receivedInquiries]);
 
   // Ref so WS handler always sees the latest active thread without needing re-subscription
   const activeMessageThreadIdRef = useRef<string | null>(null);
@@ -899,6 +913,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         clearNewMessagePing,
         lastTypingPing,
         clearTypingPing,
+        lastNewInquiryPing,
         setActiveMessageThreadId,
         quoteInquiry,
         addReview,

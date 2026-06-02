@@ -120,7 +120,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
 export default function MobileNav() {
   const [location] = useLocation();
   const { profile } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, lastNewMessagePing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, lastNewMessagePing, lastNewInquiryPing } = useSocial();
   const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
@@ -128,6 +128,7 @@ export default function MobileNav() {
   const { dimmed: notifDimmed, warn: notifWarn } = deriveNotifStatus(settings);
   const [showMore, setShowMore] = useState(false);
   const [messagePulse, setMessagePulse] = useState(false);
+  const [inboxPulse, setInboxPulse] = useState(false);
 
   useEffect(() => {
     if (!lastNewMessagePing) return;
@@ -135,6 +136,13 @@ export default function MobileNav() {
     const t = setTimeout(() => setMessagePulse(false), 2000);
     return () => clearTimeout(t);
   }, [lastNewMessagePing]);
+
+  useEffect(() => {
+    if (!lastNewInquiryPing) return;
+    setInboxPulse(true);
+    const t = setTimeout(() => setInboxPulse(false), 2000);
+    return () => clearTimeout(t);
+  }, [lastNewInquiryPing]);
 
   const notifTitle = notifDimmed
     ? "Notifications silenced or paused — check Settings"
@@ -331,6 +339,8 @@ export default function MobileNav() {
                         const notifItemWarn = isNotifItem && notifWarn && !notifDimmed;
                         const isMsgItem = href === "/messages";
                         const isPulsing = isMsgItem && messagePulse;
+                        const isInboxItem = href === "/inbox";
+                        const isInboxPulsing = isInboxItem && inboxPulse;
 
                         return (
                           <Link key={href} href={href} onClick={() => setShowMore(false)}>
@@ -341,16 +351,18 @@ export default function MobileNav() {
                                   ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
                                   : isPulsing
                                   ? "border-blue-400/60 bg-blue-500/10 text-blue-300"
+                                  : isInboxPulsing
+                                  ? "border-green-400/60 bg-green-500/10 text-green-300"
                                   : notifMuted
                                   ? "border-white/8 bg-stone-900/60 text-stone-600 hover:border-white/15 hover:text-stone-400"
                                   : "border-white/8 bg-stone-900/60 text-stone-400 hover:border-white/15 hover:text-stone-200"
                               }`}
                             >
-                              <Icon size={18} strokeWidth={isActive || isPulsing ? 2.5 : 1.8} className={`${notifMuted && !isActive ? "opacity-50" : ""} ${isPulsing ? "animate-bounce" : ""}`} />
+                              <Icon size={18} strokeWidth={isActive || isPulsing || isInboxPulsing ? 2.5 : 1.8} className={`${notifMuted && !isActive ? "opacity-50" : ""} ${isPulsing || isInboxPulsing ? "animate-bounce" : ""}`} />
                               <span className="text-[10px] font-medium leading-tight text-center">{label}</span>
                               {badge > 0 && (
                                 <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
-                                  notifMuted ? "bg-stone-600 text-stone-300" : "bg-red-500 text-white"
+                                  notifMuted ? "bg-stone-600 text-stone-300" : isInboxItem ? "bg-green-500 text-white" : "bg-red-500 text-white"
                                 }`}>
                                   {badge > 9 ? "9+" : badge}
                                 </span>

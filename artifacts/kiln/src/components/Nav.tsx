@@ -13,7 +13,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, lastTypingPing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, lastTypingPing, lastNewInquiryPing } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const { settings } = useSettings();
@@ -23,6 +23,7 @@ export default function Nav() {
   const [showSearch, setShowSearch] = useState(false);
   const [messagePulse, setMessagePulse] = useState(false);
   const [typingPulse, setTypingPulse] = useState(false);
+  const [inboxPulse, setInboxPulse] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   interface SwitchAccount {
@@ -106,6 +107,13 @@ export default function Nav() {
     return () => clearTimeout(t);
   }, [lastNewMessagePing]);
 
+  useEffect(() => {
+    if (!lastNewInquiryPing) return;
+    setInboxPulse(true);
+    const t = setTimeout(() => setInboxPulse(false), 2000);
+    return () => clearTimeout(t);
+  }, [lastNewInquiryPing]);
+
   // Typing indicator: animate the Messages icon for 3 s when someone is
   // composing in a thread the user is not currently viewing.
   // Also clear when the user navigates to /messages (they'll see it in-thread).
@@ -118,6 +126,7 @@ export default function Nav() {
 
   useEffect(() => {
     if (location.startsWith("/messages")) setTypingPulse(false);
+    if (location.startsWith("/inbox")) setInboxPulse(false);
   }, [location]);
 
   useEffect(() => {
@@ -309,13 +318,21 @@ export default function Nav() {
             {/* Inbox */}
             <Link
               href="/inbox"
-              className="relative flex h-8 w-8 items-center justify-center rounded-full border border-stone-700 text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors"
+              className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors ${
+                inboxPulse ? "border-green-400/60 text-green-300" : "border-stone-700"
+              }`}
               title="Commission Inbox"
             >
-              <Inbox size={15} />
+              <Inbox size={15} className={inboxPulse ? "animate-bounce" : ""} />
               {(pendingInquiries > 0 || unreadCommissionPaymentCount > 0) && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[9px] font-bold text-white">
+                <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[9px] font-bold text-white ${inboxPulse ? "animate-ping-once" : ""}`}>
                   {(pendingInquiries + unreadCommissionPaymentCount) > 9 ? "9+" : (pendingInquiries + unreadCommissionPaymentCount)}
+                </span>
+              )}
+              {inboxPulse && (pendingInquiries + unreadCommissionPaymentCount) === 0 && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
                 </span>
               )}
             </Link>
