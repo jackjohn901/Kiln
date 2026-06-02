@@ -255,6 +255,7 @@ function RefCapture() {
 
 function TitleSetter() {
   const [location] = useLocation();
+  const { unreadMessageCount } = useSocial();
   useEffect(() => {
     const routes: [string, string, string][] = [
       ["/", "Kiln — Craft Creator Platform", "Watch craft artists share their process. Buy ceramics, glass, weaving, metalwork, and woodwork directly from makers. Book workshops and support artists you love."],
@@ -302,10 +303,11 @@ function TitleSetter() {
     const match = routes.find(([p]) =>
       p === location || (p !== "/" && location.startsWith(p + "/"))
     );
-    document.title = match ? match[1] : "Kiln — Craft Creator Platform";
+    const baseTitle = match ? match[1] : "Kiln — Craft Creator Platform";
+    document.title = unreadMessageCount > 0 ? `(${unreadMessageCount}) ${baseTitle}` : baseTitle;
     const descEl = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (descEl && match) descEl.content = match[2];
-  }, [location]);
+  }, [location, unreadMessageCount]);
   return null;
 }
 
