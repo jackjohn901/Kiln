@@ -191,6 +191,13 @@ export default function Cart() {
 
   // Free-shipping proximity nudges: show when subtotal is within 20% below the threshold
   const FREE_SHIPPING_GAP = 0.20;
+  function artistDisplayName(id: string): string {
+    return id
+      .replace(/^seed-/, "")
+      .split("-")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
   interface FreeShippingNudge { artistId: string; threshold: number; subtotal: number; amountNeeded: number; progress: number; }
   const freeShippingNudges: FreeShippingNudge[] = [];
   if (shippingRates.size > 0) {
@@ -397,8 +404,14 @@ export default function Cart() {
                       </div>
                       <p className="text-xs text-stone-400 mb-2">
                         Add <span className="font-semibold text-emerald-300">${nudge.amountNeeded.toLocaleString()}</span> more from{" "}
-                        <span className="text-stone-300">{nudge.artistId}</span> to unlock free shipping.
+                        <span className="text-stone-300">{artistDisplayName(nudge.artistId)}</span> to unlock free shipping.
                       </p>
+                      <Link
+                        href={`/profile/${nudge.artistId}?tab=shop`}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        Browse {artistDisplayName(nudge.artistId)} →
+                      </Link>
                       {/* Progress bar */}
                       <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
                         <motion.div
