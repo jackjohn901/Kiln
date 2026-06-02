@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Check, Package, ArrowRight, Truck, ShieldCheck,
   ExternalLink, MessageCircle, Info, CreditCard, Gift, AlertTriangle, Clock,
-  MapPin,
+  MapPin, LogIn,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useAuth } from "@/contexts/AuthContext";
@@ -553,6 +553,37 @@ export default function CartCheckout() {
           <Link href="/shop">
             <button className="mt-4 rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors">
               Browse Shop
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && step !== "done") {
+    return (
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="flex flex-col items-center justify-center py-32 text-center px-6">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
+            <LogIn size={28} className="text-amber-400" />
+          </div>
+          <h2 className="font-serif text-2xl text-amber-100 mb-2">Sign in to check out</h2>
+          <p className="text-stone-400 text-sm max-w-xs mb-7">
+            Your cart is saved. Sign in to complete your purchase — it only takes a moment.
+          </p>
+          <button
+            onClick={() => {
+              const returnTo = encodeURIComponent("/kiln/cart/checkout");
+              window.location.href = `/api/login?returnTo=${returnTo}`;
+            }}
+            className="rounded-full bg-amber-500 px-8 py-3 text-sm font-bold text-stone-950 hover:bg-amber-400 transition-colors"
+          >
+            Sign in to continue
+          </button>
+          <Link href="/cart">
+            <button className="mt-4 text-sm text-stone-500 hover:text-stone-300 transition-colors">
+              Back to cart
             </button>
           </Link>
         </div>
