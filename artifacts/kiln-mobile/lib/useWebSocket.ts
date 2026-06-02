@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 
@@ -114,8 +115,18 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       }
     );
 
+    let previouslyConnected: boolean | null = null;
+    const netInfoUnsubscribe = NetInfo.addEventListener((state) => {
+      const isConnected = state.isConnected ?? false;
+      if (isConnected && previouslyConnected === false) {
+        reconnectIfNeeded();
+      }
+      previouslyConnected = isConnected;
+    });
+
     return () => {
       appStateSubscription.remove();
+      netInfoUnsubscribe();
       if (retryTimer) clearTimeout(retryTimer);
       wsRef.current?.close();
       wsRef.current = null;
