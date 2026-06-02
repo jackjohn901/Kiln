@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
+import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck, Clock, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
@@ -101,6 +101,9 @@ export default function Cart() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artistIdsKey]);
 
+  const [unlockedToasts, setUnlockedToasts] = useState<{ id: string; artistId: string }[]>([]);
+  const prevArtistSubtotalsRef = useRef<Map<string, number>>(new Map());
+
   const bundleDiscount = bundleApplied ? Math.round(subtotal * 0.10) : 0;
 
   // Build per-artist subtotals and item quantities for shipping calculation
@@ -111,6 +114,36 @@ export default function Cart() {
     artistSubtotals.set(aid, (artistSubtotals.get(aid) ?? 0) + (listing.price as number) * quantity);
     artistItemQtys.set(aid, (artistItemQtys.get(aid) ?? 0) + quantity);
   }
+
+  // Detect when a per-artist subtotal crosses the free-shipping threshold and fire a celebratory toast.
+  // We serialize the subtotals to a stable string so the effect only re-runs when values actually change.
+  const artistSubtotalsKey = [...artistSubtotals.entries()].sort().map(([k, v]) => `${k}:${v}`).join("|");
+  useEffect(() => {
+    if (shippingRates.size === 0) return;
+    const prev = prevArtistSubtotalsRef.current;
+    const newUnlocked: { id: string; artistId: string }[] = [];
+
+    for (const [aid, info] of shippingRates.entries()) {
+      if (!info.freeThreshold || info.offerFreeShipping) continue;
+      const prevSub = prev.get(aid) ?? 0;
+      const currSub = artistSubtotals.get(aid) ?? 0;
+      if (prevSub < info.freeThreshold && currSub >= info.freeThreshold) {
+        newUnlocked.push({ id: `${aid}-${Date.now()}`, artistId: aid });
+      }
+    }
+
+    prevArtistSubtotalsRef.current = new Map(artistSubtotals);
+
+    if (newUnlocked.length > 0) {
+      setUnlockedToasts(prev => [...prev, ...newUnlocked]);
+      newUnlocked.forEach(t => {
+        setTimeout(() => {
+          setUnlockedToasts(prev => prev.filter(existing => existing.id !== t.id));
+        }, 3000);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistSubtotalsKey, shippingRates]);
 
   // Compute shipping total + breakdown (base rate vs per-item add-on)
   let shipping: number | null = subtotal > 0 ? null : 0;
@@ -181,6 +214,31 @@ export default function Cart() {
   return (
     <div className="min-h-screen bg-[#12100e]">
       <Nav />
+
+      {/* Free-shipping unlock toasts */}
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none" style={{ width: "min(90vw, 360px)" }}>
+        <AnimatePresence>
+          {unlockedToasts.map(t => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: -16, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ duration: 0.28, ease: "easeOut" }}
+              className="flex items-center gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-950/90 backdrop-blur-sm px-4 py-3 shadow-lg shadow-emerald-900/30"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-emerald-100 leading-snug">Free shipping unlocked!</p>
+                <p className="text-xs text-emerald-400/80 truncate">from {t.artistId}</p>
+              </div>
+              <Sparkles size={14} className="shrink-0 text-emerald-400" />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6">
 
         <div className="mb-6 flex items-center gap-3">
