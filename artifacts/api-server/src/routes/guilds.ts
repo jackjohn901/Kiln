@@ -41,13 +41,33 @@ router.get("/guilds/:id", async (req, res): Promise<void> => {
   res.json({ ...guild, isJoined: isMember, members: members.map(m => ({ ...m, joinedAt: m.joinedAt.toISOString() })), createdAt: guild.createdAt.toISOString() });
 });
 
+// Derive a URL-safe slug from a display name. Slugs are generated server-side so
+// clients cannot drive uniqueness behaviour or supply a colliding value.
+function slugifyName(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "guild";
+}
+
 // POST /guilds — create guild
 router.post("/guilds", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const { name, description, technique, imageUrl, bannerUrl, isPublic, slug } = req.body;
-  if (!name || !slug) { res.status(400).json({ error: "name and slug required" }); return; }
+  const { name, description, technique, imageUrl, bannerUrl, isPublic } = req.body;
+  if (!name || typeof name !== "string" || !name.trim()) { res.status(400).json({ error: "name required" }); return; }
+  const base = slugifyName(name);
   try {
-    const [guild] = await db.insert(guildsTable).values({ id: crypto.randomUUID(), name, slug, description, technique, imageUrl, bannerUrl, isPublic: isPublic !== false, createdBy: req.user.id }).returning();
+    // The slug column is unique. Retry with a short random suffix on a unique
+    // violation (Postgres 23505) so duplicate/concurrent names don't 500.
+    let guild: typeof guildsTable.$inferSelect | undefined;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const slug = attempt === 0 ? base : `${base}-${Math.random().toString(36).slice(2, 6)}`;
+      try {
+        [guild] = await db.insert(guildsTable).values({ id: crypto.randomUUID(), name, slug, description, technique, imageUrl, bannerUrl, isPublic: isPublic !== false, createdBy: req.user.id }).returning();
+        break;
+      } catch (e) {
+        if ((e as { code?: string }).code === "23505" && attempt < 5) continue;
+        throw e;
+      }
+    }
+    if (!guild) { res.status(500).json({ error: "Failed to create guild" }); return; }
     await db.insert(guildMembersTable).values({ guildId: guild.id, userId: req.user.id, role: "admin" });
     await db.update(guildsTable).set({ memberCount: 1 }).where(eq(guildsTable.id, guild.id));
     res.status(201).json({ ...guild, isJoined: true, createdAt: guild.createdAt.toISOString() });

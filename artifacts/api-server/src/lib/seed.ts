@@ -28,10 +28,10 @@ export interface SeedHistoryEntry {
   createdAt: string;
 }
 
-const SEED_MARKER_ID = "seed-v4-marker";
+const SEED_MARKER_ID = "seed-v5-marker";
 
 const SEED_USERS = [
-  { id: "seed-v4-marker", email: "seed-v4@kiln.internal", firstName: "Seed", lastName: "V4" },
+  { id: "seed-v5-marker", email: "seed-v5@kiln.internal", firstName: "Seed", lastName: "V5" },
   { id: "seed-elena-vasquez", email: "elena@example.kiln", firstName: "Elena", lastName: "Vasquez" },
   { id: "seed-marco-chen", email: "marco@example.kiln", firstName: "Marco", lastName: "Chen" },
   { id: "seed-zoe-nakamura", email: "zoe@example.kiln", firstName: "Zoe", lastName: "Nakamura" },
@@ -529,6 +529,38 @@ const SEED_GUILDS = [
     bannerUrl: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=1200&q=80",
     memberCount: 1480, postCount: 520, isPublic: true, createdBy: "seed-sam-rivera",
   },
+  {
+    id: "seed-guild-07", name: "The Jeweler's Bench", slug: "jewelers-bench",
+    description: "Metalsmiths, lapidaries, and adornment-makers. Stone settings, soldering tips, and showing off what's on the bench.",
+    technique: "Jewelry",
+    imageUrl: null,
+    bannerUrl: null,
+    memberCount: 2380, postCount: 910, isPublic: true, createdBy: "seed-aria-patel",
+  },
+  {
+    id: "seed-guild-08", name: "Craft Educators Guild", slug: "craft-educators",
+    description: "Art teachers, workshop leaders, and craft mentors. Lesson plans, studio safety, and growing the next generation of makers.",
+    technique: "Teaching",
+    imageUrl: null,
+    bannerUrl: null,
+    memberCount: 1640, postCount: 540, isPublic: true, createdBy: "seed-elena-vasquez",
+  },
+  {
+    id: "seed-guild-09", name: "Apprentice Hall", slug: "apprentice-hall",
+    description: "Apprentices, hobbyists, and anyone learning a craft. Ask beginner questions without judgment and share your first attempts.",
+    technique: "Students",
+    imageUrl: null,
+    bannerUrl: null,
+    memberCount: 2970, postCount: 1120, isPublic: true, createdBy: "seed-sam-rivera",
+  },
+  {
+    id: "seed-guild-10", name: "Collectors' Circle", slug: "collectors-circle",
+    description: "Patrons and collectors of handmade work. Discover new makers, share your finds, and talk provenance, care, and display.",
+    technique: "Collecting",
+    imageUrl: null,
+    bannerUrl: null,
+    memberCount: 880, postCount: 310, isPublic: true, createdBy: "seed-felix-okafor",
+  },
 ];
 
 const SEED_GUILD_MEMBERS = [
@@ -544,6 +576,14 @@ const SEED_GUILD_MEMBERS = [
   { guildId: "seed-guild-05", userId: "seed-sam-rivera", role: "member" },
   { guildId: "seed-guild-06", userId: "seed-sam-rivera", role: "admin" },
   { guildId: "seed-guild-06", userId: "seed-elena-vasquez", role: "member" },
+  { guildId: "seed-guild-07", userId: "seed-aria-patel", role: "admin" },
+  { guildId: "seed-guild-07", userId: "seed-marco-chen", role: "member" },
+  { guildId: "seed-guild-08", userId: "seed-elena-vasquez", role: "admin" },
+  { guildId: "seed-guild-08", userId: "seed-zoe-nakamura", role: "member" },
+  { guildId: "seed-guild-09", userId: "seed-sam-rivera", role: "admin" },
+  { guildId: "seed-guild-09", userId: "seed-felix-okafor", role: "member" },
+  { guildId: "seed-guild-10", userId: "seed-felix-okafor", role: "admin" },
+  { guildId: "seed-guild-10", userId: "seed-aria-patel", role: "member" },
 ];
 
 // ── Patron Tiers ──────────────────────────────────────────────────────────────
@@ -805,7 +845,7 @@ export async function seedDatabase(): Promise<void> {
       listings: SEED_LISTINGS.length, drops: SEED_DROPS.length,
       auctions: SEED_AUCTIONS.length, workshops: SEED_WORKSHOPS.length,
       guilds: SEED_GUILDS.length, patronTiers: SEED_PATRON_TIERS.length,
-    }, "Database seeded (v4)");
+    }, "Database seeded (v5)");
   } catch (err) {
     logger.error({ err }, "Seed error (non-fatal)");
   }

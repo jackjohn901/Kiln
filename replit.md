@@ -24,7 +24,7 @@ A TikTok/Instagram Reels-style creator platform for craft artists at kilnfire.re
 
 - `lib/db/src/schema/` — source of truth for all DB tables
 - `artifacts/api-server/src/routes/index.ts` — all API routes registered here
-- `artifacts/api-server/src/lib/seed.ts` — seed data (v4 marker = seed-v4-marker)
+- `artifacts/api-server/src/lib/seed.ts` — seed data (v5 marker = seed-v5-marker)
 - `artifacts/kiln/src/contexts/` — AuthContext, ProfileContext, SocialContext, CartContext
 - `artifacts/kiln/src/pages/` — all page components
 - `artifacts/kiln/src/data/` — static reference data (techniques, materials, etc.)
@@ -70,7 +70,7 @@ All seed data uses IDs prefixed `seed-`:
 
 ## Gotchas
 
-- Seed marker must be bumped (seed-v3 → seed-v4 etc.) to re-run seed on a live DB.
+- Seed marker must be bumped (seed-v4 → seed-v5 etc.) to re-run seed on a live DB.
 - All authenticated API calls need `credentials: "include"` in fetch options.
 - `pnpm run dev` at workspace root has no script — run individual packages via workflows.
 - Static guild/artist data files in `src/data/` are for reference/demo data; DB is source of truth for real users.
