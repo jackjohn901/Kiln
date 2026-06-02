@@ -494,6 +494,11 @@ export default function Messages() {
     if (unreadEls.length === 0) return;
 
     const threadId = activeApiThreadId;
+    // AbortController lets us cancel the /read fetch when the user switches
+    // threads before the response arrives, preventing a stale
+    // refreshUnreadMessageCount() from landing an incorrect badge count.
+    const ac = new AbortController();
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((e) => e.isIntersecting)) return;
@@ -510,15 +515,23 @@ export default function Messages() {
         fetch(`/api/messages/threads/${threadId}/read`, {
           method: "POST",
           credentials: "include",
+          signal: ac.signal,
         })
-          .then(() => refreshUnreadMessageCount())
+          .then(() => {
+            // Only refresh the badge if this thread is still the active one.
+            // If the user switched away, ac will have been aborted by cleanup.
+            if (!ac.signal.aborted) refreshUnreadMessageCount();
+          })
           .catch(() => {});
       },
       { threshold: 0.1, root: container }
     );
 
     unreadEls.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      ac.abort();
+    };
   }, [activeApiThreadId, apiMessages, profile, refreshUnreadMessageCount]);
 
   useEffect(() => {
