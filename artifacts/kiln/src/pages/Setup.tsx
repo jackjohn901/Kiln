@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronRight, ChevronLeft, Flame, CheckCircle, Camera } from "lucide-react";
+import { ChevronRight, ChevronLeft, Flame, CheckCircle, Camera, ArrowRight, Lock } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthSplash from "@/components/AuthSplash";
 import { artists } from "@/data/artists";
 
 type AccountType =
@@ -119,6 +121,7 @@ export default function Setup() {
     return null;
   }
 
+  const { isAuthenticated, isLoading, login } = useAuth();
   const [savingProfile, setSavingProfile] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -169,6 +172,66 @@ export default function Setup() {
     } finally {
       setSavingProfile(false);
     }
+  }
+
+  // ── Sign-in gate ──────────────────────────────────────────────────────────────
+  // New users must sign in before building a profile. Doing it up front (instead of
+  // at publish time) means the secure sign-in step is expected and branded, not a
+  // jarring redirect after they've already filled out the whole form.
+  if (isLoading) {
+    return <AuthSplash label="Warming up…" />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="mx-auto flex max-w-md flex-col items-center px-4 py-16 text-center">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
+            <Flame size={30} className="text-amber-400" />
+          </div>
+          <h1 className="font-serif text-3xl text-amber-100">Welcome to Kiln</h1>
+          <p className="mt-3 leading-relaxed text-stone-400">
+            You're one step away. Sign in securely to create your free profile — it only takes a minute.
+          </p>
+
+          <div className="mt-8 w-full space-y-2.5 text-left">
+            {[
+              "Share your process to a feed built for craft",
+              "Sell your work with no listing fees",
+              "Build a community around what you make",
+            ].map((line) => (
+              <div
+                key={line}
+                className="flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/50 px-4 py-3"
+              >
+                <CheckCircle size={16} className="shrink-0 text-amber-400" />
+                <span className="text-sm text-stone-300">{line}</span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={login}
+            className="mt-8 flex w-full items-center justify-center gap-2 rounded-full bg-amber-500 px-6 py-3.5 text-base font-semibold text-stone-950 transition-colors hover:bg-amber-400"
+          >
+            Continue to secure sign-in
+            <ArrowRight size={16} />
+          </button>
+
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-stone-600">
+            <Lock size={11} /> Free to join · No fees · Secure sign-in
+          </p>
+
+          <button
+            onClick={() => navigate("/?skipLanding=true")}
+            className="mt-6 text-sm text-stone-500 underline-offset-4 transition-colors hover:text-amber-300 hover:underline"
+          >
+            Just exploring? Browse Kiln first
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // ── Account type picker ───────────────────────────────────────────────────────
