@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer, Download, Link2, Copy, Check, Loader2 } from "lucide-react";
+import { CheckCircle, Package, ArrowRight, Clock, AlertCircle, ShoppingBag, Printer, Download, Link2, Copy, Check, Loader2, LogIn } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useCart } from "@/contexts/CartContext";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
@@ -34,6 +34,7 @@ export default function CartSuccess() {
   const [processingWindowLabel, setProcessingWindowLabel] = useState<string | null>(null);
   const [perSellerWindows, setPerSellerWindows] = useState<{ sellerName: string; days: number | null; label: string | null }[]>([]);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const orderCreated = useRef(false);
 
   useEffect(() => {
@@ -105,8 +106,9 @@ export default function CartSuccess() {
           } else if (res.status === 401) {
             // Session expired during the Stripe redirect — payment was processed but the
             // user is no longer authenticated. Order rows were created by the webhook and
-            // will be visible once they sign in again. Degrade gracefully without showing
-            // an error so the success page is still meaningful.
+            // will be visible once they sign in again. Show a friendly prompt instead of
+            // an alarming error.
+            setSessionExpired(true);
           } else {
             let message = "We couldn't complete your order because one or more items are no longer available. Please contact support.";
             try {
@@ -252,6 +254,26 @@ export default function CartSuccess() {
                 {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                 {copied ? "Copied" : "Copy"}
               </button>
+            </div>
+          </div>
+        )}
+
+        {sessionExpired && (
+          <div className="rounded-2xl border border-stone-600/40 bg-stone-800/50 p-5 text-sm text-left mb-6">
+            <div className="flex items-start gap-3">
+              <LogIn size={18} className="text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-stone-200 font-semibold mb-1">Sign in to view your order details</p>
+                <p className="text-stone-400 leading-relaxed">
+                  Your payment went through. Sign in to see your full order history and track this purchase.
+                </p>
+                <a
+                  href="/api/login?returnTo=/kiln/orders"
+                  className="inline-flex items-center gap-1.5 mt-3 text-amber-400 hover:text-amber-300 text-xs font-medium underline underline-offset-2 decoration-amber-500/40 transition-colors"
+                >
+                  Sign in to view order history
+                </a>
+              </div>
             </div>
           </div>
         )}
