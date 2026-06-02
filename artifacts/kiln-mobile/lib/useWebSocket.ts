@@ -42,6 +42,12 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
+      ws.onopen = () => {
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["message-threads"] });
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
+      };
+
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data as string);
