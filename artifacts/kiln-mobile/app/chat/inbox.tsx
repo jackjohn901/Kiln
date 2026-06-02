@@ -12,7 +12,7 @@ import { Image } from "expo-image";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { apiGet, relativeTime } from "@/lib/api";
@@ -32,6 +32,7 @@ export default function InboxScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, login } = useAuth();
+  const queryClient = useQueryClient();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const { data, isLoading } = useQuery({
@@ -93,7 +94,18 @@ export default function InboxScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={[styles.threadRow, { backgroundColor: item.unreadCount > 0 ? colors.card : "transparent" }]}
-              onPress={() => router.push(`/chat/${item.id}` as any)}
+              onPress={() => {
+                if (item.unreadCount > 0) {
+                  queryClient.setQueryData<{ threads: Thread[] }>(
+                    ["message-threads"],
+                    (old) =>
+                      old
+                        ? { ...old, threads: old.threads.map((t) => t.id === item.id ? { ...t, unreadCount: 0 } : t) }
+                        : old
+                  );
+                }
+                router.push(`/chat/${item.id}` as any);
+              }}
             >
               <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
                 {item.otherUserAvatar ? (

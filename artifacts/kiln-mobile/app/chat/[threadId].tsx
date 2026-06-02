@@ -115,6 +115,26 @@ export default function ChatScreen() {
 
   const queryKey = ["thread", threadId];
 
+  // Optimistically clear this thread's unread badge the moment the screen mounts —
+  // don't make the user wait for a network round-trip.
+  useEffect(() => {
+    if (!threadId || threadId === "inbox") return;
+    queryClient.setQueryData<{ threads: Array<{ id: string; unreadCount: number }> }>(
+      ["message-threads"],
+      (old) => {
+        if (!old) return old;
+        const thread = old.threads.find((t) => t.id === threadId);
+        if (!thread || thread.unreadCount === 0) return old;
+        return {
+          ...old,
+          threads: old.threads.map((t) =>
+            t.id === threadId ? { ...t, unreadCount: 0 } : t
+          ),
+        };
+      }
+    );
+  }, [threadId, queryClient]);
+
   const { data, isLoading, refetch } = useQuery({
     queryKey,
     queryFn: () =>
