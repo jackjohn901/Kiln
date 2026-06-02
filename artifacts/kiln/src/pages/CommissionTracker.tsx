@@ -533,7 +533,7 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
             </button>
           )}
 
-          {(commission.status === "accepted" || commission.status === "in_progress" || commission.status === "completed") && (
+          {commission.status !== "declined" && commission.status !== "cancelled" && (
             <UpdateThread
               commissionId={commission.id}
               artistId={commission.artistId}
