@@ -275,3 +275,9 @@ id = "A11KpBa0-ZE2E2xMN2RMz"
 uri = "file://kiln-soft-launch-testing-checklist.md"
 type = "text"
 title = "Kiln Soft Launch Testing Checklist"
+
+[[outputs]]
+id = "mkmiFTQluGlMOrUtxSk41"
+uri = "file://artifacts/kiln/public/favicon.png"
+type = "image"
+title = "Kiln app icon (flame) — upload as your App icon"
