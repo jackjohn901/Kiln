@@ -16,6 +16,7 @@ interface CommunityPost {
   content: string;
   imageUrl: string | null;
   guildId: string | null;
+  topic: string | null;
   parentId: string | null;
   likeCount: number;
   replyCount: number;
@@ -64,12 +65,14 @@ function Avatar({ author, size = 9 }: { author: CommunityAuthor; size?: number }
 function Composer({
   placeholder = "What's on your mind?",
   guildId,
+  topic,
   parentId,
   onPosted,
   compact = false,
 }: {
   placeholder?: string;
   guildId?: string;
+  topic?: string;
   parentId?: string;
   onPosted: (post: CommunityPost) => void;
   compact?: boolean;
@@ -101,7 +104,7 @@ function Composer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ content: text.trim(), guildId, parentId }),
+        body: JSON.stringify({ content: text.trim(), guildId, topic, parentId }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -251,6 +254,11 @@ function PostCard({
                 <span className="text-xs text-stone-500">@{post.author.handle}</span>
               )}
               <span className="text-xs text-stone-600">· {relativeTime(post.createdAt)}</span>
+              {post.topic && (
+                <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300/90">
+                  {post.topic}
+                </span>
+              )}
             </div>
           </div>
           {isOwn && (

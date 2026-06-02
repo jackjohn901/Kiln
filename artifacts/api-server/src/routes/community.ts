@@ -6,6 +6,11 @@ import { randomUUID } from "crypto";
 
 const router = Router();
 
+// Allowed guild discussion channels. Keep in sync with DISCUSSION_CHANNELS
+// in artifacts/kiln/src/pages/GuildDetail.tsx.
+const GUILD_TOPICS = ["General", "Show & Tell", "Help & Critique", "Buy / Sell / Trade"];
+const GUILD_TOPIC_SET = new Set<string>(GUILD_TOPICS);
+
 // Shared: enrich posts with author profile + viewer like status
 async function enrichPosts(
   posts: (typeof communityPostsTable.$inferSelect)[],
@@ -48,6 +53,7 @@ async function enrichPosts(
       content: p.content,
       imageUrl: p.imageUrl,
       guildId: p.guildId,
+      topic: p.topic,
       parentId: p.parentId,
       repostOfId: p.repostOfId,
       likeCount: p.likeCount,
@@ -101,6 +107,12 @@ router.get("/community/guilds/:guildId", async (req, res): Promise<void> => {
     const { guildId } = req.params;
     const limit = Math.min(Number(req.query.limit) || 30, 60);
     const offset = Number(req.query.offset) || 0;
+    const rawTopic = typeof req.query.topic === "string" ? req.query.topic.trim() : "";
+    if (rawTopic && !GUILD_TOPIC_SET.has(rawTopic)) {
+      res.status(400).json({ error: "Unknown channel" });
+      return;
+    }
+    const topic = rawTopic || null;
     const viewerId = req.isAuthenticated() ? req.user.id : null;
 
     const posts = await db
@@ -111,6 +123,7 @@ router.get("/community/guilds/:guildId", async (req, res): Promise<void> => {
           eq(communityPostsTable.guildId, guildId),
           isNull(communityPostsTable.parentId),
           eq(communityPostsTable.isDeleted, false),
+          topic ? eq(communityPostsTable.topic, topic) : undefined,
         ),
       )
       .orderBy(desc(communityPostsTable.isPinned), desc(communityPostsTable.createdAt))
@@ -164,13 +177,25 @@ router.get("/community/:postId", async (req, res): Promise<void> => {
 router.post("/community", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Login required" }); return; }
   try {
-    const { content, imageUrl, guildId } = req.body as {
+    const { content, imageUrl, guildId, topic } = req.body as {
       content?: string;
       imageUrl?: string;
       guildId?: string;
+      topic?: string;
     };
     if (!content?.trim()) { res.status(400).json({ error: "Content is required" }); return; }
     if (content.length > 1000) { res.status(400).json({ error: "Max 1000 characters" }); return; }
+
+    // Topics (channels) only apply to guild posts, and must be a known channel.
+    let cleanTopic: string | null = null;
+    if (guildId && typeof topic === "string" && topic.trim()) {
+      const t = topic.trim();
+      if (!GUILD_TOPIC_SET.has(t)) {
+        res.status(400).json({ error: "Unknown channel" });
+        return;
+      }
+      cleanTopic = t;
+    }
 
     const id = randomUUID();
     await db.insert(communityPostsTable).values({
@@ -179,6 +204,7 @@ router.post("/community", async (req, res): Promise<void> => {
       content: content.trim(),
       imageUrl: imageUrl ?? null,
       guildId: guildId ?? null,
+      topic: cleanTopic,
       parentId: null,
     });
 

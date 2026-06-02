@@ -16,4 +16,5 @@
 - [Storefront id resolution](storefront-id-resolution.md) — listings/auctions keyed by user UUID not handle; resolve real id before fetch, own uses /me/listings, all ArtistProfile fetch effects must be AbortController-cancellable.
 - [Auth redirect smoothing](auth-redirect-smoothing.md) — omit OIDC `prompt: login consent` so returning users glide through; show branded AuthSplash, never blank, during redirect/isLoading.
 - [Mobile review-prompt gating](mobile-review-prompt-gating.md) — trigger store-review at end of one-shot onboarding (AsyncStorage flag), best-effort, never block app entry.
+- [Kiln guild channels](kiln-guild-channels.md) — guild discussion topics are a fixed allowlist duplicated in server (community.ts) + client (GuildDetail.tsx); keep in sync or posts/filters 400.
 - [Onboarding auth gating](onboarding-auth-gating.md) — front-load sign-in before data-creating onboarding; Replit Auth's full-page redirect wipes form state, so a late 401 loses everything. Clerk migration unsupported.

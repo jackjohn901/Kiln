@@ -60,6 +60,8 @@ const DEFAULT_RULES = [
   "Safety first: always note when sharing dangerous techniques.",
 ];
 
+const DISCUSSION_CHANNELS = ["General", "Show & Tell", "Help & Critique", "Buy / Sell / Trade"];
+
 export default function GuildDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -73,20 +75,25 @@ export default function GuildDetail() {
   const [apiMembers, setApiMembers] = useState<ApiMemberWithProfile[]>([]);
   const [apiEvents, setApiEvents] = useState<{ title: string; date: string; location: string; description: string }[]>([]);
   const [discussionPosts, setDiscussionPosts] = useState<CommunityPost[]>([]);
-  const [discussionsLoaded, setDiscussionsLoaded] = useState(false);
+  const [discussionsLoading, setDiscussionsLoading] = useState(false);
+  const [activeChannel, setActiveChannel] = useState<string>("all");
 
   const staticGuild = getGuildById(id ?? "");
+  const resolvedGuildId = staticGuild?.id ?? apiGuild?.id ?? id;
 
-  // Load guild discussions when tab is first opened
+  // Load guild discussions for the active channel (refetch when channel changes)
   useEffect(() => {
-    if (tab !== "discussions" || discussionsLoaded || !id) return;
-    const guildId = staticGuild?.id ?? apiGuild?.id ?? id;
-    setDiscussionsLoaded(true);
-    fetch(`/api/community/guilds/${guildId}`, { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.posts) setDiscussionPosts(data.posts); })
-      .catch(() => {});
-  }, [tab, discussionsLoaded, id, staticGuild, apiGuild]);
+    if (tab !== "discussions" || !resolvedGuildId) return;
+    const q = activeChannel === "all" ? "" : `?topic=${encodeURIComponent(activeChannel)}`;
+    let cancelled = false;
+    setDiscussionsLoading(true);
+    fetch(`/api/community/guilds/${resolvedGuildId}${q}`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled && data?.posts) setDiscussionPosts(data.posts); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setDiscussionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [tab, resolvedGuildId, activeChannel]);
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -202,6 +209,9 @@ export default function GuildDetail() {
             events={staticGuild.events} resources={staticGuild.resources} rules={staticGuild.rules}
             memberCount={staticGuild.memberCount}
             guildId={staticGuild.id}
+            activeChannel={activeChannel}
+            setActiveChannel={setActiveChannel}
+            discussionsLoading={discussionsLoading}
             discussionPosts={discussionPosts}
             onDiscussionPosted={(p) => setDiscussionPosts((prev) => [p, ...prev])}
             onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))} />
@@ -255,6 +265,9 @@ export default function GuildDetail() {
           posts={[]} members={apiMembers} events={apiEvents} resources={[]} rules={DEFAULT_RULES}
           memberCount={guild.memberCount}
           guildId={guild.id}
+          activeChannel={activeChannel}
+          setActiveChannel={setActiveChannel}
+          discussionsLoading={discussionsLoading}
           discussionPosts={discussionPosts}
           onDiscussionPosted={(p) => setDiscussionPosts((prev) => [p, ...prev])}
           onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))} />
@@ -277,6 +290,9 @@ interface GuildTabsProps {
   rules: string[];
   memberCount: number;
   guildId: string;
+  activeChannel: string;
+  setActiveChannel: (c: string) => void;
+  discussionsLoading: boolean;
   discussionPosts: CommunityPost[];
   onDiscussionPosted: (p: CommunityPost) => void;
   onDiscussionDelete: (id: string) => void;
@@ -290,7 +306,7 @@ const TAB_LABELS: Record<Tab, string> = {
   resources: "Resources",
 };
 
-function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, events, resources, rules, memberCount, guildId, discussionPosts, onDiscussionPosted, onDiscussionDelete }: GuildTabsProps) {
+function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, events, resources, rules, memberCount, guildId, activeChannel, setActiveChannel, discussionsLoading, discussionPosts, onDiscussionPosted, onDiscussionDelete }: GuildTabsProps) {
   return (
     <>
       <div className="mb-6 flex border-b border-white/10 gap-1 overflow-x-auto scrollbar-none">
@@ -363,15 +379,42 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
         {tab === "discussions" && (
           <motion.div key="discussions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="flex flex-col gap-4">
+              {/* Channel pills */}
+              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                {["all", ...DISCUSSION_CHANNELS].map((ch) => (
+                  <button
+                    key={ch}
+                    onClick={() => setActiveChannel(ch)}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      activeChannel === ch
+                        ? "bg-amber-500 text-stone-950"
+                        : "border border-white/10 text-stone-400 hover:border-white/25 hover:text-stone-200"
+                    }`}
+                  >
+                    {ch === "all" ? "All" : ch}
+                  </button>
+                ))}
+              </div>
               <Composer
-                placeholder="Start a discussion, ask a question, or share a tip…"
+                placeholder={
+                  activeChannel === "all"
+                    ? "Start a discussion, ask a question, or share a tip…"
+                    : `Post in ${activeChannel}…`
+                }
                 guildId={guildId}
+                topic={activeChannel === "all" ? "General" : activeChannel}
                 onPosted={onDiscussionPosted}
               />
-              {discussionPosts.length === 0 ? (
+              {discussionsLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 size={20} className="animate-spin text-stone-600" />
+                </div>
+              ) : discussionPosts.length === 0 ? (
                 <div className="py-16 text-center">
-                  <p className="text-stone-600 mb-2">No discussions yet.</p>
-                  <p className="text-xs text-stone-700">Be the first to start a conversation in this guild.</p>
+                  <p className="text-stone-600 mb-2">
+                    {activeChannel === "all" ? "No discussions yet." : `No posts in ${activeChannel} yet.`}
+                  </p>
+                  <p className="text-xs text-stone-700">Be the first to start a conversation here.</p>
                 </div>
               ) : (
                 discussionPosts.map((post) => (

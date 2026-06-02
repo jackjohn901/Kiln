@@ -6,6 +6,7 @@ export const communityPostsTable = pgTable("community_posts", {
   content: text("content").notNull(),
   imageUrl: text("image_url"),
   guildId: varchar("guild_id", { length: 100 }),
+  topic: varchar("topic", { length: 50 }),
   parentId: varchar("parent_id", { length: 36 }),
   repostOfId: varchar("repost_of_id", { length: 36 }),
   likeCount: integer("like_count").notNull().default(0),
