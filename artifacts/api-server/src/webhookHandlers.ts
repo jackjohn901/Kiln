@@ -1,11 +1,12 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, type PerArtistShippingLine, newPatronEmail, stripeAccountRestrictedEmail } from './lib/email';
+import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, type PerArtistShippingLine, newPatronEmail, stripeAccountRestrictedEmail, workshopBookingEmail, newWorkshopBookingArtistEmail, commissionPaymentEmail, type WorkshopCalendarParams } from './lib/email';
 import { buildReceiptPdf, sessionReceiptId, ordinalId, fmtDate, STATUS_LABELS, TYPE_LABELS, type ReceiptData } from './lib/receiptPdf';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
-import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable, digitalDownloadPurchasesTable } from '@workspace/db';
+import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable, digitalDownloadPurchasesTable, workshopsTable, workshopBookingsTable, commissionsTable, auctionsTable, notificationsTable, usersTable } from '@workspace/db';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDigitalProduct } from './lib/digitalProducts';
+import { isEmailPaused } from './lib/emailPaused';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
 
@@ -445,6 +446,209 @@ export class WebhookHandlers {
                 logger.info({ productId: meta.productId, userId: meta.userId, sessionId: session.id }, 'Digital download entitlement granted');
               }
             }
+          }
+        }
+
+        // --- Workshop booking ---
+        // Triggered when a paid workshop checkout completes. Creates the booking row,
+        // increments spotsBooked, and sends confirmation emails to the student and artist.
+        // Idempotent: a duplicate Stripe delivery for the same (workshopId, userId) pair
+        // is detected by checking for an existing booking row before inserting.
+        if (session.mode === 'payment' && meta.type === 'workshop' && meta.workshopId && meta.userId) {
+          const workshopId = meta.workshopId;
+          const studentId = meta.userId;
+          const paidAmountCents = session.amount_total ?? 0;
+          const customerName = session.customer_details?.name ?? email ?? 'Student';
+          const customerEmail = email ?? null;
+          try {
+            const [workshop] = await db
+              .select()
+              .from(workshopsTable)
+              .where(eq(workshopsTable.id, workshopId));
+            if (!workshop) {
+              logger.warn({ workshopId, sessionId: session.id }, 'Workshop webhook: workshop not found');
+            } else {
+              // Amount integrity: paid amount must match the workshop price (±1 cent for rounding)
+              const expectedCents = workshop.price * 100;
+              if (Math.abs(expectedCents - paidAmountCents) > 100) {
+                logger.warn({ workshopId, expectedCents, paidAmountCents, sessionId: session.id }, 'Workshop webhook: amount mismatch — booking skipped');
+              } else {
+              const [existingBooking] = await db
+                .select({ id: workshopBookingsTable.id })
+                .from(workshopBookingsTable)
+                .where(and(eq(workshopBookingsTable.workshopId, workshopId), eq(workshopBookingsTable.userId, studentId)))
+                .limit(1);
+              if (existingBooking) {
+                logger.info({ workshopId, studentId, sessionId: session.id }, 'Workshop webhook: booking already exists — skipping');
+              } else if (workshop.spotsBooked >= workshop.maxSpots) {
+                logger.warn({ workshopId, studentId, sessionId: session.id }, 'Workshop webhook: no spots left — booking skipped');
+              } else {
+                const bookingId = crypto.randomUUID();
+                await db.insert(workshopBookingsTable).values({
+                  id: bookingId,
+                  workshopId,
+                  userId: studentId,
+                  userName: customerName,
+                  userEmail: customerEmail ?? undefined,
+                  status: 'confirmed',
+                  paidAmount: paidAmountCents,
+                });
+                await db.update(workshopsTable)
+                  .set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` })
+                  .where(eq(workshopsTable.id, workshopId));
+
+                // Fetch artist settings once — used for both in-app and email preferences
+                const [[artistUser], [artistSettings]] = await Promise.all([
+                  db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, workshop.artistId)),
+                  db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, workshop.artistId)),
+                ]);
+                const artistPrefSettings = artistSettings?.settings as Record<string, unknown> | null;
+
+                // In-app notification for artist (respects notif_workshops preference)
+                const artistWantsInApp = artistPrefSettings?.notif_workshops !== false;
+                if (artistWantsInApp) {
+                  await db.insert(notificationsTable).values({
+                    id: crypto.randomUUID(),
+                    userId: workshop.artistId,
+                    type: 'workshop',
+                    fromId: studentId,
+                    fromName: customerName,
+                    fromAvatarUrl: null,
+                    text: `booked your workshop: ${workshop.title}`,
+                    link: `/workshops`,
+                  });
+                }
+
+                const calParams: WorkshopCalendarParams | undefined = workshop.startDate ? {
+                  startDateISO: workshop.startDate.toISOString(),
+                  endDateISO: workshop.endDate?.toISOString() ?? null,
+                  durationHours: workshop.durationHours,
+                  isOnline: workshop.isOnline,
+                  location: workshop.location ?? null,
+                  workshopId: workshop.id,
+                } : undefined;
+
+                // Student confirmation email
+                if (customerEmail) {
+                  const startLabel = workshop.startDate
+                    ? workshop.startDate.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
+                    : 'Date TBD';
+                  const studentHtml = workshopBookingEmail(workshop.title, workshop.artistName, startLabel, calParams, { isOnline: workshop.isOnline, location: workshop.location ?? null, meetingUrl: workshop.meetingUrl ?? null });
+                  await sendEmailWithRetry({ to: customerEmail, subject: `Booking confirmed: "${workshop.title}"`, html: studentHtml }, { label: 'workshop booking confirmation (webhook)', contextId: session.id });
+                }
+
+                // Artist notification email (respects notif_email_new_booking preference)
+                const artistWantsEmail = !isEmailPaused(artistPrefSettings, artistSettings?.notifEmailResumeAt) && artistPrefSettings?.notif_email_new_booking !== false;
+                if (artistUser?.email && artistWantsEmail) {
+                  const artistHtml = newWorkshopBookingArtistEmail(customerName, customerEmail ?? '', workshop.title, paidAmountCents, calParams, null, studentId);
+                  await sendEmailWithRetry({ to: artistUser.email, subject: `New booking: "${workshop.title}"`, html: artistHtml }, { label: 'new workshop booking (artist, webhook)', contextId: session.id });
+                }
+
+                logger.info({ workshopId, studentId, bookingId, sessionId: session.id }, 'Workshop webhook: booking created');
+              }
+              } // end amount-match else
+            } // end workshop found else
+          } catch (err) {
+            logger.error({ err, workshopId, studentId, sessionId: session.id }, 'Workshop webhook: handler failed');
+          }
+        }
+
+        // --- Commission milestone payment ---
+        // Triggered when a deposit or final payment for a commission completes.
+        // Marks the relevant field on the commission row and notifies the artist.
+        // Idempotent: skips if the milestone is already recorded as paid.
+        if (session.mode === 'payment' && meta.type === 'commission' && meta.commissionId && meta.milestone) {
+          const commissionId = meta.commissionId;
+          const milestone = meta.milestone; // 'deposit' | 'final'
+          const paidAmountCents = session.amount_total ?? 0;
+          try {
+            const [commission] = await db
+              .select()
+              .from(commissionsTable)
+              .where(eq(commissionsTable.id, commissionId));
+            if (!commission) {
+              logger.warn({ commissionId, sessionId: session.id }, 'Commission webhook: commission not found');
+            } else if (!['deposit', 'final'].includes(milestone)) {
+              // Reject unknown milestone values — prevents metadata spoofing attacks
+              logger.warn({ commissionId, milestone, sessionId: session.id }, 'Commission webhook: invalid milestone value — skipping');
+            } else if (meta.userId && commission.clientId !== meta.userId) {
+              // Ownership check: the payer must be the client on this commission
+              logger.warn({ commissionId, expectedClientId: commission.clientId, sessionUserId: meta.userId, sessionId: session.id }, 'Commission webhook: userId is not the commission client — skipping');
+            } else {
+              const alreadyPaid = milestone === 'deposit' ? commission.depositPaid : commission.finalPaid;
+              if (alreadyPaid) {
+                logger.info({ commissionId, milestone, sessionId: session.id }, 'Commission webhook: milestone already paid — skipping');
+              } else {
+                const updates: Partial<typeof commissionsTable.$inferInsert> = milestone === 'deposit'
+                  ? { depositPaid: true, depositAmount: paidAmountCents }
+                  : { finalPaid: true };
+                await db.update(commissionsTable).set(updates).where(eq(commissionsTable.id, commissionId));
+
+                // Fetch artist settings once — used for both in-app and email preferences
+                const [[artistUser], [artistSettings]] = await Promise.all([
+                  db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, commission.artistId)),
+                  db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, commission.artistId)),
+                ]);
+                const artistPrefSettings = artistSettings?.settings as Record<string, unknown> | null;
+
+                // In-app notification for artist (respects notif_commissions preference)
+                const artistWantsInApp = artistPrefSettings?.notif_commissions !== false;
+                if (artistWantsInApp) {
+                  await db.insert(notificationsTable).values({
+                    id: crypto.randomUUID(),
+                    userId: commission.artistId,
+                    type: 'commission_payment',
+                    fromId: commission.clientId,
+                    fromName: commission.clientName,
+                    fromAvatarUrl: null,
+                    text: `paid ${milestone === 'deposit' ? 'the deposit' : 'the final payment'} for their commission`,
+                    link: `/commissions`,
+                  });
+                }
+
+                // Artist email notification (respects notif_email_commission_payment preference)
+                const artistWantsEmail = !isEmailPaused(artistPrefSettings, artistSettings?.notifEmailResumeAt) && artistPrefSettings?.notif_email_commission_payment !== false;
+                if (artistUser?.email && artistWantsEmail) {
+                  const milestoneLabel = milestone === 'deposit' ? 'Deposit' : 'Final payment';
+                  const commHtml = commissionPaymentEmail(commission.clientName, commission.clientEmail ?? '', commissionId, commission.workType ?? '', milestone, paidAmountCents);
+                  await sendEmailWithRetry({ to: artistUser.email, subject: `${milestoneLabel} received from ${commission.clientName}`, html: commHtml }, { label: 'commission payment notification (webhook)', contextId: session.id });
+                }
+
+                logger.info({ commissionId, milestone, paidAmountCents, sessionId: session.id }, 'Commission webhook: payment recorded');
+              }
+            }
+          } catch (err) {
+            logger.error({ err, commissionId, milestone: meta.milestone, sessionId: session.id }, 'Commission webhook: handler failed');
+          }
+        }
+
+        // --- Auction payment ---
+        // Triggered when the winning bidder completes checkout.
+        // Marks the auction as paid. Idempotent: skips if already in 'paid' status.
+        if (session.mode === 'payment' && meta.type === 'auction' && meta.auctionId) {
+          const auctionId = meta.auctionId;
+          const paidAmountCents = session.amount_total ?? 0;
+          try {
+            const [auction] = await db
+              .select({ id: auctionsTable.id, status: auctionsTable.status, currentBidderId: auctionsTable.currentBidderId, currentBid: auctionsTable.currentBid })
+              .from(auctionsTable)
+              .where(eq(auctionsTable.id, auctionId));
+            if (!auction) {
+              logger.warn({ auctionId, sessionId: session.id }, 'Auction webhook: auction not found');
+            } else if (auction.status === 'paid') {
+              logger.info({ auctionId, sessionId: session.id }, 'Auction webhook: already paid — skipping');
+            } else if (meta.userId && auction.currentBidderId !== meta.userId) {
+              // Winner check: only the winning bidder may complete the checkout
+              logger.warn({ auctionId, expectedBidderId: auction.currentBidderId, sessionUserId: meta.userId, sessionId: session.id }, 'Auction webhook: userId is not the winning bidder — skipping');
+            } else if (Math.abs((auction.currentBid * 100) - paidAmountCents) > 100) {
+              // Amount integrity: paid amount must match winning bid (±1 cent for rounding)
+              logger.warn({ auctionId, expectedCents: auction.currentBid * 100, paidAmountCents, sessionId: session.id }, 'Auction webhook: amount mismatch — skipping');
+            } else {
+              await db.update(auctionsTable).set({ status: 'paid' }).where(eq(auctionsTable.id, auctionId));
+              logger.info({ auctionId, sessionId: session.id }, 'Auction webhook: marked as paid');
+            }
+          } catch (err) {
+            logger.error({ err, auctionId, sessionId: session.id }, 'Auction webhook: handler failed');
           }
         }
       }
