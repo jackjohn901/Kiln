@@ -112,7 +112,7 @@ function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDo
 
 export default function CartCheckout() {
   const [, navigate] = useLocation();
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   const { items, subtotal, itemCount, clearCart, removeItem } = useCart();
   const [step, setStep] = useState<Step>("address");
   const [addr, setAddr] = useState<AddressForm>(EMPTY_ADDR);
@@ -192,8 +192,21 @@ export default function CartCheckout() {
   // (in case the buyer edits their address in Settings mid-session).
   const fetchSavedAddress = useCallback(() => {
     fetch("/api/me/settings", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<{ defaultShippingAddress?: { street?: string; city?: string; state?: string; zip?: string; country?: string } | null }> : null)
+      .then(r => r.ok ? r.json() as Promise<{ defaultShippingAddress?: { street?: string; city?: string; state?: string; zip?: string; country?: string } | null; contactEmail?: string | null }> : null)
       .then(data => {
+        // Pre-fill name from auth user (firstName + lastName)
+        const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
+        // Pre-fill email from contactEmail (profile setting) or auth email fallback
+        const profileEmail = typeof data?.contactEmail === "string" && data.contactEmail.trim()
+          ? data.contactEmail.trim()
+          : (typeof user?.email === "string" && user.email.trim() ? user.email.trim() : "");
+
+        setAddr(prev => ({
+          ...prev,
+          name: prev.name || fullName,
+          email: prev.email || profileEmail,
+        }));
+
         const saved = data?.defaultShippingAddress;
         if (!saved) {
           setSavedAddress(null);
@@ -223,7 +236,7 @@ export default function CartCheckout() {
         }
       })
       .catch(() => { setSavedAddress(null); });
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchSavedAddress();
