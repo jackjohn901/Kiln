@@ -90,12 +90,15 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, req.params.id));
   if (!listing || listing.artistId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { title, price, isAvailable, isSold, medium, dimensions, description, bundleMinQty, bundleDiscountPct, isPinned, sortOrder, stockCount } = req.body as {
+  const { title, price, isAvailable, isSold, medium, dimensions, description, bundleMinQty, bundleDiscountPct, isPinned, sortOrder, stockCount, shipsTo, shipsFrom, technique, weight, year, edition, tags, imageUrl } = req.body as {
     title?: string; price?: number; isAvailable?: boolean; isSold?: boolean;
     medium?: string; dimensions?: string; description?: string;
     bundleMinQty?: number | null; bundleDiscountPct?: number | null;
     isPinned?: boolean; sortOrder?: number;
     stockCount?: number | null;
+    shipsTo?: string[]; shipsFrom?: string;
+    technique?: string; weight?: string; year?: number | null;
+    edition?: string; tags?: string[]; imageUrl?: string | null;
   };
   const updates: Partial<typeof listing> = { updatedAt: new Date() };
   if (title !== undefined) updates.title = title;
@@ -110,6 +113,14 @@ router.patch("/listings/:id", async (req, res): Promise<void> => {
   if (isPinned !== undefined) updates.isPinned = Boolean(isPinned);
   if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
   if (stockCount !== undefined) updates.stockCount = stockCount !== null ? Number(stockCount) : null;
+  if (shipsTo !== undefined) updates.shipsTo = Array.isArray(shipsTo) ? shipsTo : [];
+  if (shipsFrom !== undefined) updates.shipsFrom = shipsFrom;
+  if (technique !== undefined) updates.technique = technique;
+  if (weight !== undefined) updates.weight = weight;
+  if (year !== undefined) updates.year = year !== null ? Number(year) : null;
+  if (edition !== undefined) updates.edition = edition;
+  if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
+  if (imageUrl !== undefined) updates.imageUrl = imageUrl;
   const [updated] = await db.update(listingsTable).set(updates).where(eq(listingsTable.id, req.params.id)).returning();
   // If the listing is no longer purchasable, drop it from everyone's server-side cart.
   if (updated.isSold || !updated.isAvailable) {

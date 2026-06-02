@@ -421,9 +421,9 @@ export default function InventoryManager() {
                             >
                               <Star size={12} fill={listing.isPinned ? "currentColor" : "none"} />
                             </button>
-                            <button onClick={() => startEdit(listing)} className="p-1.5 rounded-full hover:bg-white/5 transition-colors">
+                            <Link href={`/listings/${listing.id}/edit`} className="p-1.5 rounded-full hover:bg-white/5 transition-colors inline-flex">
                               <Edit2 size={12} className="text-stone-500" />
-                            </button>
+                            </Link>
                             <button onClick={() => deleteNew(listing.id)} className="p-1.5 rounded-full hover:bg-red-500/10 transition-colors">
                               <Trash2 size={12} className="text-stone-700 hover:text-red-400" />
                             </button>
