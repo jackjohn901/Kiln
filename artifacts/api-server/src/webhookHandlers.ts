@@ -1,5 +1,5 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, type PerArtistShippingLine, newPatronEmail, stripeAccountRestrictedEmail, workshopBookingEmail, newWorkshopBookingArtistEmail, commissionPaymentEmail, type WorkshopCalendarParams } from './lib/email';
+import { sendEmail, sendEmailWithRetry, manualPayoutReceiptEmail, type ManualPayoutReceiptItem, type PerArtistShippingLine, newPatronEmail, stripeAccountRestrictedEmail, workshopBookingEmail, newWorkshopBookingArtistEmail, commissionPaymentEmail, newSaleEmail, type WorkshopCalendarParams } from './lib/email';
 import { buildReceiptPdf, sessionReceiptId, ordinalId, fmtDate, STATUS_LABELS, TYPE_LABELS, type ReceiptData } from './lib/receiptPdf';
 import { logger } from './lib/logger';
 import { db } from '@workspace/db';
@@ -295,6 +295,8 @@ export class WebhookHandlers {
           const sessionOrders = receiptOrderId
             ? await db
                 .select({
+                  id: ordersTable.id,
+                  sellerId: ordersTable.sellerId,
                   title: ordersTable.title,
                   amount: ordersTable.amount,
                   quantity: ordersTable.quantity,
@@ -400,6 +402,58 @@ export class WebhookHandlers {
             },
             { contextId: session.id, label: 'order confirmation' },
           );
+
+          // Artist sale notification emails — one per seller, with the shipping
+          // amount they charged so they know what the buyer paid for delivery.
+          if (webhookCreatedOrders.length > 0 && sessionOrders.length > 0) {
+            const ordersBySeller = new Map<string, typeof sessionOrders>();
+            for (const o of sessionOrders) {
+              if (!o.sellerId) continue;
+              if (!ordersBySeller.has(o.sellerId)) ordersBySeller.set(o.sellerId, []);
+              ordersBySeller.get(o.sellerId)!.push(o);
+            }
+            if (ordersBySeller.size > 0) {
+              const sellerIds = [...ordersBySeller.keys()];
+              const [artistUsers, artistSettingsRows] = await Promise.all([
+                db.select({ id: usersTable.id, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, sellerIds)),
+                db.select({ userId: userSettingsTable.userId, settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
+                  .from(userSettingsTable).where(inArray(userSettingsTable.userId, sellerIds)),
+              ]);
+              const artistEmailMap = new Map(artistUsers.map((u) => [u.id, u.email]));
+              const artistSettingsMap = new Map(artistSettingsRows.map((s) => [s.userId, s]));
+              const buyerDisplayName = session.customer_details?.name ?? email ?? 'A buyer';
+              const buyerEmailAddr = email ?? '';
+
+              for (const [sellerId, sellerOrders] of ordersBySeller) {
+                const artistEmail = artistEmailMap.get(sellerId);
+                if (!artistEmail) continue;
+                const settings = artistSettingsMap.get(sellerId);
+                const prefSettings = settings?.settings as Record<string, unknown> | null;
+                const wantsEmail = !isEmailPaused(prefSettings, settings?.notifEmailResumeAt) && prefSettings?.notif_email_new_sale !== false;
+                if (!wantsEmail) continue;
+
+                const artistName = sellerOrders[0]?.displayName ?? '';
+                const shippingEntry = perArtistShipping?.find((s) => s.artistName === artistName) ?? null;
+                const artistShippingCents = shippingEntry !== null ? shippingEntry.amountCents : null;
+
+                const artistItems: ManualPayoutReceiptItem[] = sellerOrders.map((o) => ({
+                  title: o.title ?? 'Item',
+                  quantity: o.quantity ?? 1,
+                  priceCents: Math.round((o.amount ?? 0) * 100),
+                }));
+                const itemsTotal = Math.round(sellerOrders.reduce((s, o) => s + (o.amount ?? 0), 0) * 100);
+                const artistTotalCents = artistShippingCents !== null ? itemsTotal + artistShippingCents : itemsTotal;
+
+                const artistOrderId = webhookCreatedOrders.find((wo) => wo.sellerId === sellerId)?.orderId ?? null;
+                const saleHtml = newSaleEmail(buyerDisplayName, buyerEmailAddr, session.id, artistTotalCents, artistItems, artistOrderId, null, meta.userId, artistShippingCents);
+                const itemTitles = sellerOrders.map((o) => o.title ?? 'Item').join(', ');
+                await sendEmailWithRetry(
+                  { to: artistEmail, subject: `New Sale! ${itemTitles}`, html: saleHtml },
+                  { contextId: session.id, label: 'artist sale notification' },
+                );
+              }
+            }
+          }
         }
 
         if (session.mode === 'subscription' && meta.platform === 'kiln' && meta.tierId && meta.userId) {

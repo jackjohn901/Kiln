@@ -679,6 +679,7 @@ export function newSaleEmail(
   orderId?: string | null,
   buyerHandle?: string | null,
   buyerId?: string | null,
+  shippingCents?: number | null,
 ): string {
   const itemRows = items
     .map(
@@ -700,6 +701,10 @@ export function newSaleEmail(
     ? `<a href="${buyerProfileUrl}" style="color:#fcd34d;text-decoration:none;font-weight:bold;">${escHtml(buyerName || "A buyer")}</a>`
     : `<strong>${escHtml(buyerName || "A buyer")}</strong>`;
 
+  const shippingLine = shippingCents !== null && shippingCents !== undefined
+    ? `<p style="margin:6px 0 0;font-size:14px;color:#a8a29e;">Shipping charged: <strong style="color:#d6d3d1;">${shippingCents === 0 ? "Free shipping" : `$${(shippingCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}</strong></p>`
+    : "";
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Sale! 🎉</h1>
     <p style="color:#78716c;margin-bottom:0;">Someone just purchased your work on Kiln.</p>
@@ -712,6 +717,7 @@ export function newSaleEmail(
     ${card(`
       <p style="margin:0 0 10px;font-size:14px;color:#fcd34d;font-weight:bold;">Items ordered</p>
       ${itemRows}
+      ${shippingLine}
       <p style="margin:12px 0 0;font-size:16px;border-top:1px solid #3c3835;padding-top:12px;">
         Total: <strong style="color:#fcd34d;">$${(amountTotalCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
       </p>
