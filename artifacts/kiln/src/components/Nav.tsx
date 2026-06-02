@@ -13,7 +13,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, lastTypingPing } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const { settings } = useSettings();
@@ -22,6 +22,7 @@ export default function Nav() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [messagePulse, setMessagePulse] = useState(false);
+  const [typingPulse, setTypingPulse] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   interface SwitchAccount {
@@ -104,6 +105,20 @@ export default function Nav() {
     const t = setTimeout(() => setMessagePulse(false), 2000);
     return () => clearTimeout(t);
   }, [lastNewMessagePing]);
+
+  // Typing indicator: animate the Messages icon for 3 s when someone is
+  // composing in a thread the user is not currently viewing.
+  // Also clear when the user navigates to /messages (they'll see it in-thread).
+  useEffect(() => {
+    if (!lastTypingPing) return;
+    setTypingPulse(true);
+    const t = setTimeout(() => setTypingPulse(false), 3000);
+    return () => clearTimeout(t);
+  }, [lastTypingPing]);
+
+  useEffect(() => {
+    if (location.startsWith("/messages")) setTypingPulse(false);
+  }, [location]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -267,11 +282,11 @@ export default function Nav() {
             <Link
               href="/messages"
               className={`relative flex h-8 w-8 items-center justify-center rounded-full border text-stone-400 hover:border-amber-400/40 hover:text-amber-300 transition-colors ${
-                messagePulse ? "border-blue-400/60 text-blue-300" : "border-stone-700"
+                messagePulse ? "border-blue-400/60 text-blue-300" : typingPulse ? "border-blue-400/40 text-blue-300/70" : "border-stone-700"
               }`}
               title="Messages"
             >
-              <MessageCircle size={15} className={messagePulse ? "animate-bounce" : ""} />
+              <MessageCircle size={15} className={messagePulse ? "animate-bounce" : typingPulse ? "animate-pulse" : ""} />
               {unreadMessageCount > 0 && (
                 <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white ${messagePulse ? "animate-ping-once" : ""}`}>
                   {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
@@ -281,6 +296,12 @@ export default function Nav() {
                 <span className="absolute -top-1 -right-1 flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+                </span>
+              )}
+              {typingPulse && !messagePulse && unreadMessageCount === 0 && (
+                <span className="absolute -bottom-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400/60 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-400/80" />
                 </span>
               )}
             </Link>

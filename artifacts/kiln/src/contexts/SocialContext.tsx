@@ -204,6 +204,8 @@ interface SocialContextType extends SocialState {
   decrementUnreadMessageCount: (n: number) => void;
   lastNewMessagePing: { senderName: string; senderAvatarUrl: string | null; threadId: string } | null;
   clearNewMessagePing: () => void;
+  lastTypingPing: { threadId: string; userId: string } | null;
+  clearTypingPing: () => void;
   setActiveMessageThreadId: (id: string | null) => void;
   quoteInquiry: (id: string, quote: CommissionQuote) => void;
   addReview: (review: Omit<ShopReview, "id" | "createdAt">) => void;
@@ -342,15 +344,25 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     threadId: string;
   } | null>(null);
 
+  // Track typing pings so Nav can animate the Messages icon
+  const [lastTypingPing, setLastTypingPing] = useState<{
+    threadId: string;
+    userId: string;
+  } | null>(null);
+
   // Ref so WS handler always sees the latest active thread without needing re-subscription
   const activeMessageThreadIdRef = useRef<string | null>(null);
 
   const clearNewMessagePing = useCallback(() => setLastNewMessagePing(null), []);
+  const clearTypingPing = useCallback(() => setLastTypingPing(null), []);
 
   const setActiveMessageThreadId = useCallback((id: string | null) => {
     activeMessageThreadIdRef.current = id;
     // Clear any stale ping for the thread being opened
-    if (id !== null) setLastNewMessagePing(prev => (prev?.threadId === id ? null : prev));
+    if (id !== null) {
+      setLastNewMessagePing(prev => (prev?.threadId === id ? null : prev));
+      setLastTypingPing(prev => (prev?.threadId === id ? null : prev));
+    }
   }, []);
 
   // Update unread message count when an incoming message WebSocket event arrives,
@@ -376,6 +388,18 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     });
     return unsub;
   }, [wsSubscribe, fetchUnreadMessageCount]);
+
+  // Subscribe to typing events — animate the nav Messages icon when someone
+  // is composing in a thread the user is not currently viewing.
+  useEffect(() => {
+    const unsub = wsSubscribe("typing", (evt) => {
+      const e = evt as { threadId?: string; userId?: string };
+      if (e.threadId && e.threadId !== activeMessageThreadIdRef.current) {
+        setLastTypingPing({ threadId: e.threadId, userId: e.userId ?? "" });
+      }
+    });
+    return unsub;
+  }, [wsSubscribe]);
 
   // Sync from server on login: load real following IDs + notifications
   useEffect(() => {
@@ -873,6 +897,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         decrementUnreadMessageCount,
         lastNewMessagePing,
         clearNewMessagePing,
+        lastTypingPing,
+        clearTypingPing,
         setActiveMessageThreadId,
         quoteInquiry,
         addReview,
