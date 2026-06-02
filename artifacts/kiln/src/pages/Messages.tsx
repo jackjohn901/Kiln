@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { MessageCircle, Send, ArrowLeft, Search, PenSquare, X, ImagePlus, Loader2, ShoppingBag, Store } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -968,12 +968,24 @@ export default function Messages() {
                   const lastReadSentId = [...apiMessages].reverse().find(
                     (m) => m.senderId === profile.id && m.read
                   )?.id ?? null;
+                  let dividerShown = false;
                   return apiMessages.map((msg) => {
                     const isMe = msg.senderId === profile.id;
                     const isUnread = !isMe && !msg.read;
+                    const showDivider = isUnread && !dividerShown;
+                    if (showDivider) dividerShown = true;
                     return (
+                      <React.Fragment key={msg.id}>
+                        {showDivider && (
+                          <div className="flex items-center gap-3 my-1 px-1">
+                            <div className="flex-1 h-px bg-blue-500/30" />
+                            <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider shrink-0">
+                              New messages
+                            </span>
+                            <div className="flex-1 h-px bg-blue-500/30" />
+                          </div>
+                        )}
                       <div
-                        key={msg.id}
                         className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                         {...(isUnread ? { "data-unread-msg": "" } : {})}
                       >
@@ -1002,6 +1014,7 @@ export default function Messages() {
                           <p className="text-[10px] text-stone-500 mt-0.5 mr-0.5">Seen</p>
                         )}
                       </div>
+                      </React.Fragment>
                     );
                   });
                 })()}
