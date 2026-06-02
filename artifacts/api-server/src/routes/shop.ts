@@ -132,6 +132,7 @@ router.get("/artists/:artistId/shipping", async (req, res): Promise<void> => {
       internationalRate: typeof s.internationalRate === "number" ? s.internationalRate : null,
       perItemRate: typeof s.perItemRate === "number" ? s.perItemRate : null,
       freeThreshold: typeof s.freeThreshold === "number" ? s.freeThreshold : null,
+      freeShippingGapPercent: typeof s.freeShippingGapPercent === "number" ? s.freeShippingGapPercent : null,
       offerLocalPickup: s.offerLocalPickup === true,
       shipsTo: Array.isArray(s.shipsTo) ? (s.shipsTo as string[]).filter((x) => typeof x === "string") : [],
     });

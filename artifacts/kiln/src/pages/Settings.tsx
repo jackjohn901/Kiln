@@ -16,12 +16,13 @@ interface ShippingSettings {
   internationalRate: number;
   perItemRate: number;
   freeThreshold: number;
+  freeShippingGapPercent: number;
   offerFreeShipping: boolean;
   shipsTo: string[];
 }
 
 function defaultShipping(): ShippingSettings {
-  return { domesticRate: 18, internationalRate: 45, perItemRate: 0, freeThreshold: 500, offerFreeShipping: false, shipsTo: [] };
+  return { domesticRate: 18, internationalRate: 45, perItemRate: 0, freeThreshold: 500, freeShippingGapPercent: 20, offerFreeShipping: false, shipsTo: [] };
 }
 
 function readShippingSettings(): ShippingSettings {
@@ -1271,6 +1272,26 @@ export default function Settings() {
                     </div>
                     <p className="text-[10px] text-stone-700 mt-1">Orders over this amount ship free. Set to 0 to disable.</p>
                   </div>
+
+                  {!shipping.offerFreeShipping && shipping.freeThreshold > 0 && (
+                    <div>
+                      <label className="text-xs text-stone-500 mb-1 block">Free-shipping nudge window</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={shipping.freeShippingGapPercent}
+                          onChange={(e) => setShipping((s) => ({ ...s, freeShippingGapPercent: Math.max(1, Math.min(100, Number(e.target.value) || 20)) }))}
+                          className="w-full rounded-xl border border-white/10 bg-stone-800/60 px-4 pr-8 py-2.5 text-sm text-stone-200 focus:border-amber-500/50 focus:outline-none"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 text-sm">%</span>
+                      </div>
+                      <p className="text-[10px] text-stone-700 mt-1">
+                        Buyers within this % of your threshold see a "add ${(shipping.freeThreshold * (shipping.freeShippingGapPercent / 100)).toFixed(0)} more for free shipping" nudge. Default is 20%.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -12,6 +12,7 @@ interface ShippingRateInfo {
   internationalRate: number | null;
   perItemRate: number | null;
   freeThreshold: number | null;
+  freeShippingGapPercent: number | null;
 }
 
 async function fetchArtistShipping(artistId: string): Promise<ShippingRateInfo> {
@@ -19,7 +20,7 @@ async function fetchArtistShipping(artistId: string): Promise<ShippingRateInfo> 
     const res = await fetch(`/api/artists/${artistId}/shipping`);
     if (res.ok) return await res.json() as ShippingRateInfo;
   } catch { /* fall through */ }
-  return { offerFreeShipping: false, domesticRate: null, internationalRate: null, perItemRate: null, freeThreshold: null };
+  return { offerFreeShipping: false, domesticRate: null, internationalRate: null, perItemRate: null, freeThreshold: null, freeShippingGapPercent: null };
 }
 
 function calcArtistShipping(info: ShippingRateInfo, artistSubtotal: number, isDomestic: boolean, totalQty: number): number {
@@ -189,8 +190,8 @@ export default function Cart() {
   }, {});
   const bundleEligible = Object.values(artistGroups).some((group) => group.length >= 2);
 
-  // Free-shipping proximity nudges: show when subtotal is within 20% below the threshold
-  const FREE_SHIPPING_GAP = 0.20;
+  // Free-shipping proximity nudges: show when subtotal is within the artist's configured gap below the threshold (default 20%)
+  const DEFAULT_FREE_SHIPPING_GAP = 0.20;
   function artistDisplayName(id: string): string {
     return id
       .replace(/^seed-/, "")
@@ -205,7 +206,8 @@ export default function Cart() {
       if (!info.freeThreshold || info.offerFreeShipping) continue;
       const artistSub = artistSubtotals.get(aid) ?? 0;
       if (artistSub >= info.freeThreshold) continue; // already qualifies
-      const lowerBound = info.freeThreshold * (1 - FREE_SHIPPING_GAP);
+      const gap = info.freeShippingGapPercent !== null ? info.freeShippingGapPercent / 100 : DEFAULT_FREE_SHIPPING_GAP;
+      const lowerBound = info.freeThreshold * (1 - gap);
       if (artistSub >= lowerBound) {
         freeShippingNudges.push({
           artistId: aid,
