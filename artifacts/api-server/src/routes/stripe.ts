@@ -340,14 +340,15 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
       .join(',');
 
     // Validate and encode per-artist shipping breakdown supplied by the client.
-    // We only store artist names and amounts (not IDs) since names are display-only.
+    // We store artistId (a), artist name (n), and amount in cents (c).
+    // The artistId is used by the webhook to credit shipping cost to the correct order row.
     // Validation: every artistId in the breakdown must belong to one of the listing's artists.
     let shippingBreakdownMeta: string | null = null;
     if (Array.isArray(rawShippingBreakdown) && rawShippingBreakdown.length > 0 && listingIds.length > 0) {
       const listingArtistIdSet = new Set(
         listingIds.map((id) => listingPriceMap.get(id)?.artistId).filter(Boolean),
       );
-      const validated: Array<{ n: string; c: number }> = [];
+      const validated: Array<{ a: string; n: string; c: number }> = [];
       for (const entry of rawShippingBreakdown) {
         if (
           typeof entry.artistId === 'string' &&
@@ -357,7 +358,7 @@ router.post('/stripe/checkout', async (req, res): Promise<void> => {
           entry.amountCents >= 0 &&
           listingArtistIdSet.has(entry.artistId)
         ) {
-          validated.push({ n: entry.artistName.slice(0, 60).trim(), c: Math.round(entry.amountCents) });
+          validated.push({ a: entry.artistId, n: entry.artistName.slice(0, 60).trim(), c: Math.round(entry.amountCents) });
         }
       }
       if (validated.length > 0) {

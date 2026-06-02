@@ -33,6 +33,7 @@ interface Order {
   notes: string | null;
   processingWindowDays: number | null;
   processingWindowLabel: string | null;
+  shippingCost?: number | null;
   manualPayout: boolean;
   addressLocked: boolean;
   createdAt: string;
@@ -69,6 +70,10 @@ const STATUS_CONFIG: Record<string, { icon: React.ElementType; label: string; co
 
 function formatPrice(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+function formatCents(cents: number) {
+  return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDate(iso: string) {
@@ -687,10 +692,55 @@ export default function OrderDetail() {
                   );
                 })}
               </div>
-              <div className="mt-3 pt-3 border-t border-white/8 flex items-center justify-between">
-                <span className="text-xs text-stone-400 font-medium">Total</span>
-                <span className="text-base font-bold text-amber-300">{formatPrice(cartTotal)}</span>
-              </div>
+              {(() => {
+                // Build per-seller shipping lines, deduped by sellerId.
+                // shippingCost is only stamped on the first order row per artist in the DB,
+                // so raw summing of all sibling rows would be correct — but we dedupe here
+                // too as a belt-and-suspenders guard, and to drive both display and total
+                // from the same derived list.
+                const seenShippingSellers = new Set<string>();
+                const sellerShippingLines = siblingOrders
+                  .filter((o) => (o.shippingCost ?? 0) > 0 && !seenShippingSellers.has(o.sellerId) && !!(seenShippingSellers.add(o.sellerId) || true))
+                  .map((o) => ({
+                    sellerName: o.sellerName?.trim() || (o.sellerHandle ? `@${o.sellerHandle}` : "Artist"),
+                    cents: o.shippingCost!,
+                  }));
+
+                const shippingTotalCents = sellerShippingLines.reduce((sum, l) => sum + l.cents, 0);
+                const hasShipping = shippingTotalCents > 0;
+
+                return (
+                  <div className="mt-3 pt-3 border-t border-white/8 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-stone-500">Items</span>
+                      <span className="text-sm text-stone-300 tabular-nums">{formatPrice(cartTotal)}</span>
+                    </div>
+                    {hasShipping && sellerShippingLines.length > 1 ? (
+                      sellerShippingLines.map((line, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500 truncate mr-2">
+                            Shipping · <span className="text-stone-400">{line.sellerName}</span>
+                          </span>
+                          <span className="text-sm text-stone-300 tabular-nums shrink-0">{formatCents(line.cents)}</span>
+                        </div>
+                      ))
+                    ) : hasShipping ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-stone-500">Shipping</span>
+                        <span className="text-sm text-stone-300 tabular-nums">{formatCents(shippingTotalCents)}</span>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center justify-between pt-1.5 border-t border-white/8">
+                      <span className="text-xs text-stone-400 font-medium">Total</span>
+                      <span className="text-base font-bold text-amber-300">
+                        {hasShipping
+                          ? formatCents(Math.round(cartTotal * 100) + shippingTotalCents)
+                          : formatPrice(cartTotal)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           ) : (
             <div className="flex items-start gap-4">
@@ -717,6 +767,24 @@ export default function OrderDetail() {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full ${typeConf.color}`}>{typeConf.label}</span>
                   <span className="text-base font-bold text-amber-300">{formatPrice(order.amount)}</span>
                 </div>
+                {(order.shippingCost ?? 0) > 0 && (
+                  <div className="mt-2 pt-2 border-t border-white/8 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-stone-500">Item</span>
+                      <span className="text-sm text-stone-300 tabular-nums">{formatPrice(order.amount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-stone-500">Shipping</span>
+                      <span className="text-sm text-stone-300 tabular-nums">{formatCents(order.shippingCost!)}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1.5 border-t border-white/6">
+                      <span className="text-xs text-stone-400 font-medium">Total</span>
+                      <span className="text-sm font-bold text-amber-300">
+                        {formatCents(Math.round(order.amount * 100) + order.shippingCost!)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

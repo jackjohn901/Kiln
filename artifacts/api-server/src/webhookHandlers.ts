@@ -28,8 +28,10 @@ async function createOrdersForSession(params: {
   listingIds: string[];
   listingQtys: number[];
   manualPayout: boolean;
+  /** Map of artistId → shipping cost in cents, derived from the Stripe session metadata. */
+  artistShippingMap?: Map<string, number>;
 }): Promise<{ orderId: string; sellerId: string }[]> {
-  const { sessionId, amountTotal, userId, listingIds, listingQtys, manualPayout } = params;
+  const { sessionId, amountTotal, userId, listingIds, listingQtys, manualPayout, artistShippingMap } = params;
   if (listingIds.length === 0) return [];
 
   const dedupeKey = `stripe:${sessionId}`;
@@ -105,6 +107,11 @@ async function createOrdersForSession(params: {
     buyerShippingAddress = parts.length > 0 ? parts.join('\n') : null;
   }
 
+  // Track which artists have already had their shipping cost credited to an order row.
+  // Per-artist shipping covers all items from that artist in one checkout — it must only
+  // appear once, on the first order row for that artist.
+  const shippingCreditedArtists = new Set<string>();
+
   const result: { orderId: string; sellerId: string }[] = [];
   for (let i = 0; i < listingIds.length; i++) {
     const listing = listingMap.get(listingIds[i]);
@@ -114,6 +121,13 @@ async function createOrdersForSession(params: {
     }
     const qty = listingQtys[i] ?? 1;
     const orderId = crypto.randomUUID();
+
+    // Only stamp shippingCost on the first order row per artist.
+    const shippingCost = (artistShippingMap && !shippingCreditedArtists.has(listing.artistId))
+      ? (artistShippingMap.get(listing.artistId) ?? null)
+      : null;
+    if (shippingCost !== null) shippingCreditedArtists.add(listing.artistId);
+
     await db.insert(ordersTable).values({
       id: orderId,
       buyerId: userId,
@@ -131,6 +145,7 @@ async function createOrdersForSession(params: {
       notes: dedupeKey,
       processingWindowDays: processingWindowMap.get(listing.artistId) ?? null,
       processingWindowLabel: processingWindowLabelMap.get(listing.artistId) ?? null,
+      shippingCost,
       manualPayout,
     });
     result.push({ orderId, sellerId: listing.artistId });
@@ -271,6 +286,32 @@ export class WebhookHandlers {
           if (meta.listingIds && meta.userId) {
             const listingIds = meta.listingIds.split(',').filter(Boolean);
             const listingQtys = (meta.listingQtys ?? '').split(',').map((q) => parseInt(q, 10) || 1);
+
+            // Parse the shipping breakdown stored in Stripe metadata and build a
+            // Map<artistId, shippingCents> so each order row can record its shipping cost.
+            let artistShippingMap: Map<string, number> | undefined;
+            if (meta.shippingBreakdown) {
+              try {
+                const parsed = JSON.parse(meta.shippingBreakdown) as unknown;
+                if (Array.isArray(parsed)) {
+                  const entries = parsed.filter(
+                    (e): e is { a?: string; n: string; c: number } =>
+                      e !== null &&
+                      typeof e === 'object' &&
+                      typeof (e as Record<string, unknown>).n === 'string' &&
+                      typeof (e as Record<string, unknown>).c === 'number',
+                  );
+                  // New format includes artistId (a); old format (before this change) did not.
+                  const withId = entries.filter((e) => typeof e.a === 'string' && e.a.length > 0);
+                  if (withId.length > 0) {
+                    artistShippingMap = new Map(withId.map((e) => [e.a as string, e.c]));
+                  }
+                }
+              } catch {
+                // Malformed JSON — proceed without shipping map.
+              }
+            }
+
             try {
               webhookCreatedOrders = await createOrdersForSession({
                 sessionId: session.id,
@@ -279,6 +320,7 @@ export class WebhookHandlers {
                 listingIds,
                 listingQtys,
                 manualPayout: meta.manualPayout === 'true',
+                artistShippingMap,
               });
             } catch (orderErr) {
               logger.error({ err: orderErr, sessionId: session.id }, 'Webhook order creation failed; receipt email will omit deep link');

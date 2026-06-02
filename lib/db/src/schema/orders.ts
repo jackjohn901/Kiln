@@ -19,6 +19,7 @@ export const ordersTable = pgTable("orders", {
   quantity: integer("quantity").notNull().default(1),
   processingWindowDays: integer("processing_window_days"),
   processingWindowLabel: text("processing_window_label"),
+  shippingCost: integer("shipping_cost"),
   manualPayout: boolean("manual_payout").notNull().default(false),
   addressLocked: boolean("address_locked").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

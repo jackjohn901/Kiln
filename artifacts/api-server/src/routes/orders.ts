@@ -51,6 +51,7 @@ router.get("/orders/cart/:sessionKey", cartReceiptLimiter, async (req, res): Pro
       notes: ordersTable.notes,
       processingWindowDays: ordersTable.processingWindowDays,
       processingWindowLabel: ordersTable.processingWindowLabel,
+      shippingCost: ordersTable.shippingCost,
       manualPayout: ordersTable.manualPayout,
       createdAt: ordersTable.createdAt,
       updatedAt: ordersTable.updatedAt,
