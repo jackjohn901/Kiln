@@ -77,15 +77,21 @@ export default function CreateListing() {
   const [tagInput, setTagInput] = useState("");
   const [imagePreview, setImagePreview] = useState("");
 
-  // Pre-fill shipsTo from artist's shipping settings
+  // Pre-fill shipsTo and shipsFrom from artist's shipping settings
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
-      .then((data: { shippingSettings?: { shipsTo?: string[] } } | null) => {
+      .then((data: { shippingSettings?: { shipsTo?: string[] }; defaultShippingAddress?: { city?: string; state?: string; country?: string } } | null) => {
         const shipsTo = data?.shippingSettings?.shipsTo;
-        if (Array.isArray(shipsTo) && shipsTo.length > 0) {
-          setForm(f => ({ ...f, shipsTo }));
-        }
+        const addr = data?.defaultShippingAddress;
+        const shipsFrom = addr
+          ? [addr.city, addr.state || addr.country].filter(Boolean).join(", ")
+          : "";
+        setForm(f => ({
+          ...f,
+          ...(Array.isArray(shipsTo) && shipsTo.length > 0 ? { shipsTo } : {}),
+          ...(shipsFrom ? { shipsFrom } : {}),
+        }));
       })
       .catch(() => {});
   }, []);
