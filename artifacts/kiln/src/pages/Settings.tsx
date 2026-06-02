@@ -1374,8 +1374,18 @@ export default function Settings() {
                   step={5}
                   value={Math.min(samplePrice, 500)}
                   onChange={(e) => setSamplePrice(Number(e.target.value))}
-                  className="w-full h-1.5 mb-3 rounded-full appearance-none cursor-pointer accent-amber-500 bg-stone-700"
+                  className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-amber-500 bg-stone-700"
                 />
+                {!shipping.offerFreeShipping && samplePrice > 0 && samplePrice !== shipping.freeThreshold && (
+                  <div className="flex justify-end mt-1.5 mb-1">
+                    <button
+                      onClick={() => setShipping((s) => ({ ...s, freeThreshold: samplePrice }))}
+                      className="text-[10px] text-amber-500 hover:text-amber-400 transition-colors underline underline-offset-2"
+                    >
+                      Set ${samplePrice} as free-shipping threshold
+                    </button>
+                  </div>
+                )}
                 <div
                   className={`overflow-hidden transition-all duration-300 ${freeShipUnlocked ? "max-h-12 opacity-100 mb-2" : "max-h-0 opacity-0 mb-0"}`}
                 >

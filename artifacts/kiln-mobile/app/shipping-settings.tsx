@@ -11,6 +11,7 @@ import {
   Switch,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -284,6 +285,16 @@ export default function ShippingSettingsScreen() {
                   </View>
                 </View>
               </View>
+              {!shipping.offerFreeShipping && samplePrice > 0 && samplePrice !== shipping.freeThreshold && (
+                <TouchableOpacity
+                  onPress={() => setShipping((s) => ({ ...s, freeThreshold: samplePrice }))}
+                  style={{ alignSelf: "flex-end", marginBottom: 6 }}
+                >
+                  <Text style={{ fontSize: 10, color: colors.primary, textDecorationLine: "underline" }}>
+                    Set ${samplePrice} as free-shipping threshold
+                  </Text>
+                </TouchableOpacity>
+              )}
               {freeShipVisible && (
                 <Animated.View
                   style={{
