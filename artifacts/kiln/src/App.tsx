@@ -15,6 +15,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { StripeConnectProvider } from "@/contexts/StripeConnectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import MobileNav from "@/components/MobileNav";
+import MessageToast from "@/components/MessageToast";
+import { useSocial } from "@/contexts/SocialContext";
 import NotFound from "@/pages/not-found";
 import Feed from "@/pages/Feed";
 import Artists from "@/pages/Artists";
@@ -223,6 +225,19 @@ function SessionGuard() {
     return () => window.removeEventListener("kiln:session-expired", handleSessionExpired);
   }, [isLoading]);
   return null;
+}
+
+function MessageToastMount() {
+  const { lastNewMessagePing, clearNewMessagePing } = useSocial();
+  if (!lastNewMessagePing) return null;
+  return (
+    <MessageToast
+      senderName={lastNewMessagePing.senderName}
+      senderAvatarUrl={lastNewMessagePing.senderAvatarUrl}
+      threadId={lastNewMessagePing.threadId}
+      onDismiss={clearNewMessagePing}
+    />
+  );
 }
 
 function RefCapture() {
@@ -489,6 +504,7 @@ function App() {
                     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                       <Router />
                       <MobileNav />
+                      <MessageToastMount />
                     </WouterRouter>
                     <Toaster />
                   </StripeConnectProvider>

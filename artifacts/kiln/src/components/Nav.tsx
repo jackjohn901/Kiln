@@ -9,12 +9,11 @@ import { useStripeConnect } from "@/contexts/StripeConnectContext";
 import { useSettings, deriveNotifStatus } from "@/contexts/SettingsContext";
 import NotificationPanel from "@/components/NotificationPanel";
 import GlobalSearch from "@/components/GlobalSearch";
-import MessageToast from "@/components/MessageToast";
 
 export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, clearNewMessagePing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const { settings } = useSettings();
@@ -526,14 +525,6 @@ export default function Nav() {
         {showSearch && <GlobalSearch onClose={() => setShowSearch(false)} />}
       </AnimatePresence>
 
-      {lastNewMessagePing && (
-        <MessageToast
-          senderName={lastNewMessagePing.senderName}
-          senderAvatarUrl={lastNewMessagePing.senderAvatarUrl}
-          threadId={lastNewMessagePing.threadId}
-          onDismiss={clearNewMessagePing}
-        />
-      )}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Home, Compass, Plus, ShoppingBag, LayoutGrid,
@@ -120,13 +120,21 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
 export default function MobileNav() {
   const [location] = useLocation();
   const { profile } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, lastNewMessagePing } = useSocial();
   const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const { settings } = useSettings();
   const { dimmed: notifDimmed, warn: notifWarn } = deriveNotifStatus(settings);
   const [showMore, setShowMore] = useState(false);
+  const [messagePulse, setMessagePulse] = useState(false);
+
+  useEffect(() => {
+    if (!lastNewMessagePing) return;
+    setMessagePulse(true);
+    const t = setTimeout(() => setMessagePulse(false), 2000);
+    return () => clearTimeout(t);
+  }, [lastNewMessagePing]);
 
   const notifTitle = notifDimmed
     ? "Notifications silenced or paused — check Settings"
@@ -321,6 +329,8 @@ export default function MobileNav() {
                           href === "/inbox" ? (pendingInquiries + unreadCommissionPaymentCount) : 0;
                         const notifMuted = isNotifItem && notifDimmed;
                         const notifItemWarn = isNotifItem && notifWarn && !notifDimmed;
+                        const isMsgItem = href === "/messages";
+                        const isPulsing = isMsgItem && messagePulse;
 
                         return (
                           <Link key={href} href={href} onClick={() => setShowMore(false)}>
@@ -329,12 +339,14 @@ export default function MobileNav() {
                               className={`relative w-full flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 transition-all ${
                                 isActive
                                   ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                                  : isPulsing
+                                  ? "border-blue-400/60 bg-blue-500/10 text-blue-300"
                                   : notifMuted
                                   ? "border-white/8 bg-stone-900/60 text-stone-600 hover:border-white/15 hover:text-stone-400"
                                   : "border-white/8 bg-stone-900/60 text-stone-400 hover:border-white/15 hover:text-stone-200"
                               }`}
                             >
-                              <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} className={notifMuted && !isActive ? "opacity-50" : undefined} />
+                              <Icon size={18} strokeWidth={isActive || isPulsing ? 2.5 : 1.8} className={`${notifMuted && !isActive ? "opacity-50" : ""} ${isPulsing ? "animate-bounce" : ""}`} />
                               <span className="text-[10px] font-medium leading-tight text-center">{label}</span>
                               {badge > 0 && (
                                 <span className={`absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
