@@ -820,6 +820,8 @@ export default function Settings() {
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Videos</p>
             <Toggle settingKey="display_autoplay" label="Autoplay videos" desc="Process reels play automatically" />
             <Toggle settingKey="display_sound" label="Sound on by default" desc="Videos play with audio" />
+            <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Creator</p>
+            <Toggle settingKey="creator_mode" label="Creator mode" desc="Show a bigger Kiln logo + watermark so your screen-recorded reels stay branded off-platform" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Earnings</p>
             <div className="flex items-center justify-between py-3">
               <div className="flex-1 min-w-0 pr-4">

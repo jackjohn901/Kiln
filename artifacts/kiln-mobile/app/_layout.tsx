@@ -6,10 +6,11 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useSegments, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useRef } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -19,8 +20,9 @@ import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { SaleNotificationListener } from "@/components/SaleNotificationListener";
-import { AuthProvider } from "@/lib/auth";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { useAppUpdates } from "@/hooks/useAppUpdates";
+import { ONBOARDING_DONE_KEY } from "@/app/onboarding";
 
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) setBaseUrl(`https://${domain}`);
@@ -60,12 +62,58 @@ function RootOverlays() {
   );
 }
 
+/**
+ * Sends freshly-authenticated, first-time users into the onboarding flow once.
+ *
+ * Runs after auth resolves: if the user is signed in, hasn't completed
+ * onboarding, and isn't already on the onboarding screen, it routes them there.
+ * The `kiln:onboarding_done` flag (set when onboarding finishes) makes this
+ * fire at most once per install. A ref guards against re-triggering while the
+ * async storage read is in flight.
+ */
+function useOnboardingGate() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const segments = useSegments();
+  const onOnboarding = segments[0] === "onboarding";
+  const checking = useRef(false);
+  const handled = useRef(false);
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || onOnboarding || handled.current || checking.current) return;
+    checking.current = true;
+    const authedAtStart = isAuthenticated;
+    AsyncStorage.getItem(ONBOARDING_DONE_KEY)
+      .then((done) => {
+        // Mark the gate resolved for this sign-in regardless of outcome so we
+        // never re-read storage on later navigation. Guard against a sign-out
+        // that happened while the read was in flight (stale completion).
+        handled.current = true;
+        if (!done && authedAtStart) {
+          router.replace("/onboarding");
+        }
+      })
+      .catch((err) => {
+        console.warn("Onboarding gate: failed to read flag", err);
+      })
+      .finally(() => {
+        checking.current = false;
+      });
+  }, [isAuthenticated, isLoading, onOnboarding]);
+
+  // Reset when the user signs out so a future sign-in can re-evaluate.
+  useEffect(() => {
+    if (!isAuthenticated) handled.current = false;
+  }, [isAuthenticated]);
+}
+
 function RootLayoutNav() {
+  useOnboardingGate();
   return (
     <View style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false, presentation: "modal" }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="chat/[threadId]" options={{ headerShown: true, headerTitle: "", headerBackTitle: "Back" }} />
       </Stack>
       {/*

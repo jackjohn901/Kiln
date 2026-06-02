@@ -199,8 +199,8 @@ export default function Nav() {
       >
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <Link href="/" data-testid="nav-logo" className="flex items-center gap-2 select-none">
-            <Flame size={18} className="text-amber-400" />
-            <span className="font-serif text-xl font-bold tracking-tight text-amber-100">Kiln</span>
+            <Flame size={settings.creator_mode ? 26 : 18} className="text-amber-400 transition-all" />
+            <span className={`font-serif font-bold tracking-tight text-amber-100 transition-all ${settings.creator_mode ? "text-3xl" : "text-xl"}`}>Kiln</span>
           </Link>
 
           <div className="hidden items-center gap-1 md:flex">

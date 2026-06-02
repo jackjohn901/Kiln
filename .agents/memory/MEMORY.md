@@ -15,3 +15,4 @@
 - [Create-flow navigation](create-flow-navigation.md) — after create POST, navigate directly to the new item's detail (/auctions/:id, /listings/:id) using the returned id; interstitials + Live-tab filters cause "nothing showed up".
 - [Storefront id resolution](storefront-id-resolution.md) — listings/auctions keyed by user UUID not handle; resolve real id before fetch, own uses /me/listings, all ArtistProfile fetch effects must be AbortController-cancellable.
 - [Auth redirect smoothing](auth-redirect-smoothing.md) — omit OIDC `prompt: login consent` so returning users glide through; show branded AuthSplash, never blank, during redirect/isLoading.
+- [Mobile review-prompt gating](mobile-review-prompt-gating.md) — trigger store-review at end of one-shot onboarding (AsyncStorage flag), best-effort, never block app entry.

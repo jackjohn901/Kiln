@@ -336,6 +336,8 @@ const ReelCard = memo(function ReelCard({
   const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed, isFollowing, followArtist, unfollowArtist, isVerified, sendTip } = useSocial();
   const [showTip, setShowTip] = useState(false);
   const { profile: myProfile } = useProfile();
+  const { settings } = useSettings();
+  const creatorMode = settings.creator_mode;
   const isPatronGated = reel.patronOnly && !isSubscribed(reel.artistId);
   const isOwnReel = !!myProfile && myProfile.id === reel.artistId;
   const isFollowingArtist = isFollowing(reel.artistId);
@@ -410,6 +412,12 @@ const ReelCard = memo(function ReelCard({
 
   return (
     <div className="relative h-[100svh] w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
+      {creatorMode && (
+        <div className="pointer-events-none absolute left-3 top-16 z-30 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-sm">
+          <Flame size={20} className="text-amber-400 drop-shadow" />
+          <span className="font-serif text-lg font-bold tracking-tight text-amber-100 drop-shadow">Kiln</span>
+        </div>
+      )}
       {/* Ken Burns keyframes for seed thumbnails */}
       <style>{`
         @keyframes kenBurns {

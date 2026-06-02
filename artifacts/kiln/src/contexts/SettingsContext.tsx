@@ -32,6 +32,7 @@ export interface KilnSettings {
   display_compact: boolean;
   display_autoplay: boolean;
   display_sound: boolean;
+  creator_mode: boolean;
   earnings_flash_ms: number;
 }
 
@@ -119,6 +120,7 @@ export function defaultSettings(): KilnSettings {
     display_compact: false,
     display_autoplay: true,
     display_sound: true,
+    creator_mode: false,
     earnings_flash_ms: 2000,
   };
 }

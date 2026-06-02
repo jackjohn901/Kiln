@@ -3,10 +3,12 @@ import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  DollarSign, Send, Printer, Download, Lock, Mail,
+  DollarSign, Send, Printer, Download, Lock, Mail, Flame,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import ShareStoryModal from "@/components/ShareStoryModal";
 import { useSocial } from "@/contexts/SocialContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import { toast } from "@/hooks/use-toast";
 
 interface Sale {
@@ -219,9 +221,11 @@ export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { markLinkRead } = useSocial();
+  const { profile } = useProfile();
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -432,10 +436,30 @@ export default function SaleDetail() {
           </Link>
         </div>
 
-        <div className="mb-6">
-          <h1 className="font-serif text-2xl text-amber-100">Sale Detail</h1>
-          <p className="mt-1 font-mono text-sm text-amber-400/70">{ordinalId(sale.id)}</p>
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-2xl text-amber-100">Sale Detail</h1>
+            <p className="mt-1 font-mono text-sm text-amber-400/70">{ordinalId(sale.id)}</p>
+          </div>
+          <button
+            onClick={() => setShowShare(true)}
+            className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-amber-500/15 px-3.5 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+          >
+            <Flame size={16} />
+            <span>Share to Story</span>
+          </button>
         </div>
+
+        <ShareStoryModal
+          open={showShare}
+          onClose={() => setShowShare(false)}
+          imageUrl={sale.imageUrl ?? undefined}
+          title={sale.title}
+          eyebrow="Just sold on Kiln"
+          badge="SOLD"
+          handle={profile?.handle ?? undefined}
+          price={formatPrice(sale.amount)}
+        />
 
         <div className={`mb-4 flex items-center gap-2.5 rounded-2xl border p-4 ${statusConf.bg}`}>
           <StatusIcon size={18} className={statusConf.color} />

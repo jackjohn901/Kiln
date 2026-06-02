@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import MuxPlayer from "@mux/mux-player-react";
 import Nav from "@/components/Nav";
 import Comments from "@/components/Comments";
+import ShareStoryModal from "@/components/ShareStoryModal";
 import PollBlock, { type Poll } from "@/components/PollBlock";
 import { getReelById, ALL_REELS, TECHNIQUE_COLORS } from "@/data/reels";
 import { useSocial } from "@/contexts/SocialContext";
@@ -58,6 +59,7 @@ export default function PostDetail() {
 
   const [showComments, setShowComments] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const [dbPost, setDbPost] = useState<DbPost | null>(null);
   const [dbLoading, setDbLoading] = useState(false);
@@ -261,8 +263,25 @@ export default function PostDetail() {
                     <Share2 size={18} />
                     <span>{copied ? "Copied!" : "Share"}</span>
                   </button>
+                  <button
+                    onClick={() => setShowShare(true)}
+                    className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-sm font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+                  >
+                    <Flame size={16} />
+                    <span>Story</span>
+                  </button>
                 </div>
               </div>
+
+              <ShareStoryModal
+                open={showShare}
+                onClose={() => setShowShare(false)}
+                imageUrl={dbPost.thumbnailUrl ?? undefined}
+                title={dbPost.caption || "New work"}
+                eyebrow={dbPost.technique ?? undefined}
+                badge="NEW WORK"
+                handle={dbPost.authorName}
+              />
 
               {poll && (
                 <div className="mt-4">
@@ -425,8 +444,25 @@ export default function PostDetail() {
                   <Share2 size={18} />
                   <span>{copied ? "Copied!" : "Share"}</span>
                 </button>
+                <button
+                  onClick={() => setShowShare(true)}
+                  className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-sm font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+                >
+                  <Flame size={16} />
+                  <span>Story</span>
+                </button>
               </div>
             </div>
+
+            <ShareStoryModal
+              open={showShare}
+              onClose={() => setShowShare(false)}
+              imageUrl={reel.thumbnail}
+              title={reel.caption}
+              eyebrow={reel.technique}
+              badge="NEW WORK"
+              handle={reel.artistName}
+            />
 
             {showComments && (
               <Comments
