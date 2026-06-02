@@ -96,13 +96,13 @@ export default function Landing() {
       <section className="mx-auto max-w-4xl px-4 pb-16 pt-20 text-center">
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-semibold text-amber-300">
           <Flame size={12} />
-          The platform built exclusively for craft artists
+          The home of makers
         </div>
         <h1 className="font-serif text-5xl font-bold leading-tight text-amber-100 sm:text-6xl">
-          Where craft artists<br />build their world
+          Watch creativity<br />happen
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-stone-400 leading-relaxed">
-          A TikTok-style process video feed, a direct shop with no fees, workshops, patron subscriptions, and a community that speaks your language — all in one place for ceramicists, glassblowers, weavers, and every maker in between.
+          Most platforms show the finished piece. Kiln shows the making — the throw, the fire, the glaze that almost didn't work. Follow ceramicists, glassblowers, weavers, woodworkers and metalsmiths in a TikTok-style process feed, then collect their work, book their workshops, and back them directly. No fees, no gatekeepers.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
@@ -252,9 +252,9 @@ export default function Landing() {
       {/* Bottom CTA */}
       <section className="mx-auto max-w-3xl px-4 pb-24 pt-12 text-center">
         <Flame size={32} className="mx-auto mb-4 text-amber-400" />
-        <h2 className="font-serif text-4xl text-amber-100">Ready to build your world?</h2>
+        <h2 className="font-serif text-4xl text-amber-100">Ready to let people watch you make?</h2>
         <p className="mx-auto mt-4 max-w-xl text-stone-400">
-          Join the craft artists already on Kiln. Your profile, your shop, your community — free to start.
+          Join the craft artists already sharing their process on Kiln. Your feed, your shop, your community — free to start.
         </p>
         <Link
           href="/setup"
@@ -272,7 +272,7 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Flame size={14} className="text-amber-400" />
             <span className="font-serif text-sm text-amber-100">Kiln</span>
-            <span className="text-xs text-stone-600 ml-2">The platform for craft artists</span>
+            <span className="text-xs text-stone-600 ml-2">The home of makers</span>
           </div>
           <div className="flex flex-wrap gap-4 text-xs text-stone-600">
             <Link href="/privacy" className="hover:text-stone-400 transition-colors">Privacy</Link>
