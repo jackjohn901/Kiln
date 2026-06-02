@@ -73,7 +73,10 @@ function ShippingBadge({ shipping }: { shipping: ArtistShipping | null }) {
               )}
               {hasInternational && (
                 <span className="flex items-center gap-1 text-xs text-stone-400">
-                  <Truck size={12} />International: ${shipping.internationalRate}
+                  <Truck size={12} />International from ${shipping.internationalRate}
+                  {shipping.perItemRate != null && shipping.perItemRate > 0 && (
+                    <> + ${shipping.perItemRate} per additional item</>
+                  )}
                 </span>
               )}
               {shipping.offerLocalPickup && (
