@@ -101,6 +101,7 @@ export function useUpload() {
       const uploadRes = await fetch(uploadURL, {
         method: "PUT",
         headers: { "Content-Type": compressed.type },
+        credentials: "include",
         body: compressed,
       });
       if (!uploadRes.ok) throw new Error("Upload to storage failed");

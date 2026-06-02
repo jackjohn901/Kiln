@@ -1,6 +1,6 @@
 import { Storage, File } from "@google-cloud/storage";
-import { Readable } from "stream";
-import { randomUUID } from "crypto";
+import { Readable, Transform } from "stream";
+import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "crypto";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -10,6 +10,46 @@ import {
 } from "./objectAcl";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+
+// Secret used to sign upload slot tokens. Falls back to a random value
+// generated at startup — tokens survive the process lifetime (~15 min TTL).
+const UPLOAD_TOKEN_SECRET =
+  process.env.UPLOAD_TOKEN_SECRET ?? randomBytes(32).toString("hex");
+
+const UPLOAD_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+function buildUploadToken(objectId: string, userId: string): string {
+  const expiresAt = Date.now() + UPLOAD_TOKEN_TTL_MS;
+  const payload = `${objectId}:${userId}:${expiresAt}`;
+  const sig = createHmac("sha256", UPLOAD_TOKEN_SECRET).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+
+export function verifyUploadToken(
+  token: string,
+  objectId: string,
+  userId: string
+): boolean {
+  const dotIdx = token.lastIndexOf(".");
+  if (dotIdx < 0) return false;
+  const payload = token.slice(0, dotIdx);
+  const sig = token.slice(dotIdx + 1);
+
+  const parts = payload.split(":");
+  if (parts.length !== 3) return false;
+  const [tokenObjectId, tokenUserId, expiresAtStr] = parts as [string, string, string];
+
+  if (tokenObjectId !== objectId || tokenUserId !== userId) return false;
+
+  const expiresAt = parseInt(expiresAtStr, 10);
+  if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false;
+
+  const expected = createHmac("sha256", UPLOAD_TOKEN_SECRET).update(payload).digest("hex");
+  const sigBuf = Buffer.from(sig, "hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  if (sigBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(sigBuf, expectedBuf);
+}
 
 export const objectStorageClient = new Storage({
   credentials: {
@@ -34,6 +74,14 @@ export class ObjectNotFoundError extends Error {
     super("Object not found");
     this.name = "ObjectNotFoundError";
     Object.setPrototypeOf(this, ObjectNotFoundError.prototype);
+  }
+}
+
+export class UploadSizeLimitError extends Error {
+  constructor(maxBytes: number) {
+    super(`File size must not exceed ${Math.round(maxBytes / (1024 * 1024))} MB`);
+    this.name = "UploadSizeLimitError";
+    Object.setPrototypeOf(this, UploadSizeLimitError.prototype);
   }
 }
 
@@ -125,6 +173,65 @@ export class ObjectStorageService {
       objectName,
       method: "PUT",
       ttlSec: 900,
+    });
+  }
+
+  /**
+   * Allocate an upload slot without issuing a presigned URL.
+   * Returns the objectId, the normalized objectPath, and a short-lived signed
+   * token that binds the slot to the requesting user. The caller embeds the
+   * token in the upload URL so the PUT endpoint can verify ownership.
+   */
+  allocateUploadSlot(userId: string): {
+    objectId: string;
+    objectPath: string;
+    uploadToken: string;
+  } {
+    const objectId = randomUUID();
+    const objectPath = `/objects/uploads/${objectId}`;
+    const uploadToken = buildUploadToken(objectId, userId);
+    return { objectId, objectPath, uploadToken };
+  }
+
+  /**
+   * Stream a body directly to GCS, enforcing a byte-count limit.
+   * Throws if the body exceeds maxBytes or if the write fails.
+   */
+  async writeObjectEntity(
+    objectId: string,
+    inputStream: Readable,
+    contentType: string,
+    maxBytes: number
+  ): Promise<void> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    const writeStream = file.createWriteStream({
+      contentType,
+      resumable: false,
+    });
+
+    let received = 0;
+    const limiter = new Transform({
+      transform(chunk: Buffer, _enc, cb) {
+        received += chunk.length;
+        if (received > maxBytes) {
+          cb(new UploadSizeLimitError(maxBytes));
+          return;
+        }
+        cb(null, chunk);
+      },
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      inputStream.pipe(limiter).pipe(writeStream);
+      writeStream.on("finish", resolve);
+      writeStream.on("error", reject);
+      limiter.on("error", reject);
+      inputStream.on("error", reject);
     });
   }
 

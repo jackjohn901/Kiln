@@ -1,10 +1,17 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { z } from "zod";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import {
+  ObjectStorageService,
+  ObjectNotFoundError,
+  UploadSizeLimitError,
+  verifyUploadToken,
+} from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const RequestUploadUrlBody = z.object({
   name: z.string().min(1),
@@ -21,7 +28,7 @@ const RequestUploadUrlBody = z.object({
     }),
 });
 const RequestUploadUrlResponse = z.object({
-  uploadURL: z.string().url(),
+  uploadURL: z.string().min(1),
   objectPath: z.string(),
   metadata: RequestUploadUrlBody.optional(),
 });
@@ -32,9 +39,10 @@ const objectStorageService = new ObjectStorageService();
 /**
  * POST /storage/uploads/request-url
  *
- * Request a presigned URL for file upload.
- * The client sends JSON metadata (name, size, contentType) — NOT the file.
- * Then uploads the file directly to the returned presigned URL.
+ * Reserve an upload slot and return the proxy upload URL.
+ * The client sends JSON metadata (name, size, contentType) — NOT the file bytes.
+ * The client then PUTs the file to the returned uploadURL (our own proxy endpoint),
+ * which enforces the size and content-type constraints on the actual bytes received.
  */
 router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) {
@@ -52,8 +60,8 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   try {
     const { name, size, contentType } = parsed.data;
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+    const { objectId, objectPath, uploadToken } = objectStorageService.allocateUploadSlot(req.user.id);
+    const uploadURL = `/api/storage/uploads/${objectId}?token=${encodeURIComponent(uploadToken)}`;
 
     res.json(
       RequestUploadUrlResponse.parse({
@@ -63,8 +71,64 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
       }),
     );
   } catch (error) {
-    req.log.error({ err: error }, "Error generating upload URL");
-    res.status(500).json({ error: "Failed to generate upload URL" });
+    req.log.error({ err: error }, "Error allocating upload slot");
+    res.status(500).json({ error: "Failed to allocate upload slot" });
+  }
+});
+
+/**
+ * PUT /storage/uploads/:objectId
+ *
+ * Proxy upload endpoint — the client PUTs image bytes here.
+ * This enforces content-type and size constraints on the actual bytes received,
+ * then writes them directly to GCS. Unlike presigned URLs, this cannot be
+ * bypassed by a client that obtained a URL with a valid metadata request.
+ */
+router.put("/storage/uploads/:objectId", async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const rawId = req.params.objectId;
+  const objectId = Array.isArray(rawId) ? (rawId[0] ?? "") : rawId;
+  if (!objectId || !UUID_RE.test(objectId)) {
+    res.status(400).json({ error: "Invalid upload ID" });
+    return;
+  }
+
+  const rawToken = req.query.token;
+  const token = typeof rawToken === "string" ? rawToken : "";
+  if (!token || !verifyUploadToken(token, objectId, req.user.id)) {
+    res.status(403).json({ error: "Invalid or expired upload token" });
+    return;
+  }
+
+  const contentType = req.headers["content-type"] ?? "";
+  if (!contentType.startsWith("image/")) {
+    res.status(415).json({ error: "Only image files are allowed" });
+    return;
+  }
+
+  const contentLengthStr = req.headers["content-length"];
+  if (contentLengthStr !== undefined) {
+    const declared = parseInt(contentLengthStr, 10);
+    if (!Number.isFinite(declared) || declared > MAX_IMAGE_SIZE) {
+      res.status(413).json({ error: "File size must not exceed 10 MB" });
+      return;
+    }
+  }
+
+  try {
+    await objectStorageService.writeObjectEntity(objectId, req, contentType, MAX_IMAGE_SIZE);
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    if (error instanceof UploadSizeLimitError) {
+      res.status(413).json({ error: error.message });
+      return;
+    }
+    req.log.error({ err: error }, "Error writing upload to storage");
+    res.status(500).json({ error: "Upload failed" });
   }
 });
 

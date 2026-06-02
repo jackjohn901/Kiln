@@ -88,6 +88,7 @@ export function useUpload(options: UseUploadOptions = {}) {
       const response = await fetch(uploadURL, {
         method: "PUT",
         body: file,
+        credentials: "include",
         headers: {
           "Content-Type": file.type || "application/octet-stream",
         },
