@@ -34,6 +34,7 @@ export interface KilnSettings {
   display_sound: boolean;
   creator_mode: boolean;
   earnings_flash_ms: number;
+  notif_msg_sound: boolean;
 }
 
 export const SETTING_KEY = "kiln_settings_v1";
@@ -122,6 +123,7 @@ export function defaultSettings(): KilnSettings {
     display_sound: true,
     creator_mode: false,
     earnings_flash_ms: 2000,
+    notif_msg_sound: true,
   };
 }
 

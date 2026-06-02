@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { MessageCircle, X } from "lucide-react";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface MessageToastProps {
   senderName: string;
@@ -33,12 +34,13 @@ function playPingSound() {
 export default function MessageToast({ senderName, senderAvatarUrl, onDismiss }: MessageToastProps) {
   const dismissRef = useRef(onDismiss);
   dismissRef.current = onDismiss;
+  const { settings } = useSettings();
 
   useEffect(() => {
-    playPingSound();
+    if (settings.notif_msg_sound) playPingSound();
     const t = setTimeout(() => dismissRef.current(), 4500);
     return () => clearTimeout(t);
-  }, []);
+  }, [settings.notif_msg_sound]);
 
   return (
     <div

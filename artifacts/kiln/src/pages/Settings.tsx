@@ -538,6 +538,7 @@ export default function Settings() {
 
         {section === "notifications" && (
           <div className="rounded-2xl border border-white/8 bg-stone-900/60 px-5 divide-y-0">
+            <Toggle settingKey="notif_msg_sound" label="Message notification sound" desc="Play a chime when a new message arrives" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Activity</p>
             <Toggle settingKey="notif_likes" label="Likes" desc="When someone likes your posts" />
             <Toggle settingKey="notif_comments" label="Comments" desc="Replies to your posts" />
