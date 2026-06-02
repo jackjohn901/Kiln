@@ -15,6 +15,20 @@ router.post("/commissions", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const { artistId, artistName, workType, description, budgetRange, timeline, dimensions, referenceUrls } = req.body;
   if (!artistId || !description) { res.status(400).json({ error: "artistId and description required" }); return; }
+  const MAX_REF_IMAGES = 5;
+  if (referenceUrls !== undefined && referenceUrls !== null) {
+    if (!Array.isArray(referenceUrls)) {
+      res.status(400).json({ error: "referenceUrls must be an array" }); return;
+    }
+    if (referenceUrls.length > MAX_REF_IMAGES) {
+      res.status(400).json({ error: `referenceUrls may contain at most ${MAX_REF_IMAGES} images` }); return;
+    }
+    for (const url of referenceUrls) {
+      if (typeof url !== "string" || !STORAGE_PATH_RE.test(url)) {
+        res.status(400).json({ error: "Each referenceUrl must be a same-origin storage path (/api/storage/objects/…)" }); return;
+      }
+    }
+  }
   try {
     const user = req.user;
     const clientName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Collector";

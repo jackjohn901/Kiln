@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { useParams, Link, useLocation } from "wouter";
-import { ArrowLeft, CheckCircle, Clock, Image, DollarSign, Ruler, FileText, Flame, ChevronRight, Info } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Image, DollarSign, Ruler, FileText, Flame, ChevronRight, Info, Upload, X, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useUpload } from "@/hooks/useUpload";
 
 const ALL_ARTISTS = [...artists, ...seedArtists];
 
@@ -64,6 +65,38 @@ export default function CommissionFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const { upload, uploading: imageUploading } = useUpload();
+  const [refImages, setRefImages] = useState<Array<{ previewUrl: string; servingUrl: string }>>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleRefImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (refImages.length >= 5) { setUploadError("You can attach up to 5 images."); return; }
+    if (!file.type.startsWith("image/")) { setUploadError("Only image files can be attached."); return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadError("Image must be 10 MB or smaller."); return; }
+    setUploadError(null);
+    const previewUrl = URL.createObjectURL(file);
+    try {
+      const result = await upload(file);
+      setRefImages(prev => [...prev, { previewUrl, servingUrl: result.servingUrl }]);
+    } catch {
+      URL.revokeObjectURL(previewUrl);
+      setUploadError("Image upload failed. Please try again.");
+    }
+  }
+
+  function removeRefImage(idx: number) {
+    setRefImages(prev => {
+      const next = [...prev];
+      URL.revokeObjectURL(next[idx].previewUrl);
+      next.splice(idx, 1);
+      return next;
+    });
+  }
+
   function field(k: keyof typeof form, v: string) { setForm((f) => ({ ...f, [k]: v })); }
 
   const canSubmit = form.workType && form.description && form.budget && form.timeline && form.contactEmail && form.contactName;
@@ -85,7 +118,7 @@ export default function CommissionFlow() {
           budgetRange: form.budget,
           timeline: form.timeline,
           dimensions: form.dimensions || undefined,
-          referenceUrls: form.referenceUrl ? [form.referenceUrl] : [],
+          referenceUrls: refImages.map(img => img.servingUrl),
         }),
       });
       if (!r.ok) {
@@ -307,13 +340,60 @@ export default function CommissionFlow() {
                   </Field>
                 </div>
 
-                <Field label="Reference images (optional)" hint="Link to a Pinterest board, Google Drive folder, or any images that inspired you">
-                  <input
-                    value={form.referenceUrl}
-                    onChange={(e) => field("referenceUrl", e.target.value)}
-                    placeholder="https://pinterest.com/board/..."
-                    className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                  />
+                <Field label="Reference images (optional)" hint="Upload photos or link to a Pinterest/Google Drive board">
+                  <div className="space-y-2">
+                    {/* Uploaded image thumbnails */}
+                    {refImages.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {refImages.map((img, idx) => (
+                          <div key={idx} className="relative">
+                            <img
+                              src={img.previewUrl}
+                              alt={`Reference ${idx + 1}`}
+                              className="h-16 w-16 rounded-lg object-cover border border-white/10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeRefImage(idx)}
+                              className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-stone-800 border border-white/20 text-stone-400 hover:text-rose-400 transition-colors"
+                            >
+                              <X size={8} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Upload button */}
+                    {refImages.length < 5 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={imageUploading}
+                          className="flex items-center gap-1.5 rounded-lg border border-dashed border-white/20 px-3 py-2 text-xs text-stone-400 hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50"
+                        >
+                          {imageUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                          {imageUploading ? "Uploading…" : "Upload photo"}
+                        </button>
+                        <span className="text-xs text-stone-600">or paste a link below</span>
+                      </div>
+                    )}
+                    {uploadError && <p className="text-xs text-rose-400">{uploadError}</p>}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleRefImageSelect}
+                    />
+                    {/* External URL fallback */}
+                    <input
+                      value={form.referenceUrl}
+                      onChange={(e) => field("referenceUrl", e.target.value)}
+                      placeholder="https://pinterest.com/board/..."
+                      className="w-full rounded-xl border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                    />
+                  </div>
                 </Field>
 
                 <Field label="Anything else?">
@@ -373,10 +453,24 @@ export default function CommissionFlow() {
                     <p className="text-[10px] text-stone-600 uppercase tracking-wider mb-1">Description</p>
                     <p className="text-sm text-stone-300 leading-relaxed">{form.description}</p>
                   </div>
-                  {form.referenceUrl && (
+                  {(refImages.length > 0 || form.referenceUrl) && (
                     <div>
-                      <p className="text-[10px] text-stone-600 uppercase tracking-wider mb-1">References</p>
-                      <a href={form.referenceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-400 hover:text-amber-300 truncate block">{form.referenceUrl}</a>
+                      <p className="text-[10px] text-stone-600 uppercase tracking-wider mb-1.5">References</p>
+                      {refImages.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {refImages.map((img, idx) => (
+                            <img
+                              key={idx}
+                              src={img.previewUrl}
+                              alt={`Reference ${idx + 1}`}
+                              className="h-16 w-16 rounded-lg object-cover border border-white/10"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {form.referenceUrl && (
+                        <a href={form.referenceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-400 hover:text-amber-300 truncate block">{form.referenceUrl}</a>
+                      )}
                     </div>
                   )}
                 </div>

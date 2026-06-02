@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { X, CheckCircle, Lock, Clock } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, CheckCircle, Lock, Clock, Upload, Loader2 } from "lucide-react";
 import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useUpload } from "@/hooks/useUpload";
 
 const BUDGETS = ["Under $500", "$500–$2,000", "$2,000–$5,000", "$5,000–$15,000", "$15,000+", "Open to discussion"];
 const TIMELINES = ["ASAP", "1–3 months", "3–6 months", "6–12 months", "No rush — whenever you're ready"];
@@ -27,7 +28,7 @@ interface Props {
 }
 
 export default function CommissionModal({ artistId, artistName, artistAvatarUrl, commissionStatus, onClose }: Props) {
-  const { sendCommissionInquiry, addNotification } = useSocial();
+  const { addNotification } = useSocial();
   const { profile } = useProfile();
 
   const [step, setStep] = useState<"form" | "success">("form");
@@ -39,31 +40,82 @@ export default function CommissionModal({ artistId, artistName, artistAvatarUrl,
   const [fromName, setFromName] = useState(profile?.name ?? "");
   const [fromEmail, setFromEmail] = useState("");
 
+  const { upload, uploading: imageUploading } = useUpload();
+  const [refImages, setRefImages] = useState<Array<{ previewUrl: string; servingUrl: string }>>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleRefImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (refImages.length >= 5) { setUploadError("You can attach up to 5 images."); return; }
+    if (!file.type.startsWith("image/")) { setUploadError("Only image files can be attached."); return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadError("Image must be 10 MB or smaller."); return; }
+    setUploadError(null);
+    const previewUrl = URL.createObjectURL(file);
+    try {
+      const result = await upload(file);
+      setRefImages(prev => [...prev, { previewUrl, servingUrl: result.servingUrl }]);
+    } catch {
+      URL.revokeObjectURL(previewUrl);
+      setUploadError("Image upload failed. Please try again.");
+    }
+  }
+
+  function removeRefImage(idx: number) {
+    setRefImages(prev => {
+      const next = [...prev];
+      URL.revokeObjectURL(next[idx].previewUrl);
+      next.splice(idx, 1);
+      return next;
+    });
+  }
+
   const statusUI = STATUS_UI[commissionStatus];
 
-  function handleSubmit() {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function handleSubmit() {
     if (!description || !budget || !timeline || !fromName || !fromEmail) return;
-    sendCommissionInquiry({
-      toArtistId: artistId,
-      toArtistName: artistName,
-      fromName,
-      fromEmail,
-      fromHandle: profile?.handle,
-      type,
-      description,
-      budget,
-      timeline,
-      dimensions: dimensions || undefined,
-    });
-    addNotification({
-      type: "commission",
-      fromId: "system",
-      fromName: artistName,
-      fromAvatarUrl: artistAvatarUrl,
-      text: `Your commission inquiry to ${artistName} has been sent.`,
-      link: `/artists/${artistId}`,
-    });
-    setStep("success");
+    if (imageUploading) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const r = await fetch("/api/commissions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistId,
+          artistName,
+          workType: type,
+          description,
+          budgetRange: budget,
+          timeline,
+          dimensions: dimensions || undefined,
+          referenceUrls: refImages.map(img => img.servingUrl),
+        }),
+      });
+      if (!r.ok) {
+        setSubmitError("Couldn\u2019t send your inquiry. Please check your connection and try again.");
+        setSubmitting(false);
+        return;
+      }
+      addNotification({
+        type: "commission",
+        fromId: "system",
+        fromName: artistName,
+        fromAvatarUrl: artistAvatarUrl,
+        text: `Your commission inquiry to ${artistName} has been sent.`,
+        link: `/artists/${artistId}`,
+      });
+      setStep("success");
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
+    }
+    setSubmitting(false);
   }
 
   const canSubmit = description.trim() && budget && timeline && fromName.trim() && fromEmail.trim();
@@ -198,6 +250,51 @@ export default function CommissionModal({ artistId, artistName, artistAvatarUrl,
               />
             </div>
 
+            <div>
+              <label className="text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-1.5">
+                Reference images <span className="text-stone-600 normal-case font-normal">(optional, up to 5)</span>
+              </label>
+              {refImages.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {refImages.map((img, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={img.previewUrl}
+                        alt={`Reference ${idx + 1}`}
+                        className="h-14 w-14 rounded-lg object-cover border border-white/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeRefImage(idx)}
+                        className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-stone-700 border border-white/20 text-stone-400 hover:text-rose-400 transition-colors"
+                      >
+                        <X size={8} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {refImages.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
+                  className="flex items-center gap-1.5 rounded-lg border border-dashed border-white/20 px-3 py-2 text-xs text-stone-400 hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50"
+                >
+                  {imageUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  {imageUploading ? "Uploading…" : "Upload photo"}
+                </button>
+              )}
+              {uploadError && <p className="mt-1 text-xs text-rose-400">{uploadError}</p>}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleRefImageSelect}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-1.5">Your name</label>
@@ -220,12 +317,16 @@ export default function CommissionModal({ artistId, artistName, artistAvatarUrl,
               </div>
             </div>
 
+            {submitError && (
+              <p className="text-xs text-rose-400 text-center">{submitError}</p>
+            )}
+
             <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
+              onClick={() => void handleSubmit()}
+              disabled={!canSubmit || submitting || imageUploading}
               className="w-full py-3 rounded-full bg-amber-500 disabled:bg-stone-700 disabled:text-stone-500 text-stone-950 font-semibold text-sm hover:bg-amber-400 transition-colors"
             >
-              Send inquiry
+              {submitting ? "Sending…" : "Send inquiry"}
             </button>
           </div>
         )}

@@ -31,6 +31,7 @@ interface Commission {
   artistNotes: string | null;
   milestone: string | null;
   estimatedDelivery: string | null;
+  referenceUrls: string[] | null;
   createdAt: string;
 }
 
@@ -454,6 +455,23 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
       {expanded && (
         <div className="border-t border-white/5 p-4 space-y-4">
           <p className="text-xs text-stone-400 leading-relaxed">{commission.description}</p>
+
+          {commission.referenceUrls && commission.referenceUrls.length > 0 && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-stone-600 mb-2">Reference images</p>
+              <div className="flex flex-wrap gap-2">
+                {commission.referenceUrls.map((url, idx) => (
+                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block">
+                    <img
+                      src={url}
+                      alt={`Reference ${idx + 1}`}
+                      className="h-20 w-20 rounded-xl object-cover border border-white/10 hover:border-amber-500/40 hover:opacity-90 transition-all cursor-pointer"
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!isArtist && commission.status === "quoted" && (
             <div className="rounded-xl border border-violet-500/30 bg-violet-500/8 p-4 space-y-3">
