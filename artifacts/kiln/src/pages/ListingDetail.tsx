@@ -96,6 +96,14 @@ function StarRow({ rating, size = 14, interactive = false, onRate }: {
 
 // ─── Shipping Estimate ─────────────────────────────────────────────────────────
 
+const SHIPPING_ZIP_KEY = "kiln_shipping_zip_v1";
+function getSavedZip(): string {
+  try { return localStorage.getItem(SHIPPING_ZIP_KEY) ?? ""; } catch { return ""; }
+}
+function saveZip(zip: string) {
+  try { localStorage.setItem(SHIPPING_ZIP_KEY, zip); } catch {}
+}
+
 function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artistShipping: ArtistShipping | null }) {
   const freeThreshold = artistShipping?.freeThreshold ?? null;
   const qualifiesFree =
@@ -105,12 +113,24 @@ function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artis
   const perItemRate = artistShipping?.perItemRate ?? null;
   const intlRate = artistShipping?.internationalRate ?? null;
 
+  const [zip, setZip] = useState(() => getSavedZip());
+  const [submitted, setSubmitted] = useState(() => getSavedZip() !== "");
+
   const domesticDisplay = qualifiesFree
     ? "Free"
     : domesticRate != null && domesticRate > 0
       ? formatPrice(domesticRate)
       : "Calculated at checkout";
   const intlDisplay = intlRate != null && intlRate > 0 ? formatPrice(intlRate) : "Ask the artist";
+
+  function handleZipSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = zip.trim();
+    if (!trimmed) return;
+    saveZip(trimmed);
+    setZip(trimmed);
+    setSubmitted(true);
+  }
 
   return (
     <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4">
@@ -125,11 +145,34 @@ function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artis
       </div>
 
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-stone-300">Domestic (US)</p>
             {!qualifiesFree && perItemRate != null && perItemRate > 0 && (
               <p className="text-[10px] text-stone-600">+{formatPrice(perItemRate)} per additional item</p>
+            )}
+            {!qualifiesFree && (
+              <form onSubmit={handleZipSubmit} className="mt-1.5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="ZIP code"
+                  value={zip}
+                  onChange={(e) => { setZip(e.target.value); setSubmitted(false); }}
+                  maxLength={10}
+                  className="w-24 rounded-lg border border-white/10 bg-stone-800 px-2 py-1 text-[11px] text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!zip.trim()}
+                  className="rounded-lg bg-amber-500/15 border border-amber-500/20 px-2 py-1 text-[11px] font-medium text-amber-400 disabled:opacity-40 hover:bg-amber-500/25 transition-colors"
+                >
+                  {submitted ? "Update" : "Estimate"}
+                </button>
+                {submitted && (
+                  <span className="text-[10px] text-stone-500">for {zip}</span>
+                )}
+              </form>
             )}
           </div>
           <span className="shrink-0 text-sm font-bold text-amber-300">{domesticDisplay}</span>
