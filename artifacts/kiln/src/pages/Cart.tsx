@@ -39,7 +39,7 @@ interface ProcessingWindow {
 }
 
 export default function Cart() {
-  const { items, itemCount, subtotal, removeItem, updateQty, clearCart } = useCart();
+  const { items, itemCount, subtotal, cartReady, removeItem, updateQty, clearCart } = useCart();
   const [bundleApplied, setBundleApplied] = useState(false);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
   const [isDomestic, setIsDomestic] = useState(true);
@@ -64,6 +64,9 @@ export default function Cart() {
   const artistIdsKey = [...artistIds].sort().join(",");
 
   useEffect(() => {
+    // Wait until CartContext has finished its server reconcile so that a transient
+    // change to the artist set during hydration doesn't trigger an extra fetch.
+    if (!cartReady) return;
     if (artistIds.length === 0) {
       setShippingRates(new Map());
       return;
@@ -72,9 +75,11 @@ export default function Cart() {
       .then(results => setShippingRates(new Map(results.map(r => [r.aid, r.info]))))
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artistIdsKey]);
+  }, [cartReady, artistIdsKey]);
 
   useEffect(() => {
+    // Same guard: don't hit the API while the cart is still being reconciled.
+    if (!cartReady) return;
     if (artistIds.length === 0) {
       setProcessingWindows(new Map());
       return;
@@ -100,7 +105,7 @@ export default function Cart() {
       setProcessingWindows(perArtist);
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artistIdsKey]);
+  }, [cartReady, artistIdsKey]);
 
   const [unlockedToasts, setUnlockedToasts] = useState<{ id: string; artistId: string }[]>([]);
   const prevArtistSubtotalsRef = useRef<Map<string, number>>(new Map());
@@ -146,7 +151,10 @@ export default function Cart() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artistSubtotalsKey, shippingRates]);
 
-  // Compute shipping total + breakdown (base rate vs per-item add-on)
+  // Compute shipping total + breakdown (base rate vs per-item add-on).
+  // Stays null (→ "Calculating…") only after the cart is ready and rates haven't
+  // arrived yet.  Before cartReady we stay null too, but render "—" instead so
+  // there's no flash during the initial hydration cycle.
   let shipping: number | null = subtotal > 0 ? null : 0;
   let shippingBase = 0;
   let shippingPerItemAddOn = 0;
@@ -449,7 +457,7 @@ export default function Cart() {
               {shipping === null ? (
                 <div className="flex justify-between text-sm text-stone-400">
                   <span className="flex items-center gap-1"><Truck size={12} /> Shipping</span>
-                  <span className="text-stone-600">Calculating…</span>
+                  <span className="text-stone-600">{cartReady ? "Calculating…" : "—"}</span>
                 </div>
               ) : shipping === 0 ? (
                 <div className="flex justify-between text-sm text-stone-400">
