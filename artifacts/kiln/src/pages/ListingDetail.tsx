@@ -104,6 +104,18 @@ function saveZip(zip: string) {
   try { localStorage.setItem(SHIPPING_ZIP_KEY, zip); } catch {}
 }
 
+const SHIPPING_MODE_KEY = "kiln_shipping_mode_v1";
+type ShippingMode = "domestic" | "international";
+function getSavedShippingMode(): ShippingMode {
+  try {
+    const v = localStorage.getItem(SHIPPING_MODE_KEY);
+    return v === "international" ? "international" : "domestic";
+  } catch { return "domestic"; }
+}
+function saveShippingMode(mode: ShippingMode) {
+  try { localStorage.setItem(SHIPPING_MODE_KEY, mode); } catch {}
+}
+
 function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artistShipping: ArtistShipping | null }) {
   const freeThreshold = artistShipping?.freeThreshold ?? null;
   const qualifiesFree =
@@ -113,8 +125,14 @@ function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artis
   const perItemRate = artistShipping?.perItemRate ?? null;
   const intlRate = artistShipping?.internationalRate ?? null;
 
+  const [mode, setMode] = useState<ShippingMode>(() => getSavedShippingMode());
   const [zip, setZip] = useState(() => getSavedZip());
   const [submitted, setSubmitted] = useState(() => getSavedZip() !== "");
+
+  function handleModeChange(next: ShippingMode) {
+    setMode(next);
+    saveShippingMode(next);
+  }
 
   const domesticDisplay = qualifiesFree
     ? "Free"
@@ -137,57 +155,77 @@ function ShippingEstimate({ listing, artistShipping }: { listing: Listing; artis
       <div className="flex items-center gap-2 mb-3">
         <Truck size={14} className="text-amber-400" />
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shipping</p>
-        {qualifiesFree && (
+        {qualifiesFree && mode === "domestic" && (
           <span className="ml-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
             Free shipping
           </span>
         )}
       </div>
 
+      <div className="flex rounded-lg bg-stone-800/60 border border-white/6 p-0.5 mb-3 gap-0.5">
+        {(["domestic", "international"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => handleModeChange(tab)}
+            className={`flex-1 rounded-md py-1 text-[11px] font-medium transition-colors ${
+              mode === tab
+                ? "bg-stone-700 text-stone-100"
+                : "text-stone-500 hover:text-stone-300"
+            }`}
+          >
+            {tab === "domestic" ? "Domestic" : "International"}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-stone-300">Domestic (US)</p>
-            {!qualifiesFree && perItemRate != null && perItemRate > 0 && (
-              <p className="text-[10px] text-stone-600">+{formatPrice(perItemRate)} per additional item</p>
-            )}
-            {!qualifiesFree && (
-              <form onSubmit={handleZipSubmit} className="mt-1.5 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="ZIP code"
-                  value={zip}
-                  onChange={(e) => { setZip(e.target.value); setSubmitted(false); }}
-                  maxLength={10}
-                  className="w-24 rounded-lg border border-white/10 bg-stone-800 px-2 py-1 text-[11px] text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!zip.trim()}
-                  className="rounded-lg bg-amber-500/15 border border-amber-500/20 px-2 py-1 text-[11px] font-medium text-amber-400 disabled:opacity-40 hover:bg-amber-500/25 transition-colors"
-                >
-                  {submitted ? "Update" : "Estimate"}
-                </button>
-                {submitted && (
-                  <span className="text-[10px] text-stone-500">for {zip}</span>
+        {mode === "domestic" ? (
+          <>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-stone-300">Domestic (US)</p>
+                {!qualifiesFree && perItemRate != null && perItemRate > 0 && (
+                  <p className="text-[10px] text-stone-600">+{formatPrice(perItemRate)} per additional item</p>
                 )}
-              </form>
+                {!qualifiesFree && (
+                  <form onSubmit={handleZipSubmit} className="mt-1.5 flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="ZIP code"
+                      value={zip}
+                      onChange={(e) => { setZip(e.target.value); setSubmitted(false); }}
+                      maxLength={10}
+                      className="w-24 rounded-lg border border-white/10 bg-stone-800 px-2 py-1 text-[11px] text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!zip.trim()}
+                      className="rounded-lg bg-amber-500/15 border border-amber-500/20 px-2 py-1 text-[11px] font-medium text-amber-400 disabled:opacity-40 hover:bg-amber-500/25 transition-colors"
+                    >
+                      {submitted ? "Update" : "Estimate"}
+                    </button>
+                    {submitted && (
+                      <span className="text-[10px] text-stone-500">for {zip}</span>
+                    )}
+                  </form>
+                )}
+              </div>
+              <span className="shrink-0 text-sm font-bold text-amber-300">{domesticDisplay}</span>
+            </div>
+            {!qualifiesFree && freeThreshold != null && freeThreshold > 0 && (
+              <p className="text-[10px] text-emerald-400/80">
+                Free shipping on orders over {formatPrice(freeThreshold)}
+              </p>
             )}
+          </>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-stone-300">International</p>
+            <span className="shrink-0 text-sm font-bold text-amber-300">{intlDisplay}</span>
           </div>
-          <span className="shrink-0 text-sm font-bold text-amber-300">{domesticDisplay}</span>
-        </div>
-
-        {!qualifiesFree && freeThreshold != null && freeThreshold > 0 && (
-          <p className="text-[10px] text-emerald-400/80">
-            Free shipping on orders over {formatPrice(freeThreshold)}
-          </p>
         )}
-
-        <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2.5">
-          <p className="text-xs text-stone-300">International</p>
-          <span className="shrink-0 text-sm font-bold text-amber-300">{intlDisplay}</span>
-        </div>
 
         {artistShipping?.offerLocalPickup && (
           <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2.5">
