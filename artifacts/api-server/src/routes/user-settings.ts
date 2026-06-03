@@ -340,6 +340,50 @@ router.get("/unsubscribe/mentions", async (req, res): Promise<void> => {
   }
 });
 
+// GET /api/unsubscribe/comments?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Sets notif_email_comments: false in the user's settings JSON
+router.get("/unsubscribe/comments", async (req, res): Promise<void> => {
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  if (!token) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is missing a token. Please use the link from your email.", false));
+    return;
+  }
+
+  const userId = verifyUnsubscribeToken(token);
+  if (!userId) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is invalid or has been tampered with. Please use the link from your original comment email.", false));
+    return;
+  }
+
+  try {
+    const existing = await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
+    const currentSettings = (existing[0]?.settings as Record<string, unknown>) ?? {};
+    const newSettings = { ...currentSettings, notif_email_comments: false };
+
+    if (existing.length > 0) {
+      await db.update(userSettingsTable)
+        .set({ settings: newSettings })
+        .where(eq(userSettingsTable.userId, userId));
+    } else {
+      await db.insert(userSettingsTable).values({
+        userId,
+        settings: newSettings,
+        shippingSettings: {},
+        paymentSettings: {},
+      });
+    }
+
+    res.send(unsubscribePage(
+      "You've been unsubscribed",
+      "You won't receive comment notification emails anymore. You can re-enable them any time in your notification settings.",
+      true,
+    ));
+  } catch {
+    res.status(500).send(unsubscribePage("Something went wrong", "We couldn't update your preference right now. Please try again later or manage your settings from your account.", false));
+  }
+});
+
 // GET /api/unsubscribe/workshop-reminders?token=<token>
 // Public one-click unsubscribe — no auth required, token is HMAC-verified
 // Opts the user out of ALL workshop reminder emails globally

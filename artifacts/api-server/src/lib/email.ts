@@ -300,7 +300,10 @@ export function newFollowerEmail(followerName: string, unsubscribeUrl?: string):
   `);
 }
 
-export function newCommentEmail(commenterName: string, postCaption: string, postId: string): string {
+export function newCommentEmail(commenterName: string, postCaption: string, postId: string, unsubscribeUrl?: string): string {
+  const unsubscribeFooter = unsubscribeUrl
+    ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want comment emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from comment emails</a></p>`
+    : "";
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Comment</h1>
     ${card(`
@@ -308,6 +311,7 @@ export function newCommentEmail(commenterName: string, postCaption: string, post
       <p style="margin:0;color:#78716c;font-style:italic;">"${postCaption.slice(0, 80)}…"</p>
     `)}
     ${btn(`${BASE_URL}/posts/${postId}`, "See the comment")}
+    ${unsubscribeFooter}
   `);
 }
 

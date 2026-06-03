@@ -377,7 +377,11 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
           if (emailSnoozed) {
             db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, commentNotifId)).catch(() => {});
           }
-          if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId) }, { label: "new comment notification" });
+          if (wantsEmail && p?.contactEmail) {
+            const unsubToken = generateUnsubscribeToken(post.authorId);
+            const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/comments?token=${encodeURIComponent(unsubToken)}`;
+            await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId, unsubscribeUrl) }, { label: "new comment notification" });
+          }
         } catch (err) {
           logger.warn({ err, authorId: post.authorId, postId }, "Failed to send new-comment notification email");
         }
