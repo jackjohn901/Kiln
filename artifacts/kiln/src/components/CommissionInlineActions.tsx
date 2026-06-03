@@ -164,6 +164,27 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
     }
   }
 
+  async function handleCancel() {
+    setActionState("saving");
+    try {
+      const res = await fetch(`/api/commissions/${commissionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (res.ok) {
+        setDbStatus("cancelled");
+        setActionState("resolved");
+        onStatusChange?.("cancelled");
+      } else {
+        setActionState("error");
+      }
+    } catch {
+      setActionState("error");
+    }
+  }
+
   async function handleAccept() {
     setActionState("saving");
     try {
@@ -312,6 +333,13 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
             className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors"
           >
             <Check size={10} /> Accept quote
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+            className="flex items-center gap-1 rounded-full bg-red-500/20 px-2.5 py-1 text-xs font-medium text-red-400 hover:bg-red-500/30 transition-colors"
+          >
+            <X size={10} /> Decline
           </button>
         </div>
       </div>
