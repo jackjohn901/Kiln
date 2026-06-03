@@ -6,7 +6,7 @@ import {
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
   SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown, GitBranch,
-  Mic, MicOff, DollarSign, BadgeCheck, ArrowUp, ChevronRight,
+  Mic, MicOff, DollarSign, BadgeCheck, ArrowUp, ChevronRight, Play,
 } from "lucide-react";
 import TipModal from "@/components/TipModal";
 import ReportModal from "@/components/ReportModal";
@@ -414,18 +414,26 @@ const ReelCard = memo(function ReelCard({
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [reel.videoUrl]);
 
+  // One-off manual play when autoplay is disabled (tap-to-play overlay)
+  const [manualPlay, setManualPlay] = useState(false);
+  // Reset the manual play whenever we scroll to a new reel or autoplay toggles
+  useEffect(() => { setManualPlay(false); }, [isActive, autoplayEnabled]);
+  const shouldPlay = isActive && (autoplayEnabled || manualPlay);
+  const hasControllableVideo = !!(reel.muxPlaybackId || resolvedVideoUrl);
+  const showPlayOverlay = isActive && !autoplayEnabled && !manualPlay && hasControllableVideo;
+
   // Imperative play/pause — autoPlay={bool} doesn't retrigger after mount
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !resolvedVideoUrl) return;
-    if (isActive && autoplayEnabled) {
+    if (shouldPlay) {
       v.currentTime = 0;
       v.play().catch(() => {});
     } else {
       v.pause();
     }
-  }, [isActive, resolvedVideoUrl, autoplayEnabled]);
+  }, [shouldPlay, resolvedVideoUrl]);
 
   // Original audio: browsers require muted for autoplay — unmute imperatively after user gesture
   useEffect(() => {
@@ -468,9 +476,10 @@ const ReelCard = memo(function ReelCard({
           streamType="on-demand"
           autoPlay={autoplayEnabled}
           muted={!videoAudioOn || !musicUnlocked}
-          loop
+          loop={autoplayEnabled}
           playsInline
-          paused={!isActive || !autoplayEnabled}
+          paused={!shouldPlay}
+          onEnded={() => setManualPlay(false)}
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : resolvedVideoUrl && isNearby ? (
@@ -480,10 +489,11 @@ const ReelCard = memo(function ReelCard({
           key={resolvedVideoUrl}
           src={resolvedVideoUrl}
           muted
-          loop
+          loop={autoplayEnabled}
           playsInline
           preload={isActive ? "auto" : "metadata"}
           poster={reel.thumbnail}
+          onEnded={() => setManualPlay(false)}
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : reel.muxPlaybackId || resolvedVideoUrl ? (
@@ -528,6 +538,20 @@ const ReelCard = memo(function ReelCard({
       )}
 
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/40" />
+
+      {/* Tap-to-play overlay — shown when autoplay is off so users can start a video manually */}
+      {showPlayOverlay && (
+        <button
+          type="button"
+          aria-label="Play video"
+          onClick={() => setManualPlay(true)}
+          className="absolute inset-0 z-20 flex items-center justify-center"
+        >
+          <span className="flex h-20 w-20 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm ring-1 ring-white/20 transition-transform active:scale-90">
+            <Play size={36} className="ml-1 text-white drop-shadow" fill="currentColor" />
+          </span>
+        </button>
+      )}
 
       {/* Before/After reveal overlay */}
       {reel.beforeImageUrl && showBefore && (
