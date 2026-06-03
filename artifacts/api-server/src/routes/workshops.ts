@@ -147,6 +147,30 @@ router.delete("/workshops/:id/book", async (req, res): Promise<void> => {
   res.json({ success: true });
 });
 
+// PATCH /workshops/bookings/:id — update a booking the caller owns.
+// Currently supports toggling the per-booking reminder opt-out so students can
+// re-enable reminders for a workshop they previously muted.
+router.patch("/workshops/bookings/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [booking] = await db.select().from(workshopBookingsTable).where(eq(workshopBookingsTable.id, req.params.id));
+    if (!booking) { res.status(404).json({ error: "Not found" }); return; }
+    if (booking.userId !== req.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const { reminderOptOut } = req.body as { reminderOptOut?: unknown };
+    if (typeof reminderOptOut !== "boolean") { res.status(400).json({ error: "reminderOptOut (boolean) required" }); return; }
+
+    const [updated] = await db.update(workshopBookingsTable)
+      .set({ reminderOptOut })
+      .where(eq(workshopBookingsTable.id, booking.id))
+      .returning();
+    res.json({ booking: { ...updated, createdAt: updated.createdAt.toISOString() } });
+  } catch (err) {
+    req.log.error({ err }, "patchWorkshopBooking error");
+    res.status(500).json({ error: "Failed to update booking" });
+  }
+});
+
 // GET /workshops/:id/calendar.ics — download ICS file for Apple Calendar and other clients
 router.get("/workshops/:id/calendar.ics", async (req, res): Promise<void> => {
   try {

@@ -6,6 +6,7 @@ import { useProfile } from "@/contexts/ProfileContext";
 import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
 import { readPaymentSettings, savePaymentSettings, formatProcessingWindowLabel, type ArtistPayments } from "@/utils/paymentSettings";
 import { useStripeConnect } from "@/contexts/StripeConnectContext";
+import { toast } from "@/hooks/use-toast";
 
 const SHIPPING_KEY = "kiln_shipping_v1";
 
@@ -51,6 +52,7 @@ interface WorkshopBookingEntry {
   id: string;
   workshopId: string;
   createdAt: string;
+  reminderOptOut: boolean;
   workshop: {
     id: string;
     title: string;
@@ -116,6 +118,7 @@ export default function Settings() {
   const [mobileTab, setMobileTab] = useState<MobileTab>("All");
   const [bookings, setBookings] = useState<WorkshopBookingEntry[] | null>(null);
   const [bookingsError, setBookingsError] = useState(false);
+  const [reminderUpdating, setReminderUpdating] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
@@ -126,6 +129,26 @@ export default function Settings() {
   function setTimedError(setter: (v: string | null) => void, msg: string) {
     setter(msg);
     setTimeout(() => setter(null), 4000);
+  }
+
+  async function setBookingReminderOptOut(bookingId: string, optOut: boolean) {
+    setReminderUpdating(bookingId);
+    setBookings(prev => prev?.map(b => b.id === bookingId ? { ...b, reminderOptOut: optOut } : b) ?? prev);
+    try {
+      const r = await fetch(`/api/workshops/bookings/${bookingId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reminderOptOut: optOut }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      toast({ title: optOut ? "Reminders muted" : "Reminders turned back on" });
+    } catch {
+      setBookings(prev => prev?.map(b => b.id === bookingId ? { ...b, reminderOptOut: !optOut } : b) ?? prev);
+      toast({ title: "Couldn\u2019t update reminders", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setReminderUpdating(null);
+    }
   }
 
   useEffect(() => {
@@ -1569,6 +1592,7 @@ export default function Settings() {
               const dateLabel = w.startDate
                 ? new Date(w.startDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
                 : null;
+              const isUpcoming = !w.startDate || new Date(w.startDate).getTime() > Date.now();
               return (
                 <div key={b.id} className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden">
                   <Link href={`/workshops/${w.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-white/3 transition-colors">
@@ -1611,6 +1635,23 @@ export default function Settings() {
                       <div className="flex items-center gap-2">
                         <MapPin size={12} className="shrink-0 text-stone-500" />
                         <span>{w.location || "Location to be announced"}</span>
+                      </div>
+                    )}
+                    {isUpcoming && (
+                      <div className="flex items-center justify-between gap-3 pt-2 mt-1 border-t border-white/5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Bell size={12} className={`shrink-0 ${b.reminderOptOut ? "text-stone-600" : "text-amber-400"}`} />
+                          <span className="truncate">{b.reminderOptOut ? "Reminders off" : "Reminders on"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={reminderUpdating === b.id}
+                          onClick={() => setBookingReminderOptOut(b.id, !b.reminderOptOut)}
+                          aria-label={b.reminderOptOut ? "Turn reminders on" : "Mute reminders"}
+                          className={`relative h-6 w-11 rounded-full transition-colors shrink-0 disabled:opacity-50 ${!b.reminderOptOut ? "bg-amber-500" : "bg-stone-700"}`}
+                        >
+                          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${!b.reminderOptOut ? "translate-x-5" : "translate-x-0.5"}`} />
+                        </button>
                       </div>
                     )}
                   </div>
