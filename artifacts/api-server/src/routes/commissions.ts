@@ -211,7 +211,7 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
       : status === "declined"
       ? `declined your commission request`
       : `updated your commission: ${status}`;
-    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: notifText, link: `/commissions` });
+    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: commission.clientId, type: "commission", fromId: req.user.id, fromName: commission.artistName, fromAvatarUrl: req.user.profileImageUrl ?? null, text: notifText, link: `/commissions/${commission.id}` });
     const clientEmail = commission.clientEmail ?? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, commission.clientId)).then(r => r[0]?.email));
     if (clientEmail) {
       const effectivePrice = updated.quotedPrice ?? commission.quotedPrice;

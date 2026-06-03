@@ -98,7 +98,8 @@ export default function NotificationPanel({ onClose }: Props) {
           </div>
         ) : (
           notifications.map((n) => {
-            const isCommission = n.type === "commission" && !!n.commissionId;
+            const commissionId = n.commissionId ?? n.link?.match(/\/commissions\/([a-f0-9-]{36})/)?.[1];
+            const isCommission = n.type === "commission" && !!commissionId;
             if (isCommission) {
               return (
                 <div
@@ -114,7 +115,7 @@ export default function NotificationPanel({ onClose }: Props) {
                       <p className={`text-xs leading-snug ${n.read ? "text-stone-400" : "text-stone-200"}`}>{n.text}</p>
                       <p className="text-xs text-stone-600 mt-0.5"><RelativeTime since={n.createdAt} className="" /></p>
                     </button>
-                    <CommissionInlineActions commissionId={n.commissionId!} />
+                    <CommissionInlineActions commissionId={commissionId!} />
                   </div>
                   {!n.read && <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0 mt-1" />}
                 </div>
