@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -118,6 +119,10 @@ export default function OrderDetailScreen() {
   const [bannerType, setBannerType] = useState<"shipped" | "delivered">("shipped");
   const [statusRing, setStatusRing] = useState(false);
   const bannerOpacity = useRef(new Animated.Value(0)).current;
+
+  const shareTracking = useCallback((trackingNumber: string) => {
+    Share.share({ message: trackingNumber }).catch(() => {});
+  }, []);
 
   const dismissBanner = useCallback(() => {
     Animated.timing(bannerOpacity, {
@@ -295,6 +300,16 @@ export default function OrderDetailScreen() {
                   ? "The artist has marked this order as shipped."
                   : "This order has been marked as delivered."}
               </Text>
+              {bannerType === "shipped" && order.trackingNumber ? (
+                <Pressable
+                  onPress={() => shareTracking(order.trackingNumber!)}
+                  hitSlop={6}
+                  style={styles.trackingChip}
+                >
+                  <Feather name="share" size={11} color="#FBBF24" />
+                  <Text style={styles.trackingChipText}>{order.trackingNumber}</Text>
+                </Pressable>
+              ) : null}
             </View>
             <Pressable onPress={dismissBanner} hitSlop={8}>
               <Feather name="x" size={14} color="#8A7E75" />
@@ -738,6 +753,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#A8A29E",
     marginTop: 2,
+  },
+  trackingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(251,191,36,0.15)",
+  },
+  trackingChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#FCD34D",
+    flexShrink: 1,
   },
   statusCardHighlighted: {
     shadowColor: "#FBBF24",

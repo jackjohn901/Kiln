@@ -3,7 +3,7 @@ import { Link, useLocation, useParams, useSearch } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn, Lock,
+  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn, Lock, Copy,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
@@ -214,6 +214,7 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [trackingCopied, setTrackingCopied] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [editingAddress, setEditingAddress] = useState(false);
   const [addressDraft, setAddressDraft] = useState("");
@@ -378,6 +379,13 @@ export default function OrderDetail() {
     void loadThread();
     return () => { cancelled = true; };
   }, [id]);
+
+  const handleCopyTracking = useCallback((trackingNumber: string) => {
+    navigator.clipboard.writeText(trackingNumber).then(() => {
+      setTrackingCopied(true);
+      setTimeout(() => setTrackingCopied(false), 2000);
+    }).catch(() => {});
+  }, []);
 
   const handleCopyLink = useCallback((rawNotes: string | null) => {
     const key = rawNotes?.startsWith("stripe:") ? rawNotes.slice(7) : null;
@@ -645,6 +653,20 @@ export default function OrderDetail() {
                   ? "The artist has marked this order as shipped."
                   : "This order has been marked as delivered."}
               </p>
+              {banner.type === "shipped" && order.trackingNumber && (
+                <button
+                  onClick={() => handleCopyTracking(order.trackingNumber!)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-2.5 py-1.5 font-mono text-xs text-amber-200 hover:bg-amber-500/25 transition-colors max-w-full"
+                  title="Copy tracking number"
+                >
+                  {trackingCopied ? (
+                    <Check size={11} className="shrink-0 text-emerald-400" />
+                  ) : (
+                    <Copy size={11} className="shrink-0" />
+                  )}
+                  <span className="break-all">{order.trackingNumber}</span>
+                </button>
+              )}
             </div>
             <button
               onClick={dismissBanner}
