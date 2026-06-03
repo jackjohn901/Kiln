@@ -3,7 +3,7 @@ import { Link, useSearch } from "wouter";
 import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin, AlertCircle, CheckCircle, ExternalLink, Loader2, CalendarDays, Video } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
-import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
+import { useSettings, PUSH_KEYS, type KilnSettings } from "@/contexts/SettingsContext";
 import { readPaymentSettings, savePaymentSettings, formatProcessingWindowLabel, type ArtistPayments } from "@/utils/paymentSettings";
 import { useStripeConnect } from "@/contexts/StripeConnectContext";
 import { toast } from "@/hooks/use-toast";
@@ -433,6 +433,12 @@ export default function Settings() {
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
   const emailPaused = settings.notif_email_paused;
+
+  const SMS_KEYS: (keyof KilnSettings)[] = ["notif_sms_outbid", "notif_sms_drops", "notif_sms_shipped"];
+  const activePushCount = PUSH_KEYS.filter((k) => settings[k]).length;
+  const activeSmsCount = SMS_KEYS.filter((k) => settings[k]).length;
+  const smsPaused = settings.notif_sms_paused;
+
   const notifDesc = !settingsLoaded
     ? "—"
     : !contactEmail.trim()
@@ -625,6 +631,67 @@ export default function Settings() {
 
         {section === "notifications" && (
           <div className="rounded-2xl border border-white/8 bg-stone-900/60 px-5 divide-y-0">
+            {settingsLoaded && (() => {
+              const pushOff = activePushCount === 0;
+              const emailFullyOff = emailPaused || activeEmailCount === 0;
+              const smsFullyOff = smsPaused || activeSmsCount === 0;
+              const segments: { text: string; warn: boolean }[] = [
+                { text: `${activePushCount} of ${PUSH_KEYS.length} push types enabled`, warn: pushOff },
+                {
+                  text: emailPaused ? "Emails paused" : activeEmailCount === 0 ? "Emails off" : `${activeEmailCount} of ${EMAIL_KEYS.length} emails on`,
+                  warn: emailFullyOff,
+                },
+                {
+                  text: smsPaused ? "SMS paused" : activeSmsCount === 0 ? "SMS off" : `${activeSmsCount} of ${SMS_KEYS.length} SMS on`,
+                  warn: smsFullyOff,
+                },
+              ];
+              const anyWarn = segments.some((s) => s.warn);
+              return (
+                <div className={`my-4 rounded-xl border p-3.5 ${anyWarn ? "border-amber-500/20 bg-amber-500/5" : "border-emerald-500/15 bg-emerald-500/5"}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {anyWarn ? <AlertTriangle size={13} className="text-amber-400 shrink-0" /> : <CheckCircle size={13} className="text-emerald-400 shrink-0" />}
+                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">Notification summary</p>
+                  </div>
+                  <p className="text-sm leading-relaxed">
+                    {segments.map((s, i) => (
+                      <span key={i}>
+                        {i > 0 && <span className="text-stone-600"> · </span>}
+                        <span className={s.warn ? "text-amber-300" : "text-stone-300"}>{s.text}</span>
+                      </span>
+                    ))}
+                  </p>
+                  {(emailPaused || smsPaused || pushOff) && (
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      {pushOff && (
+                        <button
+                          onClick={() => patchSettings(Object.fromEntries(PUSH_KEYS.map((k) => [k, true])))}
+                          className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+                        >
+                          Turn on push
+                        </button>
+                      )}
+                      {emailPaused && (
+                        <button
+                          onClick={clearSnooze}
+                          className="rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+                        >
+                          Resume emails
+                        </button>
+                      )}
+                      {smsPaused && (
+                        <button
+                          onClick={clearSmsSnooze}
+                          className="rounded-full bg-sky-500/15 border border-sky-500/30 px-3 py-1 text-xs font-medium text-sky-300 hover:bg-sky-500/25 transition-colors"
+                        >
+                          Resume SMS
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <Toggle settingKey="notif_msg_sound" label="Message notification sound" desc="Play a chime when a new message arrives" />
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Activity</p>
             <Toggle settingKey="notif_likes" label="Likes" desc="When someone likes your posts" />
