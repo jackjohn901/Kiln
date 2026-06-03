@@ -1,10 +1,13 @@
-import { useEffect, useRef } from "react";
-import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star, BellOff } from "lucide-react";
 import { useSocial, KilnNotification } from "@/contexts/SocialContext";
+import { useSettings, PUSH_KEYS } from "@/contexts/SettingsContext";
 import { useLocation } from "wouter";
 import CommissionInlineActions from "@/components/CommissionInlineActions";
 import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
 
+
+const PAUSED_BANNER_DISMISS_KEY = "kiln_notif_paused_banner_dismissed_v1";
 
 const SALE_FALLBACK_LINK = "/earnings";
 
@@ -38,8 +41,37 @@ interface Props {
 
 export default function NotificationPanel({ onClose }: Props) {
   const { notifications, markRead, markAllRead, unreadCount } = useSocial();
+  const { settings } = useSettings();
   const [, navigate] = useLocation();
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const emailPaused = settings.notif_email_paused;
+  const allPushOff = PUSH_KEYS.every((k) => !settings[k]);
+  const pausedMessage = emailPaused && allPushOff
+    ? "Notifications paused — push off, email paused"
+    : emailPaused
+      ? "Email notifications paused"
+      : allPushOff
+        ? "Push notifications are all off"
+        : null;
+
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(PAUSED_BANNER_DISMISS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  function dismissBanner() {
+    setBannerDismissed(true);
+    try { sessionStorage.setItem(PAUSED_BANNER_DISMISS_KEY, "1"); } catch {}
+  }
+
+  function goToNotifSettings() {
+    navigate("/settings?section=notifications");
+    onClose();
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -89,6 +121,26 @@ export default function NotificationPanel({ onClose }: Props) {
           </button>
         </div>
       </div>
+
+      {pausedMessage && !bannerDismissed && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/20">
+          <BellOff size={13} className="text-amber-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-xs text-amber-200/90 leading-snug">
+            <span>{pausedMessage}</span>
+            <span className="text-stone-500"> · </span>
+            <button onClick={goToNotifSettings} className="text-amber-300 hover:text-amber-200 font-medium underline underline-offset-2">
+              Go to Settings
+            </button>
+          </div>
+          <button
+            onClick={dismissBanner}
+            aria-label="Dismiss"
+            className="text-amber-400/60 hover:text-amber-300 flex-shrink-0"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       <div className="overflow-y-auto" style={{ maxHeight: "calc(70vh - 52px)" }}>
         {notifications.length === 0 ? (
