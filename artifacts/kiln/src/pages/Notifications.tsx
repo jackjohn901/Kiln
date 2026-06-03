@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail, MailX, Gavel } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail, MailX, Gavel, MessageSquareX } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -66,6 +66,12 @@ function NotificationRow({ n, onRead }: { n: KilnNotification; onRead: (id: stri
               email missed
             </span>
           )}
+          {n.smsSkipped && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-medium text-sky-400 shrink-0">
+              <MessageSquareX size={9} />
+              SMS missed
+            </span>
+          )}
         </div>
         <p className="mt-0.5 text-xs text-stone-600"><RelativeTime since={n.createdAt} className="" /></p>
       </div>
@@ -86,7 +92,7 @@ function NotificationRow({ n, onRead }: { n: KilnNotification; onRead: (id: stri
       animate={{ opacity: 1, y: 0 }}
       className={`group relative flex items-start gap-3 rounded-2xl p-3 transition-colors ${
         n.read ? "bg-transparent hover:bg-white/3" : "bg-white/5 hover:bg-white/7"
-      } ${n.emailSkipped ? "ring-1 ring-amber-500/10" : ""}`}
+      } ${(n.emailSkipped || n.smsSkipped) ? "ring-1 ring-amber-500/10" : ""}`}
     >
       {/* Avatar + type icon */}
       <div className="relative flex-shrink-0">
@@ -169,6 +175,7 @@ export default function Notifications() {
             imageUrl: (n.imageUrl as string | undefined) ?? undefined,
             read: (n.read as boolean) ?? false,
             emailSkipped: (n.emailSkipped as boolean) ?? false,
+            smsSkipped: (n.smsSkipped as boolean) ?? false,
             createdAt: n.createdAt as string,
           };
         }));
@@ -182,7 +189,7 @@ export default function Notifications() {
     return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [notifications, apiNotifications]);
 
-  const snoozedNotifications = useMemo(() => allNotifications.filter(n => n.emailSkipped), [allNotifications]);
+  const snoozedNotifications = useMemo(() => allNotifications.filter(n => n.emailSkipped || n.smsSkipped), [allNotifications]);
 
   const handleRead = useCallback((id: string) => {
     markRead(id);
@@ -192,7 +199,7 @@ export default function Notifications() {
   }, [markRead]);
 
   const handleDismissMissed = useCallback(() => {
-    setApiNotifications((prev) => prev.map((n) => n.emailSkipped ? { ...n, emailSkipped: false } : n));
+    setApiNotifications((prev) => prev.map((n) => (n.emailSkipped || n.smsSkipped) ? { ...n, emailSkipped: false, smsSkipped: false } : n));
     dismissMissed();
     setFilter((f) => (f === "snoozed" ? "all" : f));
   }, [dismissMissed]);
@@ -243,7 +250,7 @@ export default function Notifications() {
               <p className="text-sm font-medium text-amber-300">
                 {snoozedNotifications.length} notification{snoozedNotifications.length !== 1 ? "s" : ""} missed while snoozed
               </p>
-              <p className="text-xs text-amber-400/70">These arrived while your email was paused — no email was sent.</p>
+              <p className="text-xs text-amber-400/70">These arrived while your notifications were paused — no email or text was sent.</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -288,7 +295,7 @@ export default function Notifications() {
         {filter === "snoozed" && snoozedNotifications.length > 0 && (
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3">
             <p className="min-w-0 flex-1 text-sm text-amber-300/80">
-              These notifications arrived while your email was snoozed. Your in-app notification was saved, but no email was sent.
+              These notifications arrived while you were snoozed. Your in-app notification was saved, but no email or text was sent.
             </p>
             <button
               onClick={handleDismissMissed}
@@ -305,7 +312,7 @@ export default function Notifications() {
             {filter === "snoozed" ? (
               <>
                 <MailX size={40} className="mb-4 text-stone-700" />
-                <p className="text-stone-500">No missed emails — you were reachable the whole time</p>
+                <p className="text-stone-500">No missed alerts — you were reachable the whole time</p>
               </>
             ) : (
               <>

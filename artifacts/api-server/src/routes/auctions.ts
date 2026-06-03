@@ -185,7 +185,7 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
         const outbidHtml = await prependSnoozeRecap(prevBidderId, outbidEmail(auction.title, bidAmount, name));
         await sendEmailWithRetry({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidHtml }, { label: "outbid notification", contextId: auction.id });
       }
-      sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilndrop.com/kiln/auctions/${auction.id}`, s?.notifSmsResumeAt);
+      sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilndrop.com/kiln/auctions/${auction.id}`, s?.notifSmsResumeAt, outbidNotifId);
     } catch (err) {
       logger.warn({ err, prevBidderId, auctionId: auction.id }, "Failed to send outbid notification email");
     }

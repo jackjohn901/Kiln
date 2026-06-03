@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, notificationsTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or } from "drizzle-orm";
 
 const router = Router();
 
@@ -35,8 +35,11 @@ router.patch("/notifications/dismiss-missed", async (req, res): Promise<void> =>
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
     await db.update(notificationsTable)
-      .set({ emailSkipped: false })
-      .where(and(eq(notificationsTable.userId, req.user.id), eq(notificationsTable.emailSkipped, true)));
+      .set({ emailSkipped: false, smsSkipped: false })
+      .where(and(
+        eq(notificationsTable.userId, req.user.id),
+        or(eq(notificationsTable.emailSkipped, true), eq(notificationsTable.smsSkipped, true)),
+      ));
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "dismissMissed error");

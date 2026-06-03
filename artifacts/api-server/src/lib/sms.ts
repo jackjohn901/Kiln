@@ -1,5 +1,6 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { db, skippedSmsLogTable } from "@workspace/db";
+import { db, skippedSmsLogTable, notificationsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { isSmsPaused } from "./emailPaused";
 
@@ -37,6 +38,7 @@ export async function sendSmsIfOptedIn(
   settings: Record<string, unknown> | null | undefined,
   body: string,
   resumeAt?: Date | null,
+  notifId?: string | null,
 ): Promise<void> {
   if (!phone) return;
   if (isSmsPaused(settings, resumeAt)) {
@@ -45,6 +47,14 @@ export async function sendSmsIfOptedIn(
     db.insert(skippedSmsLogTable)
       .values({ userId, smsKey, body })
       .catch((err) => logger.warn({ err, userId, smsKey }, "failed to log skipped SMS"));
+    // Flag the matching in-app notification (if one exists for this recipient)
+    // so the Missed tab can surface it with an "SMS missed" badge.
+    if (notifId) {
+      db.update(notificationsTable)
+        .set({ smsSkipped: true })
+        .where(eq(notificationsTable.id, notifId))
+        .catch((err) => logger.warn({ err, notifId }, "failed to flag SMS-skipped notification"));
+    }
     return;
   }
   const optedOut = settings?.[smsKey] === false;

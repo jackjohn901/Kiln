@@ -26,6 +26,7 @@ export interface KilnNotification {
   imageUrl?: string;
   read: boolean;
   emailSkipped?: boolean;
+  smsSkipped?: boolean;
   createdAt: string;
 }
 
@@ -453,7 +454,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
     fetch("/api/notifications", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; imageUrl?: string | null; read: boolean; emailSkipped?: boolean; createdAt: string }> } | null) => {
+      .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; imageUrl?: string | null; read: boolean; emailSkipped?: boolean; smsSkipped?: boolean; createdAt: string }> } | null) => {
         if (!data?.notifications?.length) return;
         const apiNotifs: KilnNotification[] = data.notifications.map((n) => {
           const link = n.link ?? undefined;
@@ -470,6 +471,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
             imageUrl: n.imageUrl ?? undefined,
             read: n.read,
             emailSkipped: n.emailSkipped ?? false,
+            smsSkipped: n.smsSkipped ?? false,
             createdAt: n.createdAt,
           };
         });
@@ -566,7 +568,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     let snapshot: SocialState["notifications"] = [];
     update((s) => {
       snapshot = s.notifications;
-      return { ...s, notifications: s.notifications.map((n) => n.emailSkipped ? { ...n, emailSkipped: false } : n) };
+      return { ...s, notifications: s.notifications.map((n) => (n.emailSkipped || n.smsSkipped) ? { ...n, emailSkipped: false, smsSkipped: false } : n) };
     });
     fetch("/api/notifications/dismiss-missed", { method: "PATCH", credentials: "include" })
       .then((r) => {
