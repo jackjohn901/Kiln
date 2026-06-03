@@ -18,3 +18,4 @@
 - [Mobile review-prompt gating](mobile-review-prompt-gating.md) — trigger store-review at end of one-shot onboarding (AsyncStorage flag), best-effort, never block app entry.
 - [Kiln guild channels](kiln-guild-channels.md) — guild channels are per-guild DB rows (guilds.channels), server-authoritative; private DB guilds are members-only but static/demo guilds (not in DB) stay open.
 - [Onboarding auth gating](onboarding-auth-gating.md) — front-load sign-in before data-creating onboarding; Replit Auth's full-page redirect wipes form state, so a late 401 loses everything. Clerk migration unsupported.
+- [Kiln badge system](kiln-badge-system.md) — awardBadge() must be called by feature routes; badges with no badge_definitions row are awarded silently but never render; most defs aren't seeded from source (only referral ones are).

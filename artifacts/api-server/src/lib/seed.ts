@@ -4,10 +4,23 @@ import {
   usersTable, profilesTable, postsTable,
   listingsTable, dropsTable, auctionsTable, auctionBidsTable,
   workshopsTable, guildsTable, guildMembersTable,
-  patronTiersTable, seedHistoryTable,
+  patronTiersTable, seedHistoryTable, badgeDefinitionsTable,
 } from "@workspace/db";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
+
+const REFERRAL_BADGE_DEFINITIONS = [
+  { id: "referral_1", name: "Early Adopter", description: "Invited your first artist to Kiln", icon: "⭐", category: "community", rarity: "common" },
+  { id: "referral_10", name: "Recruiter", description: "Invited 10 artists to Kiln", icon: "📣", category: "community", rarity: "rare" },
+  { id: "referral_100", name: "Evangelist", description: "Invited 100 artists to Kiln", icon: "🌐", category: "community", rarity: "legendary" },
+];
+
+// Ensures the referral milestone badge definitions exist so awarded referral
+// badges actually render. Idempotent: safe to run on every server start.
+export async function ensureReferralBadges(): Promise<void> {
+  await db.insert(badgeDefinitionsTable).values(REFERRAL_BADGE_DEFINITIONS).onConflictDoNothing();
+  logger.info("Referral badge definitions ensured");
+}
 
 export interface SeedActor {
   id: string;

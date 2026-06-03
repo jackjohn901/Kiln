@@ -4,7 +4,7 @@ import { logger } from "./lib/logger";
 import { setupWebSocket } from "./lib/websocket";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./stripeClient";
-import { seedDatabase } from "./lib/seed";
+import { seedDatabase, ensureReferralBadges } from "./lib/seed";
 import { backfillProcessingWindow } from "./lib/backfillProcessingWindow";
 import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
 import { startStoryExpiry } from "./lib/storyExpiry";
@@ -175,6 +175,7 @@ if (Number.isNaN(port) || port <= 0) {
     // so one failure can't take down the others or crash the process.
     initStripe().catch((err) => logger.error({ err }, "initStripe failed"));
     seedDatabase().catch((err) => logger.error({ err }, "seedDatabase failed"));
+    ensureReferralBadges().catch((err) => logger.error({ err }, "ensureReferralBadges failed"));
     backfillProcessingWindow().catch((err) => logger.error({ err }, "backfillProcessingWindow error"));
     try { startScheduledPostsPublisher(); } catch (err) { logger.error({ err }, "startScheduledPostsPublisher failed"); }
     try { startStoryExpiry(); } catch (err) { logger.error({ err }, "startStoryExpiry failed"); }

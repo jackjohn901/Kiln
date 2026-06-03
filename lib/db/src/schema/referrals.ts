@@ -10,7 +10,7 @@ export const referralCodesTable = pgTable("referral_codes", {
 export const referralUsesTable = pgTable("referral_uses", {
   id: varchar("id", { length: 36 }).primaryKey(),
   referrerId: varchar("referrer_id", { length: 255 }).notNull(),
-  refereeId: varchar("referee_id", { length: 255 }).notNull(),
+  refereeId: varchar("referee_id", { length: 255 }).notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

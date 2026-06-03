@@ -254,6 +254,35 @@ function RefCapture() {
   return null;
 }
 
+// Once the visitor is signed in, automatically redeem any invite code they
+// arrived with (?ref=CODE), so the inviter gets credit toward their badge
+// without the new user having to paste the code manually.
+function RefAutoApply() {
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    let code: string | null = null;
+    try { code = localStorage.getItem("kiln_referral_code"); } catch {}
+    if (!code || !code.trim()) return;
+    fetch("/api/referrals/use", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code.trim().toUpperCase() }),
+    })
+      .then((r) => {
+        // Clear on success or on any terminal outcome (already used, own code,
+        // invalid) where retrying would never succeed. Leave it for transient
+        // 5xx errors so a later visit can retry.
+        if (r.ok || r.status === 400 || r.status === 404 || r.status === 409) {
+          try { localStorage.removeItem("kiln_referral_code"); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+  return null;
+}
+
 function TitleSetter() {
   const [location] = useLocation();
   const { unreadMessageCount } = useSocial();
@@ -326,6 +355,7 @@ function Router() {
     <>
       <TitleSetter />
       <RefCapture />
+      <RefAutoApply />
       <QuizGate />
       <SetupGate />
       <SessionGuard />
