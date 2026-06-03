@@ -565,10 +565,32 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
   );
 }
 
+type StatusFilter = "all" | "pending" | "quoted" | "accepted" | "in_progress" | "completed" | "declined";
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "quoted", label: "Quoted" },
+  { key: "accepted", label: "Accepted" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "completed", label: "Completed" },
+  { key: "declined", label: "Declined" },
+];
+
+const FILTER_ACTIVE_COLORS: Record<StatusFilter, string> = {
+  all: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  pending: "bg-stone-700/60 text-stone-300 border-stone-600",
+  quoted: "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  accepted: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  in_progress: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  completed: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  declined: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+};
+
 export default function CommissionTracker() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"all" | "active">("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { markTypeRead } = useSocial();
   const { user } = useAuth();
 
@@ -594,9 +616,14 @@ export default function CommissionTracker() {
   };
 
   const filtered = commissions.filter(c => {
-    if (tab === "active") return !["completed", "declined", "cancelled"].includes(c.status);
-    return true;
+    if (statusFilter === "all") return true;
+    return c.status === statusFilter;
   });
+
+  const countFor = (key: StatusFilter) => {
+    if (key === "all") return commissions.length;
+    return commissions.filter(c => c.status === key).length;
+  };
 
   const currentUserId = user?.id ?? "";
 
@@ -614,13 +641,31 @@ export default function CommissionTracker() {
           </div>
         </div>
 
-        <div className="mb-6 flex gap-1 rounded-xl bg-stone-900/50 p-1 border border-white/5">
-          {([{ key: "all", label: "All" }, { key: "active", label: "Active" }] as const).map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors ${tab === t.key ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"}`}>
-              {t.label}
-            </button>
-          ))}
+        <div className="mb-6 -mx-4 px-4 overflow-x-auto">
+          <div className="flex gap-2 pb-1 min-w-max">
+            {STATUS_FILTERS.map(f => {
+              const count = countFor(f.key);
+              const isActive = statusFilter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setStatusFilter(f.key)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                    isActive
+                      ? FILTER_ACTIVE_COLORS[f.key]
+                      : "border-white/10 text-stone-500 hover:text-stone-300 hover:border-white/20"
+                  }`}
+                >
+                  {f.label}
+                  {count > 0 && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isActive ? "bg-white/10" : "bg-stone-800 text-stone-500"}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {loading ? (
@@ -630,10 +675,20 @@ export default function CommissionTracker() {
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
             <MessageCircle size={32} className="mx-auto mb-3 text-stone-700" />
-            <p className="text-stone-500 text-sm">No commissions yet.</p>
-            <Link href="/discover" className="mt-3 inline-flex items-center gap-1 rounded-full border border-amber-500/30 px-4 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 transition-colors">
-              Find artists to commission
-            </Link>
+            <p className="text-stone-500 text-sm">
+              {statusFilter === "all"
+                ? "No commissions yet."
+                : `No ${STATUS_FILTERS.find(f => f.key === statusFilter)?.label.toLowerCase()} commissions.`}
+            </p>
+            {statusFilter === "all" ? (
+              <Link href="/discover" className="mt-3 inline-flex items-center gap-1 rounded-full border border-amber-500/30 px-4 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10 transition-colors">
+                Find artists to commission
+              </Link>
+            ) : (
+              <button onClick={() => setStatusFilter("all")} className="mt-3 inline-flex items-center gap-1 rounded-full border border-white/10 px-4 py-1.5 text-xs text-stone-400 hover:text-stone-200 transition-colors">
+                Show all commissions
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
