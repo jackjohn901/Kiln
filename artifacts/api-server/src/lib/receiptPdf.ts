@@ -109,7 +109,7 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Uint8Array> {
   let y = height - 60;
 
   page.drawText("Kiln", { x: ML, y, font: bold, size: 22, color: DARK });
-  page.drawText("kilnfire.replit.app", { x: ML, y: y - 14, font: normal, size: 9, color: MID });
+  page.drawText("kilndrop.com", { x: ML, y: y - 14, font: normal, size: 9, color: MID });
 
   page.drawText(data.refNum, { x: ML + CW - bold.widthOfTextAtSize(data.refNum, 14), y, font: bold, size: 14, color: DARK });
   page.drawText(data.receiptTitle, {
@@ -243,7 +243,7 @@ export async function buildReceiptPdf(data: ReceiptData): Promise<Uint8Array> {
 
   const footerY = 40;
   page.drawLine({ start: { x: ML, y: footerY + 14 }, end: { x: ML + CW, y: footerY + 14 }, thickness: 0.5, color: RULE });
-  const footerText = "Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages";
+  const footerText = "Thank you for your purchase. Questions? Visit kilndrop.com/kiln/messages";
   const footerW = normal.widthOfTextAtSize(footerText, 8);
   page.drawText(footerText, {
     x: ML + (CW - footerW) / 2, y: footerY, font: normal, size: 8, color: MID,

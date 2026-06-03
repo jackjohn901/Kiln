@@ -431,7 +431,7 @@ function unsubscribePage(title: string, message: string, success: boolean): stri
     <div class="icon">${icon}</div>
     <h1>${title}</h1>
     <p>${message}</p>
-    <a href="https://kilnfire.replit.app/kiln/settings">Manage all preferences</a>
+    <a href="https://kilndrop.com/kiln/settings">Manage all preferences</a>
     <p class="sub" style="margin-top:20px;">You can re-enable reminders from your notification settings at any time.</p>
   </div>
 </body>

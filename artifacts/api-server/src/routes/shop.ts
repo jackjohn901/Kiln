@@ -357,7 +357,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
           db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
         ]).then(([[s], [prof], [buyer]]) => {
           const buyerSettings = s?.settings as Record<string, unknown> | null;
-          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilnfire.replit.app/kiln/orders/${updated.id}`, s?.notifSmsResumeAt);
+          sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilndrop.com/kiln/orders/${updated.id}`, s?.notifSmsResumeAt);
           const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
           const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_shipped !== false;
           if (emailSnoozed) {

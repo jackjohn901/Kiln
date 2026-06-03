@@ -21,9 +21,9 @@ Prepared for submission to Apple App Store.
 
 | Field | Value |
 |-------|-------|
-| **Privacy Policy URL** | https://kilnfire.replit.app/kiln/privacy |
-| **Support URL** | https://kilnfire.replit.app |
-| **Marketing URL** | https://kilnfire.replit.app |
+| **Privacy Policy URL** | https://kilndrop.com/kiln/privacy |
+| **Support URL** | https://kilndrop.com |
+| **Marketing URL** | https://kilndrop.com |
 
 ---
 
@@ -165,7 +165,7 @@ This is the first release of KilnFire — the social platform built for craft ar
 ---
 
 ## Privacy Policy Contact Email
-The privacy policy at https://kilnfire.replit.app/kiln/privacy currently lists **privacy@kilnfire.app** as the contact address. Before submitting, update this to a real monitored inbox. Apple may use it during the review process.
+The privacy policy at https://kilndrop.com/kiln/privacy currently lists **privacy@kilnfire.app** as the contact address. Before submitting, update this to a real monitored inbox. Apple may use it during the review process.
 
 ---
 

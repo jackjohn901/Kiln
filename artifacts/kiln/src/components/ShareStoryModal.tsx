@@ -20,7 +20,7 @@ export interface ShareStoryModalProps {
   price?: string;
 }
 
-const SHARE_DOMAIN = "kilnfire.replit.app";
+const SHARE_DOMAIN = "kilndrop.com";
 
 /**
  * Loads a remote image and returns it as a data URL so html-to-image can

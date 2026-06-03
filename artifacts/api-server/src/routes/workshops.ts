@@ -175,7 +175,7 @@ router.get("/workshops/:id/calendar.ics", async (req, res): Promise<void> => {
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       "BEGIN:VEVENT",
-      `UID:workshop-${w.id}@kilnfire.replit.app`,
+      `UID:workshop-${w.id}@kilndrop.com`,
       `DTSTAMP:${dtStamp}`,
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,

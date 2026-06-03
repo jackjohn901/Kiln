@@ -52,7 +52,7 @@
       [
         "expo-router",
         {
-          "origin": "https://kilnfire.replit.app/"
+          "origin": "https://kilndrop.com/"
         }
       ],
       "expo-font",

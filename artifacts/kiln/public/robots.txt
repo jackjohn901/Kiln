@@ -26,4 +26,4 @@ Allow: /
 User-agent: bingbot
 Allow: /
 
-Sitemap: https://kilnfire.replit.app/kiln/sitemap.xml
+Sitemap: https://kilndrop.com/kiln/sitemap.xml

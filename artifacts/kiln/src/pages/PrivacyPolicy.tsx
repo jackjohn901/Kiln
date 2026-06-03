@@ -227,7 +227,7 @@ export default function PrivacyPolicy() {
                 {CONTACT_EMAIL}
               </a>
             </p>
-            <p className="text-muted-foreground mt-1">Website: kilnfire.replit.app</p>
+            <p className="text-muted-foreground mt-1">Website: kilndrop.com</p>
           </div>
         </Section>
 

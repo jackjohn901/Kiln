@@ -8,7 +8,7 @@ const client = new OpenAI({
   apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"],
 });
 
-const KILN_CONTEXT = `Kiln is a creator marketplace and social platform built exclusively for craft artists. Features: TikTok-style process video feed, direct sales shop (no listing fees), workshop booking, patron subscription tiers, custom commissions, limited-edition drops, live bidding auctions, guild communities, mentorship, AI craft assistant. URL: https://kilnfire.replit.app/kiln/`;
+const KILN_CONTEXT = `Kiln is a creator marketplace and social platform built exclusively for craft artists. Features: TikTok-style process video feed, direct sales shop (no listing fees), workshop booking, patron subscription tiers, custom commissions, limited-edition drops, live bidding auctions, guild communities, mentorship, AI craft assistant. URL: https://kilndrop.com/kiln/`;
 
 // POST /api/ai/marketing/bio
 router.post("/ai/marketing/bio", async (req, res) => {

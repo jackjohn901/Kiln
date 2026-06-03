@@ -198,7 +198,7 @@ export function buildReceiptHtml(data: ReceiptHtmlData): string {
   <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
     <div>
       <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilndrop.com</p>
     </div>
     <div style="text-align:right;">
       <p style="font-size:18px;font-weight:700;font-family:monospace;">${esc(data.refNum)}</p>
@@ -226,7 +226,7 @@ export function buildReceiptHtml(data: ReceiptHtmlData): string {
 
   <!-- Section 10: Footer -->
   <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
-    <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilnfire.replit.app/kiln/messages</p>
+    <p style="font-size:11px;color:#8a7e74;">Thank you for your purchase. Questions? Visit kilndrop.com/kiln/messages</p>
   </div>
 </body>
 </html>`;

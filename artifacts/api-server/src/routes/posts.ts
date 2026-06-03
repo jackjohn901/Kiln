@@ -408,7 +408,7 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
             }
             if (wantsEmail && p?.contactEmail) {
               const unsubToken = generateUnsubscribeToken(mentionedUserId);
-              const unsubscribeUrl = `https://kilnfire.replit.app/api/unsubscribe/mentions?token=${encodeURIComponent(unsubToken)}`;
+              const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/mentions?token=${encodeURIComponent(unsubToken)}`;
               await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: newMentionEmail(authorName, text.trim(), postId, unsubscribeUrl) }, { label: "mention notification" });
             }
           } catch (err) {

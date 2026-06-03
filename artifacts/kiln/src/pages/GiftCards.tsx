@@ -357,7 +357,7 @@ export default function GiftCards() {
 
               {recipientEmail && (
                 <a
-                  href={`mailto:${recipientEmail}?subject=Your%20Kiln%20Gift%20Card%20%E2%80%94%20%24${finalAmount}&body=Hi%20${encodeURIComponent(recipientName || "there")}%2C%0A%0AHere%20is%20your%20Kiln%20gift%20card%20code%20worth%20%24${finalAmount}%3A%0A%0A${encodeURIComponent(generatedCode)}%0A%0ARedeem%20it%20at%3A%20https%3A%2F%2Fkilnfire.replit.app%2Fkiln%2Fgift-cards%0A%0AEnjoy%20supporting%20independent%20craft%20artists!`}
+                  href={`mailto:${recipientEmail}?subject=Your%20Kiln%20Gift%20Card%20%E2%80%94%20%24${finalAmount}&body=Hi%20${encodeURIComponent(recipientName || "there")}%2C%0A%0AHere%20is%20your%20Kiln%20gift%20card%20code%20worth%20%24${finalAmount}%3A%0A%0A${encodeURIComponent(generatedCode)}%0A%0ARedeem%20it%20at%3A%20https%3A%2F%2Fkilndrop.com%2Fkiln%2Fgift-cards%0A%0AEnjoy%20supporting%20independent%20craft%20artists!`}
                   className="flex mx-auto items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400 transition-colors"
                 >
                   <Send size={14} /> Send via email

@@ -1981,7 +1981,7 @@ export default function Earnings() {
         artistName={profile?.name ?? ""}
         medium={profile?.mediums?.[0]}
         location={profile?.location ?? undefined}
-        profileUrl={`https://kilnfire.replit.app/kiln/`}
+        profileUrl={`https://kilndrop.com/kiln/`}
         saleItem={saleBanner ?? undefined}
       />
     </div>

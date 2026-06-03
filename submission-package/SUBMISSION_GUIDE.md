@@ -45,10 +45,10 @@ submission-package/
 
 | Field | Value |
 |-------|-------|
-| **Live Web App** | https://kilnfire.replit.app/kiln/ |
-| **Privacy Policy** | https://kilnfire.replit.app/kiln/privacy |
-| **Support URL** | https://kilnfire.replit.app |
-| **Marketing URL** | https://kilnfire.replit.app |
+| **Live Web App** | https://kilndrop.com/kiln/ |
+| **Privacy Policy** | https://kilndrop.com/kiln/privacy |
+| **Support URL** | https://kilndrop.com |
+| **Marketing URL** | https://kilndrop.com |
 
 > **Action required:** Update `privacy@kilnfire.app` in the privacy policy to a real monitored inbox before submitting — Apple reviewers may use it.
 

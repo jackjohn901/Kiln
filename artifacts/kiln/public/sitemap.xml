@@ -3,269 +3,269 @@
 
   <!-- Core discovery pages -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/</loc>
+    <loc>https://kilndrop.com/kiln/</loc>
     <changefreq>hourly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/discover</loc>
+    <loc>https://kilndrop.com/kiln/discover</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/artists</loc>
+    <loc>https://kilndrop.com/kiln/artists</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/shop</loc>
+    <loc>https://kilndrop.com/kiln/shop</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/workshops</loc>
+    <loc>https://kilndrop.com/kiln/workshops</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/drops</loc>
+    <loc>https://kilndrop.com/kiln/drops</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/auctions</loc>
+    <loc>https://kilndrop.com/kiln/auctions</loc>
     <changefreq>hourly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/trending</loc>
+    <loc>https://kilndrop.com/kiln/trending</loc>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
 
   <!-- Technique category pages -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques</loc>
+    <loc>https://kilndrop.com/kiln/techniques</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/ceramics</loc>
+    <loc>https://kilndrop.com/kiln/techniques/ceramics</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/glassblowing</loc>
+    <loc>https://kilndrop.com/kiln/techniques/glassblowing</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/flameworking</loc>
+    <loc>https://kilndrop.com/kiln/techniques/flameworking</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/raku</loc>
+    <loc>https://kilndrop.com/kiln/techniques/raku</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/kiln-forming</loc>
+    <loc>https://kilndrop.com/kiln/techniques/kiln-forming</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/weaving</loc>
+    <loc>https://kilndrop.com/kiln/techniques/weaving</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/blacksmithing</loc>
+    <loc>https://kilndrop.com/kiln/techniques/blacksmithing</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/enamelwork</loc>
+    <loc>https://kilndrop.com/kiln/techniques/enamelwork</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/natural-dyeing</loc>
+    <loc>https://kilndrop.com/kiln/techniques/natural-dyeing</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/lost-wax-casting</loc>
+    <loc>https://kilndrop.com/kiln/techniques/lost-wax-casting</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/woodworking</loc>
+    <loc>https://kilndrop.com/kiln/techniques/woodworking</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/techniques/pate-de-verre</loc>
+    <loc>https://kilndrop.com/kiln/techniques/pate-de-verre</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <!-- Community pages -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/guilds</loc>
+    <loc>https://kilndrop.com/kiln/guilds</loc>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/challenges</loc>
+    <loc>https://kilndrop.com/kiln/challenges</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/opportunities</loc>
+    <loc>https://kilndrop.com/kiln/opportunities</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/mentorship</loc>
+    <loc>https://kilndrop.com/kiln/mentorship</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/collab</loc>
+    <loc>https://kilndrop.com/kiln/collab</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/critique</loc>
+    <loc>https://kilndrop.com/kiln/critique</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/calendar</loc>
+    <loc>https://kilndrop.com/kiln/calendar</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/events</loc>
+    <loc>https://kilndrop.com/kiln/events</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
 
   <!-- Reference content -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/materials</loc>
+    <loc>https://kilndrop.com/kiln/materials</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/series</loc>
+    <loc>https://kilndrop.com/kiln/series</loc>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/map</loc>
+    <loc>https://kilndrop.com/kiln/map</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/collector</loc>
+    <loc>https://kilndrop.com/kiln/collector</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/studio-open-days</loc>
+    <loc>https://kilndrop.com/kiln/studio-open-days</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <!-- Info pages -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/about</loc>
+    <loc>https://kilndrop.com/kiln/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/privacy</loc>
+    <loc>https://kilndrop.com/kiln/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/terms</loc>
+    <loc>https://kilndrop.com/kiln/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <!-- Static SEO landing pages targeting high-volume search categories -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/sell-handmade-crafts-online.html</loc>
+    <loc>https://kilndrop.com/kiln/sell-handmade-crafts-online.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/pottery-classes.html</loc>
+    <loc>https://kilndrop.com/kiln/pottery-classes.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/glassblowing-art.html</loc>
+    <loc>https://kilndrop.com/kiln/glassblowing-art.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/craft-process-videos.html</loc>
+    <loc>https://kilndrop.com/kiln/craft-process-videos.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/handmade-art-for-sale.html</loc>
+    <loc>https://kilndrop.com/kiln/handmade-art-for-sale.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/craft-artist-platform.html</loc>
+    <loc>https://kilndrop.com/kiln/craft-artist-platform.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/ai-tools-for-artists.html</loc>
+    <loc>https://kilndrop.com/kiln/ai-tools-for-artists.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/commission-custom-art.html</loc>
+    <loc>https://kilndrop.com/kiln/commission-custom-art.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/weaving-fiber-arts.html</loc>
+    <loc>https://kilndrop.com/kiln/weaving-fiber-arts.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/llms.txt</loc>
+    <loc>https://kilndrop.com/kiln/llms.txt</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <!-- Press kit and media resources -->
   <url>
-    <loc>https://kilnfire.replit.app/kiln/press.html</loc>
+    <loc>https://kilndrop.com/kiln/press.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/press/index.html</loc>
+    <loc>https://kilndrop.com/kiln/press/index.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/press/kiln-craft-platform-launch-2025.html</loc>
+    <loc>https://kilndrop.com/kiln/press/kiln-craft-platform-launch-2025.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kilnfire.replit.app/kiln/press-outreach-kit.html</loc>
+    <loc>https://kilndrop.com/kiln/press-outreach-kit.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

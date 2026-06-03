@@ -51,4 +51,4 @@ If anything breaks or confuses you, **grab a screenshot** and send it back with 
 
 ---
 
-*Test link:* kilnfire.replit.app/kiln/
+*Test link:* kilndrop.com/kiln/

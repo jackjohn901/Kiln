@@ -45,7 +45,7 @@ export default function Referrals() {
       .finally(() => setLoading(false));
   }, [user]);
 
-  const inviteUrl = stats ? `https://kilnfire.replit.app/kiln/?ref=${stats.code}` : "";
+  const inviteUrl = stats ? `https://kilndrop.com/kiln/?ref=${stats.code}` : "";
 
   const handleCopy = async () => {
     if (!inviteUrl) return;

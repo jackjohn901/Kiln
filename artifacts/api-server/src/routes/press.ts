@@ -12,8 +12,8 @@ const openai = new OpenAI({
   apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"],
 });
 
-const KILN_URL = "https://kilnfire.replit.app/kiln/";
-const PRESS_INDEX = "https://kilnfire.replit.app/kiln/press/index.html";
+const KILN_URL = "https://kilndrop.com/kiln/";
+const PRESS_INDEX = "https://kilndrop.com/kiln/press/index.html";
 
 const KILN_CONTEXT = `
 Kiln is a creator marketplace and social platform built exclusively for craft artists.
@@ -25,7 +25,7 @@ Differentiator vs Etsy: craft-only, process video feed, multiple revenue streams
 Differentiator vs Patreon: includes shop, workshop booking, video feed, craft community.
 Differentiator vs TikTok: craft-specific audience, direct shop + booking + subscriptions built in.
 Press contact: press@kilnfire.com
-Press kit: https://kilnfire.replit.app/kiln/press.html
+Press kit: https://kilndrop.com/kiln/press.html
 `.trim();
 
 async function generatePressRelease(topic?: string): Promise<{
@@ -284,7 +284,7 @@ router.get("/press/rss.xml", async (_req, res) => {
 
     const items = releases
       .map((r) => {
-        const url = `https://kilnfire.replit.app/kiln/press/${r.slug}.html`;
+        const url = `https://kilndrop.com/kiln/press/${r.slug}.html`;
         const pubDate = r.generatedAt
           ? new Date(r.generatedAt).toUTCString()
           : new Date().toUTCString();
@@ -307,7 +307,7 @@ router.get("/press/rss.xml", async (_req, res) => {
     <link>${KILN_URL}</link>
     <description>News and updates from Kiln, the creator platform built exclusively for craft artists.</description>
     <language>en-us</language>
-    <atom:link href="https://kilnfire.replit.app/api/press/rss.xml" rel="self" type="application/rss+xml"/>
+    <atom:link href="https://kilndrop.com/api/press/rss.xml" rel="self" type="application/rss+xml"/>
 ${items}
   </channel>
 </rss>`;

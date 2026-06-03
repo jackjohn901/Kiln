@@ -146,7 +146,7 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   }
 }
 
-const BASE_URL = "https://kilnfire.replit.app/kiln";
+const BASE_URL = "https://kilndrop.com/kiln";
 
 const shell = (content: string) => `
 <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#1a1714;color:#d6d3d1;padding:32px;border-radius:16px;">

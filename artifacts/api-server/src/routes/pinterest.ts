@@ -7,9 +7,9 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 const PINTEREST_API = "https://api.pinterest.com/v5";
-const REDIRECT_URI = "https://kilnfire.replit.app/api/press/pinterest/callback";
-const PIN_IMAGE_URL = "https://kilnfire.replit.app/kiln/opengraph.jpg";
-const KILN_URL = "https://kilnfire.replit.app/kiln/";
+const REDIRECT_URI = "https://kilndrop.com/api/press/pinterest/callback";
+const PIN_IMAGE_URL = "https://kilndrop.com/kiln/opengraph.jpg";
+const KILN_URL = "https://kilndrop.com/kiln/";
 
 function getAppCredentials() {
   return {
@@ -103,7 +103,7 @@ export async function autoPostToPinterest(release: {
 
   try {
     const description = `${release.summary}\n\nKiln is the creator platform built exclusively for craft artists — process video, shop, workshops, patron tiers, and commissions in one place.\n\n#CraftArt #Ceramics #Pottery #Glassblowing #Weaving #HandmadeArt #CraftArtist #MakerCommunity`;
-    const pinUrl = `https://kilnfire.replit.app/kiln/press/${release.slug}.html`;
+    const pinUrl = `https://kilndrop.com/kiln/press/${release.slug}.html`;
 
     const resp = await fetch(`${PINTEREST_API}/pins`, {
       method: "POST",

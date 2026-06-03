@@ -1,7 +1,7 @@
 # Kiln — Craft Artist Creator Platform
 
 > Kiln is the creator platform built exclusively for craft artists and the people who buy, collect, and learn from them.
-> URL: https://kilnfire.replit.app/kiln/
+> URL: https://kilndrop.com/kiln/
 
 ---
 
@@ -104,21 +104,21 @@ Kiln's Studio Map shows craft studios and open studio events by location. Find p
 
 | Page | URL |
 |---|---|
-| Home feed | https://kilnfire.replit.app/kiln/ |
-| Discover artists | https://kilnfire.replit.app/kiln/discover |
-| Shop handmade art | https://kilnfire.replit.app/kiln/shop |
-| Book workshops | https://kilnfire.replit.app/kiln/workshops |
-| Limited drops | https://kilnfire.replit.app/kiln/drops |
-| Live auctions | https://kilnfire.replit.app/kiln/auctions |
-| Browse techniques | https://kilnfire.replit.app/kiln/techniques |
-| Ceramic artists | https://kilnfire.replit.app/kiln/techniques/ceramics |
-| Glassblowing | https://kilnfire.replit.app/kiln/techniques/glassblowing |
-| Weaving artists | https://kilnfire.replit.app/kiln/techniques/weaving |
-| Guilds | https://kilnfire.replit.app/kiln/guilds |
-| Opportunities | https://kilnfire.replit.app/kiln/opportunities |
-| Mentorship | https://kilnfire.replit.app/kiln/mentorship |
-| Studio Map | https://kilnfire.replit.app/kiln/map |
-| Sitemap | https://kilnfire.replit.app/kiln/sitemap.xml |
+| Home feed | https://kilndrop.com/kiln/ |
+| Discover artists | https://kilndrop.com/kiln/discover |
+| Shop handmade art | https://kilndrop.com/kiln/shop |
+| Book workshops | https://kilndrop.com/kiln/workshops |
+| Limited drops | https://kilndrop.com/kiln/drops |
+| Live auctions | https://kilndrop.com/kiln/auctions |
+| Browse techniques | https://kilndrop.com/kiln/techniques |
+| Ceramic artists | https://kilndrop.com/kiln/techniques/ceramics |
+| Glassblowing | https://kilndrop.com/kiln/techniques/glassblowing |
+| Weaving artists | https://kilndrop.com/kiln/techniques/weaving |
+| Guilds | https://kilndrop.com/kiln/guilds |
+| Opportunities | https://kilndrop.com/kiln/opportunities |
+| Mentorship | https://kilndrop.com/kiln/mentorship |
+| Studio Map | https://kilndrop.com/kiln/map |
+| Sitemap | https://kilndrop.com/kiln/sitemap.xml |
 
 ---
 

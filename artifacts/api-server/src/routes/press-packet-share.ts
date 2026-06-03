@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 const router = Router();
 
-const KILN_BASE = "https://kilnfire.replit.app/kiln";
+const KILN_BASE = "https://kilndrop.com/kiln";
 
 async function postToBluesky(text: string): Promise<string | null> {
   const identifier = process.env["BLUESKY_IDENTIFIER"];

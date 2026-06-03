@@ -92,7 +92,7 @@ router.post("/drops/:id/waitlist", async (req, res): Promise<void> => {
     db.select({ settings: userSettingsTable.settings, notifSmsResumeAt: userSettingsTable.notifSmsResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, userId)),
     db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, userId)),
   ]).then(([[s], [prof]]) => {
-    sendSmsIfOptedIn(userId, prof?.phoneNumber, "notif_sms_drops", s?.settings as Record<string, unknown> | null, `Kiln: You're on the waitlist for "${drop.title}"! We'll text you when it drops. https://kilnfire.replit.app/kiln/drops/${drop.id}`, s?.notifSmsResumeAt);
+    sendSmsIfOptedIn(userId, prof?.phoneNumber, "notif_sms_drops", s?.settings as Record<string, unknown> | null, `Kiln: You're on the waitlist for "${drop.title}"! We'll text you when it drops. https://kilndrop.com/kiln/drops/${drop.id}`, s?.notifSmsResumeAt);
   }).catch(() => {});
   res.json({ onWaitlist: true });
 });

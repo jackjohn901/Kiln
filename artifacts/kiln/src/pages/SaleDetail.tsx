@@ -147,7 +147,7 @@ function buildPackingSlipHtml(sale: Sale, windowText: string | null): string {
   <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2c2621;padding-bottom:20px;margin-bottom:28px;">
     <div>
       <p style="font-size:22px;font-weight:700;letter-spacing:-.01em;">Kiln</p>
-      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilnfire.replit.app</p>
+      <p style="font-size:11px;color:#8a7e74;margin-top:2px;">kilndrop.com</p>
     </div>
     <div style="text-align:right;">
       <p style="font-size:18px;font-weight:700;font-family:monospace;">${refNum}</p>
@@ -197,7 +197,7 @@ function buildPackingSlipHtml(sale: Sale, windowText: string | null): string {
   ${buyerSection}${processingWindowSection}${trackingSection}${notesSection}
 
   <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e7e3dc;text-align:center;">
-    <p style="font-size:11px;color:#8a7e74;">Kiln — kilnfire.replit.app &nbsp;·&nbsp; Thank you for creating.</p>
+    <p style="font-size:11px;color:#8a7e74;">Kiln — kilndrop.com &nbsp;·&nbsp; Thank you for creating.</p>
   </div>
 </body>
 </html>`;

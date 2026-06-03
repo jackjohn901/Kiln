@@ -1,6 +1,6 @@
 # Kiln — Artist Creator Platform
 
-A TikTok/Instagram Reels-style creator platform for craft artists at kilnfire.replit.app/kiln/.
+A TikTok/Instagram Reels-style creator platform for craft artists at kilndrop.com/kiln/.
 
 ## Run & Operate
 

@@ -408,7 +408,7 @@ function PressPacketDocument({ data, profileUrl, currentYear }: {
         <div className="border-t border-stone-200 pt-3 flex items-center justify-between print:border-stone-300">
           <div className="flex items-center gap-1.5">
             <Flame size={10} className="text-amber-500" />
-            <p className="text-[10px] text-stone-400">Generated via Kiln · kilnfire.replit.app · {currentYear}</p>
+            <p className="text-[10px] text-stone-400">Generated via Kiln · kilndrop.com · {currentYear}</p>
           </div>
           <p className="text-[10px] text-stone-400">© {name} {currentYear}. All rights reserved.</p>
         </div>

@@ -47,8 +47,8 @@ router.get("/users/:id/featured-badge.svg", async (req, res): Promise<void> => {
   <text x="50" y="27" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" letter-spacing="2" fill="#f59e0b">KILN</text>
   <!-- Featured label -->
   <text x="50" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#d6d3d1" letter-spacing="0.5">Featured Artist</text>
-  <!-- kilnfire.replit.app -->
-  <text x="50" y="57" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#78716c">kilnfire.replit.app/kiln</text>
+  <!-- kilndrop.com -->
+  <text x="50" y="57" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" fill="#78716c">kilndrop.com/kiln</text>
 </svg>`;
 
   res.setHeader("Content-Type", "image/svg+xml");
