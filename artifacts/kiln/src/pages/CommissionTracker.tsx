@@ -363,15 +363,23 @@ function UpdateThread({ commissionId, artistId, isArtist, currentUserId }: {
   );
 }
 
-function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
+function CommissionCard({ commission, isArtist, currentUserId, onUpdate, highlighted }: {
   commission: Commission;
   isArtist: boolean;
   currentUserId: string;
   onUpdate: (id: string, updates: Partial<Commission>) => void;
+  highlighted?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(highlighted ?? false);
   const [updating, setUpdating] = useState(false);
   const progressIndex = getMilestoneIndex(commission);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlighted && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
 
   async function handlePayDeposit() {
     if (!commission.quotedPrice) return;
@@ -416,8 +424,8 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate }: {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-white/8 bg-stone-900/50 overflow-hidden">
+    <motion.div ref={cardRef} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      className={`rounded-2xl border bg-stone-900/50 overflow-hidden transition-colors ${highlighted ? "border-amber-500/50 ring-1 ring-amber-500/30" : "border-white/8"}`}>
       <div className="p-4">
         <div className="cursor-pointer" onClick={() => setExpanded(v => !v)}>
           <div className="flex items-start justify-between gap-3">
@@ -591,6 +599,7 @@ export default function CommissionTracker() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const { markTypeRead } = useSocial();
   const { user } = useAuth();
 
@@ -604,9 +613,18 @@ export default function CommissionTracker() {
       .finally(() => setLoading(false));
 
     const params = new URLSearchParams(window.location.search);
+
     const depositPaidId = params.get("deposit_paid");
     if (depositPaidId) {
       setCommissions(prev => prev.map(c => c.id === depositPaidId ? { ...c, depositPaid: true } : c));
+    }
+
+    const hlId = params.get("highlight");
+    if (hlId) {
+      setHighlightId(hlId);
+    }
+
+    if (depositPaidId || hlId) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -615,9 +633,11 @@ export default function CommissionTracker() {
     setCommissions(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
   };
 
+  const effectiveFilter = highlightId ? "all" : statusFilter;
+
   const filtered = commissions.filter(c => {
-    if (statusFilter === "all") return true;
-    return c.status === statusFilter;
+    if (effectiveFilter === "all") return true;
+    return c.status === effectiveFilter;
   });
 
   const countFor = (key: StatusFilter) => {
@@ -699,6 +719,7 @@ export default function CommissionTracker() {
                 isArtist={commission.artistId === currentUserId}
                 currentUserId={currentUserId}
                 onUpdate={handleUpdate}
+                highlighted={commission.id === highlightId}
               />
             ))}
           </div>

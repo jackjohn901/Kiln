@@ -315,16 +315,28 @@ export function newPatronEmail(patronName: string, tierName: string): string {
   `);
 }
 
-export function newCommissionEmail(clientName: string, workType: string, description: string): string {
+export function newCommissionEmail(clientName: string, workType: string, description: string, commissionId?: string): string {
+  const trackerUrl = commissionId
+    ? `${BASE_URL}/commission-tracker?highlight=${encodeURIComponent(commissionId)}`
+    : `${BASE_URL}/commission-tracker`;
+
+  const actionButtons = commissionId ? `
+    <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+      <a href="${trackerUrl}&action=accept" style="display:inline-block;background:#10b981;color:#fff;padding:11px 24px;border-radius:24px;text-decoration:none;font-weight:bold;font-size:14px;">Accept →</a>
+      <a href="${trackerUrl}&action=decline" style="display:inline-block;background:#292524;color:#a8a29e;padding:11px 24px;border-radius:24px;text-decoration:none;font-weight:bold;font-size:14px;border:1px solid #44403c;">Decline</a>
+    </div>
+    <p style="margin:12px 0 0;font-size:11px;color:#57534e;">These links open your Commission Tracker where you can review the full request before deciding.</p>
+  ` : btn(trackerUrl, "View Request");
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Commission Request</h1>
     <p style="color:#78716c;margin-bottom:0;">A collector wants to commission your work.</p>
     ${card(`
-      <p style="margin:0 0 8px;"><strong style="color:#fcd34d;">From:</strong> ${clientName}</p>
-      <p style="margin:0 0 8px;"><strong style="color:#fcd34d;">Work type:</strong> ${workType || "Custom work"}</p>
-      <p style="margin:0;"><strong style="color:#fcd34d;">Description:</strong> ${description}</p>
+      <p style="margin:0 0 8px;"><strong style="color:#fcd34d;">From:</strong> ${escHtml(clientName)}</p>
+      <p style="margin:0 0 8px;"><strong style="color:#fcd34d;">Work type:</strong> ${escHtml(workType || "Custom work")}</p>
+      <p style="margin:0;"><strong style="color:#fcd34d;">Description:</strong> ${escHtml(description)}</p>
     `)}
-    ${btn(`${BASE_URL}/commissions`, "View Request")}
+    ${actionButtons}
   `);
 }
 
