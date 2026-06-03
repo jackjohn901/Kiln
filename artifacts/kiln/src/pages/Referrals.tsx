@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, Users, Gift, Zap, Globe, Loader2, ChevronRight, Star } from "lucide-react";
+import { Copy, Check, Users, Gift, Zap, Globe, Loader2, Network } from "lucide-react";
 import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,32 @@ interface ReferralStats {
   nextMilestone: { label: string; at: number; reward: string } | null;
 }
 
+interface NetworkMember {
+  id: string;
+  name: string;
+  handle: string | null;
+  avatar: string | null;
+  invited: number;
+}
+
+interface NetworkTier {
+  at: number;
+  badge: string;
+  label: string;
+  icon: string;
+  unlocked: boolean;
+}
+
+interface NetworkData {
+  directCount: number;
+  networkCount: number;
+  depth: number;
+  levels: { level: number; count: number }[];
+  members: NetworkMember[];
+  tiers: NetworkTier[];
+  nextTier: { at: number; badge: string; label: string; icon: string } | null;
+}
+
 const MILESTONES = [
   { at: 1, label: "First Invite", reward: "Early Adopter badge", icon: "⭐", color: "text-stone-300" },
   { at: 10, label: "Recruiter", reward: "Promotion tools + Recruiter badge", icon: "📣", color: "text-amber-400" },
@@ -20,6 +46,7 @@ const MILESTONES = [
 export default function Referrals() {
   const { user } = useAuth();
   const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [network, setNetwork] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
@@ -43,6 +70,10 @@ export default function Referrals() {
       .then(data => { if (data) setStats(data); })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetch("/api/me/network", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setNetwork(data); })
+      .catch(() => {});
   }, [user]);
 
   const inviteUrl = stats ? `https://kilndrop.com/kiln/?ref=${stats.code}` : "";
@@ -175,6 +206,113 @@ export default function Referrals() {
                 );
               })}
             </div>
+
+            {/* Your network (multi-level pyramid) */}
+            {network && (
+              network.networkCount > 0 ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-indigo-500/5 p-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Network className="w-5 h-5 text-purple-300" />
+                      <h3 className="font-semibold">Your network</h3>
+                    </div>
+                    <p className="text-xs text-stone-400 -mt-2">
+                      Everyone who joined through your invite — plus everyone <em>they</em> invited, all the way down.
+                    </p>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-white">{network.networkCount}</p>
+                        <p className="text-[11px] text-stone-400">total network</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{network.directCount}</p>
+                        <p className="text-[11px] text-stone-400">you invited</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{network.depth}</p>
+                        <p className="text-[11px] text-stone-400">{network.depth === 1 ? "level deep" : "levels deep"}</p>
+                      </div>
+                    </div>
+                    {/* Pyramid: each level of the chain, widest at the top */}
+                    <div className="space-y-1.5 pt-1">
+                      {network.levels.map(l => {
+                        const max = Math.max(...network.levels.map(x => x.count), 1);
+                        const widthPct = Math.max(18, (l.count / max) * 100);
+                        return (
+                          <div key={l.level} className="flex items-center gap-2">
+                            <span className="text-[10px] text-stone-500 w-14 flex-shrink-0">Level {l.level}</span>
+                            <div className="flex-1 flex justify-center">
+                              <div
+                                className="h-6 rounded-md bg-gradient-to-r from-purple-500/40 to-indigo-500/30 border border-purple-400/30 flex items-center justify-center"
+                                style={{ width: `${widthPct}%` }}
+                              >
+                                <span className="text-xs font-semibold text-purple-100">{l.count}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* People you invited (the level just below you), with how many each has invited */}
+                  {network.members.length > 0 && (
+                    <div className="rounded-2xl border border-white/10 bg-stone-900/60 p-4 space-y-2.5">
+                      <h3 className="text-sm font-semibold text-stone-300">People you invited</h3>
+                      {network.members.map(m => (
+                        <div key={m.id} className="flex items-center gap-3">
+                          {m.avatar ? (
+                            <img src={m.avatar} alt={m.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-xs font-semibold text-purple-200 flex-shrink-0">
+                              {m.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{m.name}</p>
+                            {m.handle && <p className="text-xs text-stone-500 truncate">@{m.handle}</p>}
+                          </div>
+                          {m.invited > 0 && (
+                            <span className="text-xs text-purple-300 flex-shrink-0">+{m.invited} invited</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Network status tiers */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-stone-400 uppercase tracking-wide">Network status</h3>
+                    {network.tiers.map(t => (
+                      <div key={t.badge} className={`rounded-xl border p-3 flex items-center gap-3 transition-all ${
+                        t.unlocked ? "border-purple-500/40 bg-purple-500/8" : "border-white/6 bg-stone-900/40"
+                      }`}>
+                        <span className="text-2xl">{t.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold text-sm ${t.unlocked ? "text-purple-200" : "text-stone-400"}`}>{t.label}</span>
+                            {t.unlocked && <Check className="w-3.5 h-3.5 text-green-400" />}
+                          </div>
+                          <p className="text-xs text-stone-500 mt-0.5">{t.at} people in your network</p>
+                        </div>
+                        {!t.unlocked && <span className="text-xs text-stone-600 flex-shrink-0">{t.at - network.networkCount} to go</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Network className="w-5 h-5 text-purple-300" />
+                    <h3 className="font-semibold">Start your network</h3>
+                  </div>
+                  <p className="text-sm text-stone-400">
+                    Share your code above. When someone joins, they get their own code too — and as they invite others,
+                    your whole network grows beneath you and unlocks bigger badges.
+                  </p>
+                </div>
+              )
+            )}
           </>
         ) : null}
 

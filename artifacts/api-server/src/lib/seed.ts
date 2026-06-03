@@ -10,16 +10,22 @@ import { logger } from "./logger";
 import { randomUUID } from "crypto";
 
 const REFERRAL_BADGE_DEFINITIONS = [
+  // Direct-invite milestones (people you personally invited).
   { id: "referral_1", name: "Early Adopter", description: "Invited your first artist to Kiln", icon: "⭐", category: "community", rarity: "common" },
   { id: "referral_10", name: "Recruiter", description: "Invited 10 artists to Kiln", icon: "📣", category: "community", rarity: "rare" },
   { id: "referral_100", name: "Evangelist", description: "Invited 100 artists to Kiln", icon: "🌐", category: "community", rarity: "legendary" },
+  // Network tiers (your entire downline: people you invited + everyone they invite, all levels).
+  { id: "network_5", name: "Community Builder", description: "Your invite network grew to 5 members across all levels", icon: "🌱", category: "network", rarity: "rare" },
+  { id: "network_25", name: "Network Weaver", description: "Your invite network grew to 25 members across all levels", icon: "🕸️", category: "network", rarity: "epic" },
+  { id: "network_100", name: "Kiln Catalyst", description: "Your invite network grew to 100 members across all levels", icon: "⚡", category: "network", rarity: "legendary" },
+  { id: "network_500", name: "Movement Maker", description: "Your invite network grew to 500 members across all levels", icon: "🌍", category: "network", rarity: "legendary" },
 ];
 
-// Ensures the referral milestone badge definitions exist so awarded referral
-// badges actually render. Idempotent: safe to run on every server start.
+// Ensures the referral & network badge definitions exist so awarded badges
+// actually render. Idempotent: safe to run on every server start.
 export async function ensureReferralBadges(): Promise<void> {
   await db.insert(badgeDefinitionsTable).values(REFERRAL_BADGE_DEFINITIONS).onConflictDoNothing();
-  logger.info("Referral badge definitions ensured");
+  logger.info("Referral & network badge definitions ensured");
 }
 
 export interface SeedActor {

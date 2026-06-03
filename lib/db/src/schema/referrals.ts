@@ -1,4 +1,4 @@
-import { pgTable, varchar, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, varchar, integer, timestamp, index } from "drizzle-orm/pg-core";
 
 export const referralCodesTable = pgTable("referral_codes", {
   userId: varchar("user_id", { length: 255 }).primaryKey(),
@@ -12,7 +12,10 @@ export const referralUsesTable = pgTable("referral_uses", {
   referrerId: varchar("referrer_id", { length: 255 }).notNull(),
   refereeId: varchar("referee_id", { length: 255 }).notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  // Speeds up the downline/network walks that traverse parent → child edges.
+  index("referral_uses_referrer_id_idx").on(table.referrerId),
+]);
 
 export type ReferralCode = typeof referralCodesTable.$inferSelect;
 export type ReferralUse = typeof referralUsesTable.$inferSelect;
