@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import type { Listing } from "@/data/listings";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface CartItem {
   listing: Listing;
@@ -39,10 +40,13 @@ function saveCart(items: CartItem[]) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [items, setItems] = useState<CartItem[]>(readCart);
   // False until the initial server reconcile has settled (or failed / skipped).
   // Cart.tsx gates its shipping-rate fetch on this so it never fires during hydration.
   const [cartReady, setCartReady] = useState(false);
+  // Tracks the previous auth state so we can detect a guest -> signed-in transition.
+  const wasAuthenticated = useRef(isAuthenticated);
 
   // Sync with server on mount: reconcile server cart with local state
   useEffect(() => {
@@ -78,6 +82,82 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setCartReady(true);
       });
   }, []);
+
+  // When a guest signs in, merge their locally stored cart into the server cart so
+  // items added before authentication aren't silently discarded.
+  useEffect(() => {
+    const was = wasAuthenticated.current;
+    wasAuthenticated.current = isAuthenticated;
+    // Only act on the guest -> signed-in transition.
+    if (was || !isAuthenticated) return;
+
+    const localItems = readCart();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Read the authoritative server cart first so we can compute exact deltas.
+        const res = await fetch("/api/me/cart", { credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { items: { listingId: string; quantity: number }[] };
+        const serverItems = data.items ?? [];
+        const serverById = new Map(serverItems.map((i) => [i.listingId, i.quantity]));
+
+        // Merge semantics: the final quantity for any listing is max(guest, server).
+        // For new items we add the full guest quantity; for items already on the
+        // server we add only the positive delta. POST sums quantities server-side,
+        // so this reaches the target without ever doubling or losing guest items.
+        const additions = localItems
+          .map((i) => {
+            const serverQty = serverById.get(i.listing.id) ?? 0;
+            const delta = i.quantity - serverQty;
+            return { listingId: i.listing.id, delta };
+          })
+          .filter((a) => a.delta > 0);
+
+        const results = await Promise.allSettled(
+          additions.map((a) =>
+            fetch("/api/me/cart", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ listingId: a.listingId, quantity: a.delta }),
+            }).then((r) => {
+              if (!r.ok) throw new Error();
+            }),
+          ),
+        );
+        if (cancelled) return;
+
+        if (results.some((r) => r.status === "rejected")) {
+          toast({
+            title: "Couldn\u2019t sync your cart",
+            description: "Some items added before signing in may not appear on your other devices.",
+            variant: "destructive",
+          });
+        }
+
+        // Merge into local state: keep every local item (these carry full listing
+        // data) and raise each quantity to max(guest, server) so neither side's
+        // additions are lost.
+        setItems((prev) => {
+          const merged = prev.map((i) => {
+            const serverQty = serverById.get(i.listing.id) ?? 0;
+            const target = Math.max(i.quantity, serverQty);
+            return target !== i.quantity ? { ...i, quantity: target } : i;
+          });
+          saveCart(merged);
+          return merged;
+        });
+      } catch {
+        // Network/parse failure — keep the local cart as the source of truth.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const addItem = useCallback((listing: Listing) => {
     setItems((prev) => {
