@@ -66,6 +66,19 @@ interface WorkshopBookingEntry {
   } | null;
 }
 
+interface SkippedSmsEntry {
+  id: number;
+  smsKey: string;
+  body: string;
+  skippedAt: string;
+}
+
+const SMS_KEY_LABELS: Record<string, string> = {
+  notif_sms_outbid: "Outbid alert",
+  notif_sms_drops: "Drop waitlist",
+  notif_sms_shipped: "Order shipped",
+};
+
 type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping" | "address" | "bookings";
 type MobileTab = "All" | "Profile" | "Selling" | "Preferences";
 
@@ -116,6 +129,7 @@ export default function Settings() {
   const [snoozePickerOpen, setSnoozePickerOpen] = useState(false);
   const [smsResumeAt, setSmsResumeAt] = useState<string | null>(null);
   const [smsSnoozePickerOpen, setSmsSnoozePickerOpen] = useState(false);
+  const [skippedSms, setSkippedSms] = useState<SkippedSmsEntry[]>([]);
   const [mobileTab, setMobileTab] = useState<MobileTab>("All");
   const [bookings, setBookings] = useState<WorkshopBookingEntry[] | null>(null);
   const [bookingsError, setBookingsError] = useState(false);
@@ -216,6 +230,10 @@ export default function Settings() {
         setSmsResumeAt(data.notifSmsResumeAt ?? null);
       })
       .catch(() => {});
+    fetch("/api/me/skipped-sms", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<SkippedSmsEntry[]> : null)
+      .then(data => { if (data) setSkippedSms(data); })
+      .catch(() => {});
   }, []);
 
   function toggle(key: keyof KilnSettings) {
@@ -315,6 +333,7 @@ export default function Settings() {
   function clearSmsSnooze() {
     setSmsResumeAt(null);
     setSmsSnoozePickerOpen(false);
+    setSkippedSms([]);
     patchSettings({ notif_sms_paused: false });
     setSaveError(null);
     fetch("/api/me/settings", {
@@ -986,6 +1005,30 @@ export default function Settings() {
                         : `SMS is paused indefinitely \u2014 tap \u201cResume now\u201d above to re-enable.`
                       : "No phone number saved \u2014 add one below before pausing has any effect."}
                   </p>
+                </div>
+              )}
+
+              {skippedSms.length > 0 && (
+                <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 mb-1">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Bell size={13} className="text-sky-400 shrink-0" />
+                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">Missed while snoozed</p>
+                    <span className="rounded-full bg-sky-500/15 border border-sky-500/25 px-2 py-0.5 text-[9px] font-medium text-sky-400">{skippedSms.length}</span>
+                  </div>
+                  <p className="text-xs text-stone-500 mb-2.5">Texts suppressed during your snooze. Resume SMS to clear this list.</p>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {skippedSms.map((entry) => (
+                      <div key={entry.id} className="rounded-lg bg-stone-900/50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3 mb-0.5">
+                          <span className="text-xs font-medium text-sky-300">{SMS_KEY_LABELS[entry.smsKey] ?? entry.smsKey}</span>
+                          <span className="text-[10px] text-stone-500 shrink-0">
+                            {new Date(entry.skippedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-stone-400 leading-relaxed">{entry.body}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

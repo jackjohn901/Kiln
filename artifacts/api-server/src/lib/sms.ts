@@ -1,4 +1,5 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { db, skippedSmsLogTable } from "@workspace/db";
 import { logger } from "./logger";
 import { isSmsPaused } from "./emailPaused";
 
@@ -38,7 +39,14 @@ export async function sendSmsIfOptedIn(
   resumeAt?: Date | null,
 ): Promise<void> {
   if (!phone) return;
-  if (isSmsPaused(settings, resumeAt)) return;
+  if (isSmsPaused(settings, resumeAt)) {
+    // Record what was suppressed so the artist can review missed alerts after
+    // they resume. Best-effort — never let a logging failure block the caller.
+    db.insert(skippedSmsLogTable)
+      .values({ userId, smsKey, body })
+      .catch((err) => logger.warn({ err, userId, smsKey }, "failed to log skipped SMS"));
+    return;
+  }
   const optedOut = settings?.[smsKey] === false;
   if (optedOut) return;
   sendSms(phone, body).catch(() => {});

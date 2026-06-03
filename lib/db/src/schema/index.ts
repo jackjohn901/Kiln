@@ -73,5 +73,6 @@ export * from "./onboarding";
 export * from "./platform_tokens";
 export * from "./review_votes";
 export * from "./failed_emails";
+export * from "./skipped_sms_log";
 export * from "./seed_history";
 export * from "./server_config";

@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userSettingsTable, profilesTable, workshopBookingsTable } from "@workspace/db";
+import { userSettingsTable, profilesTable, workshopBookingsTable, skippedSmsLogTable } from "@workspace/db";
 import { isEmailPaused } from "../lib/emailPaused";
 
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { verifyUnsubscribeToken, verifyBookingUnsubscribeToken } from "../lib/unsubscribeTokens";
 
 const router = Router();
@@ -73,6 +73,22 @@ router.get("/me/settings", async (req, res): Promise<void> => {
   }
 
   res.json({ ...resolvedRow, contactEmail: profile?.contactEmail ?? null, contactEmailBounced: profile?.contactEmailBounced ?? false, phoneNumber: profile?.phoneNumber ?? null });
+});
+
+// GET /me/skipped-sms — list SMS messages suppressed while the user's snooze was active
+router.get("/me/skipped-sms", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const rows = await db.select({
+    id: skippedSmsLogTable.id,
+    smsKey: skippedSmsLogTable.smsKey,
+    body: skippedSmsLogTable.body,
+    skippedAt: skippedSmsLogTable.skippedAt,
+  })
+    .from(skippedSmsLogTable)
+    .where(eq(skippedSmsLogTable.userId, req.user.id))
+    .orderBy(desc(skippedSmsLogTable.skippedAt))
+    .limit(50);
+  res.json(rows);
 });
 
 // PATCH /me/settings
@@ -146,6 +162,8 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
       } else if (incoming.notif_sms_paused === false) {
         notifSmsPausedAtUpdate = { notifSmsPausedAt: null };
         if (notifSmsResumeAtValue === undefined) notifSmsResumeAtValue = null;
+        // Resuming clears the missed-while-snoozed log — the artist has caught up.
+        await db.delete(skippedSmsLogTable).where(eq(skippedSmsLogTable.userId, userId)).catch(() => {});
       }
     }
   }
