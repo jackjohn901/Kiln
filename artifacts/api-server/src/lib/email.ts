@@ -148,17 +148,51 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
 
 const BASE_URL = "https://kilndrop.com/kiln";
 
+// Placeholder marker, injected into every shelled email right below the brand
+// header. `injectSnoozeRecap` swaps it for a "while you were away" banner on the
+// first email a user receives after an email snooze lifts. It is an HTML comment,
+// so it renders as nothing when no recap is added.
+const RECAP_SLOT = "<!--KILN_RECAP_SLOT-->";
+
 const shell = (content: string) => `
 <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#1a1714;color:#d6d3d1;padding:32px;border-radius:16px;">
   <div style="margin-bottom:24px;">
     <span style="font-size:20px;font-weight:bold;color:#f59e0b;">Kiln</span>
     <span style="color:#78716c;font-size:12px;margin-left:8px;">Craft Creator Platform</span>
   </div>
+  ${RECAP_SLOT}
   ${content}
   <div style="margin-top:32px;padding-top:16px;border-top:1px solid #292524;font-size:11px;color:#57534e;">
     You're receiving this because you have an account on Kiln. <a href="${BASE_URL}/settings" style="color:#f59e0b;">Manage preferences</a>
   </div>
 </div>`;
+
+/**
+ * A short "while you were away" recap block. Shown once at the top of the first
+ * email a user receives after their email snooze lifts, summarizing how many
+ * notifications were skipped while they were snoozed.
+ */
+export function snoozeRecapSection(missedCount: number): string {
+  if (missedCount <= 0) return "";
+  const noun = missedCount === 1 ? "notification" : "notifications";
+  return `
+    <div style="background:#3c2f12;border:1px solid #92591b;border-radius:12px;padding:16px;margin:0 0 16px;">
+      <p style="margin:0 0 6px;font-size:14px;color:#fcd34d;font-weight:bold;">While you were away 👋</p>
+      <p style="margin:0;font-size:13px;color:#d6d3d1;">You had <strong>${missedCount}</strong> ${noun} while your email notifications were snoozed. <a href="${BASE_URL}/notifications" style="color:#f59e0b;">Catch up on Kiln →</a></p>
+    </div>`;
+}
+
+/**
+ * Swaps the recap slot in a shelled email for a "while you were away" banner.
+ * Falls back to prepending the banner if the slot marker is missing (e.g. a
+ * future email built without `shell`). A no-op when `missedCount` is 0.
+ */
+export function injectSnoozeRecap(html: string, missedCount: number): string {
+  if (missedCount <= 0) return html;
+  const section = snoozeRecapSection(missedCount);
+  if (html.includes(RECAP_SLOT)) return html.replace(RECAP_SLOT, section);
+  return section + html;
+}
 
 const btn = (href: string, label: string) =>
   `<a href="${href}" style="display:inline-block;background:#f59e0b;color:#1c1917;padding:12px 28px;border-radius:24px;text-decoration:none;font-weight:bold;margin-top:16px;">${label} →</a>`;

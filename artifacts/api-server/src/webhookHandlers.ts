@@ -7,7 +7,7 @@ import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable,
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDigitalProduct } from './lib/digitalProducts';
 import { generateUnsubscribeToken } from './lib/unsubscribeTokens';
-import { isEmailPaused } from './lib/emailPaused';
+import { isEmailPaused, prependSnoozeRecap } from './lib/emailPaused';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
 
@@ -498,7 +498,8 @@ export class WebhookHandlers {
                 const artistTotalCents = artistShippingCents !== null ? itemsTotal + artistShippingCents : itemsTotal;
 
                 const artistOrderId = webhookCreatedOrders.find((wo) => wo.sellerId === sellerId)?.orderId ?? null;
-                const saleHtml = newSaleEmail(buyerDisplayName, buyerEmailAddr, session.id, artistTotalCents, artistItems, artistOrderId, null, meta.userId, artistShippingCents);
+                const saleHtmlBase = newSaleEmail(buyerDisplayName, buyerEmailAddr, session.id, artistTotalCents, artistItems, artistOrderId, null, meta.userId, artistShippingCents);
+                const saleHtml = await prependSnoozeRecap(sellerId, saleHtmlBase);
                 const itemTitles = sellerOrders.map((o) => o.title ?? 'Item').join(', ');
                 await sendEmailWithRetry(
                   { to: artistEmail, subject: `New Sale! ${itemTitles}`, html: saleHtml },
@@ -647,7 +648,8 @@ export class WebhookHandlers {
                 // Artist notification email (respects notif_email_new_booking preference)
                 const artistWantsEmail = !isEmailPaused(artistPrefSettings, artistSettings?.notifEmailResumeAt) && artistPrefSettings?.notif_email_new_booking !== false;
                 if (artistUser?.email && artistWantsEmail) {
-                  const artistHtml = newWorkshopBookingArtistEmail(customerName, customerEmail ?? '', workshop.title, paidAmountCents, calParams, null, studentId);
+                  const artistHtmlBase = newWorkshopBookingArtistEmail(customerName, customerEmail ?? '', workshop.title, paidAmountCents, calParams, null, studentId);
+                  const artistHtml = await prependSnoozeRecap(workshop.artistId, artistHtmlBase);
                   await sendEmailWithRetry({ to: artistUser.email, subject: `New booking: "${workshop.title}"`, html: artistHtml }, { label: 'new workshop booking (artist, webhook)', contextId: session.id });
                 }
 
@@ -717,7 +719,8 @@ export class WebhookHandlers {
                 const artistWantsEmail = !isEmailPaused(artistPrefSettings, artistSettings?.notifEmailResumeAt) && artistPrefSettings?.notif_email_commission_payment !== false;
                 if (artistUser?.email && artistWantsEmail) {
                   const milestoneLabel = milestone === 'deposit' ? 'Deposit' : 'Final payment';
-                  const commHtml = commissionPaymentEmail(commission.clientName, commission.clientEmail ?? '', commissionId, commission.workType ?? '', milestone, paidAmountCents);
+                  const commHtmlBase = commissionPaymentEmail(commission.clientName, commission.clientEmail ?? '', commissionId, commission.workType ?? '', milestone, paidAmountCents);
+                  const commHtml = await prependSnoozeRecap(commission.artistId, commHtmlBase);
                   await sendEmailWithRetry({ to: artistUser.email, subject: `${milestoneLabel} received from ${commission.clientName}`, html: commHtml }, { label: 'commission payment notification (webhook)', contextId: session.id });
                 }
 

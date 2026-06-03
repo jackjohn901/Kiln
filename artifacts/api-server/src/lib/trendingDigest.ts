@@ -11,7 +11,7 @@ import {
   trendingDigestEmail,
   type TrendingDigestPost,
 } from "./email";
-import { isEmailPaused } from "./emailPaused";
+import { isEmailPaused, prependSnoozeRecap } from "./emailPaused";
 import { generateUnsubscribeToken } from "./unsubscribeTokens";
 
 // Weekly send window (UTC). The scheduler checks hourly and only dispatches
@@ -167,8 +167,9 @@ async function sendTrendingDigests() {
         unsubscribeToken: generateUnsubscribeToken(user.userId),
       });
 
+      const recapHtml = await prependSnoozeRecap(user.userId, html);
       const sent = await sendEmailWithRetry(
-        { to: email, subject, html },
+        { to: email, subject, html: recapHtml },
         { contextId: user.userId, label: "trending digest" },
       );
 

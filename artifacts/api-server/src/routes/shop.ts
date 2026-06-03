@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable, cartItemsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
 import { sendEmailWithRetry, shippingNotificationEmail, deliveryNotificationEmail, trackingUpdateEmail } from "../lib/email";
-import { isEmailPaused } from "../lib/emailPaused";
+import { isEmailPaused, prependSnoozeRecap } from "../lib/emailPaused";
 import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
@@ -355,7 +355,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
           db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt, notifSmsResumeAt: userSettingsTable.notifSmsResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
           db.select({ phoneNumber: profilesTable.phoneNumber }).from(profilesTable).where(eq(profilesTable.userId, updated.buyerId)),
           db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
-        ]).then(([[s], [prof], [buyer]]) => {
+        ]).then(async ([[s], [prof], [buyer]]) => {
           const buyerSettings = s?.settings as Record<string, unknown> | null;
           sendSmsIfOptedIn(updated.buyerId!, prof?.phoneNumber, "notif_sms_shipped", buyerSettings, `Kiln: Your order "${updated.title}" has shipped!${tracking} https://kilndrop.com/kiln/orders/${updated.id}`, s?.notifSmsResumeAt);
           const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
@@ -364,11 +364,12 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
             db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, shippedNotifId)).catch(() => {});
           }
           if (buyer?.email && wantsEmail) {
+            const shippedHtml = await prependSnoozeRecap(updated.buyerId!, shippingNotificationEmail(updated.title ?? "Your order", updated.id, updated.trackingNumber, updated.carrier));
             sendEmailWithRetry(
               {
                 to: buyer.email,
                 subject: `Your order has shipped: ${updated.title}`,
-                html: shippingNotificationEmail(updated.title ?? "Your order", updated.id, updated.trackingNumber, updated.carrier),
+                html: shippedHtml,
               },
               { contextId: updated.id, label: "shipping notification" },
             );
@@ -389,16 +390,17 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
         Promise.all([
           db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
           db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
-        ]).then(([[s], [buyer]]) => {
+        ]).then(async ([[s], [buyer]]) => {
           const buyerSettings = s?.settings as Record<string, unknown> | null;
           const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
           const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_delivered !== false;
           if (buyer?.email && wantsEmail) {
+            const deliveredHtml = await prependSnoozeRecap(updated.buyerId!, deliveryNotificationEmail(updated.title ?? "Your order", updated.id));
             sendEmailWithRetry(
               {
                 to: buyer.email,
                 subject: `Your order has been delivered: ${updated.title}`,
-                html: deliveryNotificationEmail(updated.title ?? "Your order", updated.id),
+                html: deliveredHtml,
               },
               { contextId: updated.id, label: "delivery notification" },
             );
@@ -426,7 +428,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       Promise.all([
         db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, updated.buyerId)),
         db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, updated.buyerId)),
-      ]).then(([[s], [buyer]]) => {
+      ]).then(async ([[s], [buyer]]) => {
         const buyerSettings = s?.settings as Record<string, unknown> | null;
         const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
         const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_shipped !== false;
@@ -434,11 +436,12 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
           db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, trackingNotifId)).catch(() => {});
         }
         if (buyer?.email && wantsEmail) {
+          const trackingHtml = await prependSnoozeRecap(updated.buyerId!, trackingUpdateEmail(updated.title ?? "Your order", updated.id, newTracking ?? undefined, updated.carrier ?? undefined));
           sendEmailWithRetry(
             {
               to: buyer.email,
               subject: `Tracking updated for your order: ${updated.title}`,
-              html: trackingUpdateEmail(updated.title ?? "Your order", updated.id, newTracking ?? undefined, updated.carrier ?? undefined),
+              html: trackingHtml,
             },
             { contextId: updated.id, label: "tracking update notification" },
           );

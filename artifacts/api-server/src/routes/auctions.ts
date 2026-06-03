@@ -6,7 +6,7 @@ import { eq, desc, and, gt, max, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { broadcastAll } from "../lib/websocket";
 import { sendEmailWithRetry, outbidEmail } from "../lib/email";
-import { isEmailPaused } from "../lib/emailPaused";
+import { isEmailPaused, prependSnoozeRecap } from "../lib/emailPaused";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
 
@@ -181,7 +181,10 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
       if (emailSnoozed) {
         db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, outbidNotifId)).catch(() => {});
       }
-      if (wantsEmail && prev?.email) await sendEmailWithRetry({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidEmail(auction.title, bidAmount, name) }, { label: "outbid notification", contextId: auction.id });
+      if (wantsEmail && prev?.email) {
+        const outbidHtml = await prependSnoozeRecap(prevBidderId, outbidEmail(auction.title, bidAmount, name));
+        await sendEmailWithRetry({ to: prev.email, subject: `You've been outbid on "${auction.title}"`, html: outbidHtml }, { label: "outbid notification", contextId: auction.id });
+      }
       sendSmsIfOptedIn(prevBidderId, prof?.phoneNumber, "notif_sms_outbid", s?.settings as Record<string, unknown> | null, `Kiln: You've been outbid on "${auction.title}". New bid: $${bidAmount.toLocaleString()}. Bid now: https://kilndrop.com/kiln/auctions/${auction.id}`, s?.notifSmsResumeAt);
     } catch (err) {
       logger.warn({ err, prevBidderId, auctionId: auction.id }, "Failed to send outbid notification email");

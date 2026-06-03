@@ -1,3 +1,36 @@
+import { db, notificationsTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { injectSnoozeRecap } from "./email";
+
+/**
+ * Prepends a "while you were away" recap to an outgoing email when the
+ * recipient's snooze has just lifted.
+ *
+ * Counts the notifications that were skipped while the user was snoozed
+ * (`emailSkipped = true`) and, if any exist, injects a short recap banner into
+ * the email and clears the flag in the same atomic update so the recap is shown
+ * exactly once — on the first email delivered after the snooze ends.
+ *
+ * Best-effort: returns the original html unchanged on any error so a recap
+ * failure never blocks the underlying notification email.
+ */
+export async function prependSnoozeRecap(userId: string, html: string): Promise<string> {
+  try {
+    // Atomically clear the skipped flag and learn how many rows were affected.
+    // Concurrent sends race here harmlessly: only the update that actually flips
+    // the rows gets a non-zero count, so the recap is injected just once.
+    const cleared = await db
+      .update(notificationsTable)
+      .set({ emailSkipped: false })
+      .where(and(eq(notificationsTable.userId, userId), eq(notificationsTable.emailSkipped, true)))
+      .returning({ id: notificationsTable.id });
+    if (cleared.length === 0) return html;
+    return injectSnoozeRecap(html, cleared.length);
+  } catch {
+    return html;
+  }
+}
+
 /**
  * Returns true if the user has email notifications paused right now.
  *

@@ -4,7 +4,7 @@ import {
   postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable, listingsTable,
 } from "@workspace/db";
 import { sendEmailWithRetry, newCommentEmail, newMentionEmail, newLikeEmail } from "../lib/email";
-import { isEmailPaused } from "../lib/emailPaused";
+import { isEmailPaused, prependSnoozeRecap } from "../lib/emailPaused";
 import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -233,7 +233,8 @@ router.post("/posts/:postId/like", async (req, res): Promise<void> => {
         if (wantsEmail && p?.contactEmail) {
           const unsubToken = generateUnsubscribeToken(post.authorId);
           const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/likes?token=${encodeURIComponent(unsubToken)}`;
-          await sendEmailWithRetry({ to: p.contactEmail, subject: `${likerName} liked your post on Kiln`, html: newLikeEmail(likerName, post.caption ?? "", postId, unsubscribeUrl) }, { label: "new like notification" });
+          const likeHtml = await prependSnoozeRecap(post.authorId, newLikeEmail(likerName, post.caption ?? "", postId, unsubscribeUrl));
+          await sendEmailWithRetry({ to: p.contactEmail, subject: `${likerName} liked your post on Kiln`, html: likeHtml }, { label: "new like notification" });
         }
       } catch (err) {
         logger.warn({ err, authorId: post.authorId, postId }, "Failed to send new-like notification email");
@@ -380,7 +381,8 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
           if (wantsEmail && p?.contactEmail) {
             const unsubToken = generateUnsubscribeToken(post.authorId);
             const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/comments?token=${encodeURIComponent(unsubToken)}`;
-            await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: newCommentEmail(authorName, text.trim(), postId, unsubscribeUrl) }, { label: "new comment notification" });
+            const commentHtml = await prependSnoozeRecap(post.authorId, newCommentEmail(authorName, text.trim(), postId, unsubscribeUrl));
+            await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} commented on your post`, html: commentHtml }, { label: "new comment notification" });
           }
         } catch (err) {
           logger.warn({ err, authorId: post.authorId, postId }, "Failed to send new-comment notification email");
@@ -436,7 +438,8 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
             if (wantsEmail && p?.contactEmail) {
               const unsubToken = generateUnsubscribeToken(mentionedUserId);
               const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/mentions?token=${encodeURIComponent(unsubToken)}`;
-              await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: newMentionEmail(authorName, text.trim(), postId, unsubscribeUrl) }, { label: "mention notification" });
+              const mentionHtml = await prependSnoozeRecap(mentionedUserId, newMentionEmail(authorName, text.trim(), postId, unsubscribeUrl));
+              await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} mentioned you on Kiln`, html: mentionHtml }, { label: "mention notification" });
             }
           } catch (err) {
             logger.warn({ err, mentionedUserId, postId }, "Failed to send mention notification email");
