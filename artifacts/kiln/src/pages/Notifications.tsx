@@ -123,7 +123,7 @@ function NotificationRow({ n, onRead }: { n: KilnNotification; onRead: (id: stri
 }
 
 export default function Notifications() {
-  const { notifications, markRead, markAllRead } = useSocial();
+  const { notifications, markRead, markAllRead, dismissMissed } = useSocial();
   const { subscribe } = useWebSocket();
   const [filter, setFilter] = useState<"all" | "unread" | "snoozed">("all");
   const [apiNotifications, setApiNotifications] = useState<KilnNotification[]>([]);
@@ -191,6 +191,12 @@ export default function Notifications() {
     }
   }, [markRead]);
 
+  const handleDismissMissed = useCallback(() => {
+    setApiNotifications((prev) => prev.map((n) => n.emailSkipped ? { ...n, emailSkipped: false } : n));
+    dismissMissed();
+    setFilter((f) => (f === "snoozed" ? "all" : f));
+  }, [dismissMissed]);
+
   const filtered = useMemo(() => {
     if (filter === "unread") return allNotifications.filter(n => !n.read);
     if (filter === "snoozed") return snoozedNotifications;
@@ -239,12 +245,20 @@ export default function Notifications() {
               </p>
               <p className="text-xs text-amber-400/70">These arrived while your email was paused — no email was sent.</p>
             </div>
-            <button
-              onClick={() => setFilter("snoozed")}
-              className="shrink-0 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
-            >
-              View
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => setFilter("snoozed")}
+                className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+              >
+                View
+              </button>
+              <button
+                onClick={handleDismissMissed}
+                className="rounded-full border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300 transition-colors"
+              >
+                Dismiss all
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -272,10 +286,16 @@ export default function Notifications() {
 
         {/* Snoozed tab header */}
         {filter === "snoozed" && snoozedNotifications.length > 0 && (
-          <div className="mb-4 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3">
-            <p className="text-sm text-amber-300/80">
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3">
+            <p className="min-w-0 flex-1 text-sm text-amber-300/80">
               These notifications arrived while your email was snoozed. Your in-app notification was saved, but no email was sent.
             </p>
+            <button
+              onClick={handleDismissMissed}
+              className="shrink-0 rounded-full border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/15 transition-colors"
+            >
+              Dismiss all missed
+            </button>
           </div>
         )}
 

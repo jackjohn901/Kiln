@@ -31,6 +31,19 @@ router.post("/notifications/read-all", async (req, res): Promise<void> => {
   }
 });
 
+router.patch("/notifications/dismiss-missed", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    await db.update(notificationsTable)
+      .set({ emailSkipped: false })
+      .where(and(eq(notificationsTable.userId, req.user.id), eq(notificationsTable.emailSkipped, true)));
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "dismissMissed error");
+    res.status(500).json({ error: "Failed to dismiss missed notifications" });
+  }
+});
+
 router.patch("/notifications/:id/read", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {

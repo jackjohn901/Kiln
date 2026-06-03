@@ -1,11 +1,32 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { referralCodesTable, referralUsesTable } from "@workspace/db/schema";
+import { referralCodesTable, referralUsesTable, usersTable, profilesTable } from "@workspace/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { awardBadge } from "./badges";
 
 const router = Router();
+
+// The "owner identity" of an account. One real person (one Replit login) can
+// own up to 10 accounts; alt accounts carry the owner's id in `owner_id`, while
+// root accounts have it null. Collapsing to the owner means all of one person's
+// accounts count as a SINGLE person toward referral credit — so someone can't
+// inflate an inviter's badge by signing up ten times.
+async function getOwnerId(userId: string): Promise<string> {
+  const rows = await db.select({ ownerId: usersTable.ownerId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  return rows[0]?.ownerId ?? userId;
+}
+
+// How many DISTINCT people (owners, not accounts) a user has directly invited.
+async function getDirectOwnerCount(userId: string): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT count(DISTINCT COALESCE(u.owner_id, u.id))::int AS c
+    FROM referral_uses ru
+    JOIN users u ON u.id = ru.referee_id
+    WHERE ru.referrer_id = ${userId}
+  `);
+  return Number((result.rows[0] as { c: number } | undefined)?.c ?? 0);
+}
 
 function generateCode(userId: string): string {
   const base = userId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase();
@@ -46,7 +67,9 @@ async function getNetworkCount(userId: string): Promise<number> {
       JOIN downline d ON ru.referrer_id = d.referee_id
       WHERE d.depth < 50
     )
-    SELECT count(DISTINCT referee_id)::int AS network FROM downline
+    SELECT count(DISTINCT COALESCE(u.owner_id, u.id))::int AS network
+    FROM downline d
+    JOIN users u ON u.id = d.referee_id
   `);
   return Number((result.rows[0] as { network: number } | undefined)?.network ?? 0);
 }
@@ -71,8 +94,9 @@ router.get("/me/referral", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
   const code = await getOrCreateCode(userId);
-  const uses = await db.select().from(referralUsesTable).where(eq(referralUsesTable.referrerId, userId));
-  const count = uses.length;
+  // Count distinct PEOPLE invited, not distinct accounts: ten alt-accounts under
+  // one owner count once, matching the "one unique email per person" rule.
+  const count = await getDirectOwnerCount(userId);
   const milestone = count >= 100 ? "evangelist" : count >= 10 ? "recruiter" : count >= 1 ? "early_adopter" : null;
   const nextMilestone = count >= 100 ? null
     : count >= 10 ? { label: "Evangelist", at: 100, reward: "Revenue share + legendary badge" }
@@ -90,6 +114,11 @@ router.post("/referrals/use", async (req, res): Promise<void> => {
   if (rows.length === 0) { res.status(404).json({ error: "Invalid code" }); return; }
   const referrerId = rows[0].userId;
   if (referrerId === userId) { res.status(400).json({ error: "Cannot use your own code" }); return; }
+  // Same-owner guard: a person can run up to 10 accounts. Redeeming your own
+  // code from an alt-account would let one person credit themselves, so reject
+  // when the referrer and referee belong to the same owner.
+  const [referrerOwner, refereeOwner] = await Promise.all([getOwnerId(referrerId), getOwnerId(userId)]);
+  if (referrerOwner === refereeOwner) { res.status(400).json({ error: "Cannot use your own code" }); return; }
   const existing = await db.select().from(referralUsesTable).where(eq(referralUsesTable.refereeId, userId)).limit(1);
   if (existing.length > 0) { res.status(409).json({ error: "Already used a referral code" }); return; }
   // Cycle guard: if this user is already an ancestor of the code's owner, linking
@@ -111,10 +140,8 @@ router.post("/referrals/use", async (req, res): Promise<void> => {
   if (inserted.length === 0) { res.status(409).json({ error: "Already used a referral code" }); return; }
   // Count authoritatively from referral_uses (the source of truth) rather than
   // trusting the cached useCount, which can lag under concurrent redemptions.
-  const [{ count: newCount }] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(referralUsesTable)
-    .where(eq(referralUsesTable.referrerId, referrerId));
+  // Count distinct people (owners), so alt-accounts don't inflate the milestone.
+  const newCount = await getDirectOwnerCount(referrerId);
   await db.update(referralCodesTable).set({ useCount: newCount }).where(eq(referralCodesTable.userId, referrerId));
   // Award the referrer their milestone badge(s). awardBadge is idempotent, so
   // catch-up badges are granted even if an earlier threshold was missed.
@@ -204,6 +231,38 @@ router.get("/me/network", async (req, res): Promise<void> => {
   const nextTier = NETWORK_TIERS.find((t) => networkCount < t.at) ?? null;
 
   res.json({ directCount, networkCount, depth, levels, members, tiers, nextTier });
+});
+
+// Public: resolve an invite code to the inviter's PUBLIC profile so a brand-new
+// visitor landing on the invite page can see who invited them. Returns only
+// public-safe fields (no ids, emails, or counts) and 404 for unknown codes.
+router.get("/referrals/code/:code", async (req, res): Promise<void> => {
+  const raw = req.params.code;
+  if (!raw || raw.length > 20) { res.status(404).json({ error: "Invalid code" }); return; }
+  const rows = await db
+    .select({ userId: referralCodesTable.userId })
+    .from(referralCodesTable)
+    .where(eq(referralCodesTable.code, raw.toUpperCase()))
+    .limit(1);
+  if (rows.length === 0) { res.status(404).json({ error: "Invalid code" }); return; }
+  const profile = await db
+    .select({
+      name: profilesTable.displayName,
+      handle: profilesTable.handle,
+      avatarUrl: profilesTable.avatarUrl,
+      medium: profilesTable.medium,
+      accountType: profilesTable.accountType,
+    })
+    .from(profilesTable)
+    .where(eq(profilesTable.userId, rows[0].userId))
+    .limit(1);
+  res.json({
+    name: profile[0]?.name ?? null,
+    handle: profile[0]?.handle ?? null,
+    avatarUrl: profile[0]?.avatarUrl ?? null,
+    medium: profile[0]?.medium ?? null,
+    accountType: profile[0]?.accountType ?? null,
+  });
 });
 
 export default router;

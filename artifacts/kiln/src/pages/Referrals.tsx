@@ -77,7 +77,7 @@ export default function Referrals() {
       .catch(() => {});
   }, [user]);
 
-  const inviteUrl = stats ? `https://kilndrop.com/kiln/?ref=${stats.code}` : "";
+  const inviteUrl = stats ? `https://kilndrop.com/kiln/join?ref=${stats.code}` : "";
 
   const handleCopy = async () => {
     if (!inviteUrl) return;
@@ -87,7 +87,7 @@ export default function Referrals() {
   };
 
   const shareText = stats
-    ? `Join me on Kiln 🎨 — the home for craft artists. Sign up with my invite code ${stats.code}, and you'll get your own code to invite friends too!`
+    ? `Join me on Kiln 🎨 — the home for craft. Anyone can join (you don't have to be an artist!). Sign up with my invite code ${stats.code}, and you'll get your own code to invite friends too.`
     : "";
   const shareMessage = `${shareText} ${inviteUrl}`;
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -148,7 +148,7 @@ export default function Referrals() {
         <div className="pt-4 space-y-1">
           <div className="flex items-center gap-2">
             <Users className="w-6 h-6 text-amber-400" />
-            <h1 className="text-2xl font-bold">Invite Artists</h1>
+            <h1 className="text-2xl font-bold">Invite & Grow</h1>
           </div>
           <p className="text-stone-400 text-sm">Grow Kiln. Earn rewards. Build your legacy.</p>
         </div>
@@ -175,7 +175,7 @@ export default function Referrals() {
                 </div>
                 <div className="text-right">
                   <p className="text-3xl font-bold text-white">{stats.useCount}</p>
-                  <p className="text-xs text-stone-400">artists invited</p>
+                  <p className="text-xs text-stone-400">people invited</p>
                 </div>
               </div>
 

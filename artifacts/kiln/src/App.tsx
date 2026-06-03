@@ -140,6 +140,7 @@ import LinkInBioPublic from "@/pages/LinkInBioPublic";
 import SubscriptionBoxes from "@/pages/SubscriptionBoxes";
 import CreateSubscriptionBox from "@/pages/CreateSubscriptionBox";
 import Referrals from "@/pages/Referrals";
+import InviteLanding from "@/pages/InviteLanding";
 import Badges from "@/pages/Badges";
 import Search from "@/pages/Search";
 import AdminReports from "@/pages/AdminReports";
@@ -199,7 +200,7 @@ function QuizGate() {
 }
 
 // Pages that should never trigger the setup redirect
-const SETUP_EXEMPT = ["/setup", "/quiz", "/login", "/callback", "/terms", "/privacy", "/help", "/landing"];
+const SETUP_EXEMPT = ["/setup", "/quiz", "/login", "/callback", "/terms", "/privacy", "/help", "/landing", "/join"];
 
 function SetupGate() {
   const [location, navigate] = useLocation();
@@ -494,6 +495,7 @@ function Router() {
       <Route path="/subscription-boxes" component={SubscriptionBoxes} />
       <Route path="/subscription-boxes/create" component={CreateSubscriptionBox} />
       <Route path="/referrals" component={Referrals} />
+      <Route path="/join" component={InviteLanding} />
       <Route path="/badges" component={Badges} />
       <Route path="/search" component={Search} />
       <Route path="/admin/platform" component={PlatformAnalytics} />

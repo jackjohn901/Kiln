@@ -175,6 +175,7 @@ interface SocialContextType extends SocialState {
   addNotification: (n: Omit<KilnNotification, "id" | "read" | "createdAt">) => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  dismissMissed: () => void;
   markTypeRead: (type: KilnNotification["type"]) => void;
   markCommissionPaymentRead: (commissionId: string) => void;
   markLinkRead: (path: string) => void;
@@ -561,6 +562,22 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     fetch("/api/notifications/read-all", { method: "POST", credentials: "include" }).catch(() => {});
   }, []);
 
+  const dismissMissed = useCallback(() => {
+    let snapshot: SocialState["notifications"] = [];
+    update((s) => {
+      snapshot = s.notifications;
+      return { ...s, notifications: s.notifications.map((n) => n.emailSkipped ? { ...n, emailSkipped: false } : n) };
+    });
+    fetch("/api/notifications/dismiss-missed", { method: "PATCH", credentials: "include" })
+      .then((r) => {
+        if (!r.ok) throw new Error("dismiss failed");
+      })
+      .catch(() => {
+        update((s) => ({ ...s, notifications: snapshot }));
+        toast({ title: "Couldn\u2019t clear the missed log", description: "Please try again.", variant: "destructive" });
+      });
+  }, []);
+
   const markTypeRead = useCallback((type: KilnNotification["type"]) => {
     update((s) => ({
       ...s,
@@ -905,6 +922,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         addNotification,
         markRead,
         markAllRead,
+        dismissMissed,
         markTypeRead,
         markCommissionPaymentRead,
         markLinkRead,

@@ -363,6 +363,21 @@ export default function Setup() {
             </>
           )}
         </div>
+
+        {/* Pass it on — your own invite link continues the chain */}
+        <div className="mt-2 w-full max-w-sm rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-5 text-center">
+          <p className="font-serif text-lg text-amber-100">Now it's your turn to invite</p>
+          <p className="mt-1.5 text-sm text-stone-400">
+            You've got your own invite link to share — anyone can join, and as your network grows you earn badges and rewards.
+          </p>
+          <button
+            onClick={() => navigate("/referrals")}
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-amber-500 px-6 py-2.5 text-sm font-semibold text-stone-950 transition-colors hover:bg-amber-400"
+          >
+            Get your invite link
+            <ArrowRight size={15} />
+          </button>
+        </div>
       </div>
     );
   }
