@@ -10,6 +10,7 @@ import { startScheduledPostsPublisher } from "./lib/scheduledPosts";
 import { startStoryExpiry } from "./lib/storyExpiry";
 import { startDropCountdownScheduler } from "./lib/dropCountdown";
 import { startWorkshopReminders } from "./lib/workshopReminders";
+import { startTrendingDigest } from "./lib/trendingDigest";
 import { db, serverConfigTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
@@ -179,6 +180,7 @@ if (Number.isNaN(port) || port <= 0) {
     try { startStoryExpiry(); } catch (err) { logger.error({ err }, "startStoryExpiry failed"); }
     try { startDropCountdownScheduler(); } catch (err) { logger.error({ err }, "startDropCountdownScheduler failed"); }
     try { startWorkshopReminders(); } catch (err) { logger.error({ err }, "startWorkshopReminders failed"); }
+    try { startTrendingDigest(); } catch (err) { logger.error({ err }, "startTrendingDigest failed"); }
   });
 
   server.on("error", (err) => {

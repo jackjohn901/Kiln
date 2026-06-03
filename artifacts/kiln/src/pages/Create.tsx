@@ -92,6 +92,10 @@ export default function Create() {
   const [collabArtist, setCollabArtist] = useState("");
   const [collaboratorId, setCollaboratorId] = useState("");
   const [isPatronOnly, setIsPatronOnly] = useState(false);
+  const [myListings, setMyListings] = useState<Array<{ id: string; title: string; price: number; currency: string; imageUrl: string | null }>>([]);
+  const [selectedListingIds, setSelectedListingIds] = useState<string[]>([]);
+  const [loadingListings, setLoadingListings] = useState(false);
+  const [showListingPicker, setShowListingPicker] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -288,6 +292,30 @@ export default function Create() {
     }
   }
 
+  async function loadMyListings() {
+    if (loadingListings || myListings.length > 0) return;
+    setLoadingListings(true);
+    try {
+      const res = await fetch("/api/me/listings", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load listings");
+      const data = await res.json() as { listings?: Array<{ id: string; title: string; price: number; currency: string; imageUrl: string | null }> };
+      setMyListings((data.listings ?? []).map((l) => ({ id: l.id, title: l.title, price: l.price, currency: l.currency, imageUrl: l.imageUrl })));
+    } catch {
+      setPublishError("Couldn't load your listings. Try again.");
+      setTimeout(() => setPublishError(null), 4000);
+    } finally {
+      setLoadingListings(false);
+    }
+  }
+
+  function toggleListingTag(id: string) {
+    setSelectedListingIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 8) return prev;
+      return [...prev, id];
+    });
+  }
+
   function addTag(raw: string) {
     const t = raw.replace(/^#+/, "").trim().toLowerCase().replace(/\s+/g, "");
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
@@ -470,6 +498,7 @@ export default function Create() {
           collaboratorId: collaboratorId || null,
           collaboratorName: collabArtist || null,
           musicTrackId: selectedTrack?.id ?? null,
+          listingIds: selectedListingIds.length > 0 ? selectedListingIds : null,
         }),
       }).catch((err) => {
         console.error("Failed to save post to server", err);
@@ -1280,6 +1309,72 @@ export default function Create() {
               </button>
               {isPatronOnly && (
                 <p className="mt-2 text-xs text-amber-600/80">This post will be blurred in the feed for non-patrons with an invitation to subscribe.</p>
+              )}
+            </div>
+
+            {/* Tag products — Shop the Look */}
+            <div className="rounded-2xl border border-white/10 bg-stone-900/40 p-4 space-y-3">
+              <button
+                onClick={() => { setShowListingPicker((v) => !v); if (!showListingPicker) loadMyListings(); }}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingBag size={14} className={selectedListingIds.length > 0 ? "text-amber-400" : "text-stone-500"} />
+                  <div>
+                    <p className={`text-sm font-medium ${selectedListingIds.length > 0 ? "text-amber-200" : "text-stone-300"}`}>
+                      Tag products
+                    </p>
+                    <p className="text-xs text-stone-600">
+                      {selectedListingIds.length > 0 ? `${selectedListingIds.length} tagged · viewers can shop this reel` : "Link your shop listings to this post (up to 8)"}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className={`text-stone-500 transition-transform ${showListingPicker ? "rotate-90" : ""}`} />
+              </button>
+              {showListingPicker && (
+                <div className="pt-2 border-t border-white/8 space-y-2">
+                  {loadingListings && <p className="py-3 text-center text-xs text-stone-500">Loading your listings…</p>}
+                  {!loadingListings && myListings.length === 0 && (
+                    <p className="py-3 text-center text-xs text-stone-500">You don't have any shop listings yet.</p>
+                  )}
+                  {!loadingListings && myListings.length > 0 && (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {myListings.map((l) => {
+                        const selected = selectedListingIds.includes(l.id);
+                        const atCap = !selected && selectedListingIds.length >= 8;
+                        return (
+                          <button
+                            key={l.id}
+                            onClick={() => toggleListingTag(l.id)}
+                            disabled={atCap}
+                            className={`flex w-full items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition-colors ${
+                              selected ? "border-amber-500/50 bg-amber-500/10" : atCap ? "border-white/5 bg-stone-900/40 opacity-40" : "border-white/10 bg-stone-900/40 hover:border-amber-500/30"
+                            }`}
+                          >
+                            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-stone-800">
+                              {l.imageUrl
+                                ? <img src={l.imageUrl} alt={l.title} className="h-full w-full object-cover" />
+                                : <div className="flex h-full w-full items-center justify-center"><ShoppingBag size={14} className="text-stone-600" /></div>}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm text-stone-200">{l.title}</p>
+                              <p className="text-xs text-amber-300 font-bold">
+                                {l.currency === "USD" ? "$" : ""}{(l.price / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {l.currency !== "USD" ? ` ${l.currency}` : ""}
+                              </p>
+                            </div>
+                            <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${selected ? "bg-amber-500 border-amber-500" : "border-stone-600"}`}>
+                              {selected && <Check size={12} className="text-stone-950" strokeWidth={3} />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {selectedListingIds.length >= 8 && (
+                    <p className="text-xs text-amber-600/80">Maximum of 8 products tagged.</p>
+                  )}
+                </div>
               )}
             </div>
 

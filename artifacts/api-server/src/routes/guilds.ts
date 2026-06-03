@@ -6,6 +6,11 @@ import crypto from "crypto";
 
 const router = Router();
 
+const DEFAULT_CHANNELS = ["General", "Show & Tell", "Help & Critique", "Buy / Sell / Trade"];
+function channelsOf(g: { channels: string[] | null }): string[] {
+  return g.channels?.length ? g.channels : DEFAULT_CHANNELS;
+}
+
 // GET /guilds
 router.get("/guilds", async (req, res): Promise<void> => {
   try {
@@ -16,7 +21,7 @@ router.get("/guilds", async (req, res): Promise<void> => {
       const m = await db.select({ guildId: guildMembersTable.guildId }).from(guildMembersTable).where(eq(guildMembersTable.userId, viewerId));
       joinedIds = new Set(m.map(x => x.guildId));
     }
-    res.json({ guilds: guilds.map(g => ({ ...g, isJoined: joinedIds.has(g.id), createdAt: g.createdAt.toISOString() })) });
+    res.json({ guilds: guilds.map(g => ({ ...g, channels: channelsOf(g), isJoined: joinedIds.has(g.id), createdAt: g.createdAt.toISOString() })) });
   } catch (err) { req.log.error({ err }, "getGuilds error"); res.status(500).json({ error: "Failed to load guilds" }); }
 });
 
@@ -37,8 +42,9 @@ router.get("/guilds/:id", async (req, res): Promise<void> => {
 
   const members = await db.select().from(guildMembersTable).where(eq(guildMembersTable.guildId, guild.id));
   const isMember = viewerId ? members.some(m => m.userId === viewerId) : false;
+  const myRole = viewerId ? (members.find(m => m.userId === viewerId)?.role ?? null) : null;
 
-  res.json({ ...guild, isJoined: isMember, members: members.map(m => ({ ...m, joinedAt: m.joinedAt.toISOString() })), createdAt: guild.createdAt.toISOString() });
+  res.json({ ...guild, channels: channelsOf(guild), myRole, isJoined: isMember, members: members.map(m => ({ ...m, joinedAt: m.joinedAt.toISOString() })), createdAt: guild.createdAt.toISOString() });
 });
 
 // Derive a URL-safe slug from a display name. Slugs are generated server-side so
@@ -99,6 +105,73 @@ router.post("/guilds/:id/join", async (req, res): Promise<void> => {
     await db.update(guildsTable).set({ memberCount: sql`${guildsTable.memberCount} + 1` }).where(eq(guildsTable.id, guildId));
     res.json({ joined: true });
   } catch (err) { req.log.error({ err }, "joinGuild error"); res.status(500).json({ error: "Failed to toggle guild membership" }); }
+});
+
+// Returns true if the caller is the guild founder/creator or has the "admin" membership role.
+async function isGuildAdmin(guild: typeof guildsTable.$inferSelect, userId: string): Promise<boolean> {
+  if (guild.createdBy === userId) return true;
+  const [m] = await db.select({ role: guildMembersTable.role })
+    .from(guildMembersTable)
+    .where(and(eq(guildMembersTable.guildId, guild.id), eq(guildMembersTable.userId, userId)));
+  return m?.role === "admin";
+}
+
+// POST /guilds/:id/channels — founder/admin updates the guild's channel list
+router.post("/guilds/:id/channels", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const [guild] = await db.select().from(guildsTable).where(eq(guildsTable.id, req.params.id));
+    if (!guild) { res.status(404).json({ error: "Guild not found" }); return; }
+    if (!(await isGuildAdmin(guild, req.user.id))) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const raw = (req.body as { channels?: unknown }).channels;
+    if (!Array.isArray(raw)) { res.status(400).json({ error: "channels must be an array" }); return; }
+
+    const seen = new Set<string>();
+    const cleaned: string[] = [];
+    for (const c of raw) {
+      if (typeof c !== "string") continue;
+      const trimmed = c.trim();
+      if (!trimmed || trimmed.length > 30) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cleaned.push(trimmed);
+    }
+
+    if (cleaned.length === 0) { res.status(400).json({ error: "At least one valid channel is required" }); return; }
+    if (!cleaned.some((c) => c.toLowerCase() === "general")) cleaned.unshift("General");
+    if (cleaned.length > 12) { res.status(400).json({ error: "Maximum 12 channels" }); return; }
+
+    await db.update(guildsTable).set({ channels: cleaned }).where(eq(guildsTable.id, guild.id));
+    res.json({ channels: cleaned });
+  } catch (err) { req.log.error({ err }, "updateChannels error"); res.status(500).json({ error: "Failed to update channels" }); }
+});
+
+// POST /guilds/:id/members/:userId/role — founder/admin sets a member's role
+router.post("/guilds/:id/members/:userId/role", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const guildId = req.params.id;
+    const targetUserId = req.params.userId;
+    const [guild] = await db.select().from(guildsTable).where(eq(guildsTable.id, guildId));
+    if (!guild) { res.status(404).json({ error: "Guild not found" }); return; }
+    if (!(await isGuildAdmin(guild, req.user.id))) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const role = (req.body as { role?: unknown }).role;
+    if (role !== "moderator" && role !== "member") { res.status(400).json({ error: "Invalid role" }); return; }
+
+    if (targetUserId === guild.createdBy) { res.status(400).json({ error: "Cannot change the founder's role" }); return; }
+    if (targetUserId === req.user.id) { res.status(400).json({ error: "Cannot change your own role" }); return; }
+
+    const [member] = await db.select().from(guildMembersTable)
+      .where(and(eq(guildMembersTable.guildId, guildId), eq(guildMembersTable.userId, targetUserId)));
+    if (!member) { res.status(404).json({ error: "Member not found" }); return; }
+
+    await db.update(guildMembersTable).set({ role })
+      .where(and(eq(guildMembersTable.guildId, guildId), eq(guildMembersTable.userId, targetUserId)));
+    res.json({ ok: true, userId: targetUserId, role });
+  } catch (err) { req.log.error({ err }, "setMemberRole error"); res.status(500).json({ error: "Failed to update member role" }); }
 });
 
 export default router;

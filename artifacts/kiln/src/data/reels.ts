@@ -25,6 +25,7 @@ export interface Reel {
   streak?: number;
   artistLevel?: "Emerging" | "Rising" | "Established" | "Master";
   beforeImageUrl?: string;
+  listingIds?: string[];
 }
 
 const ARTIST_LEVELS = ["Emerging", "Rising", "Established", "Master"] as const;

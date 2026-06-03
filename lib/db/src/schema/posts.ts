@@ -16,6 +16,7 @@ export const postsTable = pgTable("posts", {
   technique: varchar("technique", { length: 100 }),
   medium: varchar("medium", { length: 100 }),
   tags: text("tags").array().default([]),
+  listingIds: text("listing_ids").array(),
   likeCount: integer("like_count").notNull().default(0),
   commentCount: integer("comment_count").notNull().default(0),
   saveCount: integer("save_count").notNull().default(0),

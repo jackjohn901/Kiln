@@ -11,6 +11,7 @@ export const guildsTable = pgTable("guilds", {
   memberCount: integer("member_count").notNull().default(0),
   postCount: integer("post_count").notNull().default(0),
   isPublic: boolean("is_public").notNull().default(true),
+  channels: text("channels").array(),
   createdBy: varchar("created_by", { length: 255 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -1,16 +1,18 @@
 ---
 name: Kiln guild discussion channels
-description: The fixed channel allowlist for guild discussions is duplicated in server + client and must stay in sync.
+description: Guild discussion channels are per-guild, stored in the DB, and server-authoritative — not a hardcoded allowlist.
 ---
 
 # Guild discussion channels (topics)
 
-Guild "Discussions" are split into a **fixed set of channels** (topics), not free-form. A post in a guild carries an optional `topic` column on `community_posts`.
+Guild "Discussions" are split into channels (topics), not free-form. A guild post carries an optional `topic` column on `community_posts`.
 
-The allowed channel list is **hard-coded in two places that must match**:
-- Server: `GUILD_TOPICS` in `artifacts/api-server/src/routes/community.ts`
-- Client: `DISCUSSION_CHANNELS` in `artifacts/kiln/src/pages/GuildDetail.tsx`
+Channels are **per-guild and stored in the DB**: `guilds.channels` (nullable `text[]`). When a guild has no custom list, both server and client fall back to a `DEFAULT_CHANNELS` const (`["General","Show & Tell","Help & Critique","Buy / Sell / Trade"]`) duplicated in `routes/guilds.ts`, `routes/community.ts`, and `GuildDetail.tsx`. Founders/admins edit a guild's channels via `POST /guilds/:id/channels`.
 
-**Why:** the server rejects any `topic` not in its allowlist with `400 Unknown channel` on both `POST /community` (create) and `GET /community/guilds/:guildId?topic=` (filter). This stops crafted clients from creating off-menu channels that the pill UI can never surface. If the two lists drift, legitimate client posts/filters start 400-ing.
+**Why:** the server validates any incoming `topic` against *that guild's* channel list (its `channels` or the default) on `GET /community/guilds/:id?topic=` and `POST /community`, rejecting off-menu topics with `400 Unknown channel`. Validation is server-authoritative — never trust the client's pill list.
 
-**How to apply:** when adding/renaming/removing a channel, edit BOTH constants in the same change (exact string match, including spacing like `"Buy / Sell / Trade"`). The client uses `"all"` as a sentinel meaning "no topic filter" (it omits the query param); the server treats absent/empty topic as no filter and stores `General` as the default when posting from the "All" view.
+**How to apply:**
+- To change a guild's channels at runtime, go through the channels endpoint; do not edit constants.
+- Only the `DEFAULT_CHANNELS` fallback is duplicated across the three files — keep those in exact-string sync (including spacing like `"Buy / Sell / Trade"`).
+- Guild privacy is enforced in `community.ts` via `loadGuildAccess(guildId, viewerId)`: a guild that exists in the DB and is `isPublic === false` is members-only (GET 404s outsiders, POST 403s them). Static/demo guilds from `src/data/guilds.ts` are NOT in the DB (`loadGuildAccess` returns null) and stay openly readable/writable as before — do not "fix" that into a 404 or it breaks demo guild discussions.
+- Pin: `POST /community/:postId/pin` is guild-posts-only and gated to founder/admin/moderator; GET ordering already sorts `isPinned` first.

@@ -6,7 +6,7 @@ import {
   Plus, Home, Users, ShoppingBag, User, Music2, Search,
   MessageCircle, Bell, CheckCircle, Clock, ShoppingCart, X, Repeat2, Flag, Check,
   SplitSquareHorizontal, Scissors, Lock, ThumbsUp, ThumbsDown, MoreHorizontal, Crown, GitBranch,
-  Mic, MicOff, DollarSign, BadgeCheck, ArrowUp,
+  Mic, MicOff, DollarSign, BadgeCheck, ArrowUp, ChevronRight,
 } from "lucide-react";
 import TipModal from "@/components/TipModal";
 import ReportModal from "@/components/ReportModal";
@@ -168,7 +168,18 @@ function apiPostToReel(p: any, defaultMusicId: string): Reel {
     streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
     artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
     beforeImageUrl: p.beforeImageUrl ?? undefined,
+    listingIds: Array.isArray(p.listingIds) ? p.listingIds : undefined,
   };
+}
+
+interface ShopListing {
+  id: string;
+  title: string;
+  price: number;
+  currency: string;
+  imageUrl: string | null;
+  isSold: boolean;
+  isAvailable: boolean;
 }
 
 const CS_ICON: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
@@ -333,6 +344,27 @@ const ReelCard = memo(function ReelCard({
   const [showBoardPicker, setShowBoardPicker] = useState(false);
   const [showAlgoMenu, setShowAlgoMenu] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
+  const [showShop, setShowShop] = useState(false);
+  const [shopListings, setShopListings] = useState<ShopListing[] | null>(null);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopError, setShopError] = useState<string | null>(null);
+  const hasTaggedListings = !!(reel.listingIds && reel.listingIds.length > 0);
+
+  const openShop = useCallback(() => {
+    setShowShop(true);
+    if (shopListings !== null || shopLoading) return;
+    setShopLoading(true);
+    setShopError(null);
+    const apiId = reel.id.startsWith("db-") ? reel.id.slice(3) : reel.id;
+    fetch(`/api/posts/${encodeURIComponent(apiId)}/listings`, { credentials: "include" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Failed to load products");
+        const data = await r.json() as { listings?: ShopListing[] };
+        setShopListings(data.listings ?? []);
+      })
+      .catch(() => setShopError("Couldn't load tagged products. Try again."))
+      .finally(() => setShopLoading(false));
+  }, [reel.id, shopListings, shopLoading]);
   const { reelLikes, reelSaves, reelReposts, toggleReelLike, toggleReelSave, toggleReelRepost, getComments, getArtistCommissionStatus, isSubscribed, isFollowing, followArtist, unfollowArtist, isVerified, sendTip } = useSocial();
   const [showTip, setShowTip] = useState(false);
   const { profile: myProfile } = useProfile();
@@ -652,6 +684,16 @@ const ReelCard = memo(function ReelCard({
         })()}
 
         <div className="pt-1 flex items-center gap-2 flex-wrap">
+          {/* Shop the look — tagged products on this reel */}
+          {hasTaggedListings && (
+            <button
+              onClick={(e) => { e.stopPropagation(); openShop(); }}
+              className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold text-stone-950 shadow hover:bg-amber-400 transition-colors"
+            >
+              <ShoppingBag size={12} />
+              <span>Shop</span>
+            </button>
+          )}
           {/* Original audio toggle — only relevant when there's actual video content */}
           {resolvedVideoUrl && (
             <button
@@ -915,6 +957,78 @@ const ReelCard = memo(function ReelCard({
           onClose={() => setShowTip(false)}
         />
       )}
+
+      {/* Shop the look panel */}
+      <AnimatePresence>
+        {showShop && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowShop(false)}
+          >
+            <motion.div
+              initial={{ y: 60 }} animate={{ y: 0 }} exit={{ y: 60 }}
+              transition={{ type: "spring", damping: 22, stiffness: 260 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-t-2xl bg-stone-900 border border-white/10 p-4 pb-10"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <p className="font-semibold text-stone-200 flex items-center gap-2">
+                  <ShoppingBag size={16} className="text-amber-400" /> Shop the look
+                </p>
+                <button onClick={() => setShowShop(false)} className="text-stone-500 hover:text-stone-300">
+                  <X size={18} />
+                </button>
+              </div>
+              {shopLoading && (
+                <p className="py-6 text-center text-sm text-stone-500">Loading products…</p>
+              )}
+              {!shopLoading && shopError && (
+                <div className="py-6 text-center">
+                  <p className="text-sm text-stone-400">{shopError}</p>
+                  <button onClick={openShop} className="mt-3 rounded-full bg-stone-800 px-4 py-1.5 text-xs font-semibold text-stone-200 hover:bg-stone-700">Retry</button>
+                </div>
+              )}
+              {!shopLoading && !shopError && shopListings && shopListings.length === 0 && (
+                <p className="py-6 text-center text-sm text-stone-500">No products tagged.</p>
+              )}
+              {!shopLoading && !shopError && shopListings && shopListings.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {shopListings.map((l) => (
+                    <Link key={l.id} href={`/listings/${l.id}`}>
+                      <button
+                        onClick={() => setShowShop(false)}
+                        className="flex w-full items-center gap-3 rounded-xl bg-stone-800/60 px-3 py-2.5 text-left hover:bg-stone-700/60 transition-colors"
+                      >
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-stone-800">
+                          {l.imageUrl
+                            ? <img src={l.imageUrl} alt={l.title} className="h-full w-full object-cover" />
+                            : <div className="flex h-full w-full items-center justify-center"><ShoppingBag size={18} className="text-stone-600" /></div>}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-stone-200">{l.title}</p>
+                          <p className="text-xs text-amber-300 font-bold">
+                            {l.currency === "USD" ? "$" : ""}{(l.price / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {l.currency !== "USD" ? ` ${l.currency}` : ""}
+                          </p>
+                          {l.isSold ? (
+                            <span className="text-[10px] font-bold text-stone-500">Sold</span>
+                          ) : !l.isAvailable ? (
+                            <span className="text-[10px] font-bold text-stone-500">Unavailable</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-emerald-400">Available</span>
+                          )}
+                        </div>
+                        <ChevronRight size={16} className="shrink-0 text-stone-500" />
+                      </button>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });

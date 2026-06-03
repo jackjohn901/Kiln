@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable,
+  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable, listingsTable,
 } from "@workspace/db";
 import { sendEmailWithRetry, newCommentEmail, newMentionEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
@@ -20,10 +20,10 @@ const router = Router();
 router.post("/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const { caption, videoUrl, thumbnailUrl, muxPlaybackId, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName, musicTrackId } = req.body as {
+  const { caption, videoUrl, thumbnailUrl, muxPlaybackId, technique, medium, tags, isPatronOnly, scheduledAt, isDraft, collaboratorId, collaboratorName, musicTrackId, listingIds } = req.body as {
     caption?: string; videoUrl?: string; thumbnailUrl?: string; muxPlaybackId?: string; technique?: string; medium?: string;
     tags?: string[]; isPatronOnly?: boolean; scheduledAt?: string; isDraft?: boolean;
-    collaboratorId?: string; collaboratorName?: string; musicTrackId?: string;
+    collaboratorId?: string; collaboratorName?: string; musicTrackId?: string; listingIds?: string[];
   };
   // Caption is optional, but a post must have *some* content —
   // either a caption, an image, or a video.
@@ -39,6 +39,23 @@ router.post("/posts", async (req, res): Promise<void> => {
   try {
     const id = crypto.randomUUID();
     const user = req.user;
+
+    // Tag shop listings — only keep IDs of listings actually owned by the poster,
+    // capped at 8, so a client can't attach listings it doesn't own.
+    let ownedListingIds: string[] | null = null;
+    if (Array.isArray(listingIds) && listingIds.length > 0) {
+      const requested = [...new Set(
+        listingIds.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((x) => x.trim()),
+      )].slice(0, 8);
+      if (requested.length > 0) {
+        const owned = await db.select({ id: listingsTable.id }).from(listingsTable)
+          .where(and(eq(listingsTable.artistId, user.id), inArray(listingsTable.id, requested)));
+        const ownedSet = new Set(owned.map((o) => o.id));
+        const filtered = requested.filter((rid) => ownedSet.has(rid));
+        ownedListingIds = filtered.length > 0 ? filtered : null;
+      }
+    }
+
     const [post] = await db.insert(postsTable).values({
       id,
       authorId: user.id,
@@ -51,6 +68,7 @@ router.post("/posts", async (req, res): Promise<void> => {
       technique: technique ?? null,
       medium: medium ?? null,
       tags: tags ?? [],
+      listingIds: ownedListingIds,
       isPatronOnly: isPatronOnly ?? false,
       isDraft: asDraft,
       scheduledAt: schedDate,
@@ -105,10 +123,38 @@ router.get("/posts/:postId", async (req, res): Promise<void> => {
     const { postId } = req.params;
     const [post] = await db.select().from(postsTable).where(eq(postsTable.id, postId));
     if (!post) { res.status(404).json({ error: "Not found" }); return; }
-    res.json({ post: { ...post, tags: post.tags ?? [], createdAt: post.createdAt.toISOString() } });
+    res.json({ post: { ...post, tags: post.tags ?? [], listingIds: post.listingIds ?? [], createdAt: post.createdAt.toISOString() } });
   } catch (err) {
     req.log.error({ err }, "getPost error");
     res.status(500).json({ error: "Failed to load post" });
+  }
+});
+
+// GET /posts/:postId/listings — resolved "shop the look" listing summaries for a post.
+// Fetched lazily by the client when a viewer opens the Shop panel on a reel.
+router.get("/posts/:postId/listings", async (req, res): Promise<void> => {
+  try {
+    const { postId } = req.params;
+    const [post] = await db.select({ listingIds: postsTable.listingIds }).from(postsTable).where(eq(postsTable.id, postId));
+    if (!post) { res.status(404).json({ error: "Not found" }); return; }
+    const ids = post.listingIds ?? [];
+    if (ids.length === 0) { res.json({ listings: [] }); return; }
+    const rows = await db.select({
+      id: listingsTable.id,
+      title: listingsTable.title,
+      price: listingsTable.price,
+      currency: listingsTable.currency,
+      imageUrl: listingsTable.imageUrl,
+      isSold: listingsTable.isSold,
+      isAvailable: listingsTable.isAvailable,
+    }).from(listingsTable).where(inArray(listingsTable.id, ids));
+    // Preserve the order the artist tagged them in
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const ordered = ids.map((id) => byId.get(id)).filter((l): l is typeof rows[number] => !!l);
+    res.json({ listings: ordered });
+  } catch (err) {
+    req.log.error({ err }, "getPostListings error");
+    res.status(500).json({ error: "Failed to load listings" });
   }
 });
 

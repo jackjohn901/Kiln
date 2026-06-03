@@ -37,6 +37,7 @@ export const profilesTable = pgTable("profiles", {
   inspirations: text("inspirations"),
   artistStatement: text("artist_statement"),
   collectorStory: text("collector_story"),
+  lastTrendingDigestAt: timestamp("last_trending_digest_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

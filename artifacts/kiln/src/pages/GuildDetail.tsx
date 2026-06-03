@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, MessageCircle, ChevronLeft, CheckCircle2, Heart, Share2, ExternalLink, BookOpen, Crown, Shield, Loader2 } from "lucide-react";
+import { Users, MessageCircle, ChevronLeft, CheckCircle2, Heart, Share2, ExternalLink, BookOpen, Crown, Shield, Loader2, Settings2, Plus, X, ShieldCheck, ShieldOff } from "lucide-react";
 import Nav from "@/components/Nav";
 import { getGuildById, type GuildMember } from "@/data/guilds";
 import RelativeTime, { relativeLabel } from "@/components/RelativeTime";
+import { useProfile } from "@/contexts/ProfileContext";
 import { Composer, PostCard, type CommunityPost } from "@/pages/Community";
 
 const ROLE_BADGES: Record<GuildMember["role"], { label: string; icon: React.ElementType; color: string } | null> = {
@@ -38,6 +39,8 @@ interface ApiGuild {
   createdAt: string;
   isJoined: boolean;
   members: ApiMember[];
+  channels?: string[];
+  myRole?: string | null;
 }
 
 function formatCount(n: number): string {
@@ -65,6 +68,8 @@ const DISCUSSION_CHANNELS = ["General", "Show & Tell", "Help & Critique", "Buy /
 export default function GuildDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const { profile } = useProfile();
+  const currentUserId = profile?.id ?? null;
   const [tab, setTab] = useState<Tab>("feed");
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -147,6 +152,54 @@ export default function GuildDetail() {
     setToggling(false);
   }
 
+  const canModerate = apiGuild?.myRole === "admin" || apiGuild?.myRole === "moderator";
+  const isFounder = apiGuild?.myRole === "admin";
+
+  async function handlePin(postId: string) {
+    if (!resolvedGuildId) return;
+    const r = await fetch(`/api/community/${postId}/pin`, { method: "POST", credentials: "include" });
+    if (!r.ok) throw new Error("Failed to pin post");
+    const data = await r.json();
+    setDiscussionPosts((prev) => {
+      const updated = prev.map((p) => (p.id === postId ? { ...p, isPinned: data.isPinned } : p));
+      return [...updated].sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    });
+  }
+
+  async function handleChannelsSaved(channels: string[]) {
+    if (!apiGuild) return;
+    const r = await fetch(`/api/guilds/${apiGuild.id}/channels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ channels }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.error ?? "Failed to save channels");
+    }
+    const data = await r.json();
+    setApiGuild((prev) => (prev ? { ...prev, channels: data.channels } : prev));
+  }
+
+  async function handleMemberRoleChange(userId: string, role: "moderator" | "member") {
+    if (!apiGuild) return;
+    const r = await fetch(`/api/guilds/${apiGuild.id}/members/${userId}/role`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ role }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.error ?? "Failed to update role");
+    }
+    setApiMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, role } : m)));
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#12100e]">
@@ -214,7 +267,12 @@ export default function GuildDetail() {
             discussionsLoading={discussionsLoading}
             discussionPosts={discussionPosts}
             onDiscussionPosted={(p) => setDiscussionPosts((prev) => [p, ...prev])}
-            onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))} />
+            onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))}
+            channels={DISCUSSION_CHANNELS}
+            canModerate={false}
+            isFounder={false}
+            currentUserId={currentUserId}
+            founderId={null} />
           <div className="h-20" />
         </div>
       </div>
@@ -270,7 +328,15 @@ export default function GuildDetail() {
           discussionsLoading={discussionsLoading}
           discussionPosts={discussionPosts}
           onDiscussionPosted={(p) => setDiscussionPosts((prev) => [p, ...prev])}
-          onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))} />
+          onDiscussionDelete={(id) => setDiscussionPosts((prev) => prev.filter((p) => p.id !== id))}
+          channels={guild.channels?.length ? guild.channels : DISCUSSION_CHANNELS}
+          canModerate={canModerate}
+          isFounder={isFounder}
+          currentUserId={currentUserId}
+          founderId={guild.createdBy}
+          onPin={handlePin}
+          onChannelsSaved={handleChannelsSaved}
+          onMemberRoleChange={handleMemberRoleChange} />
 
         <div className="h-20" />
       </div>
@@ -296,6 +362,14 @@ interface GuildTabsProps {
   discussionPosts: CommunityPost[];
   onDiscussionPosted: (p: CommunityPost) => void;
   onDiscussionDelete: (id: string) => void;
+  channels: string[];
+  canModerate: boolean;
+  isFounder: boolean;
+  currentUserId: string | null;
+  founderId: string | null;
+  onPin?: (id: string) => Promise<void>;
+  onChannelsSaved?: (channels: string[]) => Promise<void>;
+  onMemberRoleChange?: (userId: string, role: "moderator" | "member") => Promise<void>;
 }
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -306,7 +380,34 @@ const TAB_LABELS: Record<Tab, string> = {
   resources: "Resources",
 };
 
-function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, events, resources, rules, memberCount, guildId, activeChannel, setActiveChannel, discussionsLoading, discussionPosts, onDiscussionPosted, onDiscussionDelete }: GuildTabsProps) {
+function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, events, resources, rules, memberCount, guildId, activeChannel, setActiveChannel, discussionsLoading, discussionPosts, onDiscussionPosted, onDiscussionDelete, channels, canModerate, isFounder, currentUserId, founderId, onPin, onChannelsSaved, onMemberRoleChange }: GuildTabsProps) {
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleBusy, setRoleBusy] = useState<string | null>(null);
+
+  async function handlePinClick(id: string) {
+    if (!onPin) return;
+    setPinError(null);
+    try {
+      await onPin(id);
+    } catch (e) {
+      setPinError(e instanceof Error ? e.message : "Failed to pin post");
+    }
+  }
+
+  async function handleRoleClick(userId: string, role: "moderator" | "member") {
+    if (!onMemberRoleChange) return;
+    setRoleError(null);
+    setRoleBusy(userId);
+    try {
+      await onMemberRoleChange(userId, role);
+    } catch (e) {
+      setRoleError(e instanceof Error ? e.message : "Failed to update role");
+    } finally {
+      setRoleBusy(null);
+    }
+  }
+
   return (
     <>
       <div className="mb-6 flex border-b border-white/10 gap-1 overflow-x-auto scrollbar-none">
@@ -380,8 +481,8 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
           <motion.div key="discussions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="flex flex-col gap-4">
               {/* Channel pills */}
-              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-                {["all", ...DISCUSSION_CHANNELS].map((ch) => (
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
+                {["all", ...channels].map((ch) => (
                   <button
                     key={ch}
                     onClick={() => setActiveChannel(ch)}
@@ -395,6 +496,10 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                   </button>
                 ))}
               </div>
+              {isFounder && onChannelsSaved && (
+                <ChannelManager channels={channels} onSave={onChannelsSaved} />
+              )}
+              {pinError && <p className="text-xs text-rose-400">{pinError}</p>}
               <Composer
                 placeholder={
                   activeChannel === "all"
@@ -423,6 +528,8 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                     post={post}
                     onLike={() => {}}
                     onDelete={onDiscussionDelete}
+                    canPin={canModerate}
+                    onPin={onPin ? handlePinClick : undefined}
                   />
                 ))
               )}
@@ -433,6 +540,7 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
         {tab === "members" && (
           <motion.div key="members" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="flex flex-col gap-3">
+              {roleError && <p className="text-xs text-rose-400">{roleError}</p>}
               {members.map((member) => {
                 const roleMap: Record<string, GuildMember["role"]> = { admin: "founder", moderator: "moderator", member: "member" };
                 const role = roleMap[member.role] ?? "member";
@@ -440,9 +548,13 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                 const Icon = badge?.icon;
                 const name = member.displayName ?? member.userId;
                 const avatar = member.avatarUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${member.userId}`;
+                const isFounderRow = member.role === "admin" || member.userId === founderId;
+                const isSelf = currentUserId != null && member.userId === currentUserId;
+                const showRoleToggle = isFounder && onMemberRoleChange && !isFounderRow && !isSelf;
+                const isMod = member.role === "moderator";
                 return (
-                  <Link key={member.userId} href={`/artists/${member.userId}`}>
-                    <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3 hover:border-white/16 transition-colors">
+                  <div key={member.userId} className="flex items-center gap-3 rounded-xl border border-white/8 bg-stone-900/40 px-4 py-3 hover:border-white/16 transition-colors">
+                    <Link href={`/artists/${member.userId}`} className="flex items-center gap-3 flex-1 min-w-0">
                       <img src={avatar} alt={name} className="h-10 w-10 rounded-full object-cover border border-white/10"
                         onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=80&h=80&fit=crop&seed=${member.userId}`; }} />
                       <div className="flex-1 min-w-0">
@@ -456,9 +568,31 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
                         </div>
                         <p className="text-xs text-stone-500">{[member.medium, member.location].filter(Boolean).join(" · ")}</p>
                       </div>
-                      <ChevronLeft size={14} className="text-stone-600 rotate-180" />
-                    </div>
-                  </Link>
+                    </Link>
+                    {showRoleToggle ? (
+                      <button
+                        onClick={() => handleRoleClick(member.userId, isMod ? "member" : "moderator")}
+                        disabled={roleBusy === member.userId}
+                        className={`shrink-0 flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+                          isMod
+                            ? "border border-white/10 text-stone-400 hover:border-rose-500/40 hover:text-rose-400"
+                            : "bg-sky-500/15 text-sky-300 hover:bg-sky-500/25"
+                        }`}
+                      >
+                        {roleBusy === member.userId ? (
+                          <Loader2 size={11} className="animate-spin" />
+                        ) : isMod ? (
+                          <><ShieldOff size={11} /> Remove mod</>
+                        ) : (
+                          <><ShieldCheck size={11} /> Make mod</>
+                        )}
+                      </button>
+                    ) : (
+                      <Link href={`/artists/${member.userId}`} className="shrink-0">
+                        <ChevronLeft size={14} className="text-stone-600 rotate-180" />
+                      </Link>
+                    )}
+                  </div>
                 );
               })}
               {memberCount > members.length && (
@@ -534,5 +668,107 @@ function GuildTabs({ tab, setTab, likedPosts, setLikedPosts, posts, members, eve
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function ChannelManager({ channels, onSave }: { channels: string[]; onSave: (channels: string[]) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>(channels);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function startEditing() {
+    setDraft(channels.length ? channels : ["General"]);
+    setError(null);
+    setOpen(true);
+  }
+
+  function isGeneral(name: string) {
+    return name.trim().toLowerCase() === "general";
+  }
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(draft);
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save channels");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={startEditing}
+        className="self-start flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-stone-400 hover:border-white/25 hover:text-stone-200 transition-colors"
+      >
+        <Settings2 size={12} /> Manage channels
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-stone-900/60 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-stone-200">Manage channels</h3>
+        <button onClick={() => setOpen(false)} className="text-stone-500 hover:text-stone-300 transition-colors p-1">
+          <X size={14} />
+        </button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {draft.map((ch, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              value={ch}
+              onChange={(e) => setDraft((prev) => prev.map((c, idx) => (idx === i ? e.target.value : c)))}
+              maxLength={30}
+              disabled={isGeneral(ch)}
+              className="flex-1 rounded-lg bg-stone-800 border border-white/8 px-3 py-1.5 text-sm text-stone-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40 transition-colors disabled:opacity-60"
+              placeholder="Channel name"
+            />
+            {isGeneral(ch) ? (
+              <span className="shrink-0 text-[10px] text-stone-600 px-1">required</span>
+            ) : (
+              <button
+                onClick={() => setDraft((prev) => prev.filter((_, idx) => idx !== i))}
+                className="shrink-0 text-stone-600 hover:text-rose-400 transition-colors p-1.5"
+                title="Remove channel"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {draft.length < 12 && (
+        <button
+          onClick={() => setDraft((prev) => [...prev, ""])}
+          className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+        >
+          <Plus size={12} /> Add channel
+        </button>
+      )}
+      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-1.5 text-xs font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : null}
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="rounded-full border border-white/10 px-4 py-1.5 text-xs font-semibold text-stone-400 hover:text-stone-200 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }

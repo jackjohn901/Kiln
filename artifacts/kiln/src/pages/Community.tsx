@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "wouter";
-import { Heart, MessageCircle, Repeat2, Trash2, ChevronDown, ChevronUp, Send, ImagePlus, X } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Trash2, ChevronDown, ChevronUp, Send, ImagePlus, X, Pin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/contexts/ProfileContext";
 
@@ -172,11 +172,15 @@ function PostCard({
   onLike,
   onDelete,
   showReplies = false,
+  canPin = false,
+  onPin,
 }: {
   post: CommunityPost;
   onLike: (id: string) => void;
   onDelete: (id: string) => void;
   showReplies?: boolean;
+  canPin?: boolean;
+  onPin?: (id: string) => void;
 }) {
   const { isAuthenticated } = useAuth();
   const { profile } = useProfile();
@@ -261,6 +265,15 @@ function PostCard({
               )}
             </div>
           </div>
+          {canPin && onPin && (
+            <button
+              onClick={() => onPin(post.id)}
+              className={`transition-colors p-1 ${post.isPinned ? "text-amber-400 hover:text-amber-300" : "text-stone-700 hover:text-amber-400"}`}
+              title={post.isPinned ? "Unpin" : "Pin"}
+            >
+              <Pin size={13} fill={post.isPinned ? "currentColor" : "none"} />
+            </button>
+          )}
           {isOwn && (
             <button
               onClick={() => onDelete(post.id)}

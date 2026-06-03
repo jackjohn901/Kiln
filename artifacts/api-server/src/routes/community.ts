@@ -1,15 +1,46 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { communityPostsTable, communityLikesTable, profilesTable } from "@workspace/db/schema";
+import { communityPostsTable, communityLikesTable, profilesTable, guildsTable, guildMembersTable } from "@workspace/db/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 const router = Router();
 
-// Allowed guild discussion channels. Keep in sync with DISCUSSION_CHANNELS
-// in artifacts/kiln/src/pages/GuildDetail.tsx.
-const GUILD_TOPICS = ["General", "Show & Tell", "Help & Critique", "Buy / Sell / Trade"];
-const GUILD_TOPIC_SET = new Set<string>(GUILD_TOPICS);
+// Default guild discussion channels used when a guild has no custom channel list.
+// Keep in sync with DEFAULT_CHANNELS in artifacts/api-server/src/routes/guilds.ts.
+const DEFAULT_CHANNELS = ["General", "Show & Tell", "Help & Critique", "Buy / Sell / Trade"];
+
+// Load a guild plus the viewer's membership/access for it. Returns null when the
+// guild does not exist. `channels` falls back to DEFAULT_CHANNELS when unset/empty.
+async function loadGuildAccess(guildId: string, viewerId: string | null) {
+  const [guild] = await db
+    .select({
+      isPublic: guildsTable.isPublic,
+      channels: guildsTable.channels,
+      createdBy: guildsTable.createdBy,
+    })
+    .from(guildsTable)
+    .where(eq(guildsTable.id, guildId));
+  if (!guild) return null;
+
+  let isMember = false;
+  if (viewerId) {
+    if (guild.createdBy === viewerId) {
+      isMember = true;
+    } else {
+      const [m] = await db
+        .select({ userId: guildMembersTable.userId })
+        .from(guildMembersTable)
+        .where(
+          and(eq(guildMembersTable.guildId, guildId), eq(guildMembersTable.userId, viewerId)),
+        );
+      isMember = !!m;
+    }
+  }
+
+  const channels = guild.channels?.length ? guild.channels : DEFAULT_CHANNELS;
+  return { guild, isMember, channels };
+}
 
 // Shared: enrich posts with author profile + viewer like status
 async function enrichPosts(
@@ -108,12 +139,22 @@ router.get("/community/guilds/:guildId", async (req, res): Promise<void> => {
     const limit = Math.min(Number(req.query.limit) || 30, 60);
     const offset = Number(req.query.offset) || 0;
     const rawTopic = typeof req.query.topic === "string" ? req.query.topic.trim() : "";
-    if (rawTopic && !GUILD_TOPIC_SET.has(rawTopic)) {
+    const viewerId = req.isAuthenticated() ? req.user.id : null;
+
+    // Guilds that exist in the DB enforce privacy: private-guild discussions are
+    // members-only (404 hides their existence from outsiders). Static/demo guilds
+    // are not in the DB (access === null) and remain openly readable as before.
+    const access = await loadGuildAccess(guildId, viewerId);
+    if (access && !access.guild.isPublic && !access.isMember) {
+      res.status(404).json({ error: "Guild not found" });
+      return;
+    }
+    const channels = access?.channels ?? DEFAULT_CHANNELS;
+    if (rawTopic && !channels.includes(rawTopic)) {
       res.status(400).json({ error: "Unknown channel" });
       return;
     }
     const topic = rawTopic || null;
-    const viewerId = req.isAuthenticated() ? req.user.id : null;
 
     const posts = await db
       .select()
@@ -186,15 +227,25 @@ router.post("/community", async (req, res): Promise<void> => {
     if (!content?.trim()) { res.status(400).json({ error: "Content is required" }); return; }
     if (content.length > 1000) { res.status(400).json({ error: "Max 1000 characters" }); return; }
 
-    // Topics (channels) only apply to guild posts, and must be a known channel.
+    // Guild posts: when the guild exists in the DB, private guilds require
+    // membership. Static/demo guilds (access === null) stay open as before.
+    // The topic (channel), when given, must be one of that guild's channels.
     let cleanTopic: string | null = null;
-    if (guildId && typeof topic === "string" && topic.trim()) {
-      const t = topic.trim();
-      if (!GUILD_TOPIC_SET.has(t)) {
-        res.status(400).json({ error: "Unknown channel" });
+    if (guildId) {
+      const access = await loadGuildAccess(guildId, req.user.id);
+      if (access && !access.guild.isPublic && !access.isMember) {
+        res.status(403).json({ error: "Join this guild to post" });
         return;
       }
-      cleanTopic = t;
+      const channels = access?.channels ?? DEFAULT_CHANNELS;
+      if (typeof topic === "string" && topic.trim()) {
+        const t = topic.trim();
+        if (!channels.includes(t)) {
+          res.status(400).json({ error: "Unknown channel" });
+          return;
+        }
+        cleanTopic = t;
+      }
     }
 
     const id = randomUUID();
@@ -288,6 +339,47 @@ router.post("/community/:postId/like", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "community like failed");
     res.status(500).json({ error: "Failed to toggle like" });
+  }
+});
+
+// POST /community/:postId/pin — founder/admin/moderator pins or unpins a guild post
+router.post("/community/:postId/pin", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Login required" }); return; }
+  try {
+    const { postId } = req.params;
+    const [post] = await db
+      .select({ id: communityPostsTable.id, guildId: communityPostsTable.guildId, isPinned: communityPostsTable.isPinned, isDeleted: communityPostsTable.isDeleted })
+      .from(communityPostsTable)
+      .where(eq(communityPostsTable.id, postId))
+      .limit(1);
+    if (!post || post.isDeleted) { res.status(404).json({ error: "Post not found" }); return; }
+    if (!post.guildId) { res.status(403).json({ error: "Only guild posts can be pinned" }); return; }
+
+    const [guild] = await db
+      .select({ createdBy: guildsTable.createdBy })
+      .from(guildsTable)
+      .where(eq(guildsTable.id, post.guildId))
+      .limit(1);
+
+    let canModerate = guild?.createdBy === req.user.id;
+    if (!canModerate) {
+      const [membership] = await db
+        .select({ role: guildMembersTable.role })
+        .from(guildMembersTable)
+        .where(and(eq(guildMembersTable.guildId, post.guildId), eq(guildMembersTable.userId, req.user.id)));
+      canModerate = membership?.role === "admin" || membership?.role === "moderator";
+    }
+    if (!canModerate) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const isPinned = !post.isPinned;
+    await db
+      .update(communityPostsTable)
+      .set({ isPinned })
+      .where(eq(communityPostsTable.id, postId));
+    res.json({ isPinned });
+  } catch (err) {
+    req.log.error({ err }, "community pin failed");
+    res.status(500).json({ error: "Failed to pin post" });
   }
 });
 

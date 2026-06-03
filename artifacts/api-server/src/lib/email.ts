@@ -975,6 +975,65 @@ export function packingSlipEmail(opts: {
   `);
 }
 
+export interface TrendingDigestPost {
+  postId: string;
+  title: string;
+  medium?: string | null;
+  thumbnailUrl?: string | null;
+}
+
+export function trendingDigestEmail(params: {
+  craftLabel?: string | null;
+  posts: TrendingDigestPost[];
+  unsubscribeToken?: string | null;
+}): { subject: string; html: string } {
+  const craftLabel = params.craftLabel?.trim() || null;
+  const subject = craftLabel
+    ? `Trending in ${craftLabel} this week on Kiln`
+    : "Trending on Kiln this week";
+
+  const heading = craftLabel
+    ? `Trending in ${escHtml(craftLabel)} this week`
+    : "Trending this week";
+
+  const postsHtml = params.posts
+    .map((p) => {
+      const link = `${BASE_URL}/posts/${escHtml(p.postId)}`;
+      const thumb = p.thumbnailUrl
+        ? `<a href="${link}" style="flex-shrink:0;"><img src="${escHtml(p.thumbnailUrl)}" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:8px;object-fit:cover;display:block;" /></a>`
+        : `<div style="flex-shrink:0;width:72px;height:72px;border-radius:8px;background:#3c3835;"></div>`;
+      const mediumLine = p.medium
+        ? `<p style="margin:4px 0 0;color:#78716c;font-size:12px;">${escHtml(p.medium)}</p>`
+        : "";
+      return `
+        <a href="${link}" style="text-decoration:none;color:inherit;">
+          <div style="display:flex;gap:12px;align-items:center;background:#292524;border-radius:12px;padding:12px;margin:10px 0;">
+            ${thumb}
+            <div style="min-width:0;">
+              <p style="margin:0;font-size:14px;color:#d6d3d1;font-weight:bold;">${escHtml(p.title)}</p>
+              ${mediumLine}
+            </div>
+          </div>
+        </a>`;
+    })
+    .join("");
+
+  const apiBase = BASE_URL.replace(/\/kiln$/, "");
+  const unsubscribeLink = params.unsubscribeToken
+    ? `<a href="${apiBase}/api/unsubscribe/digest?token=${encodeURIComponent(params.unsubscribeToken)}" style="color:#57534e;">Unsubscribe from the weekly digest</a>`
+    : `<a href="${BASE_URL}/settings" style="color:#57534e;">Manage notification preferences</a>`;
+
+  const html = shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">${heading}</h1>
+    <p style="color:#78716c;margin-bottom:0;">Here's what the craft community is loving right now.</p>
+    ${postsHtml}
+    ${btn(`${BASE_URL}/trending`, "See what's trending")}
+    <p style="margin-top:20px;font-size:12px;color:#57534e;">${unsubscribeLink}</p>
+  `);
+
+  return { subject, html };
+}
+
 function escHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
