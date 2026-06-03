@@ -120,7 +120,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
 export default function MobileNav() {
   const [location] = useLocation();
   const { profile } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, lastNewMessagePing, lastNewInquiryPing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, unreadDropCount, unreadAuctionCount, receivedInquiries, lastNewMessagePing, lastNewInquiryPing } = useSocial();
   const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
@@ -150,7 +150,7 @@ export default function MobileNav() {
     ? "Email notifications misconfigured — check Settings"
     : undefined;
 
-  const totalBadge = unreadCount + unreadMessageCount + unreadWorkshopCount + unreadCommissionPaymentCount;
+  const totalBadge = unreadCount + unreadMessageCount + unreadWorkshopCount + unreadCommissionPaymentCount + unreadDropCount + unreadAuctionCount;
   const profileHref = profile ? `/artists/${profile.id}` : "/setup";
   const createHref = profile ? "/create" : "/setup";
   const isProfileActive = location.startsWith("/artists/") || location === "/setup" || location === "/edit-profile";
@@ -334,7 +334,9 @@ export default function MobileNav() {
                           href === "/messages" ? unreadMessageCount :
                           href === "/cart" ? itemCount :
                           href === "/workshops" ? unreadWorkshopCount :
-                          href === "/inbox" ? (pendingInquiries + unreadCommissionPaymentCount) : 0;
+                          href === "/inbox" ? (pendingInquiries + unreadCommissionPaymentCount) :
+                          href === "/drops" ? unreadDropCount :
+                          href === "/auctions" ? unreadAuctionCount : 0;
                         const notifMuted = isNotifItem && notifDimmed;
                         const notifItemWarn = isNotifItem && notifWarn && !notifDimmed;
                         const isMsgItem = href === "/messages";

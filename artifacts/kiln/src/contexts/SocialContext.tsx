@@ -16,7 +16,7 @@ export interface KilnComment {
 
 export interface KilnNotification {
   id: string;
-  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "subscription" | "sale" | "workshop_booking" | "commission_payment" | "message";
+  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "auction" | "subscription" | "sale" | "workshop_booking" | "commission_payment" | "message";
   fromId: string;
   fromName: string;
   fromAvatarUrl: string;
@@ -180,6 +180,8 @@ interface SocialContextType extends SocialState {
   unreadCount: number;
   unreadWorkshopCount: number;
   unreadCommissionPaymentCount: number;
+  unreadDropCount: number;
+  unreadAuctionCount: number;
   setMyCommissionStatus: (status: CommissionStatus) => void;
   getArtistCommissionStatus: (artistId: string) => CommissionStatus;
   sendCommissionInquiry: (inquiry: Omit<CommissionInquiry, "id" | "status" | "createdAt">) => void;
@@ -861,6 +863,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   const unreadCount = state.notifications.filter((n) => !n.read).length;
   const unreadWorkshopCount = state.notifications.filter((n) => !n.read && n.type === "workshop_booking").length;
   const unreadCommissionPaymentCount = state.notifications.filter((n) => !n.read && n.type === "commission_payment").length;
+  const unreadDropCount = state.notifications.filter((n) => !n.read && n.type === "drop").length;
+  const unreadAuctionCount = state.notifications.filter((n) => !n.read && n.type === "auction").length;
   // Prefer the server-sourced count when authenticated; fall back to local seed thread count otherwise
   const localUnreadMessageCount = state.threads.reduce(
     (sum, t) => sum + t.messages.filter((m) => !m.read && m.senderId !== "__current_user__").length,
@@ -887,6 +891,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         unreadCount,
         unreadWorkshopCount,
         unreadCommissionPaymentCount,
+        unreadDropCount,
+        unreadAuctionCount,
         setMyCommissionStatus,
         getArtistCommissionStatus,
         sendCommissionInquiry,
