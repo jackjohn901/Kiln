@@ -226,6 +226,24 @@ router.post("/workshops/:id/reminders/send", async (req, res): Promise<void> => 
     for (const booking of bookings) {
       if (!booking.userEmail) continue;
 
+      // Respect booking-level opt-out
+      if (booking.reminderOptOut) {
+        req.log.debug({ bookingId: booking.id, userId: booking.userId }, "manual reminder: skipping booking-level opted-out");
+        continue;
+      }
+
+      // Respect global workshop reminder opt-out preference
+      const [userSettings] = await db
+        .select({ settings: userSettingsTable.settings })
+        .from(userSettingsTable)
+        .where(eq(userSettingsTable.userId, booking.userId));
+
+      const settings = (userSettings?.settings as Record<string, unknown> | null) ?? {};
+      if (settings.workshopReminderOptOut === true) {
+        req.log.debug({ bookingId: booking.id, userId: booking.userId }, "manual reminder: skipping globally opted-out user");
+        continue;
+      }
+
       const startLabel = workshop.startDate
         ? workshop.startDate.toLocaleString("en-US", {
             weekday: "long",
