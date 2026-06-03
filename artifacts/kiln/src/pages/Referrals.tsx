@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, Users, Gift, Zap, Globe, Loader2, Network } from "lucide-react";
+import { Copy, Check, Users, Gift, Zap, Globe, Loader2, Network, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 import Nav from "@/components/Nav";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +49,7 @@ export default function Referrals() {
   const [network, setNetwork] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [msgCopied, setMsgCopied] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
   const [redeemStatus, setRedeemStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [redeemMsg, setRedeemMsg] = useState("");
@@ -83,6 +84,34 @@ export default function Referrals() {
     await navigator.clipboard.writeText(inviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareText = stats
+    ? `Join me on Kiln 🎨 — the home for craft artists. Sign up with my invite code ${stats.code}, and you'll get your own code to invite friends too!`
+    : "";
+  const shareMessage = `${shareText} ${inviteUrl}`;
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  const handleNativeShare = async () => {
+    if (!inviteUrl) return;
+    try {
+      await navigator.share({ title: "Join me on Kiln", text: shareText, url: inviteUrl });
+    } catch {
+      // User dismissed the share sheet, or it's unavailable — no action needed.
+    }
+  };
+
+  const handleShareFacebook = () => {
+    if (!inviteUrl) return;
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteUrl)}`;
+    window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
+  };
+
+  const handleCopyMessage = async () => {
+    if (!shareMessage.trim()) return;
+    await navigator.clipboard.writeText(shareMessage);
+    setMsgCopied(true);
+    setTimeout(() => setMsgCopied(false), 2000);
   };
 
   const handleRedeem = async () => {
@@ -160,6 +189,41 @@ export default function Referrals() {
               >
                 {copied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy invite link</>}
               </button>
+
+              {/* One-tap share */}
+              <div className="space-y-2 pt-1">
+                <p className="text-xs text-stone-400">Invite friends in one tap</p>
+                {canNativeShare && (
+                  <button
+                    onClick={handleNativeShare}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-white/10 text-white hover:bg-white/15 active:scale-95 transition-all"
+                  >
+                    <Share2 className="w-4 h-4" /> Share…
+                  </button>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleShareFacebook}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-[#1877F2] text-white hover:bg-[#1466d8] active:scale-95 transition-all"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden="true">
+                      <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z" />
+                    </svg>
+                    Facebook
+                  </button>
+                  <button
+                    onClick={handleCopyMessage}
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95 ${
+                      msgCopied ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white hover:bg-white/15"
+                    }`}
+                  >
+                    {msgCopied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy message</>}
+                  </button>
+                </div>
+                <div className="bg-stone-950/40 rounded-lg p-3 text-xs text-stone-400 italic leading-relaxed">
+                  “{shareMessage}”
+                </div>
+              </div>
             </motion.div>
 
             {/* Progress to next milestone */}
