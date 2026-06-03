@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   ChevronLeft, CheckCircle, Circle, Clock, MessageCircle, DollarSign,
   Image, Truck, Package, Star, Loader2, ChevronRight, Paperclip, X, Send,
-  FileText,
+  FileText, ArrowLeftRight,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
@@ -32,6 +32,8 @@ interface Commission {
   milestone: string | null;
   estimatedDelivery: string | null;
   referenceUrls: string[] | null;
+  counterPrice: number | null;
+  counterNote: string | null;
   createdAt: string;
 }
 
@@ -61,6 +63,7 @@ const MILESTONE_TEMPLATES = [
 const STATUS_COLORS: Record<string, string> = {
   pending: "text-stone-400 bg-stone-800 border-stone-700",
   quoted: "text-violet-400 bg-violet-500/10 border-violet-500/30",
+  countered: "text-orange-400 bg-orange-500/10 border-orange-500/30",
   accepted: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
   in_progress: "text-amber-400 bg-amber-500/10 border-amber-500/30",
   completed: "text-blue-400 bg-blue-500/10 border-blue-500/30",
@@ -372,8 +375,85 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate, highlig
 }) {
   const [expanded, setExpanded] = useState(highlighted ?? false);
   const [updating, setUpdating] = useState(false);
+  const [counterMode, setCounterMode] = useState(false);
+  const [counterPriceInput, setCounterPriceInput] = useState("");
+  const [counterNoteInput, setCounterNoteInput] = useState("");
+  const [counterSending, setCounterSending] = useState(false);
+  const [requoteMode, setRequoteMode] = useState(false);
+  const [requotePriceInput, setRequotePriceInput] = useState(String(commission.quotedPrice ?? ""));
+  const [requoteNotesInput, setRequoteNotesInput] = useState(commission.artistNotes ?? "");
   const progressIndex = getMilestoneIndex(commission);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  async function handleSendCounter() {
+    const price = parseFloat(counterPriceInput.replace(/[^0-9.]/g, ""));
+    if (!price || price <= 0) {
+      toast({ title: "Enter a valid price", description: "Counter price must be a positive number.", variant: "destructive" });
+      return;
+    }
+    setCounterSending(true);
+    try {
+      const r = await fetch(`/api/commissions/${commission.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "countered", counterPrice: price, counterNote: counterNoteInput.trim() || undefined }),
+      });
+      if (!r.ok) throw new Error();
+      const data = await r.json() as Commission;
+      onUpdate(commission.id, data);
+      setCounterMode(false);
+      setCounterPriceInput("");
+      setCounterNoteInput("");
+      toast({ title: "Counter offer sent", description: "The artist will be notified of your offer." });
+    } catch {
+      toast({ title: "Couldn\u2019t send counter offer", description: "Please try again.", variant: "destructive" });
+    }
+    setCounterSending(false);
+  }
+
+  async function handleAcceptCounter() {
+    if (!commission.counterPrice) return;
+    setUpdating(true);
+    try {
+      const r = await fetch(`/api/commissions/${commission.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "accepted", quotedPrice: commission.counterPrice }),
+      });
+      if (!r.ok) throw new Error();
+      const data = await r.json() as Commission;
+      onUpdate(commission.id, data);
+    } catch {
+      toast({ title: "Couldn\u2019t accept counter", description: "Please try again.", variant: "destructive" });
+    }
+    setUpdating(false);
+  }
+
+  async function handleRequote() {
+    const price = parseFloat(requotePriceInput.replace(/[^0-9.]/g, ""));
+    if (!price || price <= 0) {
+      toast({ title: "Enter a valid price", description: "Quote price must be a positive number.", variant: "destructive" });
+      return;
+    }
+    setUpdating(true);
+    try {
+      const r = await fetch(`/api/commissions/${commission.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "quoted", quotedPrice: price, artistNotes: requoteNotesInput.trim() || undefined }),
+      });
+      if (!r.ok) throw new Error();
+      const data = await r.json() as Commission;
+      onUpdate(commission.id, data);
+      setRequoteMode(false);
+    } catch {
+      toast({ title: "Couldn\u2019t send re-quote", description: "Please try again.", variant: "destructive" });
+    }
+    setUpdating(false);
+  }
 
   useEffect(() => {
     if (highlighted && cardRef.current) {
@@ -492,13 +572,143 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate, highlig
               {commission.artistNotes && (
                 <p className="text-xs text-stone-300 leading-relaxed">{commission.artistNotes}</p>
               )}
-              <button
-                onClick={() => updateCommission({ status: "accepted" })}
-                disabled={updating}
-                className="w-full rounded-full bg-violet-500/20 border border-violet-500/40 text-xs text-violet-300 py-2.5 font-medium hover:bg-violet-500/30 transition-colors disabled:opacity-50"
-              >
-                {updating ? "Accepting…" : "Accept Quote"}
-              </button>
+              {!counterMode ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateCommission({ status: "accepted" })}
+                    disabled={updating}
+                    className="flex-1 rounded-full bg-violet-500/20 border border-violet-500/40 text-xs text-violet-300 py-2.5 font-medium hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {updating ? "Accepting…" : "Accept Quote"}
+                  </button>
+                  <button
+                    onClick={() => setCounterMode(true)}
+                    disabled={updating}
+                    className="flex items-center gap-1 rounded-full border border-orange-500/30 px-3 py-2.5 text-xs text-orange-400 hover:bg-orange-500/10 transition-colors disabled:opacity-50"
+                  >
+                    <ArrowLeftRight size={11} /> Counter
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-orange-400/70">Your counter offer</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 text-xs">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={counterPriceInput}
+                      onChange={e => setCounterPriceInput(e.target.value)}
+                      placeholder="Counter price"
+                      className="w-full rounded-lg border border-orange-500/30 bg-stone-800 pl-6 pr-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-orange-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={counterNoteInput}
+                    onChange={e => setCounterNoteInput(e.target.value)}
+                    placeholder="Optional note to the artist…"
+                    className="w-full resize-none rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-orange-500/30 focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSendCounter}
+                      disabled={counterSending || !counterPriceInput}
+                      className="flex-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-xs text-orange-300 py-2 font-medium hover:bg-orange-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {counterSending ? "Sending…" : "Send Counter Offer"}
+                    </button>
+                    <button
+                      onClick={() => { setCounterMode(false); setCounterPriceInput(""); setCounterNoteInput(""); }}
+                      className="rounded-full border border-white/10 px-3 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isArtist && commission.status === "countered" && (
+            <div className="rounded-xl border border-orange-500/30 bg-orange-500/8 p-4 space-y-2">
+              <p className="text-[10px] uppercase tracking-wider text-orange-400/70">Counter offer sent</p>
+              {commission.counterPrice && (
+                <p className="text-lg font-bold text-orange-300">${commission.counterPrice.toLocaleString()}</p>
+              )}
+              {commission.counterNote && (
+                <p className="text-xs text-stone-300 leading-relaxed">{commission.counterNote}</p>
+              )}
+              <p className="text-[10px] text-stone-600">Waiting for the artist to respond.</p>
+            </div>
+          )}
+
+          {isArtist && commission.status === "countered" && (
+            <div className="rounded-xl border border-orange-500/30 bg-orange-500/8 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] uppercase tracking-wider text-orange-400/70">Counter offer received</p>
+                {commission.counterPrice && (
+                  <span className="text-lg font-bold text-orange-300">${commission.counterPrice.toLocaleString()}</span>
+                )}
+              </div>
+              {commission.counterNote && (
+                <p className="text-xs text-stone-300 leading-relaxed">{commission.counterNote}</p>
+              )}
+              {!requoteMode ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAcceptCounter}
+                    disabled={updating || !commission.counterPrice}
+                    className="flex-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-xs text-emerald-300 py-2.5 font-medium hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {updating ? "Accepting…" : `Accept $${commission.counterPrice?.toLocaleString()}`}
+                  </button>
+                  <button
+                    onClick={() => { setRequoteMode(true); setRequotePriceInput(String(commission.quotedPrice ?? "")); setRequoteNotesInput(commission.artistNotes ?? ""); }}
+                    disabled={updating}
+                    className="flex items-center gap-1 rounded-full border border-violet-500/30 px-3 py-2.5 text-xs text-violet-400 hover:bg-violet-500/10 transition-colors disabled:opacity-50"
+                  >
+                    Re-quote
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-violet-400/70">New quote</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 text-xs">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={requotePriceInput}
+                      onChange={e => setRequotePriceInput(e.target.value)}
+                      placeholder="Revised price"
+                      className="w-full rounded-lg border border-violet-500/30 bg-stone-800 pl-6 pr-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-violet-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={requoteNotesInput}
+                    onChange={e => setRequoteNotesInput(e.target.value)}
+                    placeholder="Notes for the buyer…"
+                    className="w-full resize-none rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-violet-500/30 focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRequote}
+                      disabled={updating || !requotePriceInput}
+                      className="flex-1 rounded-full bg-violet-500/20 border border-violet-500/40 text-xs text-violet-300 py-2 font-medium hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {updating ? "Sending…" : "Send Revised Quote"}
+                    </button>
+                    <button
+                      onClick={() => setRequoteMode(false)}
+                      className="rounded-full border border-white/10 px-3 py-2 text-xs text-stone-500 hover:text-stone-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -573,12 +783,13 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate, highlig
   );
 }
 
-type StatusFilter = "all" | "pending" | "quoted" | "accepted" | "in_progress" | "completed" | "declined";
+type StatusFilter = "all" | "pending" | "quoted" | "countered" | "accepted" | "in_progress" | "completed" | "declined";
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "quoted", label: "Quoted" },
+  { key: "countered", label: "Countered" },
   { key: "accepted", label: "Accepted" },
   { key: "in_progress", label: "In Progress" },
   { key: "completed", label: "Completed" },
@@ -589,6 +800,7 @@ const FILTER_ACTIVE_COLORS: Record<StatusFilter, string> = {
   all: "bg-amber-500/20 text-amber-300 border-amber-500/30",
   pending: "bg-stone-700/60 text-stone-300 border-stone-600",
   quoted: "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  countered: "bg-orange-500/20 text-orange-300 border-orange-500/30",
   accepted: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   in_progress: "bg-amber-500/20 text-amber-300 border-amber-500/30",
   completed: "bg-blue-500/20 text-blue-300 border-blue-500/30",

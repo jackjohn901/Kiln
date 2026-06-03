@@ -21,6 +21,8 @@ export const commissionsTable = pgTable("commissions", {
   artistNotes: text("artist_notes"),
   milestone: varchar("milestone", { length: 100 }),
   estimatedDelivery: timestamp("estimated_delivery", { withTimezone: true }),
+  counterPrice: integer("counter_price"),
+  counterNote: text("counter_note"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -153,7 +153,7 @@ router.post("/commissions/:id/updates", async (req, res): Promise<void> => {
 
 // PATCH /commissions/:id — update commission state with per-role field authorization.
 // Artist fields: status (quoted/declined/in_progress/revision/completed), quotedPrice, artistNotes, milestone, estimatedDelivery.
-// Client fields: status (accepted/cancelled only — to accept a quote or cancel the request).
+// Client fields: status (accepted/cancelled/countered only). When countered, may also send counterPrice and counterNote.
 // Payment flags (depositPaid, finalPaid) are set exclusively by Stripe webhook handlers and cannot be set here by either party.
 router.patch("/commissions/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -164,21 +164,23 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
   const isClient = commission.clientId === req.user.id;
   if (!isArtist && !isClient) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const { status, quotedPrice, artistNotes, milestone, estimatedDelivery } = req.body;
+  const { status, quotedPrice, artistNotes, milestone, estimatedDelivery, counterPrice, counterNote } = req.body;
 
   // Determine the effective role. Artist takes precedence when both flags are true
   // (e.g. a self-commission edge case), ensuring the status whitelist always fires.
   const effectiveRole: "artist" | "client" = isArtist ? "artist" : "client";
 
   const ARTIST_STATUSES = new Set(["quoted", "declined", "in_progress", "revision", "completed"]);
-  const CLIENT_STATUSES = new Set(["accepted", "cancelled"]);
+  // Artists may also accept a buyer's counter-offer (status countered → accepted)
+  if (commission.status === "countered") ARTIST_STATUSES.add("accepted");
+  const CLIENT_STATUSES = new Set(["accepted", "cancelled", "countered"]);
 
   if (status !== undefined) {
     if (effectiveRole === "artist" && !ARTIST_STATUSES.has(status)) {
-      res.status(403).json({ error: "Artists may only set status to: quoted, declined, in_progress, revision, completed" }); return;
+      res.status(403).json({ error: "Artists may only set status to: quoted, declined, in_progress, revision, completed (or accepted when buyer has countered)" }); return;
     }
     if (effectiveRole === "client" && !CLIENT_STATUSES.has(status)) {
-      res.status(403).json({ error: "Clients may only set status to: accepted, cancelled" }); return;
+      res.status(403).json({ error: "Clients may only set status to: accepted, cancelled, countered" }); return;
     }
   }
 
@@ -189,6 +191,19 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
     }
   }
 
+  // Counter-offer validation: counterPrice and counterNote are client-only, only valid when countering
+  if (counterPrice !== undefined || counterNote !== undefined) {
+    if (effectiveRole !== "client") {
+      res.status(403).json({ error: "Only clients may set counterPrice / counterNote" }); return;
+    }
+    if (status !== "countered") {
+      res.status(400).json({ error: "counterPrice / counterNote may only be set when status is 'countered'" }); return;
+    }
+    if (counterPrice !== undefined && (typeof counterPrice !== "number" || counterPrice <= 0)) {
+      res.status(400).json({ error: "counterPrice must be a positive number" }); return;
+    }
+  }
+
   const artistUpdate = effectiveRole === "artist" ? {
     ...(quotedPrice !== undefined && { quotedPrice: Number(quotedPrice) }),
     ...(artistNotes !== undefined && { artistNotes }),
@@ -196,9 +211,15 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
     ...(estimatedDelivery && { estimatedDelivery: new Date(estimatedDelivery) }),
   } : {};
 
+  const clientUpdate = effectiveRole === "client" && status === "countered" ? {
+    ...(counterPrice !== undefined && { counterPrice: Math.round(Number(counterPrice)) }),
+    counterNote: typeof counterNote === "string" ? counterNote.trim() || null : null,
+  } : {};
+
   const [updated] = await db.update(commissionsTable).set({
     ...(status !== undefined && { status }),
     ...artistUpdate,
+    ...clientUpdate,
   }).where(eq(commissionsTable.id, req.params.id)).returning();
 
   if (status && isArtist && !isClient) {
@@ -232,6 +253,33 @@ router.patch("/commissions/:id", async (req, res): Promise<void> => {
       }
     }
   }
+
+  // When a client submits a counter-offer: auto-post an update thread message and notify the artist
+  if (status === "countered" && isClient && !isArtist) {
+    const user = req.user;
+    const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Client";
+    const priceStr = updated.counterPrice != null ? `$${updated.counterPrice.toLocaleString()}` : "(no price specified)";
+    const noteStr = updated.counterNote ? `\n\n"${updated.counterNote}"` : "";
+    const updateText = `Counter offer: ${priceStr}${noteStr}`;
+    await db.insert(commissionUpdatesTable).values({
+      id: crypto.randomUUID(),
+      commissionId: commission.id,
+      authorId: user.id,
+      authorName,
+      text: updateText,
+    });
+    await db.insert(notificationsTable).values({
+      id: crypto.randomUUID(),
+      userId: commission.artistId,
+      type: "commission",
+      fromId: user.id,
+      fromName: authorName,
+      fromAvatarUrl: user.profileImageUrl ?? null,
+      text: `sent a counter offer on your commission`,
+      link: `/commission-tracker?highlight=${commission.id}`,
+    });
+  }
+
   res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), estimatedDelivery: updated.estimatedDelivery?.toISOString() ?? null });
 });
 
