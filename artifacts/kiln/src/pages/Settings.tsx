@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
-import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin, AlertCircle, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
+import { ChevronLeft, Bell, Shield, User, Palette, Globe, Trash2, LogOut, ChevronRight, Moon, Smartphone, Mail, Eye, EyeOff, Volume2, CreditCard, Check, Truck, Copy, Share2, AlertTriangle, Flame, Leaf, BookOpen, Link2, MapPin, AlertCircle, CheckCircle, ExternalLink, Loader2, CalendarDays, Video } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSettings, type KilnSettings } from "@/contexts/SettingsContext";
@@ -47,7 +47,23 @@ function defaultAddress(): DefaultShippingAddress {
   return { street: "", city: "", state: "", zip: "", country: "" };
 }
 
-type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping" | "address";
+interface WorkshopBookingEntry {
+  id: string;
+  workshopId: string;
+  createdAt: string;
+  workshop: {
+    id: string;
+    title: string;
+    artistName: string;
+    imageUrl: string | null;
+    location: string | null;
+    isOnline: boolean;
+    meetingUrl: string | null;
+    startDate: string | null;
+  } | null;
+}
+
+type Section = "notifications" | "privacy" | "display" | "account" | "payments" | "shipping" | "address" | "bookings";
 type MobileTab = "All" | "Profile" | "Selling" | "Preferences";
 
 export default function Settings() {
@@ -71,7 +87,7 @@ export default function Settings() {
   const [section, setSection] = useState<Section | null>(() => {
     const params = new URLSearchParams(search);
     const s = params.get("section");
-    const valid: Section[] = ["notifications", "privacy", "display", "account", "payments", "shipping", "address"];
+    const valid: Section[] = ["notifications", "privacy", "display", "account", "payments", "shipping", "address", "bookings"];
     return (s && (valid as string[]).includes(s)) ? (s as Section) : null;
   });
   const [saved, setSaved] = useState(false);
@@ -98,6 +114,8 @@ export default function Settings() {
   const [smsResumeAt, setSmsResumeAt] = useState<string | null>(null);
   const [smsSnoozePickerOpen, setSmsSnoozePickerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("All");
+  const [bookings, setBookings] = useState<WorkshopBookingEntry[] | null>(null);
+  const [bookingsError, setBookingsError] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
@@ -109,6 +127,20 @@ export default function Settings() {
     setter(msg);
     setTimeout(() => setter(null), 4000);
   }
+
+  useEffect(() => {
+    if (section !== "bookings" || bookings !== null) return;
+    let cancelled = false;
+    fetch("/api/me/workshops", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ bookings: WorkshopBookingEntry[] }> : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(data => {
+        if (cancelled) return;
+        setBookings(data.bookings ?? []);
+        setBookingsError(false);
+      })
+      .catch(() => { if (!cancelled) setBookingsError(true); });
+    return () => { cancelled = true; };
+  }, [section, bookings]);
 
   useEffect(() => {
     fetch("/api/me/listings", { credentials: "include" })
@@ -400,6 +432,7 @@ export default function Settings() {
     { key: "privacy", icon: Shield, label: "Privacy & Safety", desc: "Who can see and contact you", group: "Preferences" },
     { key: "display", icon: Palette, label: "Display & Playback", desc: "Theme, feed, and video settings", group: "Preferences" },
     { key: "address", icon: MapPin, label: "Delivery Address", desc: addressDesc, group: "Profile" },
+    { key: "bookings", icon: CalendarDays, label: "My Bookings", desc: "Workshops you've booked", group: "Profile" },
     { key: "payments", icon: CreditCard, label: "Payment Methods", desc: "How buyers pay you directly", group: "Selling" },
     { key: "shipping", icon: Truck, label: "Shipping Rates", desc: "Your domestic and international rates", group: "Selling" },
     { key: "account", icon: User, label: "Account", desc: "Profile, security, and data", group: "Profile" },
@@ -1496,6 +1529,94 @@ export default function Settings() {
                 White glove and crated delivery can cost $150–$500+ for large sculptures.
               </p>
             </div>
+          </div>
+        )}
+
+        {section === "bookings" && (
+          <div className="space-y-3">
+            {bookings === null && !bookingsError && (
+              <div className="flex items-center justify-center py-12 text-stone-600">
+                <Loader2 size={20} className="animate-spin" />
+              </div>
+            )}
+
+            {bookingsError && (
+              <div className="rounded-2xl border border-red-500/15 bg-red-500/5 px-5 py-4 flex items-center justify-between gap-3">
+                <p className="text-sm text-red-400">Couldn&rsquo;t load your bookings.</p>
+                <button
+                  onClick={() => { setBookings(null); setBookingsError(false); }}
+                  className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {bookings !== null && !bookingsError && bookings.length === 0 && (
+              <div className="rounded-2xl border border-white/8 bg-stone-900/60 px-5 py-10 text-center">
+                <CalendarDays size={28} className="mx-auto text-stone-700 mb-3" />
+                <p className="text-sm text-stone-300 mb-1">No bookings yet</p>
+                <p className="text-xs text-stone-600 mb-4">Workshops you book will show up here with their meeting link or location.</p>
+                <Link href="/workshops" className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-400 transition-colors">
+                  Find Workshops
+                </Link>
+              </div>
+            )}
+
+            {bookings !== null && !bookingsError && bookings.map((b) => {
+              const w = b.workshop;
+              if (!w) return null;
+              const dateLabel = w.startDate
+                ? new Date(w.startDate).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+                : null;
+              return (
+                <div key={b.id} className="rounded-2xl border border-white/8 bg-stone-900/60 overflow-hidden">
+                  <Link href={`/workshops/${w.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-white/3 transition-colors">
+                    {w.imageUrl && (
+                      <img src={w.imageUrl} alt={w.title} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-stone-200 truncate">{w.title}</p>
+                      <p className="text-xs text-amber-400/90 truncate">with {w.artistName}</p>
+                    </div>
+                    <ChevronRight size={14} className="text-stone-600 shrink-0" />
+                  </Link>
+                  <div className="border-t border-white/5 px-5 py-3 space-y-1.5 text-xs text-stone-400">
+                    {dateLabel && (
+                      <div className="flex items-center gap-2">
+                        <CalendarDays size={12} className="shrink-0 text-stone-500" />
+                        <span>{dateLabel}</span>
+                      </div>
+                    )}
+                    {w.isOnline ? (
+                      w.meetingUrl ? (
+                        <div className="flex items-center gap-2">
+                          <Video size={12} className="shrink-0 text-sky-400" />
+                          <a
+                            href={w.meetingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-400 hover:text-sky-300 underline underline-offset-2 truncate"
+                          >
+                            {w.meetingUrl}
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-stone-500">
+                          <Video size={12} className="shrink-0" />
+                          <span>Online — meeting link coming soon</span>
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <MapPin size={12} className="shrink-0 text-stone-500" />
+                        <span>{w.location || "Location to be announced"}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
