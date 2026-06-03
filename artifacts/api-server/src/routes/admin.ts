@@ -755,4 +755,57 @@ router.get("/admin/users/featured", async (req, res): Promise<void> => {
   res.json({ users: rows });
 });
 
+// POST /admin/mark-email-bounced
+// Marks a user's contact email as bounced so the UI shows the error state.
+// Called automatically by the mail-provider delivery-failure webhook, or
+// manually by an admin from the console.
+//
+// Authorization — either of:
+//   1. Authenticated admin session (ADMIN_USER_IDS env var).
+//   2. Internal secret header: X-Internal-Secret matching INTERNAL_WEBHOOK_SECRET env var.
+//      This lets the mail provider call the endpoint without a user session.
+//
+// Body: { userId: string }
+function isValidInternalSecret(req: import("express").Request): boolean {
+  const secret = (process.env["INTERNAL_WEBHOOK_SECRET"] ?? "").trim();
+  if (!secret) return false;
+  const header = (req.headers["x-internal-secret"] ?? "").toString().trim();
+  return header === secret;
+}
+
+router.post("/admin/mark-email-bounced", async (req, res): Promise<void> => {
+  const authedAdmin = req.isAuthenticated() && isAdmin(req.user.id);
+  const internalCall = isValidInternalSecret(req);
+
+  if (!authedAdmin && !internalCall) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { userId } = req.body as { userId?: string };
+  if (!userId || typeof userId !== "string" || !userId.trim()) {
+    res.status(400).json({ error: "userId is required" });
+    return;
+  }
+
+  try {
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ contactEmailBounced: true })
+      .where(eq(profilesTable.userId, userId.trim()))
+      .returning({ userId: profilesTable.userId });
+
+    if (!updated) {
+      res.status(404).json({ error: "Profile not found for the given userId" });
+      return;
+    }
+
+    req.log.info({ userId: updated.userId, triggeredBy: authedAdmin ? "admin" : "internal-webhook" }, "admin.markEmailBounced: flagged");
+    res.json({ ok: true, userId: updated.userId, contactEmailBounced: true });
+  } catch (err) {
+    req.log.error({ err }, "admin.markEmailBounced error");
+    res.status(500).json({ error: "Failed to mark email as bounced" });
+  }
+});
+
 export default router;
