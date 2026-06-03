@@ -1077,7 +1077,6 @@ export default function Feed() {
   const [apiPostOffset, setApiPostOffset] = useState(20);
   const [hasMoreApiPosts, setHasMoreApiPosts] = useState(true);
   const [musicMuted, setMusicMuted] = useState(false);
-  const [videoAudioOn, setVideoAudioOn] = useState(true);
   const [musicUnlocked, setMusicUnlocked] = useState(false);
   const [feedTab, setFeedTab] = useState<"foryou" | "following">("foryou");
   const [techniqueFilter, setTechniqueFilter] = useState<string | null>(null);
@@ -1112,18 +1111,28 @@ export default function Feed() {
   const handleComment = useCallback((id: string, name: string) => {
     setCommentReel({ id, artistName: name });
   }, []);
-  const handleToggleVideoAudio = useCallback(() => {
-    setVideoAudioOn((v) => !v);
-  }, []);
-
   const { following, unreadCount } = useSocial();
   const { profile } = useProfile();
-  const { settings: kilnSettings } = useSettings();
+  const { settings: kilnSettings, patchSettings } = useSettings();
 
-  // Sync sound and autoplay state from settings in real time
-  useEffect(() => {
-    setVideoAudioOn(kilnSettings.display_sound);
-  }, [kilnSettings.display_sound]);
+  // Sound preference is owned by Settings (display_sound). Tapping the mic on a
+  // reel is treated as a real preference change: it wins for the rest of the
+  // session and is written back to Settings so the two never disagree. Reading
+  // videoAudioOn straight from settings (instead of mirroring it into local
+  // state) means a mid-session tap can never be clobbered by a later settings
+  // re-render, while Settings-page changes still flow through to the feed live.
+  // autoplay is already read directly from kilnSettings.display_autoplay below,
+  // so it follows the same single-source-of-truth rule.
+  const videoAudioOn = kilnSettings.display_sound;
+  const settingsRef = useRef(kilnSettings);
+  settingsRef.current = kilnSettings;
+  const patchSettingsRef = useRef(patchSettings);
+  patchSettingsRef.current = patchSettings;
+  // Stable callback (reads latest values via refs) so memoized ReelCards don't
+  // re-render on every parent state change.
+  const handleToggleVideoAudio = useCallback(() => {
+    patchSettingsRef.current({ display_sound: !settingsRef.current.display_sound });
+  }, []);
 
   const [, navigate] = useLocation(); // used by StreakBadge and other sub-components
   const [activeFirings, setActiveFirings] = useState<KilnFiringStatus[]>([]);
