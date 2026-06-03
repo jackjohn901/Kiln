@@ -20,6 +20,7 @@ import { createBeatLooper } from "@/lib/beatSynth";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useSocial } from "@/contexts/SocialContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import Comments from "@/components/Comments";
 import NotificationPanel from "@/components/NotificationPanel";
@@ -1114,6 +1115,8 @@ export default function Feed() {
   const { following, unreadCount } = useSocial();
   const { profile } = useProfile();
   const { settings: kilnSettings, patchSettings } = useSettings();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const prevAuthRef = useRef<boolean | null>(null);
 
   // Sound preference is owned by Settings (display_sound). Tapping the mic on a
   // reel is treated as a real preference change: it wins for the rest of the
@@ -1284,6 +1287,23 @@ export default function Feed() {
     if (feedTab !== "following") return;
     fetchFollowingFeed();
   }, [feedTab, fetchFollowingFeed]);
+
+  // Re-fetch the Following feed when the user signs in mid-session (guest → authed).
+  // Wait until auth has settled (authLoading=false) before tracking, and treat the
+  // first settled value as the baseline so an already-authenticated user on first
+  // render does not trigger a duplicate fetch.
+  useEffect(() => {
+    if (authLoading) return;
+    const prev = prevAuthRef.current;
+    prevAuthRef.current = isAuthenticated;
+    if (prev === null) return; // establish baseline only
+    if (prev === false && isAuthenticated) {
+      // Reset so freshly-loaded posts apply immediately instead of as a "new posts" pill
+      followingLoadedRef.current = false;
+      followingReelIdsRef.current = new Set();
+      if (feedTab === "following") fetchFollowingFeed();
+    }
+  }, [authLoading, isAuthenticated, feedTab, fetchFollowingFeed]);
 
   // Poll every 60s while the Following tab is active
   useEffect(() => {
