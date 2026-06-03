@@ -225,26 +225,63 @@ export default function OrderDetail() {
   const [replyDraft, setReplyDraft] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
-  const [showUpdateBanner, setShowUpdateBanner] = useState(
-    highlightParam === "shipped" || highlightParam === "delivered",
-  );
-  const [statusHighlighted, setStatusHighlighted] = useState(
-    highlightParam === "shipped" || highlightParam === "delivered",
-  );
+  const paramBannerType: "shipped" | "delivered" | null =
+    highlightParam === "shipped" || highlightParam === "delivered" ? highlightParam : null;
+
+  // Persisted, per-order banner state so a shipped/delivered update stays visible
+  // until the buyer actually reads it (taps X or lingers for 10s+), and never
+  // re-appears on later visits. localStorage value is the update type while the
+  // banner is still pending, or "seen" once it has been dismissed/read.
+  const [banner, setBanner] = useState<{ show: boolean; type: "shipped" | "delivered" }>(() => {
+    let stored: string | null = null;
+    if (id) {
+      try { stored = localStorage.getItem(`kiln:order-update-banner:${id}`); } catch { /* ignore */ }
+    }
+    if (stored === "seen") return { show: false, type: paramBannerType ?? "shipped" };
+    if (paramBannerType) return { show: true, type: paramBannerType };
+    if (stored === "shipped" || stored === "delivered") return { show: true, type: stored };
+    return { show: false, type: "shipped" };
+  });
+  const [statusHighlighted, setStatusHighlighted] = useState(() => {
+    let stored: string | null = null;
+    if (id) {
+      try { stored = localStorage.getItem(`kiln:order-update-banner:${id}`); } catch { /* ignore */ }
+    }
+    if (stored === "seen") return false;
+    return paramBannerType !== null || stored === "shipped" || stored === "delivered";
+  });
+
+  const dismissBanner = useCallback(() => {
+    setBanner((prev) => ({ ...prev, show: false }));
+    if (id) {
+      try { localStorage.setItem(`kiln:order-update-banner:${id}`, "seen"); } catch { /* ignore */ }
+    }
+  }, [id]);
 
   useEffect(() => {
     if (id) markLinkRead(`/orders/${id}`);
   }, [id, markLinkRead]);
 
+  // While the banner is pending, persist its type so a slow load or accidental
+  // refresh keeps it visible instead of losing it after the first paint.
   useEffect(() => {
-    if (!showUpdateBanner) return;
-    const bannerTimer = setTimeout(() => setShowUpdateBanner(false), 6000);
+    if (!id || !banner.show) return;
+    try {
+      if (localStorage.getItem(`kiln:order-update-banner:${id}`) !== "seen") {
+        localStorage.setItem(`kiln:order-update-banner:${id}`, banner.type);
+      }
+    } catch { /* ignore */ }
+  }, [id, banner.show, banner.type]);
+
+  useEffect(() => {
+    if (!banner.show) return;
+    const bannerTimer = setTimeout(dismissBanner, 10000);
     const highlightTimer = setTimeout(() => setStatusHighlighted(false), 3000);
     return () => {
       clearTimeout(bannerTimer);
       clearTimeout(highlightTimer);
     };
-  }, [showUpdateBanner]);
+  }, [banner.show, dismissBanner]);
 
   useEffect(() => {
     const fetchUrl = sessionKey
@@ -596,21 +633,21 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {showUpdateBanner && (
+        {banner.show && (
           <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="h-2 w-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-amber-300">
-                {highlightParam === "shipped" ? "Your order has shipped!" : "Your order has been delivered!"}
+                {banner.type === "shipped" ? "Your order has shipped!" : "Your order has been delivered!"}
               </p>
               <p className="text-xs text-stone-400 mt-0.5">
-                {highlightParam === "shipped"
+                {banner.type === "shipped"
                   ? "The artist has marked this order as shipped."
                   : "This order has been marked as delivered."}
               </p>
             </div>
             <button
-              onClick={() => setShowUpdateBanner(false)}
+              onClick={dismissBanner}
               className="shrink-0 text-stone-500 hover:text-stone-300 transition-colors"
             >
               <X size={14} />

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { apiGet } from "@/lib/api";
 
@@ -109,26 +110,57 @@ export default function OrderDetailScreen() {
   const { id, highlight } = useLocalSearchParams<{ id: string; highlight?: string }>();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const isHighlighted = highlight === "shipped" || highlight === "delivered";
-  const [showUpdateBanner, setShowUpdateBanner] = useState(isHighlighted);
-  const [statusRing, setStatusRing] = useState(isHighlighted);
-  const bannerOpacity = useRef(new Animated.Value(isHighlighted ? 1 : 0)).current;
+  // Persisted, per-order banner so a shipped/delivered update stays visible
+  // until the buyer actually reads it (taps X or lingers for 10s+), and never
+  // re-appears on later visits. AsyncStorage value is the update type while the
+  // banner is still pending, or "seen" once it has been dismissed/read.
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  const [bannerType, setBannerType] = useState<"shipped" | "delivered">("shipped");
+  const [statusRing, setStatusRing] = useState(false);
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
+
+  const dismissBanner = useCallback(() => {
+    Animated.timing(bannerOpacity, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start(() => setShowUpdateBanner(false));
+    if (id) {
+      AsyncStorage.setItem(`kiln:order-update-banner:${id}`, "seen").catch(() => {});
+    }
+  }, [id, bannerOpacity]);
 
   useEffect(() => {
-    if (!isHighlighted) return;
+    if (!id) return;
+    let cancelled = false;
+    const key = `kiln:order-update-banner:${id}`;
+    const paramType: "shipped" | "delivered" | null =
+      highlight === "shipped" || highlight === "delivered" ? highlight : null;
+    (async () => {
+      let stored: string | null = null;
+      try { stored = await AsyncStorage.getItem(key); } catch { /* ignore */ }
+      if (cancelled || stored === "seen") return;
+      const type: "shipped" | "delivered" | null =
+        paramType ?? (stored === "shipped" || stored === "delivered" ? stored : null);
+      if (!type) return;
+      setBannerType(type);
+      setShowUpdateBanner(true);
+      setStatusRing(true);
+      bannerOpacity.setValue(1);
+      try { await AsyncStorage.setItem(key, type); } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [id, highlight, bannerOpacity]);
+
+  useEffect(() => {
+    if (!showUpdateBanner) return;
     const ringTimer = setTimeout(() => setStatusRing(false), 3000);
-    const bannerTimer = setTimeout(() => {
-      Animated.timing(bannerOpacity, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => setShowUpdateBanner(false));
-    }, 5500);
+    const bannerTimer = setTimeout(dismissBanner, 10000);
     return () => {
       clearTimeout(ringTimer);
       clearTimeout(bannerTimer);
     };
-  }, [isHighlighted, bannerOpacity]);
+  }, [showUpdateBanner, dismissBanner]);
 
   const [sellerWindow, setSellerWindow] = useState<SellerProcessingWindow | null>(null);
   const [siblingWindows, setSiblingWindows] = useState<Record<string, SellerProcessingWindow>>({});
@@ -256,15 +288,15 @@ export default function OrderDetailScreen() {
             <View style={styles.updateBannerDot} />
             <View style={{ flex: 1 }}>
               <Text style={styles.updateBannerTitle}>
-                {highlight === "shipped" ? "Your order has shipped!" : "Your order has been delivered!"}
+                {bannerType === "shipped" ? "Your order has shipped!" : "Your order has been delivered!"}
               </Text>
               <Text style={styles.updateBannerSub}>
-                {highlight === "shipped"
+                {bannerType === "shipped"
                   ? "The artist has marked this order as shipped."
                   : "This order has been marked as delivered."}
               </Text>
             </View>
-            <Pressable onPress={() => setShowUpdateBanner(false)} hitSlop={8}>
+            <Pressable onPress={dismissBanner} hitSlop={8}>
               <Feather name="x" size={14} color="#8A7E75" />
             </Pressable>
           </Animated.View>
