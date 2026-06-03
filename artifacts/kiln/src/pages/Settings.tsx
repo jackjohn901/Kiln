@@ -88,6 +88,7 @@ export default function Settings() {
   const [emailValidationError, setEmailValidationError] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneSaved, setPhoneSaved] = useState(false);
+  const [phoneFocused, setPhoneFocused] = useState(false);
   const [phoneValidationError, setPhoneValidationError] = useState(false);
   const [address, setAddress] = useState<DefaultShippingAddress>(defaultAddress);
   const [addressSaved, setAddressSaved] = useState(false);
@@ -804,7 +805,8 @@ export default function Settings() {
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => { setPhoneNumber(e.target.value); if (phoneValidationError && /^\+?[\d\s\-().]{7,20}$/.test(e.target.value.trim())) setPhoneValidationError(false); }}
-                    onBlur={(e) => savePhoneNumber(e.target.value)}
+                    onFocus={() => setPhoneFocused(true)}
+                    onBlur={(e) => { setPhoneFocused(false); savePhoneNumber(e.target.value); }}
                     placeholder="+1 555 123 4567"
                     className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${phoneValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-sky-500/50"}`}
                   />
@@ -818,6 +820,9 @@ export default function Settings() {
                     <p className="text-xs text-red-400">{phoneError}</p>
                     <button onClick={() => savePhoneNumber(phoneNumber)} className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0">Retry</button>
                   </div>
+                )}
+                {(phoneFocused || !phoneNumber.trim()) && !phoneSaved && !phoneValidationError && !phoneError && (
+                  <p className="text-xs text-stone-500 mt-1.5">Include country code, e.g. +1 555 123 4567</p>
                 )}
                 {!phoneNumber.trim() && !settings.notif_sms_paused && (
                   <p className="text-xs text-amber-500/70 mt-1.5">Add a phone number above to receive SMS alerts.</p>
