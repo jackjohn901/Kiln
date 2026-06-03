@@ -52,6 +52,7 @@ interface WorkshopBookingEntry {
   id: string;
   workshopId: string;
   createdAt: string;
+  status: string;
   reminderOptOut: boolean;
   workshop: {
     id: string;
@@ -152,7 +153,7 @@ export default function Settings() {
   }
 
   useEffect(() => {
-    if (section !== "bookings" || bookings !== null) return;
+    if ((section !== "bookings" && section !== "notifications") || bookings !== null) return;
     let cancelled = false;
     fetch("/api/me/workshops", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ bookings: WorkshopBookingEntry[] }> : Promise.reject(new Error(`HTTP ${r.status}`)))
@@ -737,6 +738,60 @@ export default function Settings() {
                   <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${!settings.workshopReminderOptOut ? "translate-x-5" : "translate-x-0.5"}`} />
                 </button>
               </div>
+              {(() => {
+                const upcoming = (bookings ?? []).filter(
+                  (b) =>
+                    b.workshop &&
+                    b.status === "confirmed" &&
+                    (!b.workshop.startDate || new Date(b.workshop.startDate).getTime() > Date.now())
+                );
+                if (upcoming.length === 0) return null;
+                const mutedCount = upcoming.filter((b) => b.reminderOptOut).length;
+                return (
+                  <div className="mb-2 rounded-xl border border-white/8 bg-stone-800/40 p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <CalendarDays size={13} className="text-amber-400 shrink-0" />
+                      <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Per-workshop reminders</p>
+                    </div>
+                    <p className="text-xs text-stone-600 mb-2.5">
+                      {mutedCount > 0
+                        ? `${mutedCount} of ${upcoming.length} upcoming workshop${upcoming.length === 1 ? "" : "s"} muted — you won't get reminders for those.`
+                        : `Reminders are on for all ${upcoming.length} upcoming workshop${upcoming.length === 1 ? "" : "s"}.`}
+                    </p>
+                    <div className="space-y-1.5">
+                      {upcoming.map((b) => {
+                        const w = b.workshop!;
+                        const dateLabel = w.startDate
+                          ? new Date(w.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                          : null;
+                        return (
+                          <div key={b.id} className="flex items-center justify-between gap-3 rounded-lg bg-stone-900/50 px-3 py-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm text-stone-200 truncate">{w.title}</p>
+                              <p className="text-xs truncate flex items-center gap-1.5">
+                                <Bell size={11} className={`shrink-0 ${b.reminderOptOut ? "text-stone-600" : "text-amber-400"}`} />
+                                <span className={b.reminderOptOut ? "text-stone-500" : "text-stone-400"}>
+                                  {b.reminderOptOut ? "Reminders muted" : "Reminders on"}
+                                  {dateLabel ? ` \u00b7 ${dateLabel}` : ""}
+                                </span>
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={reminderUpdating === b.id}
+                              onClick={() => setBookingReminderOptOut(b.id, !b.reminderOptOut)}
+                              aria-label={b.reminderOptOut ? `Turn reminders on for ${w.title}` : `Mute reminders for ${w.title}`}
+                              className={`relative h-6 w-11 rounded-full transition-colors shrink-0 disabled:opacity-50 ${!b.reminderOptOut ? "bg-amber-500" : "bg-stone-700"}`}
+                            >
+                              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${!b.reminderOptOut ? "translate-x-5" : "translate-x-0.5"}`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
               <Toggle settingKey="notif_email_commission_payment" label="Commission payments" desc="Email when a deposit or final payment lands on a commission" />
               <Toggle settingKey="notif_email_new_commission" label="New commission requests" desc="Email when a collector sends you a commission inquiry" />
               <Toggle settingKey="notif_email_new_patron" label="New patron alerts" desc="Email when someone subscribes to one of your tiers" />
