@@ -805,7 +805,7 @@ export default function Settings() {
                     placeholder="+1 555 123 4567"
                     className={`flex-1 min-w-0 rounded-xl border bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:outline-none ${phoneValidationError ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-sky-500/50"}`}
                   />
-                  {phoneSaved && <span className="text-xs text-emerald-400 shrink-0">Saved ✓</span>}
+                  <span className="text-xs text-emerald-400 shrink-0 transition-opacity" style={{ opacity: phoneSaved ? 1 : 0, transitionDuration: phoneSaved ? "180ms" : "200ms" }}>Saved ✓</span>
                 </div>
                 {phoneValidationError && (
                   <p className="text-xs text-red-400 mt-1.5">Please enter a valid phone number with country code.</p>
