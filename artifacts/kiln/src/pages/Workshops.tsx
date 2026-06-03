@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { markFeatureVisited } from "@/lib/featureDiscovery";
-import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X, CalendarPlus, Download, Video } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Star, MessageSquare, Loader2, CheckCircle2, X, CalendarPlus, Download, Video, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ApiWorkshop {
   id: string;
@@ -117,6 +118,8 @@ function StarRating({ value, size = 11 }: { value: number; size?: number }) {
 
 function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (workshop: ApiWorkshop) => void; onCancel: (id: string) => void }) {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isOwner = !!user && user.id === w.artistId;
   const soldOut = w.spotsLeft === 0;
   const [booking, setBooking] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -202,7 +205,14 @@ function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (worksh
 
         <div className="flex items-center justify-between">
           <span className="text-lg font-bold text-stone-100">${w.price}</span>
-          {w.isBooked ? (
+          {isOwner ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/workshops/${w.id}/edit`); }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-purple-500/40 text-xs font-semibold text-purple-300 hover:bg-purple-500/10 transition-colors"
+            >
+              <Pencil size={12} /> Edit
+            </button>
+          ) : w.isBooked ? (
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400">
                 <CheckCircle2 size={12} /> Reserved

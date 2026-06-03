@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import {
-  Calendar, MapPin, Clock, Users, CheckCircle2, Loader2, ChevronLeft, X, Star, Video,
+  Calendar, MapPin, Clock, Users, CheckCircle2, Loader2, ChevronLeft, X, Star, Video, Pencil,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Workshop {
   id: string;
@@ -45,6 +46,7 @@ function formatDate(iso: string) {
 export default function WorkshopDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const [w, setW] = useState<Workshop | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -70,6 +72,7 @@ export default function WorkshopDetail() {
   }, [id]);
 
   const soldOut = !!w && w.spotsLeft <= 0;
+  const isOwner = !!w && !!user && user.id === w.artistId;
 
   const handleBook = async () => {
     if (!w || soldOut || w.isBooked) return;
@@ -216,7 +219,14 @@ export default function WorkshopDetail() {
 
             {/* CTA */}
             <div className="mt-6">
-              {w.isBooked ? (
+              {isOwner ? (
+                <button
+                  onClick={() => navigate(`/workshops/${w.id}/edit`)}
+                  className="flex w-full items-center justify-center gap-2 rounded-full border border-purple-500/40 py-3 text-sm font-bold text-purple-300 hover:bg-purple-500/10 transition-colors"
+                >
+                  <Pencil size={15} /> Edit Workshop
+                </button>
+              ) : w.isBooked ? (
                 <div className="flex items-center gap-3">
                   <span className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 py-3 text-sm font-semibold text-emerald-400">
                     <CheckCircle2 size={15} /> Reserved
