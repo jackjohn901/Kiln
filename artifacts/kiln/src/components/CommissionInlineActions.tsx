@@ -101,6 +101,7 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
   const [dbStatus, setDbStatus] = useState<DbStatus>(initialStatus ?? "pending");
   const [role, setRole] = useState<"artist" | "buyer" | null>(null);
   const [quotedPrice, setQuotedPrice] = useState<number | null>(null);
+  const [artistNotes, setArtistNotes] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [notes, setNotes] = useState("");
   const priceRef = useRef<HTMLInputElement>(null);
@@ -118,6 +119,9 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
         const status: DbStatus = data.status ?? "pending";
         setDbStatus(status);
         if (data.quotedPrice != null) setQuotedPrice(Number(data.quotedPrice));
+        if (typeof data.artistNotes === "string" && data.artistNotes.trim()) {
+          setArtistNotes(data.artistNotes.trim());
+        }
         const detectedRole: "artist" | "buyer" = user?.id === data.clientId ? "buyer" : "artist";
         setRole(detectedRole);
         if (status === "pending" && detectedRole === "artist") {
@@ -325,6 +329,11 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
             </span>
             <span className="text-xs text-stone-500">quoted</span>
           </div>
+        )}
+        {artistNotes && (
+          <p className="text-xs text-stone-400 whitespace-pre-wrap leading-relaxed">
+            {artistNotes}
+          </p>
         )}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <button
