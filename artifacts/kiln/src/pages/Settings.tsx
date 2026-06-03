@@ -857,7 +857,9 @@ export default function Settings() {
                         ? smsResumeAt
                           ? (() => { const cd = smsSnoozeCountdown(); return cd ? `Resuming in ${cd}` : "Resuming soon\u2026"; })()
                           : "Paused indefinitely"
-                        : "Auto-resumes after the chosen period"}
+                        : phoneNumber.trim()
+                          ? "Auto-resumes after the chosen period"
+                          : "Add a phone number below to enable snoozing"}
                     </p>
                   </div>
                   {settings.notif_sms_paused ? (
@@ -868,18 +870,22 @@ export default function Settings() {
                       Resume now
                     </button>
                   ) : (
-                    <button
-                      onClick={() => phoneNumber.trim() && setSmsSnoozePickerOpen(v => !v)}
-                      disabled={!phoneNumber.trim()}
+                    <span
+                      className="shrink-0"
                       title={!phoneNumber.trim() ? "Add a phone number below before snoozing" : undefined}
-                      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                        phoneNumber.trim()
-                          ? "bg-stone-800 border-white/10 text-stone-300 hover:bg-stone-700 cursor-pointer"
-                          : "bg-stone-800/40 border-white/5 text-stone-600 cursor-not-allowed opacity-50"
-                      }`}
                     >
-                      Snooze
-                    </button>
+                      <button
+                        onClick={() => phoneNumber.trim() && setSmsSnoozePickerOpen(v => !v)}
+                        disabled={!phoneNumber.trim()}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          phoneNumber.trim()
+                            ? "bg-stone-800 border-white/10 text-stone-300 hover:bg-stone-700 cursor-pointer"
+                            : "bg-stone-800/40 border-white/5 text-stone-600 cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        Snooze
+                      </button>
+                    </span>
                   )}
                 </div>
                 {/* SMS snooze duration picker */}
