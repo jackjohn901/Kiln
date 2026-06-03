@@ -189,10 +189,32 @@ function WorkshopCard({ w, onBook, onCancel }: { w: ApiWorkshop; onBook: (worksh
               <span>{new Date(w.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
             </div>
           )}
-          <div className="flex items-center gap-2 text-xs text-stone-400">
-            <MapPin size={11} className="text-stone-500 flex-shrink-0" />
-            <span>{w.isOnline ? "Online" : (w.location ?? "TBA")}</span>
-          </div>
+          {w.isOnline ? (
+            w.meetingUrl ? (
+              <div className="flex items-center gap-2 text-xs">
+                <Video size={11} className="text-sky-400 flex-shrink-0" />
+                <a
+                  href={w.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sky-400 hover:text-sky-300 underline underline-offset-2 truncate"
+                >
+                  {w.meetingUrl}
+                </a>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-stone-400">
+                <Video size={11} className="text-sky-400 flex-shrink-0" />
+                <span>Online — link shared after booking</span>
+              </div>
+            )
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-stone-400">
+              <MapPin size={11} className="text-stone-500 flex-shrink-0" />
+              <span>{w.location ?? "Location to be announced"}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <Clock size={11} className="text-stone-500 flex-shrink-0" />
             <span>{w.durationHours}h session</span>
