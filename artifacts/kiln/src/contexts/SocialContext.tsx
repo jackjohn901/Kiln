@@ -162,6 +162,7 @@ interface SocialState {
   activityFeed: ActivityItem[];
   streak: StreakData;
   artistAlerts: string[];
+  seenQuotedIds: string[];
 }
 
 interface SocialContextType extends SocialState {
@@ -180,6 +181,8 @@ interface SocialContextType extends SocialState {
   unreadCount: number;
   unreadWorkshopCount: number;
   unreadCommissionPaymentCount: number;
+  quotedCommissionCount: number;
+  clearQuotedBadge: () => void;
   unreadDropCount: number;
   unreadAuctionCount: number;
   setMyCommissionStatus: (status: CommissionStatus) => void;
@@ -265,6 +268,7 @@ function defaultState(): SocialState {
     activityFeed: [],
     streak: { current: 0, longest: 0, lastPostDate: null },
     artistAlerts: [],
+    seenQuotedIds: [],
   };
 }
 
@@ -290,6 +294,7 @@ function readState(): SocialState {
     reelReposts: parsed.reelReposts ?? {},
     streak: parsed.streak ?? { current: 0, longest: 0, lastPostDate: null },
     artistAlerts: parsed.artistAlerts ?? [],
+    seenQuotedIds: parsed.seenQuotedIds ?? [],
     };
   } catch {
     return defaultState();
@@ -860,9 +865,24 @@ export function SocialProvider({ children }: { children: ReactNode }) {
     [state.reviews]
   );
 
+  const clearQuotedBadge = useCallback(() => {
+    const quotedIds = state.commissions
+      .filter((c) => c.status === "quoted")
+      .map((c) => c.id);
+    if (quotedIds.length === 0) return;
+    update((s) => ({
+      ...s,
+      seenQuotedIds: Array.from(new Set([...s.seenQuotedIds, ...quotedIds])),
+    }));
+  }, [state.commissions]);
+
   const unreadCount = state.notifications.filter((n) => !n.read).length;
   const unreadWorkshopCount = state.notifications.filter((n) => !n.read && n.type === "workshop_booking").length;
   const unreadCommissionPaymentCount = state.notifications.filter((n) => !n.read && n.type === "commission_payment").length;
+  const seenQuotedSet = new Set(state.seenQuotedIds);
+  const quotedCommissionCount = state.commissions.filter(
+    (c) => c.status === "quoted" && !seenQuotedSet.has(c.id)
+  ).length;
   const unreadDropCount = state.notifications.filter((n) => !n.read && n.type === "drop").length;
   const unreadAuctionCount = state.notifications.filter((n) => !n.read && n.type === "auction").length;
   // Prefer the server-sourced count when authenticated; fall back to local seed thread count otherwise
@@ -891,6 +911,8 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         unreadCount,
         unreadWorkshopCount,
         unreadCommissionPaymentCount,
+        quotedCommissionCount,
+        clearQuotedBadge,
         unreadDropCount,
         unreadAuctionCount,
         setMyCommissionStatus,

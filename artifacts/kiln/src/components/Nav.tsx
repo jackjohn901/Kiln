@@ -13,7 +13,7 @@ import GlobalSearch from "@/components/GlobalSearch";
 export default function Nav() {
   const [location] = useLocation();
   const { profile, logout } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, receivedInquiries, isVerified, lastNewMessagePing, lastTypingPing, lastNewInquiryPing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, quotedCommissionCount, clearQuotedBadge, receivedInquiries, isVerified, lastNewMessagePing, lastTypingPing, lastNewInquiryPing } = useSocial();
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
   const { settings } = useSettings();
@@ -127,7 +127,8 @@ export default function Nav() {
   useEffect(() => {
     if (location.startsWith("/messages")) setTypingPulse(false);
     if (location.startsWith("/inbox")) setInboxPulse(false);
-  }, [location]);
+    if (location.startsWith("/commissions")) clearQuotedBadge();
+  }, [location, clearQuotedBadge]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -163,6 +164,7 @@ export default function Nav() {
     { href: "/mentorship", label: "Mentorship", icon: GraduationCap },
     { href: "/collab", label: "Collab", icon: UsersRound },
     { href: "/trending", label: "Trending", icon: TrendingUp },
+    { href: "/commissions", label: "Commissions" },
     { href: "/assistant", label: "AI Assistant", icon: Sparkles },
     { href: "/grants", label: "Grant Writer", icon: FileText },
     { href: "/collector", label: "Collector", icon: Store },
@@ -232,6 +234,8 @@ export default function Nav() {
               const badge =
                 href === "/workshops" && unreadWorkshopCount > 0
                   ? unreadWorkshopCount
+                  : href === "/commissions" && quotedCommissionCount > 0
+                  ? quotedCommissionCount
                   : null;
               return (
                 <Link

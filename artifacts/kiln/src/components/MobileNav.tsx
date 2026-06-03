@@ -120,7 +120,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
 export default function MobileNav() {
   const [location] = useLocation();
   const { profile } = useProfile();
-  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, unreadDropCount, unreadAuctionCount, receivedInquiries, lastNewMessagePing, lastNewInquiryPing } = useSocial();
+  const { unreadCount, unreadMessageCount, unreadWorkshopCount, unreadCommissionPaymentCount, quotedCommissionCount, clearQuotedBadge, unreadDropCount, unreadAuctionCount, receivedInquiries, lastNewMessagePing, lastNewInquiryPing } = useSocial();
   const pendingInquiries = receivedInquiries.filter((i) => i.status === "pending").length;
   const { itemCount } = useCart();
   const { hasWarning, hasUrgent, bannerDismissed, dismissBanner } = useStripeConnect();
@@ -143,6 +143,12 @@ export default function MobileNav() {
     const t = setTimeout(() => setInboxPulse(false), 2000);
     return () => clearTimeout(t);
   }, [lastNewInquiryPing]);
+
+  useEffect(() => {
+    if (location.startsWith("/commissions") || location === "/commission-tracker") {
+      clearQuotedBadge();
+    }
+  }, [location, clearQuotedBadge]);
 
   const notifTitle = notifDimmed
     ? "Notifications silenced or paused — check Settings"
@@ -335,6 +341,7 @@ export default function MobileNav() {
                           href === "/cart" ? itemCount :
                           href === "/workshops" ? unreadWorkshopCount :
                           href === "/inbox" ? (pendingInquiries + unreadCommissionPaymentCount) :
+                          href === "/commission-tracker" ? quotedCommissionCount :
                           href === "/drops" ? unreadDropCount :
                           href === "/auctions" ? unreadAuctionCount : 0;
                         const notifMuted = isNotifItem && notifDimmed;
