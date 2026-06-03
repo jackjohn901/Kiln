@@ -191,10 +191,11 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
     setActionState("saving");
     const trimmedPrice = price.trim();
     const trimmedNotes = notes.trim();
-    const newStatus = trimmedPrice ? "quoted" : "in_progress";
-    const body: Record<string, unknown> = trimmedPrice
-      ? { status: "quoted", quotedPrice: parseFloat(trimmedPrice), ...(trimmedNotes && { artistNotes: trimmedNotes }) }
-      : { status: "in_progress", ...(trimmedNotes && { artistNotes: trimmedNotes }) };
+    const body: Record<string, unknown> = {
+      status: "quoted",
+      ...(trimmedPrice && { quotedPrice: parseFloat(trimmedPrice) }),
+      ...(trimmedNotes && { artistNotes: trimmedNotes }),
+    };
     try {
       const res = await fetch(`/api/commissions/${commissionId}`, {
         method: "PATCH",
@@ -203,9 +204,9 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        setDbStatus(newStatus);
+        setDbStatus("quoted");
         setActionState("resolved");
-        onStatusChange?.(newStatus);
+        onStatusChange?.("quoted");
       } else {
         setActionState("error");
       }
@@ -242,7 +243,9 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
   if (actionState === "quoting") {
     return (
       <div className="mt-2 space-y-2">
-        <StatusBadge status={dbStatus} />
+        <p className="text-xs text-stone-400">
+          Send the buyer a price to confirm before work begins.
+        </p>
         <form
           onSubmit={handleQuoteSubmit}
           onClick={(e) => e.stopPropagation()}
@@ -256,7 +259,7 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Quote price (optional)"
+                placeholder="Price (optional)"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="w-full rounded-lg bg-stone-800 pl-6 pr-3 py-1.5 text-xs text-stone-200 placeholder-stone-500 border border-stone-700 focus:outline-none focus:border-amber-500/60"
@@ -275,11 +278,7 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
               type="submit"
               className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/30 transition-colors"
             >
-              {price.trim() ? (
-                <>Send quote <ChevronRight size={10} /></>
-              ) : (
-                <>Accept <Check size={10} /></>
-              )}
+              Send Quote <ChevronRight size={10} />
             </button>
             <button
               type="button"
@@ -322,13 +321,20 @@ export default function CommissionInlineActions({ commissionId, initialStatus, o
   return (
     <div className="mt-2 space-y-2">
       <StatusBadge status={dbStatus} />
-      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); handleAccept(); }}
+          className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+        >
+          <Check size={10} /> Accept
+        </button>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setActionState("quoting"); }}
-          className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+          className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/30 transition-colors"
         >
-          Accept
+          <DollarSign size={10} /> Send Quote
         </button>
         <button
           type="button"
