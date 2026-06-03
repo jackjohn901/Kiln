@@ -7,6 +7,7 @@ import {
 import { eq, and, sql, or, ilike, inArray, desc, isNull, lte } from "drizzle-orm";
 import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
 import { sendEmailWithRetry, newFollowerEmail } from "../lib/email";
+import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { isEmailPaused } from "../lib/emailPaused";
 import { logger } from "../lib/logger";
 import crypto from "crypto";
@@ -138,7 +139,11 @@ router.post("/users/:userId/follow", async (req, res): Promise<void> => {
       if (emailSnoozed) {
         db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, followNotifId)).catch(() => {});
       }
-      if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName) }, { label: "new follower notification" });
+      if (wantsEmail && p?.contactEmail) {
+        const unsubToken = generateUnsubscribeToken(followingId);
+        const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/follows?token=${encodeURIComponent(unsubToken)}`;
+        await sendEmailWithRetry({ to: p.contactEmail, subject: `${followerName} started following you on Kiln`, html: newFollowerEmail(followerName, unsubscribeUrl) }, { label: "new follower notification" });
+      }
     } catch (err) {
       logger.warn({ err, followingId }, "Failed to send new-follower notification email");
     }

@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import {
   postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable, listingsTable,
 } from "@workspace/db";
-import { sendEmailWithRetry, newCommentEmail, newMentionEmail } from "../lib/email";
+import { sendEmailWithRetry, newCommentEmail, newMentionEmail, newLikeEmail } from "../lib/email";
 import { isEmailPaused } from "../lib/emailPaused";
 import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -201,20 +201,43 @@ router.post("/posts/:postId/like", async (req, res): Promise<void> => {
       .returning({ likeCount: postsTable.likeCount });
 
     // Notify post author
-    const [post] = await db.select({ authorId: postsTable.authorId }).from(postsTable).where(eq(postsTable.id, postId));
+    const [post] = await db.select({ authorId: postsTable.authorId, caption: postsTable.caption }).from(postsTable).where(eq(postsTable.id, postId));
     if (post && post.authorId !== userId) {
       const user = req.user;
+      const likerName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone";
+      const likeNotifId = crypto.randomUUID();
       await db.insert(notificationsTable).values({
-        id: crypto.randomUUID(),
+        id: likeNotifId,
         userId: post.authorId,
         type: "like",
         fromId: userId,
-        fromName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone",
+        fromName: likerName,
         fromAvatarUrl: user.profileImageUrl ?? null,
         text: "liked your post",
         link: `/post/${postId}`,
       });
       broadcast(post.authorId, { type: "notification", userId: post.authorId, text: "Someone liked your post", link: `/post/${postId}` });
+
+      // Email notification
+      try {
+        const [[p], [s]] = await Promise.all([
+          db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, post.authorId)).limit(1),
+          db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, post.authorId)).limit(1),
+        ]);
+        const emailSettings = s?.settings as Record<string, unknown> | null;
+        const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+        const wantsEmail = !emailSnoozed && emailSettings?.notif_email_likes !== false;
+        if (emailSnoozed) {
+          db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, likeNotifId)).catch(() => {});
+        }
+        if (wantsEmail && p?.contactEmail) {
+          const unsubToken = generateUnsubscribeToken(post.authorId);
+          const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/likes?token=${encodeURIComponent(unsubToken)}`;
+          await sendEmailWithRetry({ to: p.contactEmail, subject: `${likerName} liked your post on Kiln`, html: newLikeEmail(likerName, post.caption ?? "", postId, unsubscribeUrl) }, { label: "new like notification" });
+        }
+      } catch (err) {
+        logger.warn({ err, authorId: post.authorId, postId }, "Failed to send new-like notification email");
+      }
     }
 
     const likeCount = updated?.likeCount ?? 0;

@@ -439,6 +439,96 @@ router.get("/unsubscribe/digest", async (req, res): Promise<void> => {
   }
 });
 
+// GET /api/unsubscribe/likes?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Sets notif_email_likes: false in the user's settings JSON
+router.get("/unsubscribe/likes", async (req, res): Promise<void> => {
+  await handleNotifEmailUnsubscribe(
+    req, res,
+    "notif_email_likes",
+    "You won't receive new-like notification emails anymore. You can re-enable them any time in your notification settings.",
+    "your original like email",
+  );
+});
+
+// GET /api/unsubscribe/follows?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Sets notif_email_follows: false in the user's settings JSON
+router.get("/unsubscribe/follows", async (req, res): Promise<void> => {
+  await handleNotifEmailUnsubscribe(
+    req, res,
+    "notif_email_follows",
+    "You won't receive new-follower notification emails anymore. You can re-enable them any time in your notification settings.",
+    "your original follower email",
+  );
+});
+
+// GET /api/unsubscribe/patrons?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Sets notif_email_new_patron: false in the user's settings JSON
+router.get("/unsubscribe/patrons", async (req, res): Promise<void> => {
+  await handleNotifEmailUnsubscribe(
+    req, res,
+    "notif_email_new_patron",
+    "You won't receive new-patron notification emails anymore. You can re-enable them any time in your notification settings.",
+    "your original patron email",
+  );
+});
+
+// GET /api/unsubscribe/commissions?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Sets notif_email_new_commission: false in the user's settings JSON
+router.get("/unsubscribe/commissions", async (req, res): Promise<void> => {
+  await handleNotifEmailUnsubscribe(
+    req, res,
+    "notif_email_new_commission",
+    "You won't receive new-commission notification emails anymore. You can re-enable them any time in your notification settings.",
+    "your original commission email",
+  );
+});
+
+// Shared handler for simple notif_email_* boolean opt-outs driven by an HMAC token.
+async function handleNotifEmailUnsubscribe(
+  req: import("express").Request,
+  res: import("express").Response,
+  settingKey: string,
+  successMessage: string,
+  emailLabel: string,
+): Promise<void> {
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  if (!token) {
+    res.status(400).send(unsubscribePage("Invalid link", "This unsubscribe link is missing a token. Please use the link from your email.", false));
+    return;
+  }
+
+  const userId = verifyUnsubscribeToken(token);
+  if (!userId) {
+    res.status(400).send(unsubscribePage("Invalid link", `This unsubscribe link is invalid or has been tampered with. Please use the link from ${emailLabel}.`, false));
+    return;
+  }
+
+  try {
+    const existing = await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
+    const currentSettings = (existing[0]?.settings as Record<string, unknown>) ?? {};
+    const newSettings = { ...currentSettings, [settingKey]: false };
+
+    if (existing.length > 0) {
+      await db.update(userSettingsTable).set({ settings: newSettings }).where(eq(userSettingsTable.userId, userId));
+    } else {
+      await db.insert(userSettingsTable).values({
+        userId,
+        settings: newSettings,
+        shippingSettings: {},
+        paymentSettings: {},
+      });
+    }
+
+    res.send(unsubscribePage("You've been unsubscribed", successMessage, true));
+  } catch {
+    res.status(500).send(unsubscribePage("Something went wrong", "We couldn't update your preference right now. Please try again later or manage your settings from your account.", false));
+  }
+}
+
 function unsubscribePage(title: string, message: string, success: boolean): string {
   const color = success ? "#4ade80" : "#f87171";
   const icon = success ? "✓" : "✗";

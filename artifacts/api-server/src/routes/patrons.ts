@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { patronTiersTable, patronSubscriptionsTable, tipsTable, notificationsTable, ordersTable, profilesTable, userSettingsTable } from "@workspace/db";
 import { sendEmailWithRetry, newPatronEmail } from "../lib/email";
+import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { isEmailPaused } from "../lib/emailPaused";
 import { eq, and, desc, sql, inArray, gte, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -82,7 +83,11 @@ router.post("/patron-tiers/:tierId/subscribe", async (req, res): Promise<void> =
     if (emailSnoozed) {
       db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, patronNotifId)).catch(() => {});
     }
-    if (wantsEmail && p?.contactEmail) await sendEmailWithRetry({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name) }, { label: "new patron notification" });
+    if (wantsEmail && p?.contactEmail) {
+      const unsubToken = generateUnsubscribeToken(tier.artistId);
+      const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/patrons?token=${encodeURIComponent(unsubToken)}`;
+      await sendEmailWithRetry({ to: p.contactEmail, subject: `${name} became your patron on Kiln`, html: newPatronEmail(name, tier.name, unsubscribeUrl) }, { label: "new patron notification" });
+    }
   } catch (err) {
     logger.warn({ err, artistId: tier.artistId }, "Failed to send new-patron notification email");
   }

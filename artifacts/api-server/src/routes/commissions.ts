@@ -4,6 +4,7 @@ import { commissionsTable, commissionUpdatesTable, notificationsTable, usersTabl
 import { eq, or, desc, asc } from "drizzle-orm";
 import crypto from "crypto";
 import { sendEmailWithRetry, newCommissionEmail, commissionUpdateEmail, commissionQuotedEmail } from "../lib/email";
+import { generateUnsubscribeToken } from "../lib/unsubscribeTokens";
 import { isEmailPaused } from "../lib/emailPaused";
 
 const STORAGE_PATH_RE = /^\/api\/storage\/objects\/[a-zA-Z0-9_\-/.]+$/;
@@ -51,7 +52,9 @@ router.post("/commissions", async (req, res): Promise<void> => {
       db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, commissionNotifId)).catch(() => {});
     }
     if (wantsEmail && artistUser?.email) {
-      await sendEmailWithRetry({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description, commission.id) }, { label: "new commission notification" });
+      const unsubToken = generateUnsubscribeToken(artistId);
+      const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/commissions?token=${encodeURIComponent(unsubToken)}`;
+      await sendEmailWithRetry({ to: artistUser.email, subject: `New commission request from ${clientName}`, html: newCommissionEmail(clientName, workType ?? "", description, commission.id, unsubscribeUrl) }, { label: "new commission notification" });
     }
     res.status(201).json({ ...commission, createdAt: commission.createdAt.toISOString(), updatedAt: commission.updatedAt.toISOString() });
   } catch (err) { req.log.error({ err }, "createCommission error"); res.status(500).json({ error: "Failed to submit commission" }); }

@@ -6,6 +6,7 @@ import { db } from '@workspace/db';
 import { patronSubscriptionsTable, patronTiersTable, profilesTable, ordersTable, listingsTable, userSettingsTable, digitalDownloadPurchasesTable, workshopsTable, workshopBookingsTable, commissionsTable, auctionsTable, notificationsTable, usersTable } from '@workspace/db';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDigitalProduct } from './lib/digitalProducts';
+import { generateUnsubscribeToken } from './lib/unsubscribeTokens';
 import { isEmailPaused } from './lib/emailPaused';
 import crypto from 'crypto';
 import type Stripe from 'stripe';
@@ -192,12 +193,22 @@ async function activatePatronSubscription(tierId: string, userId: string): Promi
     .select({ displayName: profilesTable.displayName })
     .from(profilesTable)
     .where(eq(profilesTable.userId, userId));
+  const [artistSettings] = await db
+    .select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
+    .from(userSettingsTable)
+    .where(eq(userSettingsTable.userId, tier.artistId));
 
-  if (artistProfile?.contactEmail) {
+  const emailSettings = artistSettings?.settings as Record<string, unknown> | null;
+  const emailSnoozed = isEmailPaused(emailSettings, artistSettings?.notifEmailResumeAt);
+  const wantsEmail = !emailSnoozed && emailSettings?.notif_email_new_patron !== false;
+
+  if (wantsEmail && artistProfile?.contactEmail) {
+    const unsubToken = generateUnsubscribeToken(tier.artistId);
+    const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/patrons?token=${encodeURIComponent(unsubToken)}`;
     await sendEmailWithRetry({
       to: artistProfile.contactEmail,
       subject: `New patron: ${patronProfile?.displayName ?? 'Someone'} joined your ${tier.name} tier`,
-      html: newPatronEmail(patronProfile?.displayName ?? 'A fan', tier.name),
+      html: newPatronEmail(patronProfile?.displayName ?? 'A fan', tier.name, unsubscribeUrl),
     }, { label: "new patron notification (webhook)" });
   }
 }

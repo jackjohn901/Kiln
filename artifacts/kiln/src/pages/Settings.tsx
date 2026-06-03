@@ -419,6 +419,7 @@ export default function Settings() {
 
   const EMAIL_KEYS: (keyof KilnSettings)[] = [
     "notif_email_digest",
+    "notif_email_likes",
     "notif_email_follows",
     "notif_email_comments",
     "notif_email_new_sale",
@@ -734,6 +735,7 @@ export default function Settings() {
             )}
             <div className={settings.notif_email_paused ? "opacity-40 pointer-events-none" : undefined}>
               <Toggle settingKey="notif_email_digest" label="Weekly digest" desc="Top posts, opportunities, and updates" />
+              <Toggle settingKey="notif_email_likes" label="New like alerts" desc="Email when someone likes your posts" />
               <Toggle settingKey="notif_email_follows" label="New follower alerts" desc="Email when someone follows you" />
               <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
               <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />

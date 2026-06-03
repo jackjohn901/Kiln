@@ -270,11 +270,33 @@ export function deliveryNotificationEmail(
   `);
 }
 
-export function newFollowerEmail(followerName: string): string {
+export function newLikeEmail(likerName: string, postCaption: string, postId: string, unsubscribeUrl?: string): string {
+  const unsubscribeFooter = unsubscribeUrl
+    ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want like emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from like emails</a></p>`
+    : "";
+  const captionLine = postCaption.trim()
+    ? `<p style="margin:0;color:#78716c;font-style:italic;">"${escHtml(postCaption.slice(0, 80))}${postCaption.length > 80 ? "…" : ""}"</p>`
+    : "";
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Like ❤️</h1>
+    ${card(`
+      <p style="margin:0 0 8px;"><strong>${escHtml(likerName)}</strong> liked your post.</p>
+      ${captionLine}
+    `)}
+    ${btn(`${BASE_URL}/posts/${postId}`, "View your post")}
+    ${unsubscribeFooter}
+  `);
+}
+
+export function newFollowerEmail(followerName: string, unsubscribeUrl?: string): string {
+  const unsubscribeFooter = unsubscribeUrl
+    ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want new-follower emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from follower emails</a></p>`
+    : "";
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Follower</h1>
     ${card(`<p style="margin:0;"><strong>${followerName}</strong> is now following your work on Kiln.</p>`)}
     ${btn(`${BASE_URL}/me`, "View your profile")}
+    ${unsubscribeFooter}
   `);
 }
 
@@ -304,7 +326,10 @@ export function newMentionEmail(mentionerName: string, snippet: string, postId: 
   `);
 }
 
-export function newPatronEmail(patronName: string, tierName: string): string {
+export function newPatronEmail(patronName: string, tierName: string, unsubscribeUrl?: string): string {
+  const unsubscribeFooter = unsubscribeUrl
+    ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want new-patron emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from patron emails</a></p>`
+    : "";
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Patron! 🌟</h1>
     ${card(`
@@ -312,10 +337,11 @@ export function newPatronEmail(patronName: string, tierName: string): string {
       <p style="margin:0;color:#78716c;">Your patron community is growing. Keep creating amazing work!</p>
     `)}
     ${btn(`${BASE_URL}/earnings`, "View your patrons")}
+    ${unsubscribeFooter}
   `);
 }
 
-export function newCommissionEmail(clientName: string, workType: string, description: string, commissionId?: string): string {
+export function newCommissionEmail(clientName: string, workType: string, description: string, commissionId?: string, unsubscribeUrl?: string): string {
   const trackerUrl = commissionId
     ? `${BASE_URL}/commission-tracker?highlight=${encodeURIComponent(commissionId)}`
     : `${BASE_URL}/commission-tracker`;
@@ -328,6 +354,10 @@ export function newCommissionEmail(clientName: string, workType: string, descrip
     <p style="margin:12px 0 0;font-size:11px;color:#57534e;">These links open your Commission Tracker where you can review the full request before deciding.</p>
   ` : btn(trackerUrl, "View Request");
 
+  const unsubscribeFooter = unsubscribeUrl
+    ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want new-commission emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from commission emails</a></p>`
+    : "";
+
   return shell(`
     <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">New Commission Request</h1>
     <p style="color:#78716c;margin-bottom:0;">A collector wants to commission your work.</p>
@@ -337,6 +367,7 @@ export function newCommissionEmail(clientName: string, workType: string, descrip
       <p style="margin:0;"><strong style="color:#fcd34d;">Description:</strong> ${escHtml(description)}</p>
     `)}
     ${actionButtons}
+    ${unsubscribeFooter}
   `);
 }
 

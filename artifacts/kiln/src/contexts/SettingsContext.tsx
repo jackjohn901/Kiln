@@ -10,6 +10,7 @@ export interface KilnSettings {
   notif_drops: boolean;
   notif_email_paused: boolean;
   notif_email_digest: boolean;
+  notif_email_likes: boolean;
   notif_email_follows: boolean;
   notif_email_comments: boolean;
   notif_email_new_sale: boolean;
@@ -50,6 +51,7 @@ export const PUSH_KEYS = [
 
 export const EMAIL_KEYS = [
   "notif_email_digest",
+  "notif_email_likes",
   "notif_email_follows",
   "notif_email_comments",
   "notif_email_new_sale",
@@ -99,6 +101,7 @@ export function defaultSettings(): KilnSettings {
     notif_drops: true,
     notif_email_paused: false,
     notif_email_digest: false,
+    notif_email_likes: false,
     notif_email_follows: false,
     notif_email_comments: false,
     notif_email_new_sale: true,
