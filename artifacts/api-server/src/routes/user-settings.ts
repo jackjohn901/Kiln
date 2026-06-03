@@ -338,6 +338,19 @@ router.get("/unsubscribe/workshop-reminders", async (req, res): Promise<void> =>
   try {
     const existing = await db.select().from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
     const currentSettings = (existing[0]?.settings as Record<string, unknown>) ?? {};
+
+    // If the user has already re-enabled reminders since this email was sent,
+    // don't silently override their current preference. This happens when a
+    // student clicks an old unsubscribe link after re-opting-in via Settings.
+    if (currentSettings.workshopReminderOptOut === false) {
+      res.send(unsubscribePage(
+        "Your reminders are already enabled",
+        "You've already turned workshop reminders back on. Click this link again only if you want to stop receiving them.",
+        true,
+      ));
+      return;
+    }
+
     const newSettings = { ...currentSettings, workshopReminderOptOut: true };
 
     if (existing.length > 0) {
