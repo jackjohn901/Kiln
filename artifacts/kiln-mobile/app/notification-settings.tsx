@@ -33,6 +33,10 @@ interface NotifSettings {
   notif_email_new_patron: boolean;
   notif_email_outbid: boolean;
   notif_email_mentions: boolean;
+  notif_sms_paused: boolean;
+  notif_sms_outbid: boolean;
+  notif_sms_drops: boolean;
+  notif_sms_shipped: boolean;
 }
 
 const DEFAULTS: NotifSettings = {
@@ -51,7 +55,29 @@ const DEFAULTS: NotifSettings = {
   notif_email_new_patron: true,
   notif_email_outbid: true,
   notif_email_mentions: true,
+  notif_sms_paused: false,
+  notif_sms_outbid: true,
+  notif_sms_drops: true,
+  notif_sms_shipped: true,
 };
+
+// SNOOZE_OPTIONS: label → duration in milliseconds (null = indefinite)
+const SNOOZE_OPTIONS: { label: string; ms: number | null }[] = [
+  { label: "1 day", ms: 24 * 60 * 60 * 1000 },
+  { label: "3 days", ms: 3 * 24 * 60 * 60 * 1000 },
+  { label: "1 week", ms: 7 * 24 * 60 * 60 * 1000 },
+  { label: "Indefinitely", ms: null },
+];
+
+function smsSnoozeCountdown(resumeAt: string | null): string | null {
+  if (!resumeAt) return null;
+  const ms = new Date(resumeAt).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  if (hours < 24) return hours <= 1 ? "less than 1 hour" : `${hours} hours`;
+  const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+  return days === 1 ? "1 day" : `${days} days`;
+}
 
 function ToggleRow({
   label,
@@ -112,6 +138,13 @@ export default function NotificationSettingsScreen() {
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailError, setEmailError] = useState(false);
   const [emailValidationError, setEmailValidationError] = useState(false);
+
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneSaved, setPhoneSaved] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
+  const [phoneValidationError, setPhoneValidationError] = useState(false);
+  const [smsResumeAt, setSmsResumeAt] = useState<string | null>(null);
+  const [smsSnoozePickerOpen, setSmsSnoozePickerOpen] = useState(false);
 
   const checkOpacity = useRef(new Animated.Value(0)).current;
   const checkScale = useRef(new Animated.Value(0.6)).current;
@@ -182,9 +215,12 @@ export default function NotificationSettingsScreen() {
   const latestSettingsRef = useRef<NotifSettings>(DEFAULTS);
   const hasPendingSaveRef = useRef(false);
   const mountedRef = useRef(true);
+  const smsResumeAtRef = useRef<string | null>(null);
+  const phoneSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phoneErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null; contactEmailBounced?: boolean; notifEmailPausedAt?: string | null }>("/api/me/settings")
+    apiGet<{ settings?: Partial<NotifSettings>; contactEmail?: string | null; contactEmailBounced?: boolean; notifEmailPausedAt?: string | null; phoneNumber?: string | null; notifSmsResumeAt?: string | null }>("/api/me/settings")
       .then((data) => {
         if (data.settings) {
           const merged = { ...DEFAULTS, ...data.settings };
@@ -194,6 +230,11 @@ export default function NotificationSettingsScreen() {
         if (data.contactEmail) setNotifEmail(data.contactEmail);
         if (data.contactEmailBounced) setEmailBounced(true);
         if (data.notifEmailPausedAt) setEmailPausedAt(data.notifEmailPausedAt);
+        if (data.phoneNumber) setPhoneNumber(data.phoneNumber);
+        if (data.notifSmsResumeAt) {
+          setSmsResumeAt(data.notifSmsResumeAt);
+          smsResumeAtRef.current = data.notifSmsResumeAt;
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -216,6 +257,12 @@ export default function NotificationSettingsScreen() {
       }
       if (emailErrorTimerRef.current) {
         clearTimeout(emailErrorTimerRef.current);
+      }
+      if (phoneSavedTimerRef.current) {
+        clearTimeout(phoneSavedTimerRef.current);
+      }
+      if (phoneErrorTimerRef.current) {
+        clearTimeout(phoneErrorTimerRef.current);
       }
     };
   }, []);
@@ -313,6 +360,132 @@ export default function NotificationSettingsScreen() {
     setEmailError(false);
     saveNotifEmail(lastAttemptedEmailRef.current);
   }, [saveNotifEmail]);
+
+  const flashSaved = useCallback(() => {
+    setSaveError(false);
+    setSaved(true);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setSaved(false);
+    }, 1800);
+  }, []);
+
+  const flashSaveError = useCallback(() => {
+    setSaved(false);
+    setSaveError(true);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setSaveError(false);
+    }, 3000);
+  }, []);
+
+  // Snooze all SMS notifications for a chosen period (or indefinitely when ms is null).
+  // Persists notif_sms_paused in settings + the resume timestamp in one request, and
+  // reverts the optimistic local state if the save fails so the UI stays honest.
+  const applySmsSnooze = useCallback((ms: number | null) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+      hasPendingSaveRef.current = false;
+    }
+    const resumeAt = ms !== null ? new Date(Date.now() + ms).toISOString() : null;
+    const prevSettings = latestSettingsRef.current;
+    const prevResumeAt = smsResumeAtRef.current;
+    const next = { ...prevSettings, notif_sms_paused: true };
+    latestSettingsRef.current = next;
+    setSettings(next);
+    setSmsResumeAt(resumeAt);
+    smsResumeAtRef.current = resumeAt;
+    setSmsSnoozePickerOpen(false);
+    setSaved(false);
+    apiPatch("/api/me/settings", { settings: next, notifSmsResumeAt: resumeAt })
+      .then(() => {
+        if (!mountedRef.current) return;
+        flashSaved();
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        latestSettingsRef.current = prevSettings;
+        setSettings(prevSettings);
+        setSmsResumeAt(prevResumeAt);
+        smsResumeAtRef.current = prevResumeAt;
+        flashSaveError();
+      });
+  }, [flashSaved, flashSaveError]);
+
+  const clearSmsSnooze = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+      hasPendingSaveRef.current = false;
+    }
+    const prevSettings = latestSettingsRef.current;
+    const prevResumeAt = smsResumeAtRef.current;
+    const next = { ...prevSettings, notif_sms_paused: false };
+    latestSettingsRef.current = next;
+    setSettings(next);
+    setSmsResumeAt(null);
+    smsResumeAtRef.current = null;
+    setSmsSnoozePickerOpen(false);
+    setSaved(false);
+    apiPatch("/api/me/settings", { settings: next, notifSmsResumeAt: null })
+      .then(() => {
+        if (!mountedRef.current) return;
+        flashSaved();
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        latestSettingsRef.current = prevSettings;
+        setSettings(prevSettings);
+        setSmsResumeAt(prevResumeAt);
+        smsResumeAtRef.current = prevResumeAt;
+        flashSaveError();
+      });
+  }, [flashSaved, flashSaveError]);
+
+  const lastAttemptedPhoneRef = useRef<string>("");
+
+  const savePhoneNumber = useCallback((phone: string) => {
+    const trimmed = phone.trim();
+    if (trimmed && !/^\+?[\d\s\-().]{7,20}$/.test(trimmed)) {
+      setPhoneValidationError(true);
+      return;
+    }
+    setPhoneValidationError(false);
+    lastAttemptedPhoneRef.current = trimmed;
+    apiPatch("/api/me/settings", { phoneNumber: trimmed })
+      .then(() => {
+        if (!mountedRef.current) return;
+        setPhoneNumber(trimmed);
+        setPhoneError(false);
+        setPhoneSaved(true);
+        if (phoneSavedTimerRef.current) clearTimeout(phoneSavedTimerRef.current);
+        phoneSavedTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setPhoneSaved(false);
+        }, 1800);
+      })
+      .catch(() => {
+        if (!mountedRef.current) return;
+        setPhoneSaved(false);
+        setPhoneError(true);
+        if (phoneErrorTimerRef.current) clearTimeout(phoneErrorTimerRef.current);
+        phoneErrorTimerRef.current = setTimeout(() => {
+          if (mountedRef.current) setPhoneError(false);
+        }, 3000);
+      });
+  }, []);
+
+  const handlePhoneRetry = useCallback(() => {
+    if (phoneErrorTimerRef.current) {
+      clearTimeout(phoneErrorTimerRef.current);
+      phoneErrorTimerRef.current = null;
+    }
+    setPhoneError(false);
+    savePhoneNumber(lastAttemptedPhoneRef.current);
+  }, [savePhoneNumber]);
+
+  const hasPhone = phoneNumber.trim().length > 0;
+  const smsPaused = settings.notif_sms_paused;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -546,6 +719,163 @@ export default function NotificationSettingsScreen() {
               )}
             </View>
           </View>
+
+          <SectionHeader label="SMS" colors={colors} />
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {/* Snooze all SMS notifications */}
+            <View
+              style={[
+                styles.toggleRow,
+                { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: "column", alignItems: "stretch", gap: 10 },
+              ]}
+            >
+              <View style={styles.smsSnoozeHeader}>
+                <View style={styles.toggleText}>
+                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>Snooze all SMS notifications</Text>
+                  <Text style={[styles.toggleDesc, { color: colors.mutedForeground }]}>
+                    {smsPaused
+                      ? smsResumeAt
+                        ? (() => { const cd = smsSnoozeCountdown(smsResumeAt); return cd ? `Resuming in ${cd}` : "Resuming soon\u2026"; })()
+                        : "Paused indefinitely"
+                      : hasPhone
+                        ? "Auto-resumes after the chosen period"
+                        : "Add a phone number below to enable snoozing"}
+                  </Text>
+                </View>
+                {smsPaused ? (
+                  <Pressable
+                    onPress={clearSmsSnooze}
+                    hitSlop={6}
+                    style={[styles.snoozePill, { backgroundColor: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.4)" }]}
+                  >
+                    <Text style={[styles.snoozePillText, { color: "#ef4444" }]}>Resume now</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => hasPhone && setSmsSnoozePickerOpen((v) => !v)}
+                    disabled={!hasPhone}
+                    hitSlop={6}
+                    style={[
+                      styles.snoozePill,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        opacity: hasPhone ? 1 : 0.5,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.snoozePillText, { color: hasPhone ? colors.foreground : colors.mutedForeground }]}>Snooze</Text>
+                  </Pressable>
+                )}
+              </View>
+              {smsSnoozePickerOpen && !smsPaused && (
+                <View style={styles.snoozePickerRow}>
+                  {SNOOZE_OPTIONS.map((opt) => (
+                    <Pressable
+                      key={opt.label}
+                      onPress={() => applySmsSnooze(opt.ms)}
+                      style={[styles.snoozeOption, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    >
+                      <Text style={[styles.snoozeOptionText, { color: colors.foreground }]}>{opt.label}</Text>
+                    </Pressable>
+                  ))}
+                  <Pressable onPress={() => setSmsSnoozePickerOpen(false)} style={styles.snoozeCancel}>
+                    <Text style={[styles.snoozeOptionText, { color: colors.mutedForeground }]}>Cancel</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+
+            {smsPaused && (
+              <View style={styles.smsPausedBanner}>
+                <Feather name="alert-triangle" size={13} color="#38bdf8" style={styles.emailWarningIcon} />
+                <Text style={styles.smsPausedText}>
+                  {hasPhone
+                    ? smsResumeAt
+                      ? `SMS snoozed until ${new Date(smsResumeAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: new Date(smsResumeAt).getFullYear() !== new Date().getFullYear() ? "numeric" : undefined })} — no texts will be sent even if individual types are enabled below.`
+                      : "SMS is paused indefinitely — tap \u201cResume now\u201d above to re-enable."
+                    : "No phone number saved — add one below before pausing has any effect."}
+                </Text>
+              </View>
+            )}
+
+            <View style={smsPaused ? { opacity: 0.4 } : undefined} pointerEvents={smsPaused ? "none" : "auto"}>
+              <ToggleRow
+                label="Outbid alerts"
+                desc="Text when someone outbids you in an auction"
+                value={settings.notif_sms_outbid}
+                onChange={set("notif_sms_outbid")}
+                colors={colors}
+              />
+              <ToggleRow
+                label="Drop waitlist confirmations"
+                desc="Text when you join a drop waitlist"
+                value={settings.notif_sms_drops}
+                onChange={set("notif_sms_drops")}
+                colors={colors}
+              />
+              <ToggleRow
+                label="Order shipped"
+                desc="Text when a seller marks your order as shipped"
+                value={settings.notif_sms_shipped}
+                onChange={set("notif_sms_shipped")}
+                colors={colors}
+              />
+            </View>
+
+            <View style={[styles.emailInputRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+              <View style={styles.emailInputHeader}>
+                <Text style={[styles.toggleLabel, { color: colors.foreground, flex: 1 }]}>Mobile number</Text>
+                <View style={styles.emailStatusContainer}>
+                  {phoneSaved && (
+                    <Text style={[styles.savedLabel, styles.emailStatusAbsolute, { color: colors.primary }]}>Saved ✓</Text>
+                  )}
+                  {phoneError && (
+                    <View style={[styles.emailStatusAbsolute, { flexDirection: "row", alignItems: "center", gap: 3 }]}>
+                      <Text style={[styles.savedLabel, { color: "#ef4444" }]}>Couldn't save</Text>
+                      <Pressable onPress={handlePhoneRetry} hitSlop={8}>
+                        <Text style={[styles.savedLabel, { color: colors.primary }]}>Retry</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <Text style={[styles.toggleDesc, { color: colors.mutedForeground, marginBottom: 8 }]}>
+                Include country code (e.g. +1 555 123 4567). Never shown publicly.
+              </Text>
+              <TextInput
+                value={phoneNumber}
+                onChangeText={(text) => {
+                  setPhoneNumber(text);
+                  if (phoneValidationError && /^\+?[\d\s\-().]{7,20}$/.test(text.trim())) setPhoneValidationError(false);
+                }}
+                onBlur={() => savePhoneNumber(phoneNumber)}
+                placeholder="+1 555 123 4567"
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="phone-pad"
+                style={[
+                  styles.emailInput,
+                  {
+                    color: colors.foreground,
+                    backgroundColor: colors.background,
+                    borderColor: phoneValidationError ? "#ef4444" : colors.border,
+                  },
+                ]}
+              />
+              {phoneValidationError && (
+                <Text style={[styles.toggleDesc, { color: "#ef4444", marginTop: 4 }]}>
+                  Please enter a valid phone number with country code.
+                </Text>
+              )}
+              {!phoneValidationError && !hasPhone && !smsPaused && (
+                <Text style={[styles.toggleDesc, { color: "#f59e0b", marginTop: 4 }]}>
+                  Add a phone number above to receive SMS alerts.
+                </Text>
+              )}
+            </View>
+          </View>
         </ScrollView>
       )}
     </View>
@@ -673,5 +1003,58 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: "#fbbf24",
+  },
+  smsSnoozeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  snoozePill: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  snoozePillText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  snoozePickerRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  snoozeOption: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  snoozeOptionText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  snoozeCancel: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  smsPausedBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "rgba(56, 189, 248, 0.10)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(56, 189, 248, 0.25)",
+  },
+  smsPausedText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#38bdf8",
   },
 });
