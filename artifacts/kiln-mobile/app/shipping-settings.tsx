@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -130,18 +129,60 @@ export default function ShippingSettingsScreen() {
     ]).start(() => setFreeShipVisible(false));
   }, [samplePrice, shipping.freeThreshold, shipping.offerFreeShipping]);
 
-  const saveShipping = async () => {
+  const [saveError, setSaveError] = useState(false);
+  const errorOpacity = useRef(new Animated.Value(0)).current;
+  const errorScale = useRef(new Animated.Value(0.6)).current;
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (saveError) {
+      Animated.parallel([
+        Animated.timing(errorOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(errorScale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 12 }),
+      ]).start();
+    } else {
+      Animated.timing(errorOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+        errorScale.setValue(0.6);
+      });
+    }
+  }, [saveError, errorOpacity, errorScale]);
+
+  const performSave = useCallback(async () => {
     setSaving(true);
     try {
       await apiPatch("/api/me/settings", { shippingSettings: shipping });
+      if (!mountedRef.current) return;
+      setSaveError(false);
       setSaved(true);
-      setTimeout(() => setSaved(false), 1800);
+      setTimeout(() => { if (mountedRef.current) setSaved(false); }, 1800);
     } catch {
-      Alert.alert("Error", "Could not save shipping settings. Please try again.");
+      if (!mountedRef.current) return;
+      setSaved(false);
+      setSaveError(true);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) setSaveError(false);
+      }, 3000);
     } finally {
-      setSaving(false);
+      if (mountedRef.current) setSaving(false);
     }
-  };
+  }, [shipping]);
+
+  const saveShipping = performSave;
+
+  const handleRetry = useCallback(() => {
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+    setSaveError(false);
+    performSave();
+  }, [performSave]);
 
   return (
     <KeyboardAvoidingView
@@ -162,7 +203,15 @@ export default function ShippingSettingsScreen() {
           <Feather name="chevron-left" size={24} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Shipping Rates</Text>
-        <View style={{ width: 34 }} />
+        <View style={styles.headerRight}>
+          <Animated.View style={{ opacity: errorOpacity, transform: [{ scale: errorScale }], flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <Feather name="x" size={14} color="#ef4444" />
+            <Text style={[styles.errorLabel, { color: "#ef4444" }]}>Couldn't save</Text>
+            <Pressable onPress={handleRetry} hitSlop={8}>
+              <Text style={[styles.errorLabel, { color: colors.primary }]}> Retry</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
       </View>
 
       {loading ? (
@@ -428,6 +477,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 34, alignItems: "flex-start" },
   headerTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
+  headerRight: { width: 120, alignItems: "flex-end", justifyContent: "center" },
+  errorLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { padding: 16, gap: 12 },
   card: {
