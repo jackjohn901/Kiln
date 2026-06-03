@@ -372,6 +372,15 @@ export default function Settings() {
     }
     setEmailValidationError(false);
     setEmailError(null);
+    // Clearing the email makes any active email snooze meaningless — there's no
+    // address left to deliver to. Lift it locally so the banner/state stays honest;
+    // the server clears the persisted snooze for the same request.
+    const clearingSnooze = !trimmed && settings.notif_email_paused;
+    if (clearingSnooze) {
+      setEmailPausedAt(null);
+      setEmailResumeAt(null);
+      patchSettings({ notif_email_paused: false });
+    }
     fetch("/api/me/settings", {
       method: "PATCH",
       credentials: "include",
@@ -383,6 +392,9 @@ export default function Settings() {
         setEmailSaved(true);
         setEmailError(null);
         setTimeout(() => setEmailSaved(false), 2000);
+        if (clearingSnooze) {
+          toast({ title: "Email snooze lifted", description: "There was no address to send to, so the email snooze was cleared." });
+        }
       })
       .catch(() => { setTimedError(setEmailError, "Couldn\u2019t save email address. Please try again."); });
   }

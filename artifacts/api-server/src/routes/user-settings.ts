@@ -150,6 +150,27 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     }
   }
 
+  // If the contact email is being cleared, any active email snooze can no longer
+  // have an effect (there's no address left to deliver to). Clear it automatically
+  // so the persisted state stays honest — otherwise a stale snooze would silently
+  // suppress emails again the moment the user adds a new address later.
+  let settingsForEmailClear: Record<string, unknown> | undefined;
+  if (typeof contactEmail === "string" && contactEmail.trim().length === 0) {
+    notifEmailPausedAtUpdate = { notifEmailPausedAt: null };
+    if (notifEmailResumeAtValue === undefined) notifEmailResumeAtValue = null;
+    if (settings !== undefined && typeof settings === "object" && settings !== null) {
+      settingsForEmailClear = { ...(settings as Record<string, unknown>), notif_email_paused: false };
+    } else {
+      const [existingSettings] = await db.select({ settings: userSettingsTable.settings })
+        .from(userSettingsTable).where(eq(userSettingsTable.userId, userId));
+      const cur = (existingSettings?.settings as Record<string, unknown> | null) ?? {};
+      if (cur.notif_email_paused === true) {
+        settingsForEmailClear = { ...cur, notif_email_paused: false };
+      }
+    }
+  }
+  const settingsToPersist = settingsForEmailClear ?? settings;
+
   // Validate processingWindow if provided in paymentSettings
   if (paymentSettings !== undefined && paymentSettings !== null && typeof paymentSettings === "object") {
     const pw = (paymentSettings as Record<string, unknown>).processingWindow;
@@ -206,7 +227,7 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
     .where(eq(userSettingsTable.userId, userId));
   if (existing.length > 0) {
     const [updated] = await db.update(userSettingsTable).set({
-      ...(settings !== undefined && { settings }),
+      ...(settingsToPersist !== undefined && { settings: settingsToPersist }),
       ...(shippingSettings !== undefined && { shippingSettings }),
       ...(paymentSettings !== undefined && { paymentSettings }),
       ...(defaultShippingAddress !== undefined && { defaultShippingAddress: defaultShippingAddress ?? null }),
@@ -219,7 +240,7 @@ router.patch("/me/settings", async (req, res): Promise<void> => {
   } else {
     const [created] = await db.insert(userSettingsTable).values({
       userId,
-      settings: settings ?? {},
+      settings: settingsToPersist ?? {},
       shippingSettings: shippingSettings ?? {},
       paymentSettings: paymentSettings ?? {},
       defaultShippingAddress: defaultShippingAddress ?? null,
