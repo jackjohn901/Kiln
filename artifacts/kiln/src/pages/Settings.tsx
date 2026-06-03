@@ -705,7 +705,10 @@ export default function Settings() {
                 <p className="text-xs text-red-400 mt-1.5">Please enter a valid email address.</p>
               )}
               {emailError && !emailValidationError && (
-                <p className="text-xs text-red-400 mt-1.5">{emailError}</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <p className="text-xs text-red-400">{emailError}</p>
+                  <button onClick={() => saveContactEmail(contactEmail)} className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0">Retry</button>
+                </div>
               )}
             </div>
 
@@ -811,7 +814,10 @@ export default function Settings() {
                   <p className="text-xs text-red-400 mt-1.5">Please enter a valid phone number with country code.</p>
                 )}
                 {phoneError && !phoneValidationError && (
-                  <p className="text-xs text-red-400 mt-1.5">{phoneError}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <p className="text-xs text-red-400">{phoneError}</p>
+                    <button onClick={() => savePhoneNumber(phoneNumber)} className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0">Retry</button>
+                  </div>
                 )}
                 {!phoneNumber.trim() && !settings.notif_sms_paused && (
                   <p className="text-xs text-amber-500/70 mt-1.5">Add a phone number above to receive SMS alerts.</p>
@@ -950,7 +956,10 @@ export default function Settings() {
                 {addressSaved ? <><Check size={14} /> Saved!</> : "Save delivery address"}
               </button>
               {addressError && (
-                <p className="text-xs text-red-400 text-center mt-2">{addressError}</p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <p className="text-xs text-red-400">{addressError}</p>
+                  <button onClick={() => saveAddress(address)} className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0">Retry</button>
+                </div>
               )}
             </div>
 
@@ -1202,7 +1211,10 @@ export default function Settings() {
                 {paymentSaved ? <><Check size={14} /> Saved!</> : "Save payment methods"}
               </button>
               {paymentsError && (
-                <p className="text-xs text-red-400 text-center mt-2">{paymentsError}</p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <p className="text-xs text-red-400">{paymentsError}</p>
+                  <button onClick={() => savePayments(payments)} className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0">Retry</button>
+                </div>
               )}
             </div>
           </div>
@@ -1465,7 +1477,10 @@ export default function Settings() {
                 {shippingSaved ? <><Check size={14} /> Saved!</> : "Save shipping rates"}
               </button>
               {shippingError && (
-                <p className="text-xs text-red-400 text-center mt-2">{shippingError}</p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <p className="text-xs text-red-400">{shippingError}</p>
+                  <button onClick={() => saveShipping(shipping)} className="text-xs text-amber-400 underline underline-offset-2 hover:text-amber-300 transition-colors shrink-0">Retry</button>
+                </div>
               )}
             </div>
 
