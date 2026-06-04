@@ -449,6 +449,7 @@ export default function Settings() {
     "notif_email_outbid",
     "notif_email_mentions",
     "notif_email_shipped",
+    "notif_email_tracking_updated",
     "notif_email_delivered",
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
@@ -899,6 +900,7 @@ export default function Settings() {
               <Toggle settingKey="notif_email_outbid" label="Outbid alerts" desc="Email when someone outbids you in an auction" />
               <Toggle settingKey="notif_email_mentions" label="Mention alerts" desc="Email when someone @mentions you in a comment or post" />
               <Toggle settingKey="notif_email_shipped" label="Order shipped" desc="Email when a seller marks your order as shipped" />
+              <Toggle settingKey="notif_email_tracking_updated" label="Tracking updates" desc="Email when a seller updates the tracking number on a shipped order" />
               <Toggle settingKey="notif_email_delivered" label="Order delivered" desc="Email when a seller marks your order as delivered" />
             </div>
             <div className={`py-3${settings.notif_email_paused ? " opacity-40 pointer-events-none" : ""}`}>

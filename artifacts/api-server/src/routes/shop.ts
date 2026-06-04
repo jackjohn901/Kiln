@@ -431,7 +431,7 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
       ]).then(async ([[s], [buyer]]) => {
         const buyerSettings = s?.settings as Record<string, unknown> | null;
         const emailSnoozed = isEmailPaused(buyerSettings, s?.notifEmailResumeAt);
-        const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_shipped !== false;
+        const wantsEmail = !emailSnoozed && buyerSettings?.notif_email_tracking_updated !== false;
         if (emailSnoozed) {
           db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, trackingNotifId)).catch(() => {});
         }
