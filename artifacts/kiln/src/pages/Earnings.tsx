@@ -185,7 +185,31 @@ export default function Earnings() {
   const [selectedMonth, setSelectedMonth] = useState(persisted.month);
   const [selectedYear, setSelectedYear]   = useState(persisted.year);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearList, setShowYearList]        = useState(false);
   const [pickerYear, setPickerYear]           = useState(persisted.year);
+  const [joinYear, setJoinYear]               = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me/profile", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p: { createdAt?: string } | null) => {
+        if (cancelled || !p?.createdAt) return;
+        const y = new Date(p.createdAt).getFullYear();
+        if (!Number.isNaN(y)) setJoinYear(y);
+      })
+      .catch(() => { /* fall back to default range */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const yearOptions = (() => {
+    const currentYear = now.getFullYear();
+    const floor = joinYear ?? currentYear - 9;
+    const earliest = Math.min(floor, persisted.year, selectedYear);
+    const years: number[] = [];
+    for (let y = currentYear; y >= earliest; y--) years.push(y);
+    return years;
+  })();
 
   useEffect(() => {
     try {
@@ -216,6 +240,7 @@ export default function Earnings() {
 
   function openMonthPicker() {
     setPickerYear(selectedYear);
+    setShowYearList(false);
     setShowMonthPicker(true);
   }
 
@@ -223,6 +248,11 @@ export default function Earnings() {
     setSelectedMonth(month);
     setSelectedYear(pickerYear);
     setShowMonthPicker(false);
+  }
+
+  function selectPickerYear(year: number) {
+    setPickerYear(year);
+    setShowYearList(false);
   }
 
   useEffect(() => {
@@ -917,44 +947,75 @@ export default function Earnings() {
                       <div className="flex items-center justify-between mb-3">
                         <button
                           onClick={() => setPickerYear(y => y - 1)}
-                          className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors"
+                          disabled={showYearList}
+                          className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Previous year"
                         >
                           <ChevronLeft size={13} />
                         </button>
-                        <span className="text-xs font-semibold text-stone-200">{pickerYear}</span>
+                        <button
+                          onClick={() => setShowYearList(o => !o)}
+                          className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold text-stone-200 hover:text-amber-300 hover:bg-white/5 transition-colors"
+                          aria-label="Choose year"
+                          aria-expanded={showYearList}
+                        >
+                          {pickerYear}
+                          <ChevronDown size={12} className={showYearList ? "rotate-180 transition-transform" : "transition-transform"} />
+                        </button>
                         <button
                           onClick={() => setPickerYear(y => y + 1)}
-                          disabled={pickerYear >= now.getFullYear()}
+                          disabled={showYearList || pickerYear >= now.getFullYear()}
                           className="flex items-center justify-center w-6 h-6 rounded-full hover:bg-white/8 text-stone-500 hover:text-stone-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           aria-label="Next year"
                         >
                           <ChevronRight size={13} />
                         </button>
                       </div>
-                      <div className="grid grid-cols-3 gap-1">
-                        {MONTH_NAMES.map((name, idx) => {
-                          const isFuture = pickerYear > now.getFullYear() || (pickerYear === now.getFullYear() && idx > now.getMonth());
-                          const isSelected = idx === selectedMonth && pickerYear === selectedYear;
-                          return (
-                            <button
-                              key={name}
-                              onClick={() => !isFuture && selectPickerMonth(idx)}
-                              disabled={isFuture}
-                              className={[
-                                "rounded-lg py-1.5 text-xs font-medium transition-colors",
-                                isFuture
-                                  ? "text-stone-700 cursor-not-allowed"
-                                  : isSelected
+                      {showYearList ? (
+                        <div className="grid grid-cols-3 gap-1 max-h-44 overflow-y-auto">
+                          {yearOptions.map((year) => {
+                            const isSelected = year === pickerYear;
+                            return (
+                              <button
+                                key={year}
+                                onClick={() => selectPickerYear(year)}
+                                className={[
+                                  "rounded-lg py-1.5 text-xs font-medium tabular-nums transition-colors",
+                                  isSelected
                                     ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
                                     : "text-stone-400 hover:bg-white/8 hover:text-stone-200",
-                              ].join(" ")}
-                            >
-                              {name.slice(0, 3)}
-                            </button>
-                          );
-                        })}
-                      </div>
+                                ].join(" ")}
+                              >
+                                {year}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-1">
+                          {MONTH_NAMES.map((name, idx) => {
+                            const isFuture = pickerYear > now.getFullYear() || (pickerYear === now.getFullYear() && idx > now.getMonth());
+                            const isSelected = idx === selectedMonth && pickerYear === selectedYear;
+                            return (
+                              <button
+                                key={name}
+                                onClick={() => !isFuture && selectPickerMonth(idx)}
+                                disabled={isFuture}
+                                className={[
+                                  "rounded-lg py-1.5 text-xs font-medium transition-colors",
+                                  isFuture
+                                    ? "text-stone-700 cursor-not-allowed"
+                                    : isSelected
+                                      ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
+                                      : "text-stone-400 hover:bg-white/8 hover:text-stone-200",
+                                ].join(" ")}
+                              >
+                                {name.slice(0, 3)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
