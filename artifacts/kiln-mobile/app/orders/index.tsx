@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -73,6 +74,22 @@ function formatPrice(n: number) {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Carrier detection + tracking URL — mirrors the logic in orders/[id].tsx
+function detectTracking(trackingNumber: string): { carrier: string | null; url: string | null } {
+  const tn = trackingNumber.replace(/\s/g, "");
+  const carrier = /^1Z/i.test(tn) ? "UPS"
+    : /^(94|93|92|94|95)\d{18,}/.test(tn) || /^\d{22}$/.test(tn) || /^[A-Z]{2}\d{9}US$/i.test(tn) ? "USPS"
+    : /^\d{12}$/.test(tn) || /^\d{15}$/.test(tn) || /^\d{20}$/.test(tn) ? "FedEx"
+    : /^JD\d{18}$/i.test(tn) || /^\d{10}$/.test(tn) ? "DHL"
+    : null;
+  const url = carrier === "UPS" ? `https://www.ups.com/track?tracknum=${tn}`
+    : carrier === "USPS" ? `https://tools.usps.com/go/TrackConfirmAction?tLabels=${tn}`
+    : carrier === "FedEx" ? `https://www.fedex.com/fedextrack/?trknbr=${tn}`
+    : carrier === "DHL" ? `https://www.dhl.com/en/express/tracking.html?AWB=${tn}`
+    : null;
+  return { carrier, url };
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -279,6 +296,31 @@ export default function OrdersScreen() {
                         </Text>
                       </View>
                     ) : null}
+                    {primary.trackingNumber ? (() => {
+                      const { carrier, url } = detectTracking(primary.trackingNumber);
+                      const label = carrier ? `Track via ${carrier}` : "Track package";
+                      const chip = (
+                        <View style={styles.trackChip}>
+                          <Feather name="truck" size={11} color="#60a5fa" />
+                          <Text style={styles.trackChipText}>{label}</Text>
+                          {url ? <Feather name="external-link" size={9} color="#60a5fa" /> : null}
+                        </View>
+                      );
+                      return url ? (
+                        <Pressable
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            Linking.openURL(url).catch(() => {});
+                          }}
+                          hitSlop={6}
+                          style={styles.trackChipWrap}
+                        >
+                          {chip}
+                        </Pressable>
+                      ) : (
+                        <View style={styles.trackChipWrap}>{chip}</View>
+                      );
+                    })() : null}
                   </View>
                 </View>
               </Pressable>
@@ -351,4 +393,15 @@ const styles = StyleSheet.create({
   itemCount: { fontFamily: "Inter_400Regular", fontSize: 11 },
   windowRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   windowText: { fontFamily: "Inter_400Regular", fontSize: 11 },
+  trackChipWrap: { alignSelf: "flex-start", marginTop: 4 },
+  trackChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(96,165,250,0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  trackChipText: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#60a5fa" },
 });
