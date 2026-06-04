@@ -540,7 +540,7 @@ export function workshopBookingEmail(
   opts?: WorkshopBookingEmailOptions,
 ): string {
   const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, artistName, calParams) : "";
-  const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
+  const icsUrl = (calParams?.workshopId && calParams?.startDateISO) ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
 
   const isOnline = opts?.isOnline ?? calParams?.isOnline;
   const locationLine = isOnline
@@ -822,7 +822,7 @@ export function newWorkshopBookingArtistEmail(
   buyerId?: string | null,
 ): string {
   const gcalUrl = calParams ? buildGoogleCalendarUrl(workshopTitle, buyerName, calParams) : "";
-  const icsUrl = calParams?.workshopId ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
+  const icsUrl = (calParams?.workshopId && calParams?.startDateISO) ? `${BASE_URL.replace(/\/kiln$/, "")}/api/workshops/${calParams.workshopId}/calendar.ics` : "";
 
   const calendarLinks = (gcalUrl || icsUrl) ? `
     <div style="margin-top:16px;">

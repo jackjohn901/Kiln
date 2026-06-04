@@ -627,14 +627,14 @@ export class WebhookHandlers {
                   });
                 }
 
-                const calParams: WorkshopCalendarParams | undefined = workshop.startDate ? {
-                  startDateISO: workshop.startDate.toISOString(),
+                const calParams: WorkshopCalendarParams = {
+                  startDateISO: workshop.startDate?.toISOString() ?? null,
                   endDateISO: workshop.endDate?.toISOString() ?? null,
                   durationHours: workshop.durationHours,
                   isOnline: workshop.isOnline,
                   location: workshop.location ?? null,
                   workshopId: workshop.id,
-                } : undefined;
+                };
 
                 // Student confirmation email
                 if (customerEmail) {
