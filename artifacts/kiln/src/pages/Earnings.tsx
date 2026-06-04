@@ -460,7 +460,7 @@ export default function Earnings() {
   }, [earnings]);
 
   // Monthly trend sparkline state
-  interface MonthSummary { month: string; label: string; total: number }
+  interface MonthSummary { month: string; label: string; total: number; tips: number; subscriptions: number; shopSales: number }
   const [monthlyTrend, setMonthlyTrend] = useState<MonthSummary[]>([]);
 
   // Patron tier state
@@ -1069,15 +1069,22 @@ export default function Earnings() {
                     >
                       {monthlyTrend.map((m, i) => {
                         const isSelected = m.month === selectedKey;
-                        const barH = maxTotal === 0 ? 2 : Math.max(2, Math.round((m.total / maxTotal) * chartH));
                         const x = i * (barW + gap);
-                        const y = chartH - barH;
                         const [barYear, barMonth] = m.month.split("-").map(Number);
                         const jumpToMonth = () => {
                           if (!Number.isFinite(barYear) || !Number.isFinite(barMonth)) return;
                           setSelectedYear(barYear);
                           setSelectedMonth(barMonth - 1);
                         };
+                        // Stacked segments, bottom-up: tips (pink), patrons (violet), shop (emerald).
+                        const segs = [
+                          { value: m.tips, fill: "#f472b6" },        // pink-400
+                          { value: m.subscriptions, fill: "#a78bfa" }, // violet-400
+                          { value: m.shopSales, fill: "#34d399" },     // emerald-400
+                        ];
+                        const totalBarH = maxTotal === 0 ? 2 : Math.max(2, Math.round((m.total / maxTotal) * chartH));
+                        const scale = m.total > 0 ? totalBarH / m.total : 0;
+                        let cursorY = chartH; // baseline; segments stack upward
                         return (
                           <g
                             key={m.month}
@@ -1092,15 +1099,35 @@ export default function Earnings() {
                               }
                             }}
                           >
-                            <rect
-                              x={x}
-                              y={y}
-                              width={barW}
-                              height={barH}
-                              rx={4}
-                              className={`transition-colors ${isSelected ? "fill-amber-400" : "fill-stone-700 group-hover:fill-stone-500"}`}
-                              opacity={isSelected ? 1 : 0.7}
-                            />
+                            {m.total === 0 ? (
+                              <rect
+                                x={x}
+                                y={chartH - 2}
+                                width={barW}
+                                height={2}
+                                rx={1}
+                                className="fill-stone-700"
+                                opacity={0.5}
+                              />
+                            ) : (
+                              segs.map((seg, si) => {
+                                if (seg.value <= 0) return null;
+                                const segH = Math.max(1, seg.value * scale);
+                                cursorY -= segH;
+                                return (
+                                  <rect
+                                    key={si}
+                                    x={x}
+                                    y={cursorY}
+                                    width={barW}
+                                    height={segH}
+                                    className="transition-opacity"
+                                    fill={seg.fill}
+                                    opacity={isSelected ? 1 : 0.55}
+                                  />
+                                );
+                              })
+                            )}
                             <rect
                               x={x}
                               y={0}
@@ -1111,7 +1138,7 @@ export default function Earnings() {
                             {isSelected && m.total > 0 && (
                               <text
                                 x={x + barW / 2}
-                                y={y - 4}
+                                y={chartH - totalBarH - 4}
                                 textAnchor="middle"
                                 fontSize={9}
                                 className="fill-amber-300"
@@ -1134,6 +1161,19 @@ export default function Earnings() {
                         );
                       })}
                     </svg>
+                  </div>
+                  {/* Legend keying the stacked-bar colours */}
+                  <div className="mt-3 flex items-center justify-center gap-4">
+                    {[
+                      { label: "Tips", color: "#f472b6" },
+                      { label: "Patrons", color: "#a78bfa" },
+                      { label: "Shop", color: "#34d399" },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center gap-1.5">
+                        <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+                        <span className="text-[10px] text-stone-400">{item.label}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );

@@ -157,7 +157,7 @@ router.get("/me/earnings/monthly-summary", async (req, res): Promise<void> => {
   const anchorYear = req.query.year ? parseInt(req.query.year as string, 10) : now.getFullYear();
   const anchorMonth = req.query.month ? parseInt(req.query.month as string, 10) - 1 : now.getMonth(); // 0-indexed
 
-  const results: { month: string; label: string; total: number }[] = [];
+  const results: { month: string; label: string; total: number; tips: number; subscriptions: number; shopSales: number }[] = [];
 
   for (let i = numMonths - 1; i >= 0; i--) {
     // Work backwards from the anchor month
@@ -190,9 +190,12 @@ router.get("/me/earnings/monthly-summary", async (req, res): Promise<void> => {
     const tipCents = Number(tipsAgg[0]?.total ?? 0);
     const subCents = Number(subsAgg[0]?.total ?? 0);
     const saleCents = Number(salesAgg[0]?.total ?? 0);
-    const total = (tipCents + subCents + saleCents) / 100;
+    const tips = tipCents / 100;
+    const subscriptions = subCents / 100;
+    const shopSales = saleCents / 100;
+    const total = tips + subscriptions + shopSales;
 
-    results.push({ month: monthKey, label, total });
+    results.push({ month: monthKey, label, total, tips, subscriptions, shopSales });
   }
 
   res.json({ months: results });
