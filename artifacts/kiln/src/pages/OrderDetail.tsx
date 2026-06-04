@@ -197,6 +197,16 @@ interface OrderThreadInfo {
   latestMessage: OrderThreadMessage | null;
 }
 
+interface OrderEvent {
+  id: string;
+  type: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  previousTrackingNumber: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
@@ -222,6 +232,7 @@ export default function OrderDetail() {
   const [addressError, setAddressError] = useState<string | null>(null);
   const [savedDefaultAddress, setSavedDefaultAddress] = useState<string | null>(null);
   const [savedAddressLoaded, setSavedAddressLoaded] = useState(false);
+  const [orderEvents, setOrderEvents] = useState<OrderEvent[]>([]);
   const [orderThread, setOrderThread] = useState<OrderThreadInfo | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
   const [replySending, setReplySending] = useState(false);
@@ -315,6 +326,7 @@ export default function OrderDetail() {
         if (data.sellerProfile) setSellerProfile(data.sellerProfile as SellerProfile);
         if (data.buyerEmail) setBuyerEmail(data.buyerEmail as string);
         setIsPublicView(data.isPublicView === true);
+        if (Array.isArray(data.events)) setOrderEvents(data.events as OrderEvent[]);
         if (Array.isArray(data.perSellerWindows) && data.perSellerWindows.length > 0) {
           setPerSellerWindows(data.perSellerWindows as { sellerName: string; days: number | null; label: string | null }[]);
         }
@@ -1001,6 +1013,43 @@ export default function OrderDetail() {
             </div>
           );
         })()}
+
+        {orderEvents.length > 0 && (
+          <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Order timeline</p>
+            <ul className="space-y-3">
+              {orderEvents.map((ev, i) => {
+                const isTrackingAdded = ev.type === "tracking_added";
+                const title = isTrackingAdded ? "Tracking added" : ev.type === "tracking_updated" ? "Tracking updated" : "Order updated";
+                return (
+                  <li key={ev.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/15 ring-1 ring-blue-500/30">
+                        <Truck size={12} className="text-blue-400" />
+                      </span>
+                      {i < orderEvents.length - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}
+                    </div>
+                    <div className="flex-1 min-w-0 pb-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold text-stone-200">{title}</p>
+                        <span className="text-[11px] text-stone-500 shrink-0">{formatDate(ev.createdAt)}</span>
+                      </div>
+                      {ev.trackingNumber && (
+                        <p className="mt-1 font-mono text-xs text-stone-300 break-all">{ev.trackingNumber}</p>
+                      )}
+                      {ev.previousTrackingNumber && (
+                        <p className="mt-0.5 text-[11px] text-stone-600">
+                          Previously: <span className="font-mono break-all line-through">{ev.previousTrackingNumber}</span>
+                        </p>
+                      )}
+                      <p className="mt-0.5 text-[11px] text-stone-600">{formatTime(ev.createdAt)}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {(order.shippingAddress || canEditAddress) && (
           <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">

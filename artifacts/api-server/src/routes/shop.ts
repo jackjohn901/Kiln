@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { listingsTable, wishlistsTable, ordersTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable, cartItemsTable } from "@workspace/db";
+import { listingsTable, wishlistsTable, ordersTable, orderEventsTable, userSettingsTable, profilesTable, workReservationsTable, reservationInterestsTable, usersTable, notificationsTable, cartItemsTable } from "@workspace/db";
 import { sendSmsIfOptedIn } from "../lib/sms";
 import { sendEmailWithRetry, shippingNotificationEmail, deliveryNotificationEmail, trackingUpdateEmail } from "../lib/email";
 import { isEmailPaused, prependSnoozeRecap } from "../lib/emailPaused";
@@ -413,6 +413,19 @@ router.patch("/me/sales/:id", async (req, res): Promise<void> => {
     const newTracking = trackingNumber !== undefined ? (trackingNumber.trim() || null) : existing.trackingNumber;
     const trackingChanged = trackingNumber !== undefined && newTracking !== existing.trackingNumber;
     const statusUnchanged = status === undefined || status === existing.status;
+
+    // Append a timestamped event to the order's history whenever the tracking
+    // number changes, so the buyer can see the change (and the previous value).
+    if (trackingChanged) {
+      await db.insert(orderEventsTable).values({
+        id: crypto.randomUUID(),
+        orderId: updated.id,
+        type: existing.trackingNumber ? "tracking_updated" : "tracking_added",
+        trackingNumber: newTracking,
+        carrier: updated.carrier ?? null,
+        previousTrackingNumber: existing.trackingNumber ?? null,
+      });
+    }
     if (trackingChanged && statusUnchanged && updated.status === "shipped" && updated.buyerId) {
       const trackingNotifId = crypto.randomUUID();
       const orderLink = `/orders/${updated.id}?highlight=tracking`;

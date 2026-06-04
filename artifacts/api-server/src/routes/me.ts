@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable, usersTable, notificationsTable } from "@workspace/db";
-import { eq, inArray, and } from "drizzle-orm";
+import { ordersTable, orderEventsTable, verificationApplicationsTable, userSettingsTable, listingsTable, profilesTable, usersTable, notificationsTable } from "@workspace/db";
+import { eq, inArray, and, asc } from "drizzle-orm";
 import crypto from "crypto";
 import { logger } from "../lib/logger";
 import { getUncachableStripeClient } from "../stripeClient";
@@ -336,7 +336,23 @@ router.get("/me/orders/:id", async (req, res): Promise<void> => {
       };
     });
 
-    res.json({ order, siblingOrders: enrichedSiblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows });
+    // Order history events (e.g. tracking number changes) in chronological order.
+    const eventRows = await db
+      .select({
+        id: orderEventsTable.id,
+        type: orderEventsTable.type,
+        trackingNumber: orderEventsTable.trackingNumber,
+        carrier: orderEventsTable.carrier,
+        previousTrackingNumber: orderEventsTable.previousTrackingNumber,
+        note: orderEventsTable.note,
+        createdAt: orderEventsTable.createdAt,
+      })
+      .from(orderEventsTable)
+      .where(eq(orderEventsTable.orderId, order.id))
+      .orderBy(asc(orderEventsTable.createdAt));
+    const events = eventRows.map((e) => ({ ...e, createdAt: e.createdAt.toISOString() }));
+
+    res.json({ order, siblingOrders: enrichedSiblingOrders, buyerProfile, sellerProfile, buyerEmail, perSellerWindows, events });
   } catch (err) {
     logger.error({ err }, "me/orders/:id GET error");
     res.status(500).json({ error: "Failed to load order" });

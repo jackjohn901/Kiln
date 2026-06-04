@@ -9,6 +9,7 @@ export * from "./message_threads";
 export * from "./profiles";
 export * from "./listings";
 export * from "./orders";
+export * from "./order_events";
 export * from "./workshops";
 export * from "./commissions";
 export * from "./guilds";
