@@ -104,7 +104,7 @@ router.post("/workshops/:id/book", async (req, res): Promise<void> => {
     const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Student";
     const [booking] = await db.insert(workshopBookingsTable).values({ id: crypto.randomUUID(), workshopId: w.id, userId, userName: name, userEmail: user.email ?? undefined, paidAmount: 0 }).returning();
     await db.update(workshopsTable).set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` }).where(eq(workshopsTable.id, w.id));
-    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: w.artistId, type: "workshop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `booked your workshop: ${w.title}`, link: `/workshops` });
+    await db.insert(notificationsTable).values({ id: crypto.randomUUID(), userId: w.artistId, type: "workshop", fromId: userId, fromName: name, fromAvatarUrl: user.profileImageUrl ?? null, text: `booked your workshop: ${w.title}`, link: `/workshops/${w.id}` });
 
     const calParams = { startDateISO: w.startDate?.toISOString() ?? null, endDateISO: w.endDate?.toISOString() ?? null, durationHours: w.durationHours, isOnline: w.isOnline, location: w.location ?? null, workshopId: w.id };
 
