@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef, Re
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import type { NotificationType } from "@workspace/notifications";
 
 export interface KilnComment {
   id: string;
@@ -16,7 +17,7 @@ export interface KilnComment {
 
 export interface KilnNotification {
   id: string;
-  type: "follow" | "like" | "comment" | "commission" | "tip" | "workshop" | "drop" | "auction" | "subscription" | "sale" | "workshop_booking" | "commission_payment" | "message";
+  type: NotificationType;
   fromId: string;
   fromName: string;
   fromAvatarUrl: string;

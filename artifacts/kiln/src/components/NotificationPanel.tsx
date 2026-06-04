@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star, BellOff } from "lucide-react";
+import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star, Gavel, Mail, BellOff, type LucideIcon } from "lucide-react";
+import { getNotificationIcon, type NotificationIconName } from "@workspace/notifications";
 import { useSocial, KilnNotification } from "@/contexts/SocialContext";
 import { useSettings, PUSH_KEYS } from "@/contexts/SettingsContext";
 import { useLocation } from "wouter";
@@ -19,20 +20,32 @@ const TYPE_FALLBACK_LINKS: Partial<Record<KilnNotification["type"], string>> = {
   tip: "/earnings",
 };
 
+const ICON_COMPONENTS: Record<NotificationIconName, LucideIcon> = {
+  follow: UserPlus,
+  like: Heart,
+  comment: MessageCircle,
+  craft: Hammer,
+  money: DollarSign,
+  calendar: Calendar,
+  purchase: ShoppingBag,
+  drop: Zap,
+  premium: Star,
+  auction: Gavel,
+  message: Mail,
+  default: Bell,
+};
+
 function NotifIcon({ type }: { type: KilnNotification["type"] }) {
-  const cls = "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0";
-  if (type === "follow") return <div className={`${cls} bg-blue-500/20`}><UserPlus size={13} className="text-blue-400" /></div>;
-  if (type === "like") return <div className={`${cls} bg-rose-500/20`}><Heart size={13} className="text-rose-400" fill="currentColor" /></div>;
-  if (type === "comment") return <div className={`${cls} bg-purple-500/20`}><MessageCircle size={13} className="text-purple-400" /></div>;
-  if (type === "commission") return <div className={`${cls} bg-amber-500/20`}><Hammer size={13} className="text-amber-400" /></div>;
-  if (type === "tip") return <div className={`${cls} bg-emerald-500/20`}><DollarSign size={13} className="text-emerald-400" /></div>;
-  if (type === "workshop") return <div className={`${cls} bg-sky-500/20`}><Calendar size={13} className="text-sky-400" /></div>;
-  if (type === "workshop_booking") return <div className={`${cls} bg-sky-500/20`}><Calendar size={13} className="text-sky-400" /></div>;
-  if (type === "commission_payment") return <div className={`${cls} bg-emerald-500/20`}><DollarSign size={13} className="text-emerald-400" /></div>;
-  if (type === "sale") return <div className={`${cls} bg-green-500/20`}><ShoppingBag size={13} className="text-green-400" /></div>;
-  if (type === "drop") return <div className={`${cls} bg-orange-500/20`}><Zap size={13} className="text-orange-400" /></div>;
-  if (type === "subscription") return <div className={`${cls} bg-amber-400/20`}><Star size={13} className="text-amber-300" /></div>;
-  return <div className={`${cls} bg-stone-700`}><Bell size={13} className="text-stone-400" /></div>;
+  const { icon, color } = getNotificationIcon(type);
+  const Icon = ICON_COMPONENTS[icon];
+  return (
+    <div
+      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ backgroundColor: `${color}33` }}
+    >
+      <Icon size={13} style={{ color }} fill={icon === "like" ? "currentColor" : "none"} />
+    </div>
+  );
 }
 
 interface Props {

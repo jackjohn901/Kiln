@@ -21,3 +21,4 @@
 - [Referral tree cycle-safety](referral-tree-cycle-safety.md) — unique-parent doesn't stop cycles; reject redemption if redeemer is an ancestor of code owner, or recursive CTEs inflate network counts/badges.
 - [Kiln badge system](kiln-badge-system.md) — awardBadge() must be called by feature routes; badges with no badge_definitions row are awarded silently but never render; most defs aren't seeded from source (only referral ones are).
 - [Referral owner-dedup](referral-owner-dedup.md) — referral credit counts distinct owners (COALESCE(owner_id,id)), not accounts; invite links land on /join?ref=CODE, not root.
+- [Notification icon config](notification-icon-config.md) — notif type union + icon/color live in lib `@workspace/notifications`; web/mobile map a concept-based icon name to lucide/Feather; adding a type is a compile error until mapped.

@@ -16,6 +16,7 @@ import * as Device from "expo-device";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { useGetNotifications } from "@workspace/api-client-react";
+import { getNotificationIcon, type NotificationIconName } from "@workspace/notifications";
 import { router } from "expo-router";
 import { relativeTime, apiPost } from "@/lib/api";
 
@@ -28,36 +29,25 @@ Notifications.setNotificationHandler({
   }),
 });
 
-type NotifType =
-  | "like"
-  | "follow"
-  | "comment"
-  | "sale"
-  | "commission"
-  | "commission_payment"
-  | "tip"
-  | "workshop"
-  | "workshop_booking"
-  | "drop"
-  | "subscription"
-  | "message"
-  | "bid";
-
-const ICON_MAP: Record<string, { name: keyof typeof Feather.glyphMap; color: string }> = {
-  like: { name: "heart", color: "#E05D5D" },
-  follow: { name: "user-plus", color: "#4A90D9" },
-  comment: { name: "message-circle", color: "#D87F31" },
-  sale: { name: "shopping-bag", color: "#4CAF50" },
-  commission: { name: "edit-2", color: "#9C6FE4" },
-  commission_payment: { name: "dollar-sign", color: "#4CAF50" },
-  tip: { name: "gift", color: "#D87F31" },
-  workshop: { name: "book-open", color: "#4A90D9" },
-  workshop_booking: { name: "calendar", color: "#4A90D9" },
-  drop: { name: "droplet", color: "#26C6DA" },
-  subscription: { name: "star", color: "#F5A623" },
-  message: { name: "mail", color: "#78909C" },
-  bid: { name: "trending-up", color: "#9C6FE4" },
+const FEATHER_ICONS: Record<NotificationIconName, keyof typeof Feather.glyphMap> = {
+  follow: "user-plus",
+  like: "heart",
+  comment: "message-circle",
+  craft: "tool",
+  money: "dollar-sign",
+  calendar: "calendar",
+  purchase: "shopping-bag",
+  drop: "droplet",
+  premium: "star",
+  auction: "trending-up",
+  message: "mail",
+  default: "bell",
 };
+
+function featherIconFor(type: string): { name: keyof typeof Feather.glyphMap; color: string } {
+  const { icon, color } = getNotificationIcon(type);
+  return { name: FEATHER_ICONS[icon], color };
+}
 
 async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) return null;
@@ -213,7 +203,7 @@ export default function NotificationsScreen() {
             <View style={[styles.sep, { backgroundColor: colors.border }]} />
           )}
           renderItem={({ item }) => {
-            const icon = ICON_MAP[item.type] ?? ICON_MAP["comment"]!;
+            const icon = featherIconFor(item.type);
             const actor = item.fromName ?? "Someone";
             const text = item.text ?? "";
             const time = item.createdAt ? relativeTime(item.createdAt) : "";
