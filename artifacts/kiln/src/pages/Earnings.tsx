@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useId } from "react";
 import { Link, useSearch, useLocation } from "wouter";
 import {
-  TrendingUp, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
+  TrendingUp, TrendingDown, DollarSign, Zap, MessageSquare, Star, ArrowUpRight,
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
@@ -1039,7 +1039,32 @@ export default function Earnings() {
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-white/8 pt-3">
                 <p className="text-xs text-stone-500">Total earnings</p>
-                <p className="text-sm font-bold text-amber-400">{formatPrice(totals.total)}</p>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const selectedKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
+                    const idx = monthlyTrend.findIndex(m => m.month === selectedKey);
+                    if (idx < 1) return null;
+                    const prevTotal = monthlyTrend[idx - 1].total;
+                    if (prevTotal <= 0) return null;
+                    const pct = Math.round(((totals.total - prevTotal) / prevTotal) * 100);
+                    if (pct === 0) return null;
+                    const up = pct > 0;
+                    const Icon = up ? TrendingUp : TrendingDown;
+                    return (
+                      <span
+                        title={`${up ? "Up" : "Down"} ${Math.abs(pct)}% vs last month`}
+                        className={[
+                          "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                          up ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400",
+                        ].join(" ")}
+                      >
+                        <Icon size={11} />
+                        {up ? "+" : "−"}{Math.abs(pct)}%
+                      </span>
+                    );
+                  })()}
+                  <p className="text-sm font-bold text-amber-400">{formatPrice(totals.total)}</p>
+                </div>
               </div>
               <p className={[
                 "text-[10px] font-medium text-emerald-400 mt-2 text-center transition-opacity duration-700",
