@@ -5,7 +5,7 @@ import {
   BarChart2, Loader2, Banknote, X, Pencil, Check, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
-  ShoppingBag, Clock, Bell, Package, Share2, MessageCircle, Download,
+  ShoppingBag, Clock, Bell, Package, Share2, MessageCircle, Download, Send,
 } from "lucide-react";
 
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -262,6 +262,51 @@ export default function Earnings() {
   const statsFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statsLastRefreshed, setStatsLastRefreshed] = useState<Date | null>(null);
   const [, setStatsTick] = useState(0);
+
+  // Tip thank-you state
+  const [thanksTip, setThanksTip] = useState<EarningLine | null>(null);
+  const [thanksText, setThanksText] = useState("");
+  const [sendingThanks, setSendingThanks] = useState(false);
+  const [thanksError, setThanksError] = useState("");
+  const [thanksSentToast, setThanksSentToast] = useState<string | null>(null);
+  const thanksToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function tipperNameFromLabel(label: string) {
+    return label.replace(/^Tip from\s*/i, "").trim();
+  }
+
+  function openThanks(line: EarningLine) {
+    const name = tipperNameFromLabel(line.label);
+    setThanksTip(line);
+    setThanksText(`Thank you so much for the tip${name ? `, ${name}` : ""}! It really means a lot.`);
+    setThanksError("");
+  }
+
+  async function handleSendThanks() {
+    if (!thanksTip?.fromUserId) return;
+    const text = thanksText.trim();
+    if (!text) { setThanksError("Write a short message first."); return; }
+    setSendingThanks(true);
+    setThanksError("");
+    try {
+      const r = await fetch("/api/messages/send", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientId: thanksTip.fromUserId, text }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      const name = tipperNameFromLabel(thanksTip.label);
+      setThanksSentToast(`Thank-you sent${name ? ` to ${name}` : ""}.`);
+      if (thanksToastTimerRef.current) clearTimeout(thanksToastTimerRef.current);
+      thanksToastTimerRef.current = setTimeout(() => setThanksSentToast(null), 4000);
+      setThanksTip(null);
+    } catch {
+      setThanksError("Couldn't send your message. Please try again.");
+    } finally {
+      setSendingThanks(false);
+    }
+  }
 
   // Payout state
   const [payouts, setPayouts]           = useState<PayoutRecord[]>([]);
@@ -1177,9 +1222,20 @@ export default function Earnings() {
                         <p className="text-sm font-medium text-stone-200 leading-tight">{line.label}</p>
                         {line.sublabel && <p className="text-xs text-stone-600 mt-0.5">{line.sublabel}</p>}
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-emerald-400">+{formatPrice(line.amount)}</p>
-                        <p className="text-[10px] text-stone-600">{formatDate(line.date)}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isTip && line.fromUserId && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openThanks(line); }}
+                            title="Send a thank-you"
+                            className="flex items-center gap-1 rounded-lg border border-emerald-500/30 px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          >
+                            <MessageCircle size={11} /> Thanks
+                          </button>
+                        )}
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-emerald-400">+{formatPrice(line.amount)}</p>
+                          <p className="text-[10px] text-stone-600">{formatDate(line.date)}</p>
+                        </div>
                       </div>
                     </>
                   );
@@ -1908,6 +1964,69 @@ export default function Earnings() {
           </>
         )}
       </div>
+
+      {/* Thank-you sent toast */}
+      {thanksSentToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-lg">
+          <CheckCircle size={15} />
+          {thanksSentToast}
+        </div>
+      )}
+
+      {/* Send thanks modal */}
+      {thanksTip && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={e => e.target === e.currentTarget && setThanksTip(null)}
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-stone-900 border border-white/10 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-serif text-lg text-amber-100">Send a thank-you</h2>
+              <button onClick={() => setThanksTip(null)} className="rounded-full p-1.5 hover:bg-white/5 text-stone-500">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mb-4 flex items-center gap-3">
+              <div className="h-10 w-10 flex-shrink-0 rounded-xl overflow-hidden">
+                {thanksTip.fromAvatarUrl ? (
+                  <img src={thanksTip.fromAvatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-emerald-500/15 text-sm font-bold text-emerald-400">
+                    {tipperNameFromLabel(thanksTip.label).split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-stone-200 truncate">{tipperNameFromLabel(thanksTip.label) || "Tipper"}</p>
+                <p className="text-xs text-stone-500">Tipped {formatPrice(thanksTip.amount)}</p>
+              </div>
+            </div>
+
+            <textarea
+              value={thanksText}
+              onChange={e => setThanksText(e.target.value)}
+              rows={4}
+              maxLength={500}
+              placeholder="Write a quick thank-you…"
+              className="w-full resize-none rounded-xl border border-white/10 bg-stone-800 px-3 py-3 text-sm text-stone-100 placeholder:text-stone-600 focus:border-emerald-500/50 focus:outline-none"
+            />
+
+            {thanksError && <p className="mt-2 text-xs text-rose-400">{thanksError}</p>}
+
+            <p className="mt-2 text-[11px] text-stone-600">This sends a direct message to the tipper.</p>
+
+            <button
+              onClick={handleSendThanks}
+              disabled={sendingThanks || !thanksText.trim()}
+              className="mt-4 w-full flex items-center justify-center gap-2 rounded-full bg-emerald-500 py-3 text-sm font-semibold text-stone-950 hover:bg-emerald-400 disabled:opacity-50 transition-colors"
+            >
+              {sendingThanks ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              {sendingThanks ? "Sending…" : "Send thanks"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stripe Connect success toast */}
       {connectSuccessToast && (

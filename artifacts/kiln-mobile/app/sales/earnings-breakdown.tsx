@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -17,7 +18,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 
 type EarningType = "tip" | "subscription" | "listing" | "drop" | "commission" | "workshop";
 
@@ -182,6 +183,46 @@ export default function EarningsBreakdownScreen() {
   );
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(selectedYear);
+
+  // Tip thank-you state
+  const [thanksTip, setThanksTip] = useState<Earning | null>(null);
+  const [thanksText, setThanksText] = useState("");
+  const [sendingThanks, setSendingThanks] = useState(false);
+  const [thanksError, setThanksError] = useState("");
+  const [thanksSent, setThanksSent] = useState<string | null>(null);
+
+  function tipperNameFromLabel(label: string) {
+    return label.replace(/^Tip from\s*/i, "").trim();
+  }
+
+  function openThanks(earning: Earning) {
+    const name = tipperNameFromLabel(earning.label);
+    setThanksTip(earning);
+    setThanksText(`Thank you so much for the tip${name ? `, ${name}` : ""}! It really means a lot.`);
+    setThanksError("");
+  }
+
+  async function handleSendThanks() {
+    if (!thanksTip?.fromUserId) return;
+    const text = thanksText.trim();
+    if (!text) {
+      setThanksError("Write a short message first.");
+      return;
+    }
+    setSendingThanks(true);
+    setThanksError("");
+    try {
+      await apiPost("/api/messages/send", { recipientId: thanksTip.fromUserId, text });
+      const name = tipperNameFromLabel(thanksTip.label);
+      setThanksSent(`Thank-you sent${name ? ` to ${name}` : ""}.`);
+      setTimeout(() => setThanksSent(null), 4000);
+      setThanksTip(null);
+    } catch {
+      setThanksError("Couldn't send your message. Please try again.");
+    } finally {
+      setSendingThanks(false);
+    }
+  }
 
   const monthLabel = new Date(selectedYear, selectedMonth, 1).toLocaleDateString("en-US", {
     month: "long",
@@ -585,9 +626,23 @@ export default function EarningsBreakdownScreen() {
                       {formatDate(earning.date)}
                     </Text>
                   </View>
-                  <Text style={[styles.rowAmount, { color: colors.primary }]}>
-                    {formatPrice(earning.amount)}
-                  </Text>
+                  <View style={{ alignItems: "flex-end", gap: 6 }}>
+                    <Text style={[styles.rowAmount, { color: colors.primary }]}>
+                      {formatPrice(earning.amount)}
+                    </Text>
+                    {isTip && profileId && (
+                      <Pressable
+                        onPress={() => openThanks(earning)}
+                        style={({ pressed }) => [
+                          styles.thanksBtn,
+                          { borderColor: "#34d39955", opacity: pressed ? 0.6 : 1 },
+                        ]}
+                      >
+                        <Feather name="message-circle" size={11} color="#34d399" />
+                        <Text style={styles.thanksBtnText}>Thanks</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 </>
               );
 
@@ -695,6 +750,116 @@ export default function EarningsBreakdownScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={!!thanksTip}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setThanksTip(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setThanksTip(null)}>
+          <Pressable
+            style={[
+              styles.pickerSheet,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.thanksHeader}>
+              <Text style={[styles.thanksTitle, { color: colors.foreground }]}>
+                Send a thank-you
+              </Text>
+              <Pressable hitSlop={8} onPress={() => setThanksTip(null)}>
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+
+            {thanksTip && (
+              <View style={styles.thanksTipRow}>
+                <View style={styles.avatarCircle}>
+                  {thanksTip.fromAvatarUrl ? (
+                    <Image source={{ uri: thanksTip.fromAvatarUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <View
+                      style={[
+                        styles.avatarCircle,
+                        { backgroundColor: colors.secondary, margin: 0 },
+                      ]}
+                    >
+                      <Text style={[styles.avatarInitials, { color: "#f472b6" }]}>
+                        {tipperNameFromLabel(thanksTip.label)
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase() || "?"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, { color: colors.foreground }]} numberOfLines={1}>
+                    {tipperNameFromLabel(thanksTip.label) || "Tipper"}
+                  </Text>
+                  <Text style={[styles.rowSublabel, { color: colors.mutedForeground }]}>
+                    Tipped {formatPrice(thanksTip.amount)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <TextInput
+              value={thanksText}
+              onChangeText={setThanksText}
+              multiline
+              maxLength={500}
+              placeholder="Write a quick thank-you…"
+              placeholderTextColor={colors.mutedForeground}
+              style={[
+                styles.thanksInput,
+                { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background },
+              ]}
+            />
+
+            {thanksError ? (
+              <Text style={styles.thanksErrorText}>{thanksError}</Text>
+            ) : (
+              <Text style={[styles.thanksHint, { color: colors.mutedForeground }]}>
+                This sends a direct message to the tipper.
+              </Text>
+            )}
+
+            <Pressable
+              onPress={handleSendThanks}
+              disabled={sendingThanks || !thanksText.trim()}
+              style={({ pressed }) => [
+                styles.thanksSendBtn,
+                {
+                  backgroundColor: "#10b981",
+                  opacity: sendingThanks || !thanksText.trim() ? 0.5 : pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              {sendingThanks ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Feather name="send" size={15} color="#ffffff" />
+              )}
+              <Text style={styles.thanksSendText}>
+                {sendingThanks ? "Sending…" : "Send thanks"}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {thanksSent && (
+        <View style={styles.toast}>
+          <Feather name="check-circle" size={15} color="#ffffff" />
+          <Text style={styles.toastText}>{thanksSent}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -882,4 +1047,66 @@ const styles = StyleSheet.create({
   rowSublabel: { fontFamily: "Inter_400Regular", fontSize: 12 },
   rowDate: { fontFamily: "Inter_400Regular", fontSize: 11 },
   rowAmount: { fontFamily: "Inter_700Bold", fontSize: 16, flexShrink: 0 },
+  thanksBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  thanksBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#34d399" },
+  thanksHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  thanksTitle: { fontFamily: "Inter_700Bold", fontSize: 17 },
+  thanksTipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  thanksInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    padding: 12,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    minHeight: 96,
+    textAlignVertical: "top",
+  },
+  thanksErrorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#f87171",
+    marginTop: 8,
+  },
+  thanksHint: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 8 },
+  thanksSendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+  thanksSendText: { fontFamily: "Inter_700Bold", fontSize: 14, color: "#ffffff" },
+  toast: {
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#10b981",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  toastText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#ffffff" },
 });
