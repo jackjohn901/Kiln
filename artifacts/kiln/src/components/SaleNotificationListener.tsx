@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { BellOff } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import SaleBanner, { type SaleInfo } from "./SaleBanner";
@@ -144,6 +145,19 @@ export default function SaleNotificationListener() {
     setQueue([...queueRef.current]);
     persistAll();
   }, [persistAll]);
+
+  // Auto-dismiss the visible banner when the artist navigates to its linked page.
+  const [location] = useLocation();
+  const prevLocationRef = useRef(location);
+  useEffect(() => {
+    if (prevLocationRef.current === location) return;
+    prevLocationRef.current = location;
+    if (snoozeUntilRef.current) return;
+    const current = queueRef.current[0];
+    if (!current) return;
+    const linkPath = current.link.split(/[?#]/)[0];
+    if (location === linkPath) dismiss();
+  }, [location, dismiss]);
 
   const snooze = useCallback((durationMs: number) => {
     const until = new Date(Date.now() + durationMs);
