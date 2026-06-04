@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth";
 import { apiGet } from "@/lib/api";
@@ -129,6 +131,13 @@ const TYPE_COLOR: Record<EarningType, string> = {
   workshop: "#a78bfa",
 };
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const MONTH_KEY = "kiln:earnings:selectedMonth";
+
 function formatPrice(n: number, currency = "USD") {
   return n.toLocaleString("en-US", {
     style: "currency",
@@ -161,22 +170,83 @@ export default function EarningsBreakdownScreen() {
   const config = CATEGORY_CONFIG[category] ?? CATEGORY_CONFIG.shop;
   const subtype = params.subtype as ShopSubtype | undefined;
 
+  const now = useMemo(() => new Date(), []);
   const monthParam = params.month ? parseInt(params.month, 10) : null;
   const yearParam = params.year ? parseInt(params.year, 10) : null;
-  const hasDateFilter = monthParam !== null && yearParam !== null;
-  const monthLabel = hasDateFilter
-    ? new Date(yearParam!, monthParam! - 1, 1).toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      })
-    : null;
+
+  const [selectedMonth, setSelectedMonth] = useState(
+    monthParam !== null ? monthParam - 1 : now.getMonth(),
+  );
+  const [selectedYear, setSelectedYear] = useState(
+    yearParam !== null ? yearParam : now.getFullYear(),
+  );
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(selectedYear);
+
+  const monthLabel = new Date(selectedYear, selectedMonth, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const isCurrentMonth =
+    selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+
+  function persistMonth(month: number, year: number) {
+    AsyncStorage.setItem(
+      MONTH_KEY,
+      JSON.stringify({ month, year }),
+    ).catch(() => {
+      /* ignore */
+    });
+  }
+
+  function goToPrevMonth() {
+    let m = selectedMonth;
+    let y = selectedYear;
+    if (m === 0) {
+      m = 11;
+      y -= 1;
+    } else {
+      m -= 1;
+    }
+    setSelectedMonth(m);
+    setSelectedYear(y);
+    persistMonth(m, y);
+  }
+
+  function goToNextMonth() {
+    if (isCurrentMonth) return;
+    let m = selectedMonth;
+    let y = selectedYear;
+    if (m === 11) {
+      m = 0;
+      y += 1;
+    } else {
+      m += 1;
+    }
+    setSelectedMonth(m);
+    setSelectedYear(y);
+    persistMonth(m, y);
+  }
+
+  function openMonthPicker() {
+    setPickerYear(selectedYear);
+    setShowMonthPicker(true);
+  }
+
+  function selectPickerMonth(month: number) {
+    setSelectedMonth(month);
+    setSelectedYear(pickerYear);
+    persistMonth(month, pickerYear);
+    setShowMonthPicker(false);
+  }
 
   const { data, isLoading } = useQuery({
-    queryKey: ["me/earnings", monthParam, yearParam],
-    queryFn: () => {
-      const qs = hasDateFilter ? `?month=${monthParam}&year=${yearParam}` : "";
-      return apiGet<EarningsResponse>(`/api/me/earnings${qs}`);
-    },
+    queryKey: ["me/earnings", selectedMonth, selectedYear],
+    queryFn: () =>
+      apiGet<EarningsResponse>(
+        `/api/me/earnings?month=${selectedMonth + 1}&year=${selectedYear}`,
+      ),
     enabled: isAuthenticated,
   });
 
@@ -213,9 +283,10 @@ export default function EarningsBreakdownScreen() {
   const emptyText =
     isShopSubtype && subtypeConfig ? subtypeConfig.emptyText : config.emptyText;
 
+  const dateParams = `&month=${selectedMonth + 1}&year=${selectedYear}`;
+
   function handleBack() {
     if (isShopSubtype) {
-      const dateParams = hasDateFilter ? `&month=${monthParam}&year=${yearParam}` : "";
       router.replace(`/sales/earnings-breakdown?category=shop${dateParams}` as any);
     } else {
       router.back();
@@ -223,7 +294,6 @@ export default function EarningsBreakdownScreen() {
   }
 
   function handleSubtypeTap(st: ShopSubtype) {
-    const dateParams = hasDateFilter ? `&month=${monthParam}&year=${yearParam}` : "";
     router.push(
       `/sales/earnings-breakdown?category=shop&subtype=${st}${dateParams}` as any
     );
@@ -246,6 +316,39 @@ export default function EarningsBreakdownScreen() {
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>{headerTitle}</Text>
         <View style={{ width: 30 }} />
+      </View>
+
+      <View
+        style={[
+          styles.monthBar,
+          { borderBottomColor: colors.border, backgroundColor: colors.background },
+        ]}
+      >
+        <Pressable onPress={goToPrevMonth} hitSlop={8} style={styles.monthArrow}>
+          <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
+        </Pressable>
+        <Pressable
+          onPress={openMonthPicker}
+          hitSlop={6}
+          style={styles.monthLabelBtn}
+        >
+          <Feather name="calendar" size={14} color={colors.primary} />
+          <Text style={[styles.monthLabel, { color: colors.primary }]}>
+            {MONTH_NAMES[selectedMonth].slice(0, 3)} {selectedYear}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={goToNextMonth}
+          hitSlop={8}
+          style={[styles.monthArrow, isCurrentMonth && styles.monthArrowDisabled]}
+          disabled={isCurrentMonth}
+        >
+          <Feather
+            name="chevron-right"
+            size={18}
+            color={isCurrentMonth ? colors.border : colors.mutedForeground}
+          />
+        </Pressable>
       </View>
 
       {isLoading || authLoading ? (
@@ -518,6 +621,80 @@ export default function EarningsBreakdownScreen() {
           )}
         </ScrollView>
       )}
+
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMonthPicker(false)}>
+          <Pressable
+            style={[
+              styles.pickerSheet,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.pickerYearRow}>
+              <Pressable
+                hitSlop={12}
+                onPress={() => setPickerYear((y) => y - 1)}
+                style={styles.pickerArrow}
+              >
+                <Feather name="chevron-left" size={18} color={colors.mutedForeground} />
+              </Pressable>
+              <Text style={[styles.pickerYearLabel, { color: colors.foreground }]}>
+                {pickerYear}
+              </Text>
+              <Pressable
+                hitSlop={12}
+                onPress={() => pickerYear < now.getFullYear() && setPickerYear((y) => y + 1)}
+                style={[
+                  styles.pickerArrow,
+                  pickerYear >= now.getFullYear() && { opacity: 0.25 },
+                ]}
+                disabled={pickerYear >= now.getFullYear()}
+              >
+                <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+            <View style={styles.monthGrid}>
+              {MONTH_NAMES.map((name, idx) => {
+                const isFuture =
+                  pickerYear > now.getFullYear() ||
+                  (pickerYear === now.getFullYear() && idx > now.getMonth());
+                const isSelected = idx === selectedMonth && pickerYear === selectedYear;
+                return (
+                  <Pressable
+                    key={name}
+                    onPress={() => !isFuture && selectPickerMonth(idx)}
+                    disabled={isFuture}
+                    style={[
+                      styles.monthCell,
+                      isSelected && {
+                        backgroundColor: colors.primary + "33",
+                        borderColor: colors.primary,
+                        borderWidth: 1,
+                      },
+                      isFuture && { opacity: 0.25 },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.monthCellText,
+                        { color: isSelected ? colors.primary : colors.foreground },
+                      ]}
+                    >
+                      {name.slice(0, 3)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -539,6 +716,58 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { width: 30 },
+  monthBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  monthArrow: { padding: 2 },
+  monthArrowDisabled: { opacity: 0.3 },
+  monthLabelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 96,
+    justifyContent: "center",
+  },
+  monthLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  pickerSheet: {
+    width: "100%",
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 20,
+  },
+  pickerYearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  pickerArrow: { padding: 4 },
+  pickerYearLabel: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  monthCell: {
+    width: "30%",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  monthCellText: { fontFamily: "Inter_500Medium", fontSize: 14 },
   headerTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
   totalBanner: {
     borderRadius: 16,
