@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, ChevronRight, MapPin, Clock, Users, ExternalLink, Briefcase, Calendar } from "lucide-react";
 import Nav from "@/components/Nav";
@@ -85,10 +85,35 @@ const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 export default function CraftCalendar() {
   const now = new Date();
-  const [viewYear, setViewYear] = useState(now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(now.getMonth());
+
+  function readPersistedMonth(): { month: number; year: number } {
+    try {
+      const raw = localStorage.getItem("kiln:craftCalendar:selectedMonth");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { month: number; year: number };
+        if (
+          typeof parsed.month === "number" && parsed.month >= 0 && parsed.month <= 11 &&
+          typeof parsed.year  === "number" && parsed.year  >= 2000
+        ) return parsed;
+      }
+    } catch { /* ignore */ }
+    return { month: now.getMonth(), year: now.getFullYear() };
+  }
+
+  const persisted = readPersistedMonth();
+  const [viewYear, setViewYear] = useState(persisted.year);
+  const [viewMonth, setViewMonth] = useState(persisted.month);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<CalEvent["type"] | "all">("all");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "kiln:craftCalendar:selectedMonth",
+        JSON.stringify({ month: viewMonth, year: viewYear }),
+      );
+    } catch { /* ignore */ }
+  }, [viewMonth, viewYear]);
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
