@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -216,6 +217,15 @@ export default function NotificationsScreen() {
             const actor = item.fromName ?? "Someone";
             const text = item.text ?? "";
             const time = item.createdAt ? relativeTime(item.createdAt) : "";
+            const isTip = item.type === "tip";
+            const tipperInitials =
+              actor
+                .split(" ")
+                .filter(Boolean)
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase() || "?";
             return (
               <Pressable
                 style={[
@@ -226,9 +236,31 @@ export default function NotificationsScreen() {
                   if (item.link) router.push(item.link as any);
                 }}
               >
-                <View style={[styles.iconCircle, { backgroundColor: `${icon.color}22` }]}>
-                  <Feather name={icon.name} size={18} color={icon.color} />
-                </View>
+                {isTip ? (
+                  <View style={styles.avatarCircle}>
+                    {item.fromAvatarUrl ? (
+                      <Image
+                        source={{ uri: item.fromAvatarUrl }}
+                        style={styles.avatarImage}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.iconCircle,
+                          { backgroundColor: `${icon.color}22` },
+                        ]}
+                      >
+                        <Text style={[styles.avatarInitials, { color: icon.color }]}>
+                          {tipperInitials}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={[styles.iconCircle, { backgroundColor: `${icon.color}22` }]}>
+                    <Feather name={icon.name} size={18} color={icon.color} />
+                  </View>
+                )}
                 <View style={styles.textBlock}>
                   <Text style={[styles.rowText, { color: colors.foreground }]}>
                     <Text style={styles.actor}>{actor}</Text>
@@ -281,6 +313,13 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     alignItems: "center", justifyContent: "center",
   },
+  avatarCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    overflow: "hidden",
+    alignItems: "center", justifyContent: "center",
+  },
+  avatarImage: { width: 40, height: 40, borderRadius: 20 },
+  avatarInitials: { fontFamily: "Inter_700Bold", fontSize: 14 },
   textBlock: { flex: 1 },
   rowText: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },
   actor: { fontFamily: "Inter_600SemiBold" },
