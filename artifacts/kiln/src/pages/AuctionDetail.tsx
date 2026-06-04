@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useSocial } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import RelativeTime from "@/components/RelativeTime";
 import { toast } from "@/hooks/use-toast";
@@ -61,6 +62,7 @@ function getTimeLeft(endDate: string): string {
 export default function AuctionDetail() {
   const { id } = useParams<{ id: string }>();
   const { profile } = useProfile();
+  const { markLinkRead } = useSocial();
   const { subscribe } = useWebSocket();
   const [auction, setAuction] = useState<Auction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,10 @@ export default function AuctionDetail() {
   const [bidError, setBidError] = useState("");
   const [paying, setPaying] = useState(false);
   const amountTouched = useRef(false);
+
+  useEffect(() => {
+    if (id) markLinkRead(`/auctions/${id}`);
+  }, [id, markLinkRead]);
 
   useEffect(() => {
     if (!id) return;
