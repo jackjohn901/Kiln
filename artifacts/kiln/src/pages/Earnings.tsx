@@ -1072,16 +1072,41 @@ export default function Earnings() {
                         const barH = maxTotal === 0 ? 2 : Math.max(2, Math.round((m.total / maxTotal) * chartH));
                         const x = i * (barW + gap);
                         const y = chartH - barH;
+                        const [barYear, barMonth] = m.month.split("-").map(Number);
+                        const jumpToMonth = () => {
+                          if (!Number.isFinite(barYear) || !Number.isFinite(barMonth)) return;
+                          setSelectedYear(barYear);
+                          setSelectedMonth(barMonth - 1);
+                        };
                         return (
-                          <g key={m.month}>
+                          <g
+                            key={m.month}
+                            onClick={jumpToMonth}
+                            className="group cursor-pointer"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                jumpToMonth();
+                              }
+                            }}
+                          >
                             <rect
                               x={x}
                               y={y}
                               width={barW}
                               height={barH}
                               rx={4}
-                              className={isSelected ? "fill-amber-400" : "fill-stone-700"}
+                              className={`transition-colors ${isSelected ? "fill-amber-400" : "fill-stone-700 group-hover:fill-stone-500"}`}
                               opacity={isSelected ? 1 : 0.7}
+                            />
+                            <rect
+                              x={x}
+                              y={0}
+                              width={barW}
+                              height={chartH}
+                              fill="transparent"
                             />
                             {isSelected && m.total > 0 && (
                               <text
