@@ -15,17 +15,18 @@ interface Props {
   queueLength: number;
   onDismiss: () => void;
   onSnooze: (durationMs: number) => void;
+  preferredSnoozeMs?: number;
 }
 
 const AUTO_DISMISS_MS = 6_000;
 
-const SNOOZE_OPTIONS: { label: string; ms: number }[] = [
+export const SNOOZE_OPTIONS: { label: string; ms: number }[] = [
   { label: "5 min", ms: 5 * 60 * 1000 },
   { label: "15 min", ms: 15 * 60 * 1000 },
   { label: "30 min", ms: 30 * 60 * 1000 },
 ];
 
-export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze }: Props) {
+export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze, preferredSnoozeMs }: Props) {
   const [, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -100,18 +101,29 @@ export default function SaleBanner({ sale, queueLength, onDismiss, onSnooze }: P
 
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 z-10 flex flex-col rounded-lg border border-amber-500/30 bg-stone-900 shadow-xl overflow-hidden">
-                {SNOOZE_OPTIONS.map(({ label, ms }) => (
-                  <button
-                    key={ms}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onSnooze(ms);
-                    }}
-                    className="whitespace-nowrap px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors text-left"
-                  >
-                    {label}
-                  </button>
-                ))}
+                {SNOOZE_OPTIONS.map(({ label, ms }) => {
+                  const isPreferred = ms === preferredSnoozeMs;
+                  return (
+                    <button
+                      key={ms}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onSnooze(ms);
+                      }}
+                      aria-current={isPreferred ? "true" : undefined}
+                      className={`flex items-center justify-between gap-3 whitespace-nowrap px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors text-left ${
+                        isPreferred ? "bg-amber-500/15" : ""
+                      }`}
+                    >
+                      <span>{label}</span>
+                      {isPreferred && (
+                        <span className="rounded-full bg-amber-500/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide leading-none text-amber-200">
+                          Last
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

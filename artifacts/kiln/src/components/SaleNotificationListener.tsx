@@ -2,11 +2,27 @@ import { useEffect, useCallback, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { BellOff } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import SaleBanner, { type SaleInfo } from "./SaleBanner";
+import SaleBanner, { SNOOZE_OPTIONS, type SaleInfo } from "./SaleBanner";
 
 const SS_SNOOZE_UNTIL = "kiln_snooze_until";
 const SS_SNOOZE_QUEUE = "kiln_snooze_queue";
 const SS_SALE_QUEUE   = "kiln_sale_queue";
+
+const LS_SNOOZE_PREF  = "kiln_snooze_pref";
+
+const DEFAULT_SNOOZE_MS = SNOOZE_OPTIONS[0].ms;
+
+function readSnoozePref(): number {
+  try {
+    const raw = localStorage.getItem(LS_SNOOZE_PREF);
+    if (!raw) return DEFAULT_SNOOZE_MS;
+    const ms = Number(raw);
+    if (SNOOZE_OPTIONS.some((o) => o.ms === ms)) return ms;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_SNOOZE_MS;
+}
 
 function serializeSales(sales: SaleInfo[]): string {
   return JSON.stringify(sales.map((s) => ({ ...s, arrivedAt: s.arrivedAt.toISOString() })));
@@ -81,6 +97,8 @@ export default function SaleNotificationListener() {
   const snoozeQueueRef                = useRef<SaleInfo[]>(initialState.snoozeQueue);
 
   const [remainingSecs, setRemainingSecs] = useState(0);
+
+  const [preferredSnoozeMs, setPreferredSnoozeMs] = useState(readSnoozePref);
 
   const persistAll = useCallback(() => {
     if (snoozeUntilRef.current) {
@@ -160,6 +178,12 @@ export default function SaleNotificationListener() {
   }, [location, dismiss]);
 
   const snooze = useCallback((durationMs: number) => {
+    setPreferredSnoozeMs(durationMs);
+    try {
+      localStorage.setItem(LS_SNOOZE_PREF, String(durationMs));
+    } catch {
+      /* ignore */
+    }
     const until = new Date(Date.now() + durationMs);
     snoozeUntilRef.current = until;
     setSnoozeUntil(until);
@@ -228,6 +252,7 @@ export default function SaleNotificationListener() {
             queueLength={rest.length}
             onDismiss={dismiss}
             onSnooze={snooze}
+            preferredSnoozeMs={preferredSnoozeMs}
           />
         );
       })()}
