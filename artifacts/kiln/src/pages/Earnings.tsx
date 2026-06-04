@@ -935,6 +935,10 @@ export default function Earnings() {
                 <p className="text-xs text-stone-500">Total earnings</p>
                 <p className="text-sm font-bold text-amber-400">{formatPrice(totals.total)}</p>
               </div>
+              <p className={[
+                "text-[10px] font-medium text-emerald-400 mt-2 text-center transition-opacity duration-700",
+                statsFlash ? "opacity-100" : "opacity-0",
+              ].join(" ")}>Updated just now</p>
             </div>
 
             {/* 6-month sparkline trend */}
