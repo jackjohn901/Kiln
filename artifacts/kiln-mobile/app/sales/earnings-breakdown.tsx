@@ -195,6 +195,17 @@ export default function EarningsBreakdownScreen() {
   });
   const total = filtered.reduce((s, e) => s + e.amount, 0);
 
+  const shopSubtypeBreakdown = SHOP_SUBTYPES.map((st) => {
+    const stEarnings = allEarnings.filter((e) => e.type === st.type);
+    return {
+      ...st,
+      count: stEarnings.length,
+      total: stEarnings.reduce((s, e) => s + e.amount, 0),
+    };
+  });
+  const shopBreakdownTotal = shopSubtypeBreakdown.reduce((s, st) => s + st.total, 0);
+  const chartSegments = shopSubtypeBreakdown.filter((st) => st.total > 0);
+
   const headerTitle = isShopSubtype && subtypeConfig ? subtypeConfig.title : config.title;
   const headerIcon = isShopSubtype && subtypeConfig ? subtypeConfig.icon : config.icon;
   const headerIconColor =
@@ -270,6 +281,81 @@ export default function EarningsBreakdownScreen() {
               {filtered.length} {filtered.length === 1 ? "transaction" : "transactions"}
             </Text>
           </View>
+
+          {isShopOverview && chartSegments.length > 0 && (
+            <View
+              style={[
+                styles.chartCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+                REVENUE SPLIT
+              </Text>
+              <View style={styles.chartBar}>
+                {chartSegments.map((st, i) => {
+                  const pct = (st.total / shopBreakdownTotal) * 100;
+                  const showInline = pct >= 16;
+                  return (
+                    <Pressable
+                      key={st.type}
+                      onPress={() => handleSubtypeTap(st.type)}
+                      style={({ pressed }) => [
+                        styles.chartSegment,
+                        {
+                          flexGrow: st.total,
+                          flexBasis: 0,
+                          backgroundColor: st.iconColor,
+                          opacity: pressed ? 0.7 : 1,
+                          borderTopLeftRadius: i === 0 ? 6 : 0,
+                          borderBottomLeftRadius: i === 0 ? 6 : 0,
+                          borderTopRightRadius: i === chartSegments.length - 1 ? 6 : 0,
+                          borderBottomRightRadius:
+                            i === chartSegments.length - 1 ? 6 : 0,
+                        },
+                      ]}
+                    >
+                      {showInline && (
+                        <Text style={styles.chartSegmentLabel} numberOfLines={1}>
+                          {Math.round(pct)}%
+                        </Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.chartLegend}>
+                {chartSegments.map((st) => {
+                  const pct = (st.total / shopBreakdownTotal) * 100;
+                  return (
+                    <Pressable
+                      key={st.type}
+                      onPress={() => handleSubtypeTap(st.type)}
+                      style={({ pressed }) => [
+                        styles.legendItem,
+                        { opacity: pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <View
+                        style={[styles.legendDot, { backgroundColor: st.iconColor }]}
+                      />
+                      <Text
+                        style={[styles.legendLabel, { color: colors.foreground }]}
+                        numberOfLines={1}
+                      >
+                        {st.title}
+                      </Text>
+                      <Text
+                        style={[styles.legendPct, { color: colors.mutedForeground }]}
+                      >
+                        {Math.round(pct)}%
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           {isShopOverview && (
             <View style={{ marginBottom: 8 }}>
@@ -472,6 +558,50 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 2,
   },
+  chartCard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 16,
+    marginBottom: 16,
+  },
+  chartBar: {
+    flexDirection: "row",
+    height: 24,
+    borderRadius: 6,
+    overflow: "hidden",
+    gap: 2,
+  },
+  chartSegment: {
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 4,
+  },
+  chartSegmentLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: "#ffffff",
+  },
+  chartLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 14,
+    gap: 8,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    width: "47%",
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  legendLabel: { fontFamily: "Inter_500Medium", fontSize: 13, flexShrink: 1 },
+  legendPct: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginLeft: "auto" },
   subtypeRow: {
     flexDirection: "row",
     alignItems: "center",
