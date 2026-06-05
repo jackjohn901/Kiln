@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  PanResponder,
 } from "react-native";
 import { useEffect, useRef } from "react";
 import type { SaleEvent } from "@/lib/useWebSocket";
@@ -27,6 +28,18 @@ export const SLIDE_OUT_MS = 300;
  */
 const OFFSCREEN_X = 420;
 
+/**
+ * Minimum rightward drag distance (px) past which a release dismisses the
+ * banner even if the swipe was slow.
+ */
+const SWIPE_DISMISS_THRESHOLD = 80;
+
+/**
+ * Minimum rightward fling velocity (px/ms) past which a release dismisses the
+ * banner even if the drag was short.
+ */
+const SWIPE_VELOCITY_THRESHOLD = 0.3;
+
 export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
   const translateX = useRef(new Animated.Value(OFFSCREEN_X)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,8 +48,80 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
   const onAnimatedOutRef = useRef(onAnimatedOut);
   onAnimatedOutRef.current = onAnimatedOut;
 
+  // Set when a swipe has already animated the banner off-screen with velocity,
+  // so the slide-out effect below doesn't replay the timing animation.
+  const dismissedBySwipeRef = useRef(false);
+
+  const startAutoDismiss = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onDismissRef.current();
+    }, AUTO_DISMISS_MS);
+  };
+
+  // Created once; reads everything it needs through stable refs.
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, g) =>
+        g.dx > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderGrant: () => {
+        // Pause auto-dismiss while the user is interacting.
+        if (timerRef.current) clearTimeout(timerRef.current);
+      },
+      onPanResponderMove: (_evt, g) => {
+        // Only allow rightward drag (the dismiss direction).
+        translateX.setValue(Math.max(0, g.dx));
+      },
+      onPanResponderRelease: (_evt, g) => {
+        const dragged = Math.max(0, g.dx);
+        const shouldDismiss =
+          dragged > SWIPE_DISMISS_THRESHOLD ||
+          g.vx > SWIPE_VELOCITY_THRESHOLD;
+
+        if (shouldDismiss) {
+          // Feed the fling velocity into the slide-out: faster swipe → shorter
+          // remaining travel time, for a natural hand-off from finger to motion.
+          const remaining = OFFSCREEN_X - dragged;
+          const velocity = Math.max(Math.abs(g.vx), 0.1);
+          const duration = Math.max(
+            120,
+            Math.min(SLIDE_OUT_MS, remaining / velocity),
+          );
+          dismissedBySwipeRef.current = true;
+          Animated.timing(translateX, {
+            toValue: OFFSCREEN_X,
+            duration,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }).start(({ finished }) => {
+            if (finished) onDismissRef.current();
+          });
+        } else {
+          // Not far/fast enough — settle back and re-arm auto-dismiss.
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 12,
+          }).start();
+          startAutoDismiss();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 80,
+          friction: 12,
+        }).start();
+        startAutoDismiss();
+      },
+    }),
+  ).current;
+
   useEffect(() => {
     if (sale) {
+      dismissedBySwipeRef.current = false;
       Animated.spring(translateX, {
         toValue: 0,
         useNativeDriver: true,
@@ -44,10 +129,12 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
         friction: 12,
       }).start();
 
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        onDismissRef.current();
-      }, AUTO_DISMISS_MS);
+      startAutoDismiss();
+    } else if (dismissedBySwipeRef.current) {
+      // A swipe already animated the banner off-screen with its own velocity;
+      // skip the timing replay and just signal completion.
+      dismissedBySwipeRef.current = false;
+      onAnimatedOutRef.current?.();
     } else {
       Animated.timing(translateX, {
         toValue: OFFSCREEN_X,
@@ -73,15 +160,17 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
       style={[styles.banner, { transform: [{ translateX }] }]}
       pointerEvents={sale ? "box-none" : "none"}
     >
-      <Pressable onPress={onView} style={styles.inner}>
-        <View style={styles.dot} />
-        <View style={styles.textBlock}>
-          <Text style={styles.title}>New Sale!</Text>
-          <Text style={styles.body} numberOfLines={2}>
-            <Text style={styles.fromName}>{sale?.fromName ?? ""}</Text>
-            {bodyText ? ` — ${bodyText}` : ""}
-          </Text>
-        </View>
+      <View style={styles.inner} {...panResponder.panHandlers}>
+        <Pressable onPress={onView} style={styles.content}>
+          <View style={styles.dot} />
+          <View style={styles.textBlock}>
+            <Text style={styles.title}>New Sale!</Text>
+            <Text style={styles.body} numberOfLines={2}>
+              <Text style={styles.fromName}>{sale?.fromName ?? ""}</Text>
+              {bodyText ? ` — ${bodyText}` : ""}
+            </Text>
+          </View>
+        </Pressable>
         <View style={styles.actions}>
           <Pressable onPress={onView} style={styles.viewButton} hitSlop={8}>
             <Text style={styles.viewText}>View</Text>
@@ -94,7 +183,7 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
             <Text style={styles.dismissText}>✕</Text>
           </Pressable>
         </View>
-      </Pressable>
+      </View>
     </Animated.View>
   );
 }
@@ -122,6 +211,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
   },
   dot: {
     width: 8,
