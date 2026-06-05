@@ -700,6 +700,11 @@ export default function OrderDetail() {
             <p className="text-xs text-stone-500">
               Placed <RelativeTime since={order.createdAt} className="text-xs text-stone-500" />
             </p>
+            {new Date(order.updatedAt).getTime() - new Date(order.createdAt).getTime() > 1000 && (
+              <p className="text-xs text-stone-500">
+                Last updated <RelativeTime since={order.updatedAt} className="text-xs text-stone-500" />
+              </p>
+            )}
           </div>
         </div>
 

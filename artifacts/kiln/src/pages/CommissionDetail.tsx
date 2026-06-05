@@ -32,6 +32,7 @@ interface Commission {
   counterPrice: number | null;
   counterNote: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 const MILESTONE_TEMPLATES = [
@@ -269,6 +270,11 @@ export default function CommissionDetail({ params }: { params: { id: string } })
                 <span>
                   Opened <RelativeTime since={commission.createdAt} className="text-xs text-stone-500" />
                 </span>
+                {new Date(commission.updatedAt).getTime() - new Date(commission.createdAt).getTime() > 1000 && (
+                  <span>
+                    Last updated <RelativeTime since={commission.updatedAt} className="text-xs text-stone-500" />
+                  </span>
+                )}
                 {commission.estimatedDelivery && (
                   <span>
                     Est.{" "}

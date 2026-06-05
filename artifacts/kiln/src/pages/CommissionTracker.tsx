@@ -35,6 +35,7 @@ interface Commission {
   counterPrice: number | null;
   counterNote: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface CommissionUpdate {
@@ -526,6 +527,9 @@ function CommissionCard({ commission, isArtist, currentUserId, onUpdate, highlig
             {commission.quotedPrice && <span className="text-amber-400 font-semibold">${commission.quotedPrice.toLocaleString()}</span>}
             {commission.budgetRange && !commission.quotedPrice && <span>{commission.budgetRange}</span>}
             <RelativeTime since={commission.createdAt} className="text-xs text-stone-600" />
+            {new Date(commission.updatedAt).getTime() - new Date(commission.createdAt).getTime() > 1000 && (
+              <span>Updated <RelativeTime since={commission.updatedAt} className="text-xs text-stone-600" /></span>
+            )}
             {commission.estimatedDelivery && <span>Est. {new Date(commission.estimatedDelivery).toLocaleDateString("en-US", { month: "short", year: "2-digit" })}</span>}
           </div>
         </div>
