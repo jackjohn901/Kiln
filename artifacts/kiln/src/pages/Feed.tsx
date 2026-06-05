@@ -1286,6 +1286,29 @@ export default function Feed() {
     return () => clearTimeout(timerId);
   }, [feedTab, newFollowingPostCount, applyPendingFollowingReels, kilnSettings.feed_autorefresh_delay_ms]);
 
+  // Auto-apply the pill when the user scroll-snaps back to the top of Following.
+  // We require the user to have first scrolled away from the top, so this is a
+  // genuine "scrolled back to top" gesture rather than the already-at-top case
+  // handled by the delayed effect above. Respects the same disable setting
+  // (delay <= 0 = manual-only) so users who turned off auto-apply keep the pill.
+  const followingScrolledAwayRef = useRef(false);
+  useEffect(() => {
+    if (feedTab !== "following" || newFollowingPostCount === 0) {
+      followingScrolledAwayRef.current = false;
+      return;
+    }
+    const delay = kilnSettings.feed_autorefresh_delay_ms;
+    if (!delay || delay <= 0) return;
+    if (activeIndex > 0) {
+      followingScrolledAwayRef.current = true;
+      return;
+    }
+    if (activeIndex === 0 && followingScrolledAwayRef.current) {
+      followingScrolledAwayRef.current = false;
+      applyPendingFollowingReels();
+    }
+  }, [feedTab, activeIndex, newFollowingPostCount, applyPendingFollowingReels, kilnSettings.feed_autorefresh_delay_ms]);
+
   // Fetch on tab switch
   useEffect(() => {
     if (feedTab !== "following") return;
