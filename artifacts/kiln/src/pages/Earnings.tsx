@@ -485,16 +485,15 @@ export default function Earnings() {
   const [balanceError, setBalanceError] = useState(false);
   const [balancePollError, setBalancePollError] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  // Single global refresh cadence — shared by the earnings stats and the Stripe balance.
+  // Falls back to the older per-section keys so existing artists keep their saved choice.
   const [refreshInterval, setRefreshInterval] = useState<RefreshInterval>(() => {
-    const saved = localStorage.getItem("kiln_balance_refresh_interval");
-    return (saved as RefreshInterval | null) ?? "1m";
-  });
-  const [earningsRefreshInterval, setEarningsRefreshInterval] = useState<RefreshInterval>(() => {
-    const saved = localStorage.getItem("kiln_earnings_refresh_interval");
+    const saved = localStorage.getItem("kiln_refresh_interval")
+      ?? localStorage.getItem("kiln_earnings_refresh_interval")
+      ?? localStorage.getItem("kiln_balance_refresh_interval");
     return (saved as RefreshInterval | null) ?? "1m";
   });
   const [earningsRefreshing, setEarningsRefreshing] = useState(false);
-  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const earningsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chargesEnabledRef = useRef(false);
   const prevTotalsRef = useRef<EarningTotals | null>(null);
@@ -526,19 +525,6 @@ export default function Earnings() {
     }
   }, []);
 
-  // Auto-refresh interval — persists choice to localStorage and restarts the timer
-  useEffect(() => {
-    localStorage.setItem("kiln_balance_refresh_interval", refreshInterval);
-    if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
-    const ms = REFRESH_MS[refreshInterval];
-    if (ms !== null && chargesEnabledRef.current) {
-      autoRefreshTimerRef.current = setInterval(() => { void fetchBalance(true); }, ms);
-    }
-    return () => {
-      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
-    };
-  }, [refreshInterval, fetchBalance]);
-
   // Show success toast when returning from Stripe onboarding
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -557,19 +543,10 @@ export default function Earnings() {
         if (data.chargesEnabled) {
           chargesEnabledRef.current = true;
           void fetchBalance(false);
-          const ms = REFRESH_MS[refreshInterval];
-          if (ms !== null) {
-            if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
-            autoRefreshTimerRef.current = setInterval(() => { void fetchBalance(true); }, ms);
-          }
         }
       })
       .catch(() => {})
       .finally(() => setConnectLoading(false));
-
-    return () => {
-      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -724,10 +701,11 @@ export default function Earnings() {
     }
   }, [fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
 
+  // Single timer drives both earnings stats and the Stripe balance at the chosen cadence.
   useEffect(() => {
-    localStorage.setItem("kiln_earnings_refresh_interval", earningsRefreshInterval);
+    localStorage.setItem("kiln_refresh_interval", refreshInterval);
     if (earningsTimerRef.current) clearInterval(earningsTimerRef.current);
-    const ms = REFRESH_MS[earningsRefreshInterval];
+    const ms = REFRESH_MS[refreshInterval];
     if (ms !== null) {
       earningsTimerRef.current = setInterval(async () => {
         const result = await fetchEarnings();
@@ -739,7 +717,7 @@ export default function Earnings() {
     return () => {
       if (earningsTimerRef.current) clearInterval(earningsTimerRef.current);
     };
-  }, [earningsRefreshInterval, fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
+  }, [refreshInterval, fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
 
   useEffect(() => {
     if (!statsLastRefreshed) return;
@@ -1252,9 +1230,9 @@ export default function Earnings() {
                   {(["30s", "1m", "5m", "manual"] as RefreshInterval[]).map(opt => (
                     <button
                       key={opt}
-                      onClick={() => setEarningsRefreshInterval(opt)}
+                      onClick={() => setRefreshInterval(opt)}
                       className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                        earningsRefreshInterval === opt
+                        refreshInterval === opt
                           ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                           : "text-stone-600 hover:text-stone-400 border border-transparent"
                       }`}
@@ -1552,9 +1530,36 @@ export default function Earnings() {
                         </p>
                       ) : stripeBalance ? (
                         <>
-                          {/* Balance header: last-refreshed timestamp + manual refresh button */}
-                          <div className="mt-3 flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] text-stone-600">
+                          {/* Auto-refresh interval picker + last-refreshed status — matches the earnings stats control */}
+                          <div className="mt-3 flex items-center justify-between mb-1.5 gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-stone-600">Auto-refresh:</span>
+                              <div className="flex gap-0.5">
+                                {(["30s", "1m", "5m", "manual"] as RefreshInterval[]).map(opt => (
+                                  <button
+                                    key={opt}
+                                    onClick={() => setRefreshInterval(opt)}
+                                    className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                                      refreshInterval === opt
+                                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                        : "text-stone-600 hover:text-stone-400 border border-transparent"
+                                    }`}
+                                  >
+                                    {REFRESH_LABELS[opt]}
+                                  </button>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => void fetchBalance(false)}
+                                disabled={balanceRefreshing || balanceLoading}
+                                title="Refresh balance now"
+                                className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-40 transition-colors ml-1"
+                              >
+                                <RefreshCw size={10} className={balanceRefreshing ? "animate-spin" : ""} />
+                                Refresh
+                              </button>
+                            </div>
+                            <span className="text-[10px] text-stone-600 shrink-0">
                               {balancePollError
                                 ? <span className="text-amber-500/80">Refresh failed — showing last known balance</span>
                                 : balanceRefreshing
@@ -1563,15 +1568,6 @@ export default function Earnings() {
                                   ? `Updated ${lastRefreshed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
                                   : ""}
                             </span>
-                            <button
-                              onClick={() => void fetchBalance(false)}
-                              disabled={balanceRefreshing || balanceLoading}
-                              title="Refresh balance now"
-                              className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-stone-300 disabled:opacity-40 transition-colors"
-                            >
-                              <RefreshCw size={10} className={balanceRefreshing ? "animate-spin" : ""} />
-                              Refresh
-                            </button>
                           </div>
                           <div className={`space-y-2 transition-opacity duration-300 ${balanceRefreshing ? "opacity-50" : "opacity-100"}`}>
                             {/* Header row */}
@@ -1610,25 +1606,6 @@ export default function Earnings() {
                                 </p>
                               </div>
                             )}
-                          </div>
-                          {/* Auto-refresh interval picker */}
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-[10px] text-stone-600 shrink-0">Auto-refresh:</span>
-                            <div className="flex gap-1">
-                              {(["30s", "1m", "5m", "manual"] as RefreshInterval[]).map(opt => (
-                                <button
-                                  key={opt}
-                                  onClick={() => setRefreshInterval(opt)}
-                                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                                    refreshInterval === opt
-                                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                                      : "text-stone-600 hover:text-stone-400 border border-transparent"
-                                  }`}
-                                >
-                                  {REFRESH_LABELS[opt]}
-                                </button>
-                              ))}
-                            </div>
                           </div>
                         </>
                       ) : null}
