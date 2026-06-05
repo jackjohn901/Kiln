@@ -451,6 +451,7 @@ export default function Settings() {
     "notif_email_shipped",
     "notif_email_tracking_updated",
     "notif_email_delivered",
+    "notif_email_posts",
   ];
   const activeEmailCount = EMAIL_KEYS.filter((k) => settings[k]).length;
   const emailPaused = settings.notif_email_paused;
@@ -828,6 +829,7 @@ export default function Settings() {
               <Toggle settingKey="notif_email_comments" label="Comment alerts" desc="Email when someone comments on your posts" />
               <Toggle settingKey="notif_email_new_sale" label="New sale alerts" desc="Email when a buyer completes a purchase from your shop" />
               <Toggle settingKey="notif_email_new_booking" label="New workshop bookings" desc="Email when a student books a seat in your workshop" />
+              <Toggle settingKey="notif_email_posts" label="Scheduled post alerts" desc="Email when one of your scheduled posts goes live" />
               <div className="flex items-center justify-between py-3 border-b border-white/5">
                 <div className="flex-1 min-w-0 pr-4">
                   <p className="text-sm text-stone-200">Workshop reminder emails</p>

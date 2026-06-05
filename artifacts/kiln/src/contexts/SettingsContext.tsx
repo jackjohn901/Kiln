@@ -23,6 +23,7 @@ export interface KilnSettings {
   notif_email_shipped: boolean;
   notif_email_tracking_updated: boolean;
   notif_email_delivered: boolean;
+  notif_email_posts: boolean;
   notif_sms_paused: boolean;
   notif_sms_outbid: boolean;
   notif_sms_drops: boolean;
@@ -67,6 +68,7 @@ export const EMAIL_KEYS = [
   "notif_email_shipped",
   "notif_email_tracking_updated",
   "notif_email_delivered",
+  "notif_email_posts",
 ] as const satisfies ReadonlyArray<keyof KilnSettings>;
 
 export interface NotifStatus {
@@ -119,6 +121,7 @@ export function defaultSettings(): KilnSettings {
     notif_email_shipped: true,
     notif_email_tracking_updated: true,
     notif_email_delivered: true,
+    notif_email_posts: true,
     notif_sms_paused: false,
     notif_sms_outbid: true,
     notif_sms_drops: true,

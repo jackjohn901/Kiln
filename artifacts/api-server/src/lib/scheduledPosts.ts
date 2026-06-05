@@ -1,8 +1,18 @@
-import { db, postsTable, followsTable } from "@workspace/db";
+import {
+  db,
+  postsTable,
+  followsTable,
+  notificationsTable,
+  profilesTable,
+  userSettingsTable,
+} from "@workspace/db";
 import { eq, and, lte, isNotNull } from "drizzle-orm";
 import { logger } from "./logger";
 import { broadcast } from "./websocket";
 import { autoPostToConnectedPlatforms } from "./socialAutoPost";
+import { sendEmailWithRetry, postPublishedEmail } from "./email";
+import { isEmailPaused, prependSnoozeRecap } from "./emailPaused";
+import { generateUnsubscribeToken } from "./unsubscribeTokens";
 
 async function publishDuePosts(): Promise<void> {
   try {
@@ -56,6 +66,66 @@ async function publishDuePosts(): Promise<void> {
 
         for (const { followerId } of followers) {
           broadcast(followerId, { type: "new-post", authorId: post.authorId });
+        }
+
+        // Notify the author that their scheduled post is now live (in-app +
+        // optional email), closing the loop so they don't have to check manually.
+        const notifText = "Your scheduled post is now live";
+        const notifLink = `/posts/${post.id}`;
+        const notifId = crypto.randomUUID();
+        await db.insert(notificationsTable).values({
+          id: notifId,
+          userId: post.authorId,
+          type: "post_published",
+          text: notifText,
+          link: notifLink,
+          imageUrl: post.thumbnailUrl ?? null,
+        });
+        broadcast(post.authorId, {
+          type: "notification",
+          userId: post.authorId,
+          notifType: "post_published",
+          text: notifText,
+          link: notifLink,
+        });
+
+        // Optional email — gated on the author's email-notification settings.
+        try {
+          const [[profile], [settingsRow]] = await Promise.all([
+            db
+              .select({ contactEmail: profilesTable.contactEmail })
+              .from(profilesTable)
+              .where(eq(profilesTable.userId, post.authorId))
+              .limit(1),
+            db
+              .select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt })
+              .from(userSettingsTable)
+              .where(eq(userSettingsTable.userId, post.authorId))
+              .limit(1),
+          ]);
+          const emailSettings = settingsRow?.settings as Record<string, unknown> | null;
+          const emailSnoozed = isEmailPaused(emailSettings, settingsRow?.notifEmailResumeAt);
+          const wantsEmail = !emailSnoozed && emailSettings?.notif_email_posts !== false;
+          if (emailSnoozed) {
+            db.update(notificationsTable)
+              .set({ emailSkipped: true })
+              .where(eq(notificationsTable.id, notifId))
+              .catch(() => {});
+          }
+          if (wantsEmail && profile?.contactEmail) {
+            const unsubToken = generateUnsubscribeToken(post.authorId);
+            const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/posts?token=${encodeURIComponent(unsubToken)}`;
+            const html = await prependSnoozeRecap(
+              post.authorId,
+              postPublishedEmail(post.caption ?? "", post.id, unsubscribeUrl),
+            );
+            await sendEmailWithRetry(
+              { to: profile.contactEmail, subject: "Your scheduled post is now live on Kiln", html },
+              { label: "post published notification" },
+            );
+          }
+        } catch (err) {
+          logger.warn({ err, authorId: post.authorId, postId: post.id }, "scheduledPosts: failed to send post-published email");
         }
 
         logger.info(

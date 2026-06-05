@@ -304,6 +304,25 @@ export function deliveryNotificationEmail(
   `);
 }
 
+export function postPublishedEmail(postCaption: string, postId: string, unsubscribeUrl?: string): string {
+  const unsubscribeFooter = unsubscribeUrl
+    ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want post-published emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from these emails</a></p>`
+    : "";
+  const captionLine = postCaption.trim()
+    ? `<p style="margin:0;color:#78716c;font-style:italic;">"${escHtml(postCaption.slice(0, 80))}${postCaption.length > 80 ? "…" : ""}"</p>`
+    : "";
+  return shell(`
+    <h1 style="color:#f59e0b;font-size:22px;margin-bottom:4px;">Your scheduled post is live! 🚀</h1>
+    <p style="color:#78716c;margin-bottom:0;">The post you scheduled has just been published to your feed.</p>
+    ${card(`
+      <p style="margin:0 0 8px;">Your post is now live on Kiln.</p>
+      ${captionLine}
+    `)}
+    ${btn(`${BASE_URL}/posts/${postId}`, "View your post")}
+    ${unsubscribeFooter}
+  `);
+}
+
 export function newLikeEmail(likerName: string, postCaption: string, postId: string, unsubscribeUrl?: string): string {
   const unsubscribeFooter = unsubscribeUrl
     ? `<p style="margin-top:16px;font-size:11px;color:#57534e;">Don't want like emails? <a href="${unsubscribeUrl}" style="color:#f59e0b;">Unsubscribe from like emails</a></p>`

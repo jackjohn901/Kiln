@@ -22,6 +22,7 @@ export type NotificationType =
   | "workshop_booking"
   | "commission_payment"
   | "message"
+  | "post_published"
 
 /**
  * Platform-agnostic, concept-based icon identifiers. Each platform maps these to
@@ -65,6 +66,7 @@ export const NOTIFICATION_ICONS: Record<NotificationType, NotificationIconConfig
   subscription: { icon: "premium", color: "#fcd34d" },
   auction: { icon: "auction", color: "#c084fc" },
   message: { icon: "message", color: "#94a3b8" },
+  post_published: { icon: "drop", color: "#f59e0b" },
 };
 
 /** Fallback used when a runtime notification type is not in `NotificationType`. */

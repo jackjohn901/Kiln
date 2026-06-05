@@ -22,6 +22,7 @@ const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: 
   workshop_booking:    { icon: Calendar,      color: "text-sky-400",    bg: "bg-sky-500/15" },
   commission_payment:  { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
   message:             { icon: Mail,          color: "text-violet-400", bg: "bg-violet-500/15" },
+  post_published:      { icon: Zap,           color: "text-amber-400",  bg: "bg-amber-500/15" },
 };
 
 

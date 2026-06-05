@@ -525,6 +525,18 @@ router.get("/unsubscribe/follows", async (req, res): Promise<void> => {
   );
 });
 
+// GET /api/unsubscribe/posts?token=<token>
+// Public one-click unsubscribe — no auth required, token is HMAC-verified
+// Sets notif_email_posts: false in the user's settings JSON
+router.get("/unsubscribe/posts", async (req, res): Promise<void> => {
+  await handleNotifEmailUnsubscribe(
+    req, res,
+    "notif_email_posts",
+    "You won't receive scheduled-post notification emails anymore. You can re-enable them any time in your notification settings.",
+    "your original post-published email",
+  );
+});
+
 // GET /api/unsubscribe/patrons?token=<token>
 // Public one-click unsubscribe — no auth required, token is HMAC-verified
 // Sets notif_email_new_patron: false in the user's settings JSON
