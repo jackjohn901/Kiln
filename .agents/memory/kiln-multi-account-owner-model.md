@@ -35,3 +35,14 @@ hundreds of routes that already key off it — switching just changes which acco
   `req.user.id`); this is intended and safer.
 - Frontend switch/create clears the `kiln_profile` localStorage key then reloads so
   ProfileContext re-syncs to the new active account.
+
+**Account id conventions (use to audit/clean the `users` table):**
+- Real human accounts: numeric Replit `sub` id (e.g. `44581520`), real email, `ownerId = null`.
+- Demo/reference data: id prefixed `seed-%` — keep, it's the showcase content.
+- Automated test junk: id prefixed `e2e-%` or `test-%` — safe to delete (left by testing/e2e runs).
+- No DB-level FK constraints reference `users`/`profiles`, so cleanup means manually
+  deleting rows across every table with a user-ref column (`user_id`/`author_id`/`artist_id`/
+  `buyer_id`/`seller_id`/`sender_id`/`from_user_id`/`to_user_id`/`owner_id`) then the `users` row.
+- A single real Replit login can only ever map to ONE owner row (upsert keys on `claims.sub`),
+  so "I'm a different account each login" is almost always session expiry (landing logged-out),
+  NOT duplicate accounts.
