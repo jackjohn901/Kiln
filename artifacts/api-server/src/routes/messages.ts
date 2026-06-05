@@ -372,7 +372,7 @@ router.post("/messages/send", async (req, res): Promise<void> => {
       fromName: message.senderName,
       fromAvatarUrl: message.senderAvatarUrl ?? null,
       text: notifText,
-      link: `/messages`,
+      link: `/messages/${senderId}`,
       imageUrl: attachmentUrl ?? null,
     });
 
