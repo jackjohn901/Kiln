@@ -23,6 +23,7 @@ import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
 import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
+import YourOrdersFromArtist from "@/components/YourOrdersFromArtist";
 import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
 import { getPosts, deletePost } from "@/data/posts";
@@ -886,6 +887,8 @@ export default function ArtistProfile() {
           )}
 
           {renderStorefront({ displayName: name, ownerView: isOwn, artistId: id ?? "" })}
+
+          {!isOwn && <YourOrdersFromArtist sellerId={storefrontArtistId} />}
         </div>
       </div>
     );
@@ -1424,6 +1427,8 @@ export default function ArtistProfile() {
           )}
 
           {tab === "posts" && renderStorefront({ displayName: artist.name, ownerView: isOwn, artistId: artist.id, drops, workshops, staticListings: listings, hasTabs: true })}
+
+          {tab === "posts" && !isOwn && <YourOrdersFromArtist sellerId={artist.id} />}
 
           {/* Portfolio */}
           {tab === "portfolio" && (

@@ -523,9 +523,15 @@ router.patch("/me/sales/:id/lock-address", async (req, res): Promise<void> => {
   }
 });
 
-// GET /me/orders — my orders (as buyer) with seller (artist) profile info
+// GET /me/orders — my orders (as buyer) with seller (artist) profile info.
+// Optional ?sellerId= filters to a single artist (used on artist profiles to
+// surface the viewer's past purchases from that seller).
 router.get("/me/orders", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const sellerId = typeof req.query.sellerId === "string" ? req.query.sellerId : null;
+  const where = sellerId
+    ? and(eq(ordersTable.buyerId, req.user.id), eq(ordersTable.sellerId, sellerId))
+    : eq(ordersTable.buyerId, req.user.id);
   const rows = await db
     .select({
       order: ordersTable,
@@ -535,7 +541,7 @@ router.get("/me/orders", async (req, res): Promise<void> => {
     })
     .from(ordersTable)
     .leftJoin(profilesTable, eq(ordersTable.sellerId, profilesTable.userId))
-    .where(eq(ordersTable.buyerId, req.user.id))
+    .where(where)
     .orderBy(desc(ordersTable.createdAt));
   res.json({
     orders: rows.map(({ order, sellerDisplayName, sellerHandle, sellerAvatarUrl }) => ({
