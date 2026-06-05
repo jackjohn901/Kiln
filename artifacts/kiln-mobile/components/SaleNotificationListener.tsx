@@ -95,12 +95,14 @@ export function SaleNotificationListener() {
   useWebSocket({ onSaleNotification: handleSale });
 
   // Auto-dismiss when the artist is already on the sales list, a sale detail,
-  // or the Earnings tab — all show sale-related financial data.
+  // the Earnings tab, or an earnings order-detail screen — all show
+  // sale-related financial data the artist is clearly engaged with.
   useEffect(() => {
     const onSalesRoute =
       pathname === "/sales" ||
       pathname.startsWith("/sales/") ||
       pathname === "/earnings" ||
+      pathname.startsWith("/earnings/") ||
       pathname === "/(tabs)/earnings";
     if (onSalesRoute && currentSaleRef.current !== null) {
       dismiss();
