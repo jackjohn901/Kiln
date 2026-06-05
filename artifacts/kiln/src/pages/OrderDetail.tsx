@@ -9,6 +9,7 @@ import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
 import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 import { useSocial } from "@/contexts/SocialContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { buildReceiptHtml, ordinalId } from "@/lib/receiptHtml";
@@ -211,6 +212,7 @@ export default function OrderDetail() {
   const { id, sessionKey } = useParams<{ id?: string; sessionKey?: string }>();
   const [, navigate] = useLocation();
   const { markLinkRead } = useSocial();
+  const { settings } = useSettings();
   const { login } = useAuth();
   const search = useSearch();
   const highlightParam = new URLSearchParams(search).get("highlight");
@@ -288,12 +290,12 @@ export default function OrderDetail() {
   useEffect(() => {
     if (!banner.show) return;
     const bannerTimer = setTimeout(dismissBanner, 10000);
-    const highlightTimer = setTimeout(() => setStatusHighlighted(false), 3000);
+    const highlightTimer = setTimeout(() => setStatusHighlighted(false), settings.earnings_flash_ms);
     return () => {
       clearTimeout(bannerTimer);
       clearTimeout(highlightTimer);
     };
-  }, [banner.show, dismissBanner]);
+  }, [banner.show, dismissBanner, settings.earnings_flash_ms]);
 
   useEffect(() => {
     const fetchUrl = sessionKey

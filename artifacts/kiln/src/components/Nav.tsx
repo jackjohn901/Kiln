@@ -103,26 +103,26 @@ export default function Nav() {
   useEffect(() => {
     if (!lastNewMessagePing) return;
     setMessagePulse(true);
-    const t = setTimeout(() => setMessagePulse(false), 2000);
+    const t = setTimeout(() => setMessagePulse(false), settings.earnings_flash_ms);
     return () => clearTimeout(t);
-  }, [lastNewMessagePing]);
+  }, [lastNewMessagePing, settings.earnings_flash_ms]);
 
   useEffect(() => {
     if (!lastNewInquiryPing) return;
     setInboxPulse(true);
-    const t = setTimeout(() => setInboxPulse(false), 2000);
+    const t = setTimeout(() => setInboxPulse(false), settings.earnings_flash_ms);
     return () => clearTimeout(t);
-  }, [lastNewInquiryPing]);
+  }, [lastNewInquiryPing, settings.earnings_flash_ms]);
 
-  // Typing indicator: animate the Messages icon for 3 s when someone is
-  // composing in a thread the user is not currently viewing.
+  // Typing indicator: animate the Messages icon when someone is composing in a
+  // thread the user is not currently viewing, for the configured flash duration.
   // Also clear when the user navigates to /messages (they'll see it in-thread).
   useEffect(() => {
     if (!lastTypingPing) return;
     setTypingPulse(true);
-    const t = setTimeout(() => setTypingPulse(false), 3000);
+    const t = setTimeout(() => setTypingPulse(false), settings.earnings_flash_ms);
     return () => clearTimeout(t);
-  }, [lastTypingPing]);
+  }, [lastTypingPing, settings.earnings_flash_ms]);
 
   useEffect(() => {
     if (location.startsWith("/messages")) setTypingPulse(false);

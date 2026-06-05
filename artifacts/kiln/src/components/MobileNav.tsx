@@ -133,16 +133,16 @@ export default function MobileNav() {
   useEffect(() => {
     if (!lastNewMessagePing) return;
     setMessagePulse(true);
-    const t = setTimeout(() => setMessagePulse(false), 2000);
+    const t = setTimeout(() => setMessagePulse(false), settings.earnings_flash_ms);
     return () => clearTimeout(t);
-  }, [lastNewMessagePing]);
+  }, [lastNewMessagePing, settings.earnings_flash_ms]);
 
   useEffect(() => {
     if (!lastNewInquiryPing) return;
     setInboxPulse(true);
-    const t = setTimeout(() => setInboxPulse(false), 2000);
+    const t = setTimeout(() => setInboxPulse(false), settings.earnings_flash_ms);
     return () => clearTimeout(t);
-  }, [lastNewInquiryPing]);
+  }, [lastNewInquiryPing, settings.earnings_flash_ms]);
 
   useEffect(() => {
     if (location.startsWith("/commissions") || location === "/commission-tracker") {
