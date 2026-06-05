@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Users, Plus, X, MessageCircle, ChevronLeft, CheckCircle2, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Guild {
   id: string;
@@ -25,15 +26,25 @@ function formatCount(n: number): string {
 }
 
 function GuildCard({ guild, onToggle }: { guild: Guild; onToggle: (id: string) => void }) {
+  const { isAuthenticated, login } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const handleJoin = async () => {
+    if (!isAuthenticated) { login(); return; }
     setLoading(true);
     try {
       const r = await fetch(`/api/guilds/${guild.id}/join`, { method: "POST", credentials: "include" });
-      if (r.ok) onToggle(guild.id);
-    } catch {}
-    setLoading(false);
+      if (r.status === 401) { login(); return; }
+      if (!r.ok) {
+        toast({ title: "Couldn't update membership", description: "Please try again in a moment.", variant: "destructive" });
+        return;
+      }
+      onToggle(guild.id);
+    } catch {
+      toast({ title: "Couldn't update membership", description: "Check your connection and try again.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -90,6 +101,7 @@ function GuildCard({ guild, onToggle }: { guild: Guild; onToggle: (id: string) =
 }
 
 function CreateGuildModal({ onClose, onCreated }: { onClose: () => void; onCreated: (g: Guild) => void }) {
+  const { login } = useAuth();
   const [name, setName] = useState("");
   const [technique, setTechnique] = useState("");
   const [description, setDescription] = useState("");
@@ -115,8 +127,7 @@ function CreateGuildModal({ onClose, onCreated }: { onClose: () => void; onCreat
         }),
       });
       if (r.status === 401) {
-        setError("Please sign in to create a community.");
-        setSubmitting(false);
+        login();
         return;
       }
       if (!r.ok) {
@@ -179,6 +190,12 @@ export default function Guilds() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [, navigate] = useLocation();
+  const { isAuthenticated, login } = useAuth();
+
+  const openCreate = () => {
+    if (!isAuthenticated) { login(); return; }
+    setShowCreate(true);
+  };
 
   useEffect(() => { markFeatureVisited("guilds"); }, []);
 
@@ -212,7 +229,7 @@ export default function Guilds() {
             <h1 className="font-serif text-2xl text-amber-100">Craft Guilds</h1>
             <p className="mt-1 text-sm text-stone-500">Technique-based communities for craft artists. Join guilds to connect, share, and learn.</p>
           </div>
-          <button onClick={() => setShowCreate(true)}
+          <button onClick={openCreate}
             className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-stone-950 transition-colors hover:bg-amber-400">
             <Plus size={13} /> New
           </button>
@@ -242,7 +259,7 @@ export default function Guilds() {
           <MessageCircle size={28} className="mx-auto mb-3 text-stone-600" />
           <h3 className="font-semibold text-stone-300 mb-1">Don't see your craft?</h3>
           <p className="text-sm text-stone-500 mb-4">Guilds are community-founded. If you're a maker without a home here, start one — it takes a few seconds and you'll be its first admin.</p>
-          <button onClick={() => setShowCreate(true)}
+          <button onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-stone-950 transition-colors hover:bg-amber-400">
             <Plus size={14} /> Start a community
           </button>
