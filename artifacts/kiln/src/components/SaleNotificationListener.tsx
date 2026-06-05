@@ -7,6 +7,7 @@ import SaleBanner, { SNOOZE_OPTIONS, type SaleInfo } from "./SaleBanner";
 const SS_SNOOZE_UNTIL = "kiln_snooze_until";
 const SS_SNOOZE_QUEUE = "kiln_snooze_queue";
 const SS_SALE_QUEUE   = "kiln_sale_queue";
+const SS_SNOOZE_MS    = "kiln_snooze_ms";
 
 const LS_SNOOZE_PREF  = "kiln_snooze_pref";
 
@@ -57,6 +58,13 @@ function readSnoozeUntil(): Date | null {
   return d;
 }
 
+function readSnoozeMs(): number {
+  const raw = sessionStorage.getItem(SS_SNOOZE_MS);
+  const ms = Number(raw);
+  if (Number.isFinite(ms) && ms > 0) return ms;
+  return DEFAULT_SNOOZE_MS;
+}
+
 function computeInitialState() {
   const storedSnoozeUntil  = readSnoozeUntil();
   const storedSnoozeQueue  = deserializeSales(sessionStorage.getItem(SS_SNOOZE_QUEUE));
@@ -67,12 +75,14 @@ function computeInitialState() {
     const mergedQueue = [...storedVisibleQueue, ...storedSnoozeQueue] as SaleInfo[];
     sessionStorage.removeItem(SS_SNOOZE_UNTIL);
     sessionStorage.removeItem(SS_SNOOZE_QUEUE);
+    sessionStorage.removeItem(SS_SNOOZE_MS);
     // Persist the merged queue immediately so further navigations still find it
     sessionStorage.setItem(SS_SALE_QUEUE, serializeSales(mergedQueue));
     return {
       queue:       mergedQueue,
       snoozeUntil: null as Date | null,
       snoozeQueue: [] as SaleInfo[],
+      snoozeMs:    DEFAULT_SNOOZE_MS,
     };
   }
 
@@ -80,6 +90,7 @@ function computeInitialState() {
     queue:       storedVisibleQueue,
     snoozeUntil: storedSnoozeUntil,
     snoozeQueue: storedSnoozeQueue,
+    snoozeMs:    readSnoozeMs(),
   };
 }
 
@@ -96,6 +107,8 @@ export default function SaleNotificationListener() {
   const snoozeUntilRef                = useRef<Date | null>(initialState.snoozeUntil);
   const snoozeQueueRef                = useRef<SaleInfo[]>(initialState.snoozeQueue);
 
+  const [activeSnoozeMs, setActiveSnoozeMs] = useState<number>(initialState.snoozeMs);
+
   const [remainingSecs, setRemainingSecs] = useState(0);
 
   const [preferredSnoozeMs, setPreferredSnoozeMs] = useState(readSnoozePref);
@@ -105,6 +118,7 @@ export default function SaleNotificationListener() {
       sessionStorage.setItem(SS_SNOOZE_UNTIL, snoozeUntilRef.current.toISOString());
     } else {
       sessionStorage.removeItem(SS_SNOOZE_UNTIL);
+      sessionStorage.removeItem(SS_SNOOZE_MS);
     }
     sessionStorage.setItem(SS_SNOOZE_QUEUE, serializeSales(snoozeQueueRef.current));
     sessionStorage.setItem(SS_SALE_QUEUE,   serializeSales(queueRef.current));
@@ -179,11 +193,13 @@ export default function SaleNotificationListener() {
 
   const snooze = useCallback((durationMs: number) => {
     setPreferredSnoozeMs(durationMs);
+    setActiveSnoozeMs(durationMs);
     try {
       localStorage.setItem(LS_SNOOZE_PREF, String(durationMs));
     } catch {
       /* ignore */
     }
+    sessionStorage.setItem(SS_SNOOZE_MS, String(durationMs));
     const until = new Date(Date.now() + durationMs);
     snoozeUntilRef.current = until;
     setSnoozeUntil(until);
@@ -213,6 +229,9 @@ export default function SaleNotificationListener() {
     ? `${mins}m ${String(secs).padStart(2, "0")}s`
     : `${remainingSecs}s`;
 
+  const snoozeDurationMins = Math.round(activeSnoozeMs / 60000);
+  const snoozeDurationLabel = `${snoozeDurationMins}-min snooze`;
+
   return (
     <>
       {snoozeUntil && (
@@ -225,7 +244,7 @@ export default function SaleNotificationListener() {
             <BellOff size={15} className="shrink-0 text-amber-400" />
             <div className="min-w-0 flex-1">
               <span className="text-xs font-medium text-amber-300">
-                Banners snoozed — {countdownLabel} remaining
+                {snoozeDurationLabel} — {countdownLabel} remaining
               </span>
               {snoozedCount > 0 && (
                 <span className="ml-2 rounded-full bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 leading-none">
