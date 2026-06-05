@@ -29,6 +29,7 @@ import { getPosts, deletePost } from "@/data/posts";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 import { getCommunityBeats, type CommunityBeat, LICENSE_LABELS, LICENSE_COLORS } from "@/lib/communityBeats";
 import { useMeta } from "@/hooks/useMeta";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface ArtistShipping {
   offerFreeShipping: boolean;
@@ -367,6 +368,28 @@ export default function ArtistProfile() {
   const search = useSearch();
   const artist = findArtist(id ?? "", profile);
   const isOwn = !!(profile && (profile.id === id || profile.handle === id));
+
+  const { subscribe: wsSubscribe } = useWebSocket();
+  const [liveViewers, setLiveViewers] = useState<number>(0);
+
+  // Live "followers watching" count — only meaningful on your own profile.
+  // Subscribe to the same feed-viewers WS events the Analytics page uses, and
+  // seed the initial value from the authenticated endpoint.
+  useEffect(() => {
+    if (!isOwn || !profile) { setLiveViewers(0); return; }
+    const artistId = profile.id;
+    return wsSubscribe("feed-viewers", (e) => {
+      if (e.artistId === artistId) setLiveViewers(e.count as number);
+    });
+  }, [isOwn, profile, wsSubscribe]);
+
+  useEffect(() => {
+    if (!isOwn || !profile) return;
+    fetch("/api/analytics/me/feed-viewers", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.count != null) setLiveViewers(data.count); })
+      .catch(() => {});
+  }, [isOwn, profile]);
 
   const initialTab = (new URLSearchParams(search).get("tab") as Tab | null) ?? "posts";
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -782,6 +805,12 @@ export default function ArtistProfile() {
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-serif text-2xl font-bold text-amber-100">{name}</h1>
+                  {isOwn && liveViewers > 0 && (
+                    <span title="Followers watching your feed right now" className="flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/40 px-2 py-0.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
+                      <span className="text-[10px] font-bold text-rose-300">{liveViewers.toLocaleString()} watching</span>
+                    </span>
+                  )}
                   {isOwn && <Link href="/edit-profile"><span className="rounded-full border border-stone-700 px-3 py-1 text-xs text-stone-400 hover:border-amber-500/50 hover:text-amber-300 transition-colors">Edit Profile</span></Link>}
                 </div>
                 {!isOwn && (
@@ -1116,6 +1145,12 @@ export default function ArtistProfile() {
         <div className="mt-3">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="font-serif text-2xl font-bold text-amber-100">{displayName}</h1>
+            {isOwn && liveViewers > 0 && (
+              <span title="Followers watching your feed right now" className="flex items-center gap-1 rounded-full bg-rose-500/15 border border-rose-500/40 px-2 py-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
+                <span className="text-[10px] font-bold text-rose-300">{liveViewers.toLocaleString()} watching</span>
+              </span>
+            )}
             {verified && (
               <span title="Verified studio" className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 shrink-0">
                 <Check size={11} className="text-white" />
