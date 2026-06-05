@@ -115,6 +115,15 @@ export default function Drafts() {
               const Icon = isVid ? FileVideo : FileImage;
               const isPublishing = publishing === draft.id;
               const isDeleting = deleting === draft.id;
+              const schedDate = draft.scheduledAt ? new Date(draft.scheduledAt) : null;
+              const schedValid = schedDate && !isNaN(schedDate.getTime());
+              const schedOverdue = schedValid && schedDate.getTime() <= Date.now();
+              const schedLabel = schedValid
+                ? schedDate.toLocaleString(undefined, {
+                    month: "short", day: "numeric", year: "numeric",
+                    hour: "numeric", minute: "2-digit",
+                  })
+                : null;
 
               return (
                 <div key={draft.id}
@@ -141,10 +150,16 @@ export default function Drafts() {
                       {draft.technique && (
                         <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">{draft.technique}</span>
                       )}
-                      {draft.scheduledAt && (
-                        <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400">
-                          Scheduled {new Date(draft.scheduledAt).toLocaleDateString()}
-                        </span>
+                      {schedValid && (
+                        schedOverdue ? (
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
+                            <Loader2 size={9} className="animate-spin" /> Publishing soon…
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400">
+                            Scheduled for {schedLabel}
+                          </span>
+                        )
                       )}
                       {(draft.tags ?? []).slice(0, 2).map(tag => (
                         <span key={tag} className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-500">#{tag}</span>
