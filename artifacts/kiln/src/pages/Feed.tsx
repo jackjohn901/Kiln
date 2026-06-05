@@ -1270,17 +1270,21 @@ export default function Feed() {
     try { sessionStorage.removeItem(PENDING_FOLLOWING_KEY); } catch {}
   }, []);
 
-  // Auto-apply pill if the user is already at scroll-top when it appears
+  // Auto-apply pill if the user is already at scroll-top when it appears.
+  // The delay is artist-configurable (Settings → Display); 0 disables auto-apply
+  // entirely, leaving the pill manual-only.
   useEffect(() => {
     if (feedTab !== "following" || newFollowingPostCount === 0) return;
     if ((containerRef.current?.scrollTop ?? 1) > 0) return;
+    const delay = kilnSettings.feed_autorefresh_delay_ms;
+    if (!delay || delay <= 0) return;
     const timerId = setTimeout(() => {
       if ((containerRef.current?.scrollTop ?? 1) === 0) {
         applyPendingFollowingReels();
       }
-    }, 3000);
+    }, delay);
     return () => clearTimeout(timerId);
-  }, [feedTab, newFollowingPostCount, applyPendingFollowingReels]);
+  }, [feedTab, newFollowingPostCount, applyPendingFollowingReels, kilnSettings.feed_autorefresh_delay_ms]);
 
   // Fetch on tab switch
   useEffect(() => {

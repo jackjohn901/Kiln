@@ -1090,6 +1090,28 @@ export default function Settings() {
           <div className="rounded-2xl border border-white/8 bg-stone-900/60 px-5">
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Feed</p>
             <Toggle settingKey="display_compact" label="Compact feed" desc="Smaller cards, more posts visible" />
+            <div className="flex items-center justify-between py-3">
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="text-sm text-stone-200">Auto-refresh delay</p>
+                <p className="text-xs text-stone-600 mt-0.5">How long the &ldquo;new posts&rdquo; pill waits before applying on its own. Off keeps it manual.</p>
+              </div>
+              <div className="flex rounded-xl overflow-hidden border border-white/10 shrink-0">
+                {([
+                  { ms: 2000, label: "2s" },
+                  { ms: 3000, label: "3s" },
+                  { ms: 5000, label: "5s" },
+                  { ms: 0, label: "Off" },
+                ] as const).map(({ ms, label }) => (
+                  <button
+                    key={label}
+                    onClick={() => patchSettings({ feed_autorefresh_delay_ms: ms })}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${settings.feed_autorefresh_delay_ms === ms ? "bg-amber-500 text-stone-900" : "bg-stone-800 text-stone-400 hover:text-stone-200"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <p className="py-3 text-xs font-semibold uppercase tracking-wider text-stone-600">Videos</p>
             <Toggle settingKey="display_autoplay" label="Autoplay videos" desc="Process reels play automatically" />
             <Toggle settingKey="display_sound" label="Sound on by default" desc="Videos play with audio" />
