@@ -3,12 +3,14 @@ previewPath = "/kiln-mobile/"
 title = "Kiln — Mobile App"
 version = "1.0.0"
 id = "kiln-mobile"
+router = "expo-domain"
 
 [[integratedSkills]]
 name = "expo"
 version = "1.0.0"
 
 [[services]]
+ensurePreviewReachable = "/status"
 name = "expo"
 paths = ["/kiln-mobile/"]
 localPort = 8099
@@ -16,5 +18,10 @@ localPort = 8099
 [services.development]
 run = "pnpm --filter @workspace/kiln-mobile run dev"
 
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kiln-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/kiln-mobile", "run", "serve" ]
+
 [services.env]
 PORT = "8099"
+BASE_PATH = "/kiln-mobile/"

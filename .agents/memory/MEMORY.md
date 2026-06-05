@@ -1,5 +1,7 @@
 # Security audit memory
 
+- [Expo domain router](expo-domain-router.md) — mobile artifact.toml needs `router = "expo-domain"` or Expo Go 404s; domain 302→/__mockup while Metro is healthy on localPort.
+
 - [AI endpoint auth](ai-auth-requirement.md) — Every AI endpoint must check `req.isAuthenticated()` to prevent anonymous API cost abuse.
 - [POST ownership checks](ownership-checks.md) — Any `POST`/`PATCH`/`DELETE` that updates existing rows must verify the caller owns the record via a DB lookup.
 - [Route auth pattern](route-auth-pattern.md) — First line of every mutation handler: `if (!req.isAuthenticated()) { res.status(401); return; }`; authMiddleware adds no safety over inline checks.
