@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2, Clock, Truck, AlertCircle, Loader2, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import Nav from "@/components/Nav";
+import RelativeTime from "@/components/RelativeTime";
 
 interface Order {
   id: string;
@@ -70,9 +71,6 @@ function formatPrice(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
 
 function ManualReceiptSection({ orders }: { orders: Order[] }) {
   const [open, setOpen] = useState(false);
@@ -354,7 +352,7 @@ export default function Orders() {
                             </div>
                           );
                         })()}
-                        <p className="text-xs text-stone-500 mt-0.5">{formatDate(primary.createdAt)}</p>
+                        <RelativeTime since={primary.createdAt} className="text-xs text-stone-500 mt-0.5 block" />
                         {(() => {
                           const sellerLabel = primary.sellerDisplayName?.trim()
                             ? primary.sellerDisplayName
