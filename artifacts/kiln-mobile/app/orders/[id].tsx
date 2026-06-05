@@ -135,6 +135,13 @@ export default function OrderDetailScreen() {
     }
   }, [id, bannerOpacity]);
 
+  // Keep the latest dismissBanner in a ref so the auto-dismiss timer effect
+  // below can call it without listing it as a dependency. Otherwise any change
+  // to dismissBanner's identity (parent re-render / dep churn) would restart the
+  // 10s countdown.
+  const dismissBannerRef = useRef(dismissBanner);
+  dismissBannerRef.current = dismissBanner;
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -160,12 +167,12 @@ export default function OrderDetailScreen() {
   useEffect(() => {
     if (!showUpdateBanner) return;
     const ringTimer = setTimeout(() => setStatusRing(false), 3000);
-    const bannerTimer = setTimeout(dismissBanner, 10000);
+    const bannerTimer = setTimeout(() => dismissBannerRef.current(), 10000);
     return () => {
       clearTimeout(ringTimer);
       clearTimeout(bannerTimer);
     };
-  }, [showUpdateBanner, dismissBanner]);
+  }, [showUpdateBanner]);
 
   const [sellerWindow, setSellerWindow] = useState<SellerProcessingWindow | null>(null);
   const [siblingWindows, setSiblingWindows] = useState<Record<string, SellerProcessingWindow>>({});
