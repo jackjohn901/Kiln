@@ -853,6 +853,12 @@ export default function Messages() {
                     </span>
                     <span className="text-[10px] text-stone-600 shrink-0 ml-2">{timeShort(t.lastMessageAt)}</span>
                   </div>
+                  {t.linkedOrderId && (
+                    <span className="inline-flex items-center gap-1 mb-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-300/90">
+                      <ShoppingBag size={9} className="shrink-0" />
+                      <span className="font-mono">{"KLN-" + t.linkedOrderId.slice(0, 8).toUpperCase()}</span>
+                    </span>
+                  )}
                   <div className={`flex items-center gap-1.5 text-xs truncate ${t.unreadCount > 0 ? "text-stone-400" : "text-stone-600"}`}>
                     {t.lastMessageAttachmentUrl && STORAGE_PATH_RE.test(t.lastMessageAttachmentUrl) && (
                       <img
