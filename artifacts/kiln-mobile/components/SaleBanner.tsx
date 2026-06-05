@@ -8,6 +8,7 @@ import {
   PanResponder,
 } from "react-native";
 import { useEffect, useRef } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { SaleEvent } from "@/lib/useWebSocket";
 
 interface Props {
@@ -18,6 +19,9 @@ interface Props {
 }
 
 export const AUTO_DISMISS_MS = 6000;
+
+/** Gap (px) between the bottom of the safe-area inset and the banner's top edge. */
+const TOP_OFFSET = 8;
 
 /** Duration of the slide-out (dismiss) timing animation in ms. */
 export const SLIDE_OUT_MS = 300;
@@ -41,6 +45,7 @@ const SWIPE_DISMISS_THRESHOLD = 80;
 const SWIPE_VELOCITY_THRESHOLD = 0.3;
 
 export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
+  const insets = useSafeAreaInsets();
   const translateX = useRef(new Animated.Value(OFFSCREEN_X)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onDismissRef = useRef(onDismiss);
@@ -157,7 +162,10 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
 
   return (
     <Animated.View
-      style={[styles.banner, { transform: [{ translateX }] }]}
+      style={[
+        styles.banner,
+        { top: insets.top + TOP_OFFSET, transform: [{ translateX }] },
+      ]}
       pointerEvents={sale ? "box-none" : "none"}
     >
       <View style={styles.inner} {...panResponder.panHandlers}>
@@ -191,7 +199,6 @@ export function SaleBanner({ sale, onDismiss, onView, onAnimatedOut }: Props) {
 const styles = StyleSheet.create({
   banner: {
     position: "absolute",
-    top: 56,
     right: 12,
     zIndex: 9999,
     maxWidth: 340,
