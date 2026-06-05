@@ -605,10 +605,12 @@ export class WebhookHandlers {
                   .set({ spotsBooked: sql`${workshopsTable.spotsBooked} + 1` })
                   .where(eq(workshopsTable.id, workshopId));
 
-                // Fetch artist settings once — used for both in-app and email preferences
-                const [[artistUser], [artistSettings]] = await Promise.all([
+                // Fetch artist settings once — used for both in-app and email preferences.
+                // Also resolve the student's profile handle so the artist email can link to it.
+                const [[artistUser], [artistSettings], [studentProfile]] = await Promise.all([
                   db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, workshop.artistId)),
                   db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, workshop.artistId)),
+                  db.select({ handle: profilesTable.handle }).from(profilesTable).where(eq(profilesTable.userId, studentId)),
                 ]);
                 const artistPrefSettings = artistSettings?.settings as Record<string, unknown> | null;
 
@@ -648,7 +650,7 @@ export class WebhookHandlers {
                 // Artist notification email (respects notif_email_new_booking preference)
                 const artistWantsEmail = !isEmailPaused(artistPrefSettings, artistSettings?.notifEmailResumeAt) && artistPrefSettings?.notif_email_new_booking !== false;
                 if (artistUser?.email && artistWantsEmail) {
-                  const artistHtmlBase = newWorkshopBookingArtistEmail(customerName, customerEmail ?? '', workshop.title, paidAmountCents, calParams, null, studentId);
+                  const artistHtmlBase = newWorkshopBookingArtistEmail(customerName, customerEmail ?? '', workshop.title, paidAmountCents, calParams, studentProfile?.handle ?? null, studentId);
                   const artistHtml = await prependSnoozeRecap(workshop.artistId, artistHtmlBase);
                   await sendEmailWithRetry({ to: artistUser.email, subject: `New booking: "${workshop.title}"`, html: artistHtml }, { label: 'new workshop booking (artist, webhook)', contextId: session.id });
                 }
