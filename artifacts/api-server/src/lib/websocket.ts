@@ -22,11 +22,33 @@ const clients = new Map<string, Set<WebSocket>>();
 const firingRooms = new Map<string, Set<string>>();
 // artistId → set of follower userIds currently on the Following tab
 const feedRooms = new Map<string, Set<string>>();
-// ws → { userId, watchingFiringId, feedArtistIds } for cleanup on disconnect
-const wsMetadata = new Map<WebSocket, { userId: string | null; firingId: string | null; feedArtistIds: Set<string> }>();
+// ws → { userId, watchingFiringId, feedArtistIds, feedLastSeen } for cleanup on disconnect
+const wsMetadata = new Map<WebSocket, { userId: string | null; firingId: string | null; feedArtistIds: Set<string>; feedLastSeen: number }>();
+
+// How long a feed viewer can go without a heartbeat before being pruned.
+const FEED_VIEWER_TTL_MS = 60_000;
+// How often the server sweeps for stale feed viewers.
+const FEED_SWEEP_INTERVAL_MS = 15_000;
+
+// Prune feed viewers whose heartbeat has gone stale (e.g. mobile backgrounding
+// or a dropped connection that never fired a clean WS close).
+function sweepStaleFeedViewers(): void {
+  const now = Date.now();
+  for (const meta of wsMetadata.values()) {
+    if (!meta.userId || meta.feedArtistIds.size === 0) continue;
+    if (now - meta.feedLastSeen > FEED_VIEWER_TTL_MS) {
+      leaveFeedRooms(meta.userId, meta.feedArtistIds);
+      meta.feedArtistIds = new Set();
+    }
+  }
+}
 
 export function setupWebSocket(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
+
+  const sweepTimer = setInterval(sweepStaleFeedViewers, FEED_SWEEP_INTERVAL_MS);
+  sweepTimer.unref();
+  wss.on("close", () => clearInterval(sweepTimer));
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url ?? "", "http://localhost");
@@ -38,13 +60,15 @@ export function setupWebSocket(server: Server): WebSocketServer {
       logger.info({ userId }, "WebSocket client connected");
     }
 
-    wsMetadata.set(ws, { userId, firingId: null, feedArtistIds: new Set() });
+    wsMetadata.set(ws, { userId, firingId: null, feedArtistIds: new Set(), feedLastSeen: Date.now() });
 
     ws.on("message", (raw) => {
       try {
         const msg = JSON.parse(raw.toString()) as { type: string; firingId?: string; artistIds?: string[] };
         const meta = wsMetadata.get(ws);
         if (!meta || !userId) return;
+        // Any inbound message is a sign of life; refresh the feed TTL.
+        meta.feedLastSeen = Date.now();
 
         if (msg.type === "join-firing" && msg.firingId) {
           // Leave previous room if any
@@ -66,10 +90,23 @@ export function setupWebSocket(server: Server): WebSocketServer {
           // Join new rooms
           const ids = (msg.artistIds as string[]).filter((id) => typeof id === "string" && id.length > 0).slice(0, 100);
           meta.feedArtistIds = new Set(ids);
+          meta.feedLastSeen = Date.now();
           for (const artistId of ids) {
             if (!feedRooms.has(artistId)) feedRooms.set(artistId, new Set());
             feedRooms.get(artistId)!.add(userId);
             broadcastFeedViewerCount(artistId);
+          }
+        } else if (msg.type === "keep-feed") {
+          // Heartbeat from an active Following tab: refresh the TTL so the
+          // viewer isn't pruned. Re-assert membership in case a sweep raced.
+          meta.feedLastSeen = Date.now();
+          for (const artistId of meta.feedArtistIds) {
+            if (!feedRooms.has(artistId)) feedRooms.set(artistId, new Set());
+            const room = feedRooms.get(artistId)!;
+            if (!room.has(userId)) {
+              room.add(userId);
+              broadcastFeedViewerCount(artistId);
+            }
           }
         } else if (msg.type === "leave-feed") {
           leaveFeedRooms(userId, meta.feedArtistIds);

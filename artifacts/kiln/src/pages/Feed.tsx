@@ -1361,7 +1361,16 @@ export default function Feed() {
     if (artistIds.length === 0) return;
     joinedFeedArtistsRef.current = artistIds;
     wsSend({ type: "join-feed", artistIds });
+    // Heartbeat: keep the server's per-viewer TTL fresh so the count stays
+    // accurate even if a clean WS close never fires (mobile backgrounding,
+    // flaky connections). Only beats while the tab is visible.
+    const heartbeat = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        wsSend({ type: "keep-feed" });
+      }
+    }, 30_000);
     return () => {
+      clearInterval(heartbeat);
       wsSend({ type: "leave-feed" });
       joinedFeedArtistsRef.current = [];
     };
