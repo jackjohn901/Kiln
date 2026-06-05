@@ -41,7 +41,15 @@ function CountdownBadge({ dropDate }: { dropDate: string }) {
   const [time, setTime] = useState(getTimeUntilDrop(dropDate));
   useEffect(() => {
     const iv = setInterval(() => setTime(getTimeUntilDrop(dropDate)), 10000);
-    return () => clearInterval(iv);
+    function onVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      setTime(getTimeUntilDrop(dropDate));
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [dropDate]);
   return (
     <span className="flex items-center gap-1 rounded-full bg-stone-900/80 px-2.5 py-1 text-xs font-mono font-medium text-amber-300 border border-amber-500/20">
