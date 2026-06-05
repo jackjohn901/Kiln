@@ -292,6 +292,8 @@ export default function Earnings() {
   const statsFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statsLastRefreshed, setStatsLastRefreshed] = useState<Date | null>(null);
   const [, setStatsTick] = useState(0);
+  const [nextRefreshAt, setNextRefreshAt] = useState<Date | null>(null);
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
 
   // Tip thank-you state
   const [thanksTip, setThanksTip] = useState<EarningLine | null>(null);
@@ -698,6 +700,8 @@ export default function Earnings() {
       if (chargesEnabledRef.current) void fetchBalance(true);
     } finally {
       setEarningsRefreshing(false);
+      // Restart the auto-refresh timer so the countdown resets to the full interval.
+      setRefreshEpoch(e => e + 1);
     }
   }, [fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
 
@@ -707,23 +711,27 @@ export default function Earnings() {
     if (earningsTimerRef.current) clearInterval(earningsTimerRef.current);
     const ms = REFRESH_MS[refreshInterval];
     if (ms !== null) {
+      setNextRefreshAt(new Date(Date.now() + ms));
       earningsTimerRef.current = setInterval(async () => {
+        setNextRefreshAt(new Date(Date.now() + ms));
         const result = await fetchEarnings();
         if (result) triggerStatsFlash();
         void fetchSales();
         if (chargesEnabledRef.current) void fetchBalance(true);
       }, ms);
+    } else {
+      setNextRefreshAt(null);
     }
     return () => {
       if (earningsTimerRef.current) clearInterval(earningsTimerRef.current);
     };
-  }, [refreshInterval, fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
+  }, [refreshInterval, refreshEpoch, fetchEarnings, fetchSales, fetchBalance, triggerStatsFlash]);
 
   useEffect(() => {
-    if (!statsLastRefreshed) return;
+    if (!statsLastRefreshed && !nextRefreshAt) return;
     const id = setInterval(() => setStatsTick(t => t + 1), 1000);
     return () => clearInterval(id);
-  }, [statsLastRefreshed]);
+  }, [statsLastRefreshed, nextRefreshAt]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -1250,6 +1258,17 @@ export default function Earnings() {
                   <RefreshCw size={10} className={earningsRefreshing ? "animate-spin" : ""} />
                   Refresh
                 </button>
+                {refreshInterval !== "manual" && nextRefreshAt && (() => {
+                  const remaining = Math.max(0, Math.ceil((nextRefreshAt.getTime() - Date.now()) / 1000));
+                  const m = Math.floor(remaining / 60);
+                  const s = remaining % 60;
+                  const label = m > 0 ? `${m}m ${s}s` : `${s}s`;
+                  return (
+                    <span className="text-[10px] text-stone-500 tabular-nums ml-1">
+                      next refresh in {label}
+                    </span>
+                  );
+                })()}
               </div>
               {statsLastRefreshed && (() => {
                 const secs = Math.floor((Date.now() - statsLastRefreshed.getTime()) / 1000);
