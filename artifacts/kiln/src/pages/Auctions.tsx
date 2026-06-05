@@ -43,6 +43,8 @@ function formatPrice(n: number) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
+const CRITICAL_THRESHOLD_MS = 10000;
+
 function getTimeLeft(endDate: string): string {
   const diff = new Date(endDate).getTime() - Date.now();
   if (diff <= 0) return "Ended";
@@ -60,7 +62,7 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(auction.endDate));
   const [isCritical, setIsCritical] = useState(() => {
     const diff = new Date(auction.endDate).getTime() - Date.now();
-    return auction.status === "live" && diff > 0 && diff <= 60000;
+    return auction.status === "live" && diff > 0 && diff <= CRITICAL_THRESHOLD_MS;
   });
   const [paying, setPaying] = useState(false);
   useEffect(() => {
@@ -69,7 +71,7 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
     function tick() {
       const diff = new Date(auction.endDate).getTime() - Date.now();
       setTimeLeft(getTimeLeft(auction.endDate));
-      setIsCritical(auction.status === "live" && diff > 0 && diff <= 60000);
+      setIsCritical(auction.status === "live" && diff > 0 && diff <= CRITICAL_THRESHOLD_MS);
       if (diff <= 0) return;
       // Tick every second while seconds are shown (under a day), slower otherwise
       handle = setTimeout(tick, diff < 86400000 ? 1000 : 30000);
@@ -128,8 +130,10 @@ function AuctionCard({ auction, onBid, currentUserId }: { auction: Auction; onBi
         <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 to-transparent" />
         <div className="absolute top-3 left-3">
           {isLive ? (
-            <span className="flex items-center gap-1.5 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-stone-950">
-              <span className="h-1.5 w-1.5 rounded-full bg-stone-950 animate-pulse" /> LIVE
+            <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors ${
+              isCritical ? "bg-red-500/90 text-white animate-pulse" : "bg-amber-500/90 text-stone-950"
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${isCritical ? "bg-white" : "bg-stone-950"}`} /> LIVE
             </span>
           ) : (
             <span className="rounded-full bg-stone-700/90 px-2.5 py-1 text-[10px] font-medium text-stone-400">Ended</span>
