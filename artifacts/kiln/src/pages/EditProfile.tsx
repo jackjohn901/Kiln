@@ -124,6 +124,8 @@ export default function EditProfile() {
   );
 
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -222,6 +224,9 @@ export default function EditProfile() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     setProfile({ ...form, isCustom: true });
 
     try {
@@ -246,6 +251,8 @@ export default function EditProfile() {
       });
       if (!r.ok) throw new Error();
     } catch {
+      savingRef.current = false;
+      setSaving(false);
       toast({ title: "Couldn\u2019t save your profile", description: "Please check your connection and try again.", variant: "destructive" });
       return;
     }
@@ -595,14 +602,15 @@ export default function EditProfile() {
           {/* Save */}
           <button
             type="submit"
-            className={`flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold transition-all ${
+            disabled={saving || saved}
+            className={`flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-70 ${
               saved
                 ? "bg-emerald-500 text-white"
                 : "bg-amber-500 text-stone-950 hover:bg-amber-400"
             }`}
           >
-            <Save size={15} />
-            {saved ? "Saved!" : "Save Profile"}
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saved ? "Saved!" : saving ? "Saving\u2026" : "Save Profile"}
           </button>
         </form>
       </div>

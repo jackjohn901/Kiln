@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Wand2, Loader2, Play, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface Props {
@@ -29,8 +29,13 @@ type Phase =
 export default function AnimateTool({ previewUrl, sourceFile, onApply }: Props) {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState<"5" | "10">("5");
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [phase, setPhaseRaw] = useState<Phase>({ kind: "idle" });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
+
+  const setPhase = (next: Phase) => {
+    if (mountedRef.current) setPhaseRaw(next);
+  };
 
   function stopPolling() {
     if (pollRef.current) {
@@ -38,6 +43,14 @@ export default function AnimateTool({ previewUrl, sourceFile, onApply }: Props) 
       pollRef.current = null;
     }
   }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopPolling();
+    };
+  }, []);
 
   async function startPolling(requestId: string) {
     setPhase({ kind: "queued", requestId });

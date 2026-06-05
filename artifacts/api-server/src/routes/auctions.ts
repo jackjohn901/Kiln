@@ -52,7 +52,7 @@ router.post("/auctions", async (req, res): Promise<void> => {
   const { title, description, imageUrl, medium, dimensions, startingPrice, reservePrice, startDate, endDate, tags } = req.body;
   if (!title || !startingPrice || !startDate || !endDate) { res.status(400).json({ error: "title, startingPrice, startDate, endDate required" }); return; }
   const user = req.user;
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Artist";
   const now = new Date();
   const sd = new Date(startDate);
   // Treat a start time at (or within a minute of) "now" as live, so client/server
@@ -162,7 +162,7 @@ router.post("/auctions/:id/bid", async (req, res): Promise<void> => {
   const minBid = auction.currentBid > 0 ? auction.currentBid + 50 : auction.startingPrice;
   if (bidAmount < minBid) { res.status(400).json({ error: `Minimum bid is $${minBid}` }); return; }
   const user = req.user;
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Bidder";
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Bidder";
   const [bid] = await db.insert(auctionBidsTable).values({ id: crypto.randomUUID(), auctionId: auction.id, bidderId: user.id, bidderName: name, amount: bidAmount }).returning();
   const [updated] = await db.update(auctionsTable).set({ currentBid: bidAmount, currentBidderId: user.id, currentBidderName: name, bidCount: auction.bidCount + 1 }).where(eq(auctionsTable.id, auction.id)).returning();
   if (auction.currentBidderId && auction.currentBidderId !== user.id) {
