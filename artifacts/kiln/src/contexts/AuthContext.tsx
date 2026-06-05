@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, ReactNode } from "rea
 import { useAuth as useReplitAuth } from "@workspace/replit-auth-web";
 import type { AuthUser } from "@workspace/replit-auth-web";
 import AuthSplash from "@/components/AuthSplash";
+import { clearSaleNotificationState } from "@/components/SaleNotificationListener";
 
 export type { AuthUser };
 
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setRedirecting("Signing you out\u2026");
+    clearSaleNotificationState();
     auth.logout();
   }, [auth]);
 

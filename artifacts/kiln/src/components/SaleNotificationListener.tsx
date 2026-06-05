@@ -11,6 +11,19 @@ const SS_SNOOZE_MS    = "kiln_snooze_ms";
 
 const LS_SNOOZE_PREF  = "kiln_snooze_pref";
 
+// Clear all queued/snoozed sale-notification state so a previous artist's
+// banners don't bleed over into the next session on the same browser tab.
+export function clearSaleNotificationState() {
+  try {
+    sessionStorage.removeItem(SS_SNOOZE_UNTIL);
+    sessionStorage.removeItem(SS_SNOOZE_QUEUE);
+    sessionStorage.removeItem(SS_SALE_QUEUE);
+    sessionStorage.removeItem(SS_SNOOZE_MS);
+  } catch {
+    /* ignore */
+  }
+}
+
 const DEFAULT_SNOOZE_MS = SNOOZE_OPTIONS[0].ms;
 
 function readSnoozePref(): number {
