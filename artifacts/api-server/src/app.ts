@@ -8,6 +8,7 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import { runOnboardingCron, runWeeklyDigest } from "./lib/onboarding";
 import { drainEmailQueue } from "./lib/emailQueue";
+import { snapshotFeedViewers } from "./lib/snapshotViewers";
 
 const app: Express = express();
 
@@ -67,6 +68,7 @@ app.use("/api", router);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 const EMAIL_QUEUE_INTERVAL_MS = 5 * 60_000;
+const FEED_VIEWER_SNAPSHOT_INTERVAL_MS = 15 * 60_000;
 // Run onboarding check once a day (first run after 5min so rapid restarts don't flood Resend)
 setTimeout(() => {
   void runOnboardingCron();
@@ -82,5 +84,11 @@ setTimeout(() => {
   void drainEmailQueue();
   setInterval(() => void drainEmailQueue(), EMAIL_QUEUE_INTERVAL_MS);
 }, 30_000);
+// Snapshot live feed-viewer counts every 15 minutes so Analytics can show when
+// each artist's audience tends to be online (first run after 60s).
+setTimeout(() => {
+  void snapshotFeedViewers();
+  setInterval(() => void snapshotFeedViewers(), FEED_VIEWER_SNAPSHOT_INTERVAL_MS);
+}, 60_000);
 
 export default app;

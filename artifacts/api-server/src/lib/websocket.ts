@@ -129,6 +129,17 @@ export function getFeedViewerCount(artistId: string): number {
   return feedRooms.get(artistId)?.size ?? 0;
 }
 
+// Snapshot of every artist currently being watched, used by the periodic
+// feed-viewer snapshot cron. Only returns artists with at least one viewer.
+export function getAllFeedViewerCounts(): { artistId: string; count: number }[] {
+  const out: { artistId: string; count: number }[] = [];
+  for (const [artistId, viewers] of feedRooms.entries()) {
+    const count = viewers.size;
+    if (count > 0) out.push({ artistId, count });
+  }
+  return out;
+}
+
 export function broadcast(userId: string, event: WsEvent): void {
   const sockets = clients.get(userId);
   if (!sockets?.size) return;

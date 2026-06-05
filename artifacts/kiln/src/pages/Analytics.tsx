@@ -250,6 +250,9 @@ export default function Analytics() {
   const [apiFollowers, setApiFollowers] = useState<number | null>(null);
   const [earningTotals, setEarningTotals] = useState<EarningTotals | null>(null);
   const [liveViewers, setLiveViewers] = useState<number>(0);
+  const [audienceActivity, setAudienceActivity] = useState<{
+    avgByHourUtc: number[]; maxByHourUtc: number[]; totalSamples: number;
+  } | null>(null);
   const [analyticsData, setAnalyticsData] = useState<{
     totalPosts: number; totalLikes: number; totalComments: number;
     totalSaves: number; totalViews: number; followerCount: number; topPosts: ApiPost[];
@@ -297,6 +300,28 @@ export default function Analytics() {
     return { intensities, samples, peak };
   }, [analyticsData]);
 
+  // "When your followers are active" — rotate the server's UTC hour-of-day
+  // averages into the viewer's local timezone, then find the peak hour.
+  const audiencePeaks = useMemo(() => {
+    const utc = audienceActivity?.avgByHourUtc;
+    if (!utc || utc.length !== 24) return null;
+    const offsetH = Math.round(-new Date().getTimezoneOffset() / 60);
+    const local = new Array(24).fill(0);
+    const localMax = new Array(24).fill(0);
+    const utcMax = audienceActivity?.maxByHourUtc ?? [];
+    for (let h = 0; h < 24; h++) {
+      const lh = (((h + offsetH) % 24) + 24) % 24;
+      local[lh] = utc[h] ?? 0;
+      localMax[lh] = utcMax[h] ?? 0;
+    }
+    let max = 0;
+    let peakHour = 0;
+    for (let h = 0; h < 24; h++) {
+      if (local[h] > max) { max = local[h]; peakHour = h; }
+    }
+    return { local, localMax, max, peakHour, totalSamples: audienceActivity?.totalSamples ?? 0 };
+  }, [audienceActivity]);
+
   // Subscribe to live feed-viewer count updates for this artist
   useEffect(() => {
     if (!profile) return;
@@ -312,6 +337,15 @@ export default function Analytics() {
     fetch("/api/analytics/me/feed-viewers", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.count != null) setLiveViewers(data.count); })
+      .catch(() => {});
+  }, [profile]);
+
+  // Fetch rolling 7-day history of when followers are watching the feed
+  useEffect(() => {
+    if (!profile) return;
+    fetch("/api/analytics/me/audience-activity", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (Array.isArray(data?.avgByHourUtc)) setAudienceActivity(data); })
       .catch(() => {});
   }, [profile]);
 
@@ -655,6 +689,65 @@ export default function Analytics() {
                   Based on {postingHeatmap.samples} of your recent posts.
                 </p>
               </div>
+            </>
+          )}
+        </div>
+
+        {/* When your followers are active — rolling 7-day feed-viewer history */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-stone-200">When Your Followers Are Active</h2>
+              <p className="text-xs text-stone-500 mt-0.5">Average followers watching your feed, by hour · past 7 days (your timezone)</p>
+            </div>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Radio size={13} />
+            </div>
+          </div>
+          {!audiencePeaks || audiencePeaks.totalSamples < 1 ? (
+            <div className="py-10 text-center">
+              <p className="text-sm text-stone-400">We're still learning when your audience is online.</p>
+              <p className="text-xs text-stone-600 mt-1.5">As followers open your Following tab over the coming days, this chart will show the hours they're most active — independent of when you post.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-0.5 h-28">
+                {audiencePeaks.local.map((v, h) => {
+                  const pct = audiencePeaks.max > 0 ? v / audiencePeaks.max : 0;
+                  const isPeak = audiencePeaks.max > 0 && h === audiencePeaks.peakHour;
+                  const label12 = h === 0 ? "12am" : h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h - 12}pm`;
+                  return (
+                    <div key={h} className="flex flex-1 flex-col items-center justify-end h-full group relative">
+                      <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 z-20 hidden group-hover:block whitespace-nowrap rounded-lg border border-white/10 bg-stone-950/95 px-2 py-1 shadow-xl pointer-events-none">
+                        <span className="text-[10px] font-semibold text-stone-300">{label12}</span>
+                        <span className="text-[10px] text-stone-400"> · avg {v.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>
+                        {audiencePeaks.localMax[h] > 0 && (
+                          <span className="text-[10px] text-stone-500"> · peak {audiencePeaks.localMax[h]}</span>
+                        )}
+                      </div>
+                      <div
+                        className={`w-full rounded-t-sm ${isPeak ? "bg-emerald-400" : pct > 0.5 ? "bg-emerald-500/70" : pct > 0 ? "bg-emerald-700/60" : "bg-stone-800"}`}
+                        style={{ height: `${Math.max(pct * 100, v > 0 ? 6 : 2)}%` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-1.5 flex justify-between text-[9px] text-stone-700">
+                {["12am", "6am", "12pm", "6pm", "11pm"].map((t) => <span key={t}>{t}</span>)}
+              </div>
+              {audiencePeaks.max > 0 && (
+                <div className="mt-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5 flex items-start gap-2">
+                  <span className="text-emerald-400 text-base leading-none mt-0.5">⏰</span>
+                  <p className="text-xs text-emerald-200/80">
+                    Your followers are most active around{" "}
+                    <strong>
+                      {audiencePeaks.peakHour === 0 ? "12am" : audiencePeaks.peakHour < 12 ? `${audiencePeaks.peakHour}am` : audiencePeaks.peakHour === 12 ? "12pm" : `${audiencePeaks.peakHour - 12}pm`}
+                    </strong>
+                    . Consider going live or posting just before then.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

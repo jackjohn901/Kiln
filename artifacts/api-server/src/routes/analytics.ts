@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, followsTable, likesTable } from "@workspace/db";
+import { postsTable, followsTable, likesTable, feedViewerSnapshotsTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { getFeedViewerCount } from "../lib/websocket";
 
@@ -114,6 +114,43 @@ router.get("/analytics/me/feed-viewers", (req, res): void => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const count = getFeedViewerCount(req.user.id);
   res.json({ count });
+});
+
+// GET /analytics/me/audience-activity — rolling 7-day history of when this
+// artist's followers are watching their feed, bucketed by hour-of-day. Built
+// from the periodic feed-viewer snapshots. Returns UTC hour buckets; the client
+// rotates them into the viewer's local timezone (like the posting heatmap).
+router.get("/analytics/me/audience-activity", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
+  try {
+    const result = await db.execute(sql`
+      SELECT EXTRACT(HOUR FROM (${feedViewerSnapshotsTable.capturedAt} AT TIME ZONE 'UTC'))::int AS hour,
+             AVG(${feedViewerSnapshotsTable.count})::float AS avg_count,
+             MAX(${feedViewerSnapshotsTable.count})::int AS max_count,
+             COUNT(*)::int AS samples
+      FROM ${feedViewerSnapshotsTable}
+      WHERE ${eq(feedViewerSnapshotsTable.artistId, userId)}
+        AND ${feedViewerSnapshotsTable.capturedAt} >= now() - interval '7 days'
+      GROUP BY hour
+    `);
+
+    const avgByHourUtc = new Array(24).fill(0);
+    const maxByHourUtc = new Array(24).fill(0);
+    let totalSamples = 0;
+    for (const r of result.rows as { hour: number; avg_count: number; max_count: number; samples: number }[]) {
+      if (r.hour == null) continue;
+      avgByHourUtc[r.hour] = Math.round((r.avg_count ?? 0) * 10) / 10;
+      maxByHourUtc[r.hour] = r.max_count ?? 0;
+      totalSamples += r.samples ?? 0;
+    }
+
+    res.json({ avgByHourUtc, maxByHourUtc, totalSamples });
+  } catch (err) {
+    req.log.error({ err }, "analytics/me/audience-activity error");
+    res.status(500).json({ error: "Failed to load audience activity" });
+  }
 });
 
 export default router;
