@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation, useParams, useSearch } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn, Lock, Copy,
+  Printer, Star, Mail, Link2, Check, Download, Pencil, X, Send, LogIn, Lock, Copy, ImagePlus,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import RelativeTime from "@/components/RelativeTime";
@@ -239,6 +239,10 @@ export default function OrderDetail() {
   const [replyDraft, setReplyDraft] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [replyAttachment, setReplyAttachment] = useState<{ file: File; previewUrl: string; objectPath: string | null } | null>(null);
+  const [replyUploading, setReplyUploading] = useState(false);
+  const [replyAttachError, setReplyAttachError] = useState<string | null>(null);
+  const replyFileInputRef = useRef<HTMLInputElement>(null);
   const paramBannerType: "shipped" | "delivered" | null =
     highlightParam === "shipped" || highlightParam === "delivered" ? highlightParam : null;
 
@@ -476,10 +480,71 @@ export default function OrderDetail() {
       setAddressSaving(false);
     }
   }
+  async function handleReplyImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (replyFileInputRef.current) replyFileInputRef.current.value = "";
+
+    if (!file.type.startsWith("image/")) {
+      setReplyAttachError("Only image files can be attached.");
+      return;
+    }
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      setReplyAttachError("Image must be 10 MB or smaller.");
+      return;
+    }
+    setReplyAttachError(null);
+
+    const previewUrl = URL.createObjectURL(file);
+    setReplyAttachment({ file, previewUrl, objectPath: null });
+    setReplyUploading(true);
+
+    try {
+      const urlRes = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "image/jpeg" }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json() as { uploadURL: string; objectPath: string };
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+
+      await fetch("/api/storage/uploads/make-public", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+
+      setReplyAttachment({ file, previewUrl, objectPath });
+    } catch {
+      setReplyAttachment(null);
+      URL.revokeObjectURL(previewUrl);
+      setReplyAttachError("Couldn't upload the image. Please try again.");
+    } finally {
+      setReplyUploading(false);
+    }
+  }
+
+  function clearReplyAttachment() {
+    if (replyAttachment) URL.revokeObjectURL(replyAttachment.previewUrl);
+    setReplyAttachment(null);
+  }
+
   async function handleSendReply() {
     if (!order) return;
     const text = replyDraft.trim();
-    if (!text) return;
+    const attachmentUrl = replyAttachment?.objectPath ? `/api/storage${replyAttachment.objectPath}` : undefined;
+    if (!text && !attachmentUrl) return;
+    if (replyUploading) return;
     const recipientId = orderThread?.otherUserId ?? order.sellerId;
     if (!recipientId) return;
     setReplySending(true);
@@ -489,7 +554,7 @@ export default function OrderDetail() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId, text, orderId: order.id }),
+        body: JSON.stringify({ recipientId, text: text || undefined, attachmentUrl, orderId: order.id }),
       });
       if (!r.ok) {
         const data = await r.json().catch(() => ({})) as { error?: string };
@@ -502,6 +567,7 @@ export default function OrderDetail() {
         return;
       }
       setReplyDraft("");
+      clearReplyAttachment();
       // Open the full thread so the buyer can continue the conversation.
       navigate(`/messages/${recipientId}?orderId=${order.id}`);
     } catch {
@@ -1188,7 +1254,49 @@ export default function OrderDetail() {
               </div>
             </div>
 
+            <input
+              ref={replyFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void handleReplyImageSelect(e)}
+            />
+            {replyAttachment && (
+              <div className="mt-3 relative inline-block">
+                <img
+                  src={replyAttachment.previewUrl}
+                  alt="Attachment preview"
+                  className="h-16 w-16 rounded-lg object-cover border border-white/20"
+                />
+                {replyUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+                    <Loader2 size={14} className="animate-spin text-white" />
+                  </div>
+                )}
+                {!replyUploading && (
+                  <button
+                    onClick={clearReplyAttachment}
+                    className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-stone-700 hover:bg-stone-600 text-stone-300"
+                  >
+                    <X size={9} />
+                  </button>
+                )}
+              </div>
+            )}
             <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => replyFileInputRef.current?.click()}
+                disabled={replySending || replyUploading}
+                title="Attach image"
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-stone-800 transition-colors disabled:opacity-40 ${
+                  replyAttachError
+                    ? "border-rose-500/50 text-rose-400 hover:text-rose-300 hover:border-rose-400/60"
+                    : "border-white/10 text-stone-500 hover:text-amber-300 hover:border-amber-500/30"
+                }`}
+              >
+                <ImagePlus size={16} />
+              </button>
               <input
                 type="text"
                 value={replyDraft}
@@ -1205,12 +1313,13 @@ export default function OrderDetail() {
               />
               <button
                 onClick={() => { void handleSendReply(); }}
-                disabled={replySending || replyDraft.trim().length === 0}
+                disabled={replySending || replyUploading || (replyDraft.trim().length === 0 && !replyAttachment?.objectPath)}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
               >
                 {replySending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
               </button>
             </div>
+            {replyAttachError && <p className="mt-2 text-xs text-rose-400">{replyAttachError}</p>}
             {replyError && <p className="mt-2 text-xs text-rose-400">{replyError}</p>}
           </div>
         )}
