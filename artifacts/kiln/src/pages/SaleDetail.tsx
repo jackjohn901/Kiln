@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import {
   ShoppingBag, Zap, MessageSquare, BookOpen, Package, CheckCircle2,
   Clock, Truck, AlertCircle, Loader2, ChevronLeft, MapPin, FileText,
-  DollarSign, Send, Printer, Download, Lock, Mail, Flame,
+  DollarSign, Send, Printer, Download, Lock, Mail, Flame, ImagePlus, X,
 } from "lucide-react";
 import Nav from "@/components/Nav";
+import RelativeTime from "@/components/RelativeTime";
 import ShareStoryModal from "@/components/ShareStoryModal";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -35,6 +36,25 @@ interface Sale {
   buyerDisplayName: string | null;
   buyerHandle: string | null;
   buyerAvatarUrl: string | null;
+}
+
+interface OrderThreadMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatarUrl: string | null;
+  text: string;
+  attachmentUrl: string | null;
+  createdAt: string;
+}
+
+interface OrderThreadInfo {
+  threadId: string | null;
+  otherUserId: string;
+  otherUserName: string;
+  otherUserAvatar: string | null;
+  otherUserHandle: string | null;
+  latestMessage: OrderThreadMessage | null;
 }
 
 const CARRIERS = [
@@ -236,9 +256,39 @@ export default function SaleDetail() {
   const [emailingSlip, setEmailingSlip] = useState(false);
   const [emailSlipSuccess, setEmailSlipSuccess] = useState(false);
 
+  const [orderThread, setOrderThread] = useState<OrderThreadInfo | null>(null);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [replyAttachment, setReplyAttachment] = useState<{ file: File; previewUrl: string; objectPath: string | null } | null>(null);
+  const [replyUploading, setReplyUploading] = useState(false);
+  const [replyAttachError, setReplyAttachError] = useState<string | null>(null);
+  const replyFileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (id) markLinkRead(`/sales/${id}`);
   }, [id, markLinkRead]);
+
+  // Load the order's message thread (latest buyer message) so the seller can
+  // glance at it and reply inline without jumping to Messages.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    async function loadThread() {
+      try {
+        const r = await fetch(`/api/messages/thread-by-order/${encodeURIComponent(id!)}`, {
+          credentials: "include",
+        });
+        if (!r.ok) return;
+        const data = await r.json() as OrderThreadInfo;
+        if (!cancelled) setOrderThread(data);
+      } catch {
+        // ignore — quick-reply just won't render
+      }
+    }
+    void loadThread();
+    return () => { cancelled = true; };
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -319,6 +369,108 @@ export default function SaleDetail() {
       setUpdateError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function handleReplyImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (replyFileInputRef.current) replyFileInputRef.current.value = "";
+
+    if (!file.type.startsWith("image/")) {
+      setReplyAttachError("Only image files can be attached.");
+      return;
+    }
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      setReplyAttachError("Image must be 10 MB or smaller.");
+      return;
+    }
+    setReplyAttachError(null);
+
+    const previewUrl = URL.createObjectURL(file);
+    setReplyAttachment({ file, previewUrl, objectPath: null });
+    setReplyUploading(true);
+
+    try {
+      const urlRes = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "image/jpeg" }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json() as { uploadURL: string; objectPath: string };
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "image/jpeg" },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+
+      await fetch("/api/storage/uploads/make-public", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+
+      setReplyAttachment({ file, previewUrl, objectPath });
+    } catch {
+      setReplyAttachment(null);
+      URL.revokeObjectURL(previewUrl);
+      setReplyAttachError("Couldn't upload the image. Please try again.");
+    } finally {
+      setReplyUploading(false);
+    }
+  }
+
+  function clearReplyAttachment() {
+    if (replyAttachment) URL.revokeObjectURL(replyAttachment.previewUrl);
+    setReplyAttachment(null);
+  }
+
+  async function handleSendReply() {
+    if (!sale) return;
+    const text = replyDraft.trim();
+    const attachmentUrl = replyAttachment?.objectPath ? `/api/storage${replyAttachment.objectPath}` : undefined;
+    if (!text && !attachmentUrl) return;
+    if (replyUploading) return;
+    const recipientId = orderThread?.otherUserId ?? sale.buyerId;
+    if (!recipientId) return;
+    setReplySending(true);
+    setReplyError(null);
+    try {
+      const r = await fetch("/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ recipientId, text: text || undefined, attachmentUrl, orderId: sale.id }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({})) as { error?: string };
+        setReplyError(data.error ?? "Couldn't send your reply. Please try again.");
+        toast({
+          title: "Couldn't send your reply",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setReplyDraft("");
+      clearReplyAttachment();
+      // Open the full thread so the seller can continue the conversation.
+      navigate(`/messages/${recipientId}?orderId=${sale.id}&orderRole=seller`);
+    } catch {
+      setReplyError("Network error — please try again.");
+      toast({
+        title: "Couldn't send your reply",
+        description: "Please check your connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setReplySending(false);
     }
   }
 
@@ -782,6 +934,121 @@ export default function SaleDetail() {
               <FileText size={14} className="text-stone-500 shrink-0 mt-0.5" />
               <p className="text-sm text-stone-400">{sale.notes}</p>
             </div>
+          </div>
+        )}
+
+        {orderThread?.latestMessage && (
+          <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/50 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                Message from the buyer
+              </p>
+              {orderThread.threadId && (
+                <button
+                  onClick={() => navigate(`/messages/${orderThread.otherUserId}?orderId=${sale.id}&orderRole=seller`)}
+                  className="text-xs text-stone-500 hover:text-amber-300 transition-colors"
+                >
+                  View thread
+                </button>
+              )}
+            </div>
+            <div className="flex items-start gap-3">
+              {orderThread.latestMessage.senderAvatarUrl ?? orderThread.otherUserAvatar ? (
+                <img
+                  src={orderThread.latestMessage.senderAvatarUrl ?? orderThread.otherUserAvatar ?? ""}
+                  alt={orderThread.otherUserName}
+                  className="h-8 w-8 flex-shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                />
+              ) : (
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-stone-700 text-xs font-semibold text-stone-300 ring-1 ring-white/10">
+                  {(orderThread.otherUserName || "?")[0].toUpperCase()}
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="rounded-2xl rounded-tl-sm bg-stone-800 px-3.5 py-2.5">
+                  {orderThread.latestMessage.text && (
+                    <p className="text-sm text-stone-200 whitespace-pre-line break-words">
+                      {orderThread.latestMessage.text}
+                    </p>
+                  )}
+                  {orderThread.latestMessage.attachmentUrl && (
+                    <p className="text-xs text-stone-500 mt-1">📎 Sent an image</p>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-stone-600">
+                  {orderThread.otherUserName} ·{" "}
+                  <RelativeTime since={orderThread.latestMessage.createdAt} className="text-[11px] text-stone-600" />
+                </p>
+              </div>
+            </div>
+
+            <input
+              ref={replyFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void handleReplyImageSelect(e)}
+            />
+            {replyAttachment && (
+              <div className="mt-3 relative inline-block">
+                <img
+                  src={replyAttachment.previewUrl}
+                  alt="Attachment preview"
+                  className="h-16 w-16 rounded-lg object-cover border border-white/20"
+                />
+                {replyUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+                    <Loader2 size={14} className="animate-spin text-white" />
+                  </div>
+                )}
+                {!replyUploading && (
+                  <button
+                    onClick={clearReplyAttachment}
+                    className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-stone-700 hover:bg-stone-600 text-stone-300"
+                  >
+                    <X size={9} />
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => replyFileInputRef.current?.click()}
+                disabled={replySending || replyUploading}
+                title="Attach image"
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-stone-800 transition-colors disabled:opacity-40 ${
+                  replyAttachError
+                    ? "border-rose-500/50 text-rose-400 hover:text-rose-300 hover:border-rose-400/60"
+                    : "border-white/10 text-stone-500 hover:text-amber-300 hover:border-amber-500/30"
+                }`}
+              >
+                <ImagePlus size={16} />
+              </button>
+              <input
+                type="text"
+                value={replyDraft}
+                onChange={(e) => { setReplyDraft(e.target.value); if (replyError) setReplyError(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSendReply();
+                  }
+                }}
+                disabled={replySending}
+                placeholder="Write a reply…"
+                className="flex-1 rounded-xl border border-white/10 bg-stone-800 px-3.5 py-2.5 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/50 focus:outline-none disabled:opacity-50"
+              />
+              <button
+                onClick={() => { void handleSendReply(); }}
+                disabled={replySending || replyUploading || (replyDraft.trim().length === 0 && !replyAttachment?.objectPath)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors disabled:opacity-40"
+              >
+                {replySending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              </button>
+            </div>
+            {replyAttachError && <p className="mt-2 text-xs text-rose-400">{replyAttachError}</p>}
+            {replyError && <p className="mt-2 text-xs text-rose-400">{replyError}</p>}
           </div>
         )}
 
