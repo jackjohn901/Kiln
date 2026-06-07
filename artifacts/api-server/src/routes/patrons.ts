@@ -268,16 +268,17 @@ router.get("/me/earnings", async (req, res): Promise<void> => {
   const subTotal = subs.reduce((s, sub) => s + sub.amount / 100, 0);
   const saleTotal = sales.reduce((s, o) => s + o.amount / 100, 0);
 
-  const salesByType = sales.reduce<{ listings: number; drops: number; commissions: number; workshops: number }>(
+  const salesByType = sales.reduce<{ listings: number; drops: number; commissions: number; workshops: number; auctions: number }>(
     (acc, o) => {
       const amount = o.amount / 100;
       if (o.type === "drop") acc.drops += amount;
       else if (o.type === "commission") acc.commissions += amount;
       else if (o.type === "workshop") acc.workshops += amount;
+      else if (o.type === "auction") acc.auctions += amount;
       else acc.listings += amount;
       return acc;
     },
-    { listings: 0, drops: 0, commissions: 0, workshops: 0 },
+    { listings: 0, drops: 0, commissions: 0, workshops: 0, auctions: 0 },
   );
 
   // Build time-series buckets (only when no specific month/year filter is active)

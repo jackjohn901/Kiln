@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, Radio } from "lucide-react";
+import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, Radio, Gavel } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -241,11 +241,20 @@ interface StreamBucketDay {
   auctions: number;
 }
 
+interface SalesByType {
+  listings: number;
+  drops: number;
+  commissions: number;
+  workshops: number;
+  auctions: number;
+}
+
 interface EarningTotals {
   tips: number;
   subscriptions: number;
   shopSales: number;
   sales?: number;
+  salesByType: SalesByType;
   total: number;
   timeSeriesByMonth?: StreamBucketMonth[];
   timeSeriesByDay?: StreamBucketDay[];
@@ -386,6 +395,7 @@ export default function Analytics() {
           tips: t.tips ?? 0,
           subscriptions: t.subscriptions ?? 0,
           shopSales: t.shopSales ?? t.sales ?? 0,
+          salesByType: t.salesByType ?? { listings: 0, drops: 0, commissions: 0, workshops: 0, auctions: 0 },
           total: t.total ?? 0,
           timeSeriesByMonth: data.timeSeriesByMonth ?? [],
           timeSeriesByDay: data.timeSeriesByDay ?? [],
@@ -511,14 +521,23 @@ export default function Analytics() {
               <DollarSign size={13} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
               <p className="text-base sm:text-xl font-bold text-emerald-400 tabular-nums">
-                {earningTotals ? `$${earningTotals.shopSales.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                {earningTotals ? `$${(earningTotals.shopSales - earningTotals.salesByType.auctions).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </p>
               <div className="flex items-center justify-center gap-1 mt-0.5">
                 <ShoppingBag size={9} className="text-stone-500" />
                 <p className="text-[10px] text-stone-500">Shop Sales</p>
+              </div>
+            </div>
+            <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
+              <p className="text-base sm:text-xl font-bold text-purple-400 tabular-nums">
+                {earningTotals ? `$${earningTotals.salesByType.auctions.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+              </p>
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                <Gavel size={9} className="text-stone-500" />
+                <p className="text-[10px] text-stone-500">Auctions</p>
               </div>
             </div>
             <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">

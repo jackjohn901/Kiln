@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
   ShoppingBag, Clock, Bell, Package, Share2, MessageCircle, Download, Send,
-  Bookmark, Trash2, Plus,
+  Bookmark, Trash2, Plus, Gavel,
 } from "lucide-react";
 
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -53,6 +53,7 @@ interface SalesByType {
   drops: number;
   commissions: number;
   workshops: number;
+  auctions: number;
 }
 
 interface EarningTotals {
@@ -283,7 +284,7 @@ export default function Earnings() {
   }
 
   const [earnings, setEarnings]   = useState<EarningLine[]>([]);
-  const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, salesByType: { listings: 0, drops: 0, commissions: 0, workshops: 0 }, total: 0 });
+  const [totals, setTotals]       = useState<EarningTotals>({ tips: 0, subscriptions: 0, shopSales: 0, salesByType: { listings: 0, drops: 0, commissions: 0, workshops: 0, auctions: 0 }, total: 0 });
   const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
   const [loading, setLoading]     = useState(true);
   const [saleBanner, setSaleBanner] = useState<string | null>(null);
@@ -688,7 +689,7 @@ export default function Earnings() {
         tips: t.tips ?? 0,
         subscriptions: t.subscriptions ?? 0,
         shopSales: t.shopSales ?? t.sales ?? 0,
-        salesByType: t.salesByType ?? { listings: 0, drops: 0, commissions: 0, workshops: 0 },
+        salesByType: t.salesByType ?? { listings: 0, drops: 0, commissions: 0, workshops: 0, auctions: 0 },
         total: t.total ?? 0,
       };
       setTotals(newTotals);
@@ -1274,10 +1275,11 @@ export default function Earnings() {
             })()}
 
             {/* Stats */}
-            <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="mb-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
                 { label: "Total", value: formatPrice(totals.total), icon: TrendingUp, color: "text-amber-400", clickable: false },
-                { label: "Shop Sales", value: formatPrice(totals.shopSales), icon: ShoppingBag, color: "text-sky-400", clickable: true },
+                { label: "Shop Sales", value: formatPrice(totals.shopSales - totals.salesByType.auctions), icon: ShoppingBag, color: "text-sky-400", clickable: true },
+                { label: "Auctions", value: formatPrice(totals.salesByType.auctions), icon: Gavel, color: "text-fuchsia-400", clickable: true },
                 { label: "Tips", value: formatPrice(totals.tips), icon: DollarSign, color: "text-emerald-400", clickable: false },
                 { label: "Subscriptions", value: formatPrice(totals.subscriptions), icon: Star, color: "text-purple-400", clickable: false },
               ].map(stat => {
@@ -1371,6 +1373,7 @@ export default function Earnings() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { label: "Listings", value: totals.salesByType.listings, icon: ShoppingBag, color: "text-sky-400", bg: "bg-sky-500/10" },
+                    { label: "Auctions", value: totals.salesByType.auctions, icon: Gavel, color: "text-purple-400", bg: "bg-purple-500/10" },
                     { label: "Drops", value: totals.salesByType.drops, icon: Zap, color: "text-orange-400", bg: "bg-orange-500/10" },
                     { label: "Commissions", value: totals.salesByType.commissions, icon: MessageSquare, color: "text-blue-400", bg: "bg-blue-500/10" },
                     { label: "Workshops", value: totals.salesByType.workshops, icon: BarChart2, color: "text-violet-400", bg: "bg-violet-500/10" },
