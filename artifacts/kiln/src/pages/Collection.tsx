@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Package, Zap, Clock, CheckCircle2, ShoppingBag } from "lucide-react";
+import { Package, Zap, Clock, CheckCircle2, ShoppingBag, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { getLiveDrops, getUpcomingDrops, type Drop } from "@/data/drops";
@@ -17,8 +17,34 @@ interface PurchasedItem {
   type: "drop" | "shop";
 }
 
-const PURCHASED: PurchasedItem[] = [
-];
+interface ApiOrder {
+  id: string;
+  type: string;
+  title: string;
+  imageUrl: string | null;
+  amount: number;
+  status: string;
+  sellerId: string;
+  createdAt: string;
+  sellerDisplayName?: string | null;
+  sellerHandle?: string | null;
+}
+
+const OWNED_TYPES = new Set(["listing", "drop", "auction"]);
+const EXCLUDED_STATUS = new Set(["cancelled", "canceled", "refunded"]);
+
+function orderToPurchased(o: ApiOrder): PurchasedItem {
+  return {
+    id: o.id,
+    name: o.title,
+    artistName: o.sellerDisplayName ?? o.sellerHandle ?? "Artist",
+    artistId: o.sellerId,
+    imageUrl: o.imageUrl ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${o.id}`,
+    price: o.amount,
+    acquiredAt: o.createdAt,
+    type: o.type === "drop" ? "drop" : "shop",
+  };
+}
 
 const TABS = ["Owned", "Waitlisted"] as const;
 type TabType = typeof TABS[number];
@@ -27,6 +53,24 @@ type TabType = typeof TABS[number];
 export default function Collection() {
   const [tab, setTab] = useState<TabType>("Owned");
   const { dropsWaitlisted, isOnDropWaitlist, leaveDropWaitlist } = useSocial();
+  const [owned, setOwned] = useState<PurchasedItem[]>([]);
+  const [ownedLoading, setOwnedLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/me/orders", { credentials: "include" })
+      .then(r => (r.ok ? (r.json() as Promise<{ orders: ApiOrder[] }>) : null))
+      .then(data => {
+        if (data?.orders) {
+          setOwned(
+            data.orders
+              .filter(o => OWNED_TYPES.has(o.type) && !EXCLUDED_STATUS.has(o.status))
+              .map(orderToPurchased)
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => setOwnedLoading(false));
+  }, []);
 
   const waitlistedDropIds = Object.entries(dropsWaitlisted).filter(([, v]) => v).map(([id]) => id);
   const allDrops = [...getLiveDrops(), ...getUpcomingDrops()];
@@ -43,7 +87,7 @@ export default function Collection() {
           </div>
           <div>
             <h1 className="font-serif text-2xl font-bold text-amber-100">My Collection</h1>
-            <p className="text-sm text-stone-500">{PURCHASED.length} owned · {waitlistedDrops.length} waitlisted</p>
+            <p className="text-sm text-stone-500">{owned.length} owned · {waitlistedDrops.length} waitlisted</p>
           </div>
         </div>
 
@@ -57,7 +101,7 @@ export default function Collection() {
                 tab === t ? "bg-amber-500/20 text-amber-300" : "text-stone-500 hover:text-stone-300"
               }`}
             >
-              {t} {t === "Owned" ? `(${PURCHASED.length})` : `(${waitlistedDrops.length})`}
+              {t} {t === "Owned" ? `(${owned.length})` : `(${waitlistedDrops.length})`}
             </button>
           ))}
         </div>
@@ -65,14 +109,19 @@ export default function Collection() {
         {/* Owned */}
         {tab === "Owned" && (
           <div className="space-y-3">
-            {PURCHASED.length === 0 ? (
+            {ownedLoading ? (
+              <div className="flex items-center justify-center gap-3 py-20 text-stone-600">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-sm">Loading your collection…</span>
+              </div>
+            ) : owned.length === 0 ? (
               <div className="flex flex-col items-center py-20 text-center">
                 <ShoppingBag size={36} className="mb-3 text-stone-700" />
                 <p className="text-stone-500">Nothing in your collection yet</p>
                 <Link href="/shop" className="mt-4 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-400">Browse Shop</Link>
               </div>
             ) : (
-              PURCHASED.map((item) => (
+              owned.map((item) => (
                 <div key={item.id} className="flex gap-4 rounded-2xl border border-white/8 bg-stone-900/40 p-4">
                   <img src={item.imageUrl} alt={item.name} className="h-20 w-20 rounded-xl object-cover flex-shrink-0" />
                   <div className="min-w-0 flex-1">

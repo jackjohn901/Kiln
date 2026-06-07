@@ -2,17 +2,12 @@ import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import {
   Grid3x3, Plus, X, Edit3, Heart, Bookmark, Lock, Globe,
-  Trash2, Image, ChevronRight, Check,
+  Trash2, Image, ChevronRight, Check, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
 import { useProfile } from "@/contexts/ProfileContext";
 import BetaBanner from "@/components/BetaBanner";
-import { listings } from "@/data/listings";
-import { artists } from "@/data/artists";
-import { seedArtists } from "@/data/seedArtists";
-
-const ALL_ARTISTS = [...artists, ...seedArtists];
 
 const BOARDS_KEY = "kiln_boards_v2";
 
@@ -47,38 +42,51 @@ function writeBoards(boards: Board[]) {
   try { localStorage.setItem(BOARDS_KEY, JSON.stringify(boards)); } catch {}
 }
 
-function buildSeedItems(): BoardItem[] {
-  const items: BoardItem[] = [];
-  const sample = listings.slice(0, 12);
-  for (const l of sample) {
-    const artist = ALL_ARTISTS.find((a) => a.id === l.artistId);
-    if (!l.imageUrl) continue;
-    items.push({
-      id: genId(),
-      imageUrl: l.imageUrl,
-      title: l.title,
-      artistName: artist?.name ?? "Unknown",
-      artistId: l.artistId,
-      sourceType: "listing",
-      sourceId: l.id,
-      addedAt: new Date().toISOString(),
-    });
-  }
-  return items;
+interface ApiListing {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+  artistName: string;
+  artistId: string;
 }
 
-const DISCOVERY_ITEMS = buildSeedItems().slice(0, 24);
+function listingToBoardItem(l: ApiListing): BoardItem {
+  return {
+    id: l.id,
+    imageUrl: l.imageUrl ?? "",
+    title: l.title,
+    artistName: l.artistName,
+    artistId: l.artistId,
+    sourceType: "listing",
+    sourceId: l.id,
+    addedAt: new Date().toISOString(),
+  };
+}
 
 export default function InspirationBoards() {
   const { profile } = useProfile();
   const [boards, setBoards] = useState<Board[]>(readBoards);
   const [view, setView] = useState<"boards" | "discover" | "board-detail">("boards");
+  const [discoverItems, setDiscoverItems] = useState<BoardItem[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/inspiration-boards", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ boards: Board[] }> : null)
       .then(data => { if (data) { setBoards(data.boards ?? []); writeBoards(data.boards ?? []); } })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/listings?available=true&limit=30", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<{ listings: ApiListing[] }> : null)
+      .then(data => {
+        if (data?.listings) {
+          setDiscoverItems(data.listings.filter(l => l.imageUrl).map(listingToBoardItem));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setDiscoverLoading(false));
   }, []);
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -269,29 +277,42 @@ export default function InspirationBoards() {
         {view === "discover" && (
           <div>
             <p className="text-xs text-stone-600 mb-4">Save any piece to your boards by tapping the bookmark icon.</p>
-            <div className="columns-2 sm:columns-3 gap-3 space-y-3">
-              {DISCOVERY_ITEMS.map((item) => (
-                <div key={item.id} className="group relative break-inside-avoid rounded-xl overflow-hidden bg-stone-900">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=300&h=400&fit=crop&seed=${item.id}`; }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <p className="text-[11px] font-semibold text-white truncate">{item.title}</p>
-                    <p className="text-[10px] text-stone-400">{item.artistName}</p>
+            {discoverLoading ? (
+              <div className="flex items-center justify-center gap-3 py-20 text-stone-600">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-sm">Loading pieces…</span>
+              </div>
+            ) : discoverItems.length === 0 ? (
+              <div className="py-20 text-center">
+                <Image size={28} className="mx-auto mb-3 text-stone-700" />
+                <p className="text-stone-500 text-sm">No pieces to discover yet.</p>
+                <Link href="/shop" className="mt-3 inline-block text-xs text-amber-400 hover:text-amber-300">Browse the shop →</Link>
+              </div>
+            ) : (
+              <div className="columns-2 sm:columns-3 gap-3 space-y-3">
+                {discoverItems.map((item) => (
+                  <div key={item.id} className="group relative break-inside-avoid rounded-xl overflow-hidden bg-stone-900">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="w-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=300&h=400&fit=crop&seed=${item.id}`; }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute bottom-0 left-0 right-0 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-[11px] font-semibold text-white truncate">{item.title}</p>
+                      <p className="text-[10px] text-stone-400">{item.artistName}</p>
+                    </div>
+                    <button
+                      onClick={() => setShowAddToBoard(item)}
+                      className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-500/80"
+                    >
+                      <Bookmark size={13} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setShowAddToBoard(item)}
-                    className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-500/80"
-                  >
-                    <Bookmark size={13} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
