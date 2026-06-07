@@ -85,6 +85,9 @@ interface StreamPoint {
 function StackedBarChart({ data }: { data: StreamPoint[] }) {
   const max = Math.max(...data.map(d => d.shopSales + d.tips + d.subscriptions + d.auctions), 1);
   const [active, setActive] = useState<number | null>(null);
+  // Show every bar's label when there are few (monthly views), otherwise thin
+  // them out so the row stays legible on phones instead of hiding them entirely.
+  const labelStep = data.length <= 12 ? 1 : Math.ceil(data.length / 8);
 
   useEffect(() => {
     if (active === null) return;
@@ -158,10 +161,17 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
                   <div className="w-full rounded-t-sm" style={{ height: "4px", backgroundColor: "#292524" }} />
                 )}
               </div>
-              <span className="text-[8px] text-stone-600 leading-none hidden sm:block truncate w-full text-center">{d.label}</span>
             </div>
           );
         })}
+      </div>
+      {/* Sampled label row — legible on phones where per-bar labels would collide */}
+      <div className="mt-2 flex justify-between gap-1">
+        {data.map((d, i) =>
+          i % labelStep === 0 || i === data.length - 1 ? (
+            <span key={i} className="text-[9px] text-stone-500 whitespace-nowrap leading-none">{d.label}</span>
+          ) : null,
+        )}
       </div>
       <div className="mt-3 flex items-center gap-4 flex-wrap">
         {[
@@ -443,14 +453,14 @@ export default function Analytics() {
           <Link href={`/artists/${profile.id}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-500 hover:text-stone-300 transition-colors">
             <ChevronLeft size={16} />
           </Link>
-          <div className="flex-1">
-            <h1 className="font-serif text-2xl text-amber-100">Analytics</h1>
-            <p className="text-xs text-stone-500 mt-0.5">{profile.name} · Kiln Creator</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-serif text-xl sm:text-2xl text-amber-100">Analytics</h1>
+            <p className="text-xs text-stone-500 mt-0.5 truncate">{profile.name} · Kiln Creator</p>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 shrink-0">
             {(["30d", "90d", "1y"] as Period[]).map((p) => (
               <button key={p} onClick={() => setPeriod(p)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${period === p ? "bg-amber-500 text-stone-950" : "border border-white/10 text-stone-500 hover:text-stone-300"}`}>
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition-all ${period === p ? "bg-amber-500 text-stone-950" : "border border-white/10 text-stone-500 hover:text-stone-300"}`}>
                 {p}
               </button>
             ))}
@@ -491,7 +501,7 @@ export default function Analytics() {
         </div>
 
         {/* Earnings breakdown */}
-        <div className="mb-5 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-5 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-stone-200">Earnings Breakdown</h2>
@@ -502,8 +512,8 @@ export default function Analytics() {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-stone-800/60 p-3 text-center">
-              <p className="text-xl font-bold text-emerald-400">
+            <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
+              <p className="text-base sm:text-xl font-bold text-emerald-400 tabular-nums">
                 {earningTotals ? `$${earningTotals.shopSales.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </p>
               <div className="flex items-center justify-center gap-1 mt-0.5">
@@ -511,8 +521,8 @@ export default function Analytics() {
                 <p className="text-[10px] text-stone-500">Shop Sales</p>
               </div>
             </div>
-            <div className="rounded-xl bg-stone-800/60 p-3 text-center">
-              <p className="text-xl font-bold text-amber-400">
+            <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
+              <p className="text-base sm:text-xl font-bold text-amber-400 tabular-nums">
                 {earningTotals ? `$${earningTotals.tips.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </p>
               <div className="flex items-center justify-center gap-1 mt-0.5">
@@ -520,8 +530,8 @@ export default function Analytics() {
                 <p className="text-[10px] text-stone-500">Tips</p>
               </div>
             </div>
-            <div className="rounded-xl bg-stone-800/60 p-3 text-center">
-              <p className="text-xl font-bold text-sky-400">
+            <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
+              <p className="text-base sm:text-xl font-bold text-sky-400 tabular-nums">
                 {earningTotals ? `$${earningTotals.subscriptions.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </p>
               <div className="flex items-center justify-center gap-1 mt-0.5">
@@ -541,7 +551,7 @@ export default function Analytics() {
         </div>
 
         {/* Post activity chart (real data) */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-stone-200">Posting Activity</h2>
@@ -562,7 +572,7 @@ export default function Analytics() {
         </div>
 
         {/* Revenue by stream chart (real data) */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-stone-200">Revenue by Stream</h2>
@@ -586,7 +596,7 @@ export default function Analytics() {
         </div>
 
         {/* Likes & Engagement chart (real data) */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <div className="mb-3">
             <h2 className="text-sm font-bold text-stone-200">Likes &amp; Engagement</h2>
             <p className="text-xs text-stone-500">{likeActivityData.reduce((s, v) => s + v, 0).toLocaleString()} likes this period</p>
@@ -599,7 +609,7 @@ export default function Analytics() {
           const viewActivityData = buildDayMap(analyticsData?.viewsByDay ?? {}, period);
           const totalViewActivity = viewActivityData.reduce((s, v) => s + v, 0);
           return (
-            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+            <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
               <div className="mb-3">
                 <h2 className="text-sm font-bold text-stone-200">Post Views</h2>
                 <p className="text-xs text-stone-500">{totalViewActivity.toLocaleString()} views this period · tracked in real time</p>
@@ -610,7 +620,7 @@ export default function Analytics() {
         })()}
 
         {/* Commission stats */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <h2 className="mb-4 text-sm font-bold text-stone-200">Commission Activity</h2>
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -618,7 +628,7 @@ export default function Analytics() {
               { label: "Accepted", value: receivedInquiries.filter(i => i.status === "accepted" || i.status === "quoted").length, color: "text-emerald-400" },
               { label: "Completed", value: commissions.length, color: "text-sky-400" },
             ].map(s => (
-              <div key={s.label} className="rounded-xl bg-stone-800/60 p-3 text-center">
+              <div key={s.label} className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
                 <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
                 <p className="text-[10px] text-stone-500 mt-0.5">{s.label}</p>
               </div>
@@ -627,7 +637,7 @@ export default function Analytics() {
         </div>
 
         {/* Best time to post — derived from your own posts' engagement */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <div className="mb-4">
             <h2 className="text-sm font-bold text-stone-200">Best Time to Post</h2>
             <p className="text-xs text-stone-500 mt-0.5">When your posts have earned the most engagement (your timezone)</p>
@@ -640,7 +650,7 @@ export default function Analytics() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <div className="min-w-[340px]">
+                <div className="min-w-[280px]">
                   {/* Hour labels */}
                   <div className="flex items-center mb-1.5">
                     <div className="w-8 shrink-0" />
@@ -694,7 +704,7 @@ export default function Analytics() {
         </div>
 
         {/* When your followers are active — rolling 7-day feed-viewer history */}
-        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-stone-200">When Your Followers Are Active</h2>
@@ -753,7 +763,7 @@ export default function Analytics() {
         </div>
 
         {/* Top posts */}
-        <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-5">
+        <div className="rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
           <h2 className="mb-4 text-sm font-bold text-stone-200">Top Performing Posts</h2>
           {(analyticsData?.topPosts ?? apiPosts).length === 0 ? (
             <p className="text-sm text-stone-500 text-center py-6">No posts yet — share your craft to see analytics here.</p>
