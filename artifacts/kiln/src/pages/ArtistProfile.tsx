@@ -26,6 +26,7 @@ import CommissionModal from "@/components/CommissionModal";
 import YourOrdersFromArtist from "@/components/YourOrdersFromArtist";
 import TipModal from "@/components/TipModal";
 import DropModal from "@/components/DropModal";
+import LineageMentorsView from "@/components/LineageMentorsView";
 import { getPosts, deletePost } from "@/data/posts";
 import { resolveMediaUrl, isIdbUrl } from "@/lib/videoDB";
 import { getCommunityBeats, type CommunityBeat, LICENSE_LABELS, LICENSE_COLORS } from "@/lib/communityBeats";
@@ -2010,6 +2011,9 @@ export default function ArtistProfile() {
                     </div>
                   </div>
                 )}
+
+                {/* Professors & Teachers (user-credited craft lineage) */}
+                {storefrontArtistId && <LineageMentorsView userId={storefrontArtistId} />}
               </div>
             );
           })()}

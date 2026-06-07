@@ -52,6 +52,7 @@ export * from "./verification_applications";
 export * from "./reports";
 export * from "./newsletters";
 export * from "./mentorship_applications";
+export * from "./lineage_mentors";
 export * from "./critiques";
 export * from "./push_subscriptions";
 export * from "./giftCards";

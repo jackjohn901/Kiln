@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { GitBranch, Plus, User, ChevronRight, X, Check, Users, Award, ExternalLink } from "lucide-react";
+import { GitBranch, Plus, ChevronRight, X, Check, Users, Award, ExternalLink, Pencil, Trash2, GraduationCap, Loader2, ImagePlus } from "lucide-react";
 import { Link } from "wouter";
-import { LINEAGE_NODES, getAncestors, getGeneration, readUserLineage, saveUserLineage, type LineageNode, type UserLineageClaim } from "@/data/lineage";
+import { LINEAGE_NODES, getAncestors, getGeneration, type LineageNode } from "@/data/lineage";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUpload } from "@/hooks/useUpload";
+import { toast } from "@/hooks/use-toast";
 
 const GENERATION_COLORS = [
   "from-amber-600/20 to-amber-600/5 border-amber-600/30 text-amber-300",
@@ -49,16 +52,43 @@ function NodeCard({ node, depth, onSelect }: { node: LineageNode; depth: number;
   );
 }
 
+type Mentor = {
+  id: string;
+  userId: string;
+  name: string;
+  role: string | null;
+  institution: string | null;
+  years: string | null;
+  note: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type MentorForm = {
+  name: string;
+  role: string;
+  institution: string;
+  years: string;
+  note: string;
+  imageUrl: string;
+};
+
+const EMPTY_FORM: MentorForm = { name: "", role: "", institution: "", years: "", note: "", imageUrl: "" };
+
 export default function LineageGraph() {
   const { profile } = useProfile();
+  const { isAuthenticated } = useAuth();
+  const { upload } = useUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedNode, setSelectedNode] = useState<LineageNode | null>(null);
   const [showClaim, setShowClaim] = useState(false);
-  const [userClaim, setUserClaim] = useState<UserLineageClaim | null>(readUserLineage);
-  const [claimForm, setClaimForm] = useState({
-    mentorId: userClaim?.mentorId ?? "",
-    mentorName: userClaim?.mentorName ?? "",
-    mentorNote: userClaim?.mentorNote ?? "",
-  });
+  const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [mentorsLoading, setMentorsLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [claimForm, setClaimForm] = useState<MentorForm>(EMPTY_FORM);
 
   const roots = LINEAGE_NODES.filter(n => !n.mentorId);
 
@@ -102,16 +132,101 @@ export default function LineageGraph() {
     }
   }
 
-  function saveClaim() {
-    const claim: UserLineageClaim = {
-      mentorId: claimForm.mentorId || null,
-      mentorName: claimForm.mentorName,
-      mentorNote: claimForm.mentorNote,
-      apprentices: userClaim?.apprentices ?? [],
+  useEffect(() => {
+    if (!isAuthenticated) { setMentors([]); return; }
+    let cancelled = false;
+    setMentorsLoading(true);
+    fetch("/api/me/lineage/mentors", { credentials: "include" })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { mentors: Mentor[] }) => { if (!cancelled) setMentors(d.mentors); })
+      .catch(() => { /* read-only load: leave the list empty on failure */ })
+      .finally(() => { if (!cancelled) setMentorsLoading(false); });
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  function openAdd() {
+    setEditingId(null);
+    setClaimForm(EMPTY_FORM);
+    setShowClaim(true);
+  }
+
+  function openEdit(m: Mentor) {
+    setEditingId(m.id);
+    setClaimForm({
+      name: m.name,
+      role: m.role ?? "",
+      institution: m.institution ?? "",
+      years: m.years ?? "",
+      note: m.note ?? "",
+      imageUrl: m.imageUrl ?? "",
+    });
+    setShowClaim(true);
+  }
+
+  async function handleImagePick(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const { servingUrl } = await upload(file);
+      setClaimForm(f => ({ ...f, imageUrl: servingUrl }));
+    } catch {
+      toast({ title: "Couldn't upload photo", description: "Please try a different image.", variant: "destructive" });
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  async function saveMentor() {
+    if (!claimForm.name.trim()) {
+      toast({ title: "Add a name", description: "Enter your professor or teacher's name.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const body = {
+      name: claimForm.name.trim(),
+      role: claimForm.role.trim() || null,
+      institution: claimForm.institution.trim() || null,
+      years: claimForm.years.trim() || null,
+      note: claimForm.note.trim() || null,
+      imageUrl: claimForm.imageUrl || null,
     };
-    saveUserLineage(claim);
-    setUserClaim(claim);
-    setShowClaim(false);
+    try {
+      const url = editingId ? `/api/me/lineage/mentors/${editingId}` : "/api/me/lineage/mentors";
+      const r = await fetch(url, {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => null);
+        throw new Error(data?.error ?? "Save failed");
+      }
+      const { mentor } = (await r.json()) as { mentor: Mentor };
+      setMentors(prev => (editingId ? prev.map(m => (m.id === mentor.id ? mentor : m)) : [...prev, mentor]));
+      setShowClaim(false);
+      setClaimForm(EMPTY_FORM);
+      setEditingId(null);
+      toast({ title: editingId ? "Professor updated" : "Professor added" });
+    } catch (err) {
+      toast({ title: "Couldn't save", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteMentor(id: string) {
+    const prev = mentors;
+    setMentors(p => p.filter(m => m.id !== id));
+    try {
+      const r = await fetch(`/api/me/lineage/mentors/${id}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) throw new Error(String(r.status));
+    } catch {
+      setMentors(prev);
+      toast({ title: "Couldn't remove", description: "Please try again.", variant: "destructive" });
+    }
   }
 
   const totalArtists = LINEAGE_NODES.length;
@@ -145,31 +260,51 @@ export default function LineageGraph() {
           ))}
         </div>
 
-        {/* Your lineage claim */}
+        {/* Your professors & teachers */}
         <div className="mb-6 rounded-2xl bg-stone-900/60 border border-white/8 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-stone-500">Your Lineage</p>
-            <button onClick={() => setShowClaim(true)} className="text-xs text-amber-400 hover:text-amber-300">
-              {userClaim ? "Edit" : "Add your mentor"}
-            </button>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold uppercase tracking-widest text-stone-500">Your Professors &amp; Teachers</p>
+            {isAuthenticated && (
+              <button onClick={openAdd} className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300">
+                <Plus size={13} /> Add
+              </button>
+            )}
           </div>
-          {userClaim ? (
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-full bg-stone-700 border border-white/10 flex items-center justify-center shrink-0">
-                {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" /> : <User size={16} className="text-stone-400" />}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-100">{profile?.name ?? "You"}</p>
-                {userClaim.mentorName && (
-                  <p className="text-xs text-stone-400 mt-0.5">Studied under <span className="text-amber-300">{userClaim.mentorName}</span></p>
-                )}
-                {userClaim.mentorNote && <p className="text-xs text-stone-500 mt-1 italic">{userClaim.mentorNote}</p>}
-              </div>
+          <p className="text-[11px] text-stone-600 mb-3">The people who shaped your craft — they don&apos;t need a Kiln account.</p>
+
+          {!isAuthenticated ? (
+            <div className="rounded-xl border border-dashed border-white/15 py-5 text-center">
+              <GraduationCap size={20} className="text-stone-600 mx-auto mb-2" />
+              <p className="text-xs text-stone-500">Sign in to add the professors and teachers who shaped your craft.</p>
             </div>
-          ) : (
-            <button onClick={() => setShowClaim(true)} className="w-full rounded-xl border border-dashed border-white/15 py-4 text-xs text-stone-500 hover:text-stone-400 hover:border-white/25 transition-colors">
-              + Add your mentor to join the lineage tree
+          ) : mentorsLoading ? (
+            <div className="flex justify-center py-6"><Loader2 size={18} className="text-stone-600 animate-spin" /></div>
+          ) : mentors.length === 0 ? (
+            <button onClick={openAdd} className="w-full rounded-xl border border-dashed border-white/15 py-4 text-xs text-stone-500 hover:text-stone-400 hover:border-white/25 transition-colors">
+              + Add a professor or teacher who shaped your craft
             </button>
+          ) : (
+            <div className="space-y-2">
+              {mentors.map(m => (
+                <div key={m.id} className="flex items-start gap-3 rounded-xl border border-white/8 bg-stone-800/40 p-3">
+                  <div className="h-11 w-11 rounded-full bg-stone-700 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                    {m.imageUrl ? <img src={m.imageUrl} alt="" className="h-full w-full object-cover" /> : <GraduationCap size={16} className="text-stone-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-100 truncate">{m.name}</p>
+                    {(m.role || m.institution) && (
+                      <p className="text-xs text-stone-400 truncate">{[m.role, m.institution].filter(Boolean).join(" · ")}</p>
+                    )}
+                    {m.years && <p className="text-[11px] text-stone-600">{m.years}</p>}
+                    {m.note && <p className="text-xs text-stone-500 mt-1 italic line-clamp-3">{m.note}</p>}
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button onClick={() => openEdit(m)} className="rounded-lg bg-stone-700/60 p-1.5 text-stone-300 hover:text-amber-300" aria-label="Edit professor"><Pencil size={12} /></button>
+                    <button onClick={() => deleteMentor(m.id)} className="rounded-lg bg-stone-700/60 p-1.5 text-stone-400 hover:text-rose-400" aria-label="Remove professor"><Trash2 size={12} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
@@ -336,42 +471,83 @@ export default function LineageGraph() {
         )}
       </AnimatePresence>
 
-      {/* Claim mentor sheet */}
+      {/* Add / edit professor sheet */}
       <AnimatePresence>
         {showClaim && (
           <>
-            <motion.div className="fixed inset-0 z-[62] bg-black/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowClaim(false)} />
-            <motion.div className="fixed bottom-0 left-0 right-0 z-[63] rounded-t-3xl bg-[#1a1714] border-t border-white/10 p-6"
+            <motion.div className="fixed inset-0 z-[62] bg-black/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!saving) setShowClaim(false); }} />
+            <motion.div className="fixed bottom-0 left-0 right-0 z-[63] max-h-[90vh] overflow-y-auto rounded-t-3xl bg-[#1a1714] border-t border-white/10 p-6"
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }}>
-              <h2 className="text-lg font-bold text-amber-100 mb-4">Your Craft Lineage</h2>
+              <h2 className="text-lg font-bold text-amber-100 mb-1">{editingId ? "Edit professor" : "Add a professor"}</h2>
+              <p className="text-xs text-stone-500 mb-4">They don&apos;t need a Kiln account — this is your record of who taught you.</p>
+
+              {/* Portrait */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-16 w-16 rounded-full bg-stone-800 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center">
+                  {claimForm.imageUrl ? <img src={claimForm.imageUrl} alt="" className="h-full w-full object-cover" /> : <GraduationCap size={22} className="text-stone-500" />}
+                </div>
+                <div className="flex items-center flex-wrap gap-2">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={imageUploading}
+                    className="flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs text-stone-300 hover:border-amber-500/40 disabled:opacity-50">
+                    {imageUploading ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                    {claimForm.imageUrl ? "Change photo" : "Add photo"}
+                  </button>
+                  {claimForm.imageUrl && (
+                    <button type="button" onClick={() => setClaimForm(f => ({ ...f, imageUrl: "" }))} className="text-xs text-stone-500 hover:text-rose-400">Remove</button>
+                  )}
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
+              </div>
+
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-stone-500 mb-1.5 block">Mentor's name (who taught you?)</label>
-                  <input value={claimForm.mentorName} onChange={e => setClaimForm(f => ({ ...f, mentorName: e.target.value }))}
-                    placeholder="e.g. Harvey Littleton, your MFA advisor..." className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                  <label className="text-xs text-stone-500 mb-1.5 block">Name *</label>
+                  <input value={claimForm.name} onChange={e => setClaimForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Harvey Littleton" className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
                 </div>
-                <div>
-                  <label className="text-xs text-stone-500 mb-1.5 block">Or select from known artists on Kiln</label>
-                  <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
-                    {LINEAGE_NODES.map(n => (
-                      <button key={n.artistId} onClick={() => setClaimForm(f => ({ ...f, mentorId: n.artistId, mentorName: n.name }))}
-                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] transition-colors ${claimForm.mentorId === n.artistId ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-white/10 text-stone-400"}`}>
-                        <img src={n.avatarUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
-                        {n.name}
-                      </button>
-                    ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1.5 block">Role / title</label>
+                    <input value={claimForm.role} onChange={e => setClaimForm(f => ({ ...f, role: e.target.value }))}
+                      placeholder="MFA Advisor" className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1.5 block">Years</label>
+                    <input value={claimForm.years} onChange={e => setClaimForm(f => ({ ...f, years: e.target.value }))}
+                      placeholder="2016–2019" className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
                   </div>
                 </div>
                 <div>
+                  <label className="text-xs text-stone-500 mb-1.5 block">School / institution</label>
+                  <input value={claimForm.institution} onChange={e => setClaimForm(f => ({ ...f, institution: e.target.value }))}
+                    placeholder="Pilchuck Glass School" className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40" />
+                </div>
+                {!editingId && (
+                  <div>
+                    <label className="text-xs text-stone-500 mb-1.5 block">Or pick a known Kiln artist's name</label>
+                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                      {LINEAGE_NODES.map(n => (
+                        <button key={n.artistId} type="button" onClick={() => setClaimForm(f => ({ ...f, name: n.name }))}
+                          className="flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-stone-400 hover:border-amber-500/30">
+                          <img src={n.avatarUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
+                          {n.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
                   <label className="text-xs text-stone-500 mb-1.5 block">How did they influence your craft?</label>
-                  <textarea value={claimForm.mentorNote} onChange={e => setClaimForm(f => ({ ...f, mentorNote: e.target.value }))}
-                    placeholder="Studied at Pilchuck in 2018..." rows={2}
+                  <textarea value={claimForm.note} onChange={e => setClaimForm(f => ({ ...f, note: e.target.value }))}
+                    placeholder="Studied at Pilchuck in 2018…" rows={3}
                     className="w-full rounded-xl bg-stone-800/60 border border-white/10 px-4 py-3 text-sm text-amber-100 placeholder:text-stone-600 focus:outline-none focus:border-amber-500/40 resize-none" />
                 </div>
               </div>
               <div className="flex gap-3 mt-5">
-                <button onClick={() => setShowClaim(false)} className="flex-1 rounded-full border border-white/10 py-3 text-sm text-stone-400">Cancel</button>
-                <button onClick={saveClaim} className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950">Save Lineage</button>
+                <button onClick={() => setShowClaim(false)} disabled={saving} className="flex-1 rounded-full border border-white/10 py-3 text-sm text-stone-400 disabled:opacity-50">Cancel</button>
+                <button onClick={saveMentor} disabled={saving || imageUploading} className="flex-1 rounded-full bg-amber-500 py-3 text-sm font-semibold text-stone-950 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {saving && <Loader2 size={14} className="animate-spin" />}{editingId ? "Save changes" : "Add professor"}
+                </button>
               </div>
             </motion.div>
           </>
