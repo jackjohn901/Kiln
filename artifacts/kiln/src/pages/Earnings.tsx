@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight,
   CreditCard, CheckCircle, AlertCircle, Unlink, ExternalLink, RefreshCw,
   ShoppingBag, Clock, Bell, Package, Share2, MessageCircle, Download, Send,
+  Bookmark, Trash2, Plus,
 } from "lucide-react";
 
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -362,6 +363,88 @@ export default function Earnings() {
   const [salesDateFrom, setSalesDateFrom] = useState("");
   const [salesDateTo, setSalesDateTo]     = useState("");
   const [salesDatePreset, setSalesDatePreset] = useState<string>("");
+
+  // Saved (custom named) date ranges — persisted per-user via the API
+  type SavedRange = { id: string; name: string; dateFrom: string; dateTo: string };
+  const [savedRanges, setSavedRanges] = useState<SavedRange[]>([]);
+  const [showSaveRange, setShowSaveRange] = useState(false);
+  const [saveRangeName, setSaveRangeName] = useState("");
+  const [savingRange, setSavingRange] = useState(false);
+  const [saveRangeError, setSaveRangeError] = useState("");
+  const [rangeToast, setRangeToast] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me/saved-sales-ranges", { credentials: "include" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (cancelled || !data?.ranges) return;
+        setSavedRanges(data.ranges as SavedRange[]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const flashRangeToast = useCallback((msg: string) => {
+    setRangeToast(msg);
+    window.setTimeout(() => setRangeToast(""), 2500);
+  }, []);
+
+  const applySavedRange = useCallback((range: SavedRange) => {
+    setSalesDateFrom(range.dateFrom);
+    setSalesDateTo(range.dateTo);
+    setSalesDatePreset(`saved:${range.id}`);
+  }, []);
+
+  const handleSaveRange = useCallback(async () => {
+    const name = saveRangeName.trim();
+    if (!name) { setSaveRangeError("Give this range a name."); return; }
+    if (!salesDateFrom || !salesDateTo) { setSaveRangeError("Set both a From and To date first."); return; }
+    setSavingRange(true);
+    setSaveRangeError("");
+    try {
+      const r = await fetch("/api/me/saved-sales-ranges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, dateFrom: salesDateFrom, dateTo: salesDateTo }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => null);
+        setSaveRangeError(data?.error || "Couldn't save that range. Try again.");
+        return;
+      }
+      const data = await r.json();
+      if (data?.range) {
+        setSavedRanges(prev => [data.range as SavedRange, ...prev]);
+        setSalesDatePreset(`saved:${data.range.id}`);
+      }
+      setSaveRangeName("");
+      setShowSaveRange(false);
+      flashRangeToast("Date range saved");
+    } catch {
+      setSaveRangeError("Couldn't save that range. Try again.");
+    } finally {
+      setSavingRange(false);
+    }
+  }, [saveRangeName, salesDateFrom, salesDateTo, flashRangeToast]);
+
+  const handleDeleteRange = useCallback(async (id: string) => {
+    const prev = savedRanges;
+    setSavedRanges(rs => rs.filter(r => r.id !== id));
+    setSalesDatePreset(p => (p === `saved:${id}` ? "" : p));
+    try {
+      const r = await fetch(`/api/me/saved-sales-ranges/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("delete failed");
+      flashRangeToast("Date range deleted");
+    } catch {
+      setSavedRanges(prev);
+      flashRangeToast("Couldn't delete that range");
+    }
+  }, [savedRanges, flashRangeToast]);
 
   const applySalesPreset = useCallback((preset: "7d" | "month" | "lastMonth" | "year") => {
     const fmt = (d: Date) =>
@@ -1902,7 +1985,80 @@ export default function Earnings() {
                             {p.label}
                           </button>
                         ))}
+                        {savedRanges.map(range => {
+                          const active = salesDatePreset === `saved:${range.id}`;
+                          return (
+                            <span
+                              key={range.id}
+                              className={`group inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-1 text-[11px] font-medium transition-colors ${
+                                active
+                                  ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                                  : "border-white/10 bg-stone-800/60 text-stone-400 hover:text-stone-200 hover:border-white/20"
+                              }`}
+                            >
+                              <button
+                                onClick={() => applySavedRange(range)}
+                                className="inline-flex items-center gap-1"
+                                title={`${range.dateFrom} → ${range.dateTo}`}
+                              >
+                                <Bookmark size={10} />
+                                {range.name}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRange(range.id)}
+                                className="rounded-full p-0.5 text-stone-500 hover:text-rose-400 hover:bg-white/5 transition-colors"
+                                title="Delete saved range"
+                                aria-label={`Delete saved range ${range.name}`}
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                        {(salesDateFrom && salesDateTo) && (
+                          <button
+                            onClick={() => { setShowSaveRange(v => !v); setSaveRangeError(""); }}
+                            className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/15 px-2.5 py-1 text-[11px] font-medium text-stone-400 hover:text-amber-300 hover:border-amber-500/40 transition-colors"
+                          >
+                            <Plus size={10} /> Save range
+                          </button>
+                        )}
                       </div>
+                      {showSaveRange && (salesDateFrom && salesDateTo) && (
+                        <div className="rounded-lg border border-white/10 bg-stone-800/40 p-2.5 space-y-2">
+                          <p className="text-[11px] text-stone-500">
+                            Save {salesDateFrom} → {salesDateTo} as a named range
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={saveRangeName}
+                              onChange={e => { setSaveRangeName(e.target.value); setSaveRangeError(""); }}
+                              onKeyDown={e => { if (e.key === "Enter") handleSaveRange(); }}
+                              maxLength={60}
+                              autoFocus
+                              placeholder="e.g. Q1 fiscal, Summer market…"
+                              className="flex-1 min-w-0 rounded-lg border border-white/10 bg-stone-800/60 px-2.5 py-1.5 text-xs text-stone-200 placeholder:text-stone-600 focus:border-amber-500/40 focus:outline-none"
+                            />
+                            <button
+                              onClick={handleSaveRange}
+                              disabled={savingRange || !saveRangeName.trim()}
+                              className="flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-stone-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+                            >
+                              {savingRange ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                              Save
+                            </button>
+                            <button
+                              onClick={() => { setShowSaveRange(false); setSaveRangeError(""); setSaveRangeName(""); }}
+                              className="rounded-lg border border-white/8 p-1.5 text-stone-500 hover:text-stone-300 transition-colors"
+                              aria-label="Cancel"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                          {saveRangeError && <p className="text-[11px] text-rose-400">{saveRangeError}</p>}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2">
                         <label className="text-[11px] text-stone-500 shrink-0">From</label>
                         <input
@@ -2117,6 +2273,14 @@ export default function Earnings() {
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-lg">
           <CheckCircle size={15} />
           {thanksSentToast}
+        </div>
+      )}
+
+      {/* Saved date range toast */}
+      {rangeToast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-stone-800 border border-white/10 px-4 py-2.5 text-sm font-medium text-stone-100 shadow-lg">
+          <Bookmark size={15} className="text-amber-400" />
+          {rangeToast}
         </div>
       )}
 

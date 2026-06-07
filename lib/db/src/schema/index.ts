@@ -48,6 +48,7 @@ export * from "./beat_licenses";
 export * from "./collector_portal";
 export * from "./opportunity_saves";
 export * from "./price_alerts";
+export * from "./saved_sales_ranges";
 export * from "./verification_applications";
 export * from "./reports";
 export * from "./newsletters";
