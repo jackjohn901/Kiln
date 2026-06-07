@@ -314,6 +314,7 @@ const ReelCard = memo(function ReelCard({
   reel,
   isActive,
   isNearby,
+  isNext,
   musicMuted,
   onToggleMusic,
   videoAudioOn,
@@ -329,6 +330,7 @@ const ReelCard = memo(function ReelCard({
   reel: Reel;
   isActive: boolean;
   isNearby: boolean;
+  isNext: boolean;
   musicMuted: boolean;
   onToggleMusic: () => void;
   videoAudioOn: boolean;
@@ -480,6 +482,7 @@ const ReelCard = memo(function ReelCard({
           loop={autoplayEnabled}
           playsInline
           paused={!shouldPlay}
+          preload={isActive || isNext ? "auto" : "metadata"}
           onEnded={() => setManualPlay(false)}
           className="absolute inset-0 h-full w-full object-cover"
         />
@@ -492,7 +495,7 @@ const ReelCard = memo(function ReelCard({
           muted
           loop={autoplayEnabled}
           playsInline
-          preload={isActive ? "auto" : "metadata"}
+          preload={isActive || isNext ? "auto" : "metadata"}
           poster={reel.thumbnail}
           onEnded={() => setManualPlay(false)}
           className="absolute inset-0 h-full w-full object-cover"
@@ -1984,6 +1987,7 @@ export default function Feed() {
               reel={reel}
               isActive={i === activeIndex}
               isNearby={Math.abs(i - activeIndex) <= 2}
+              isNext={i === activeIndex + 1}
               musicMuted={musicMuted}
               onToggleMusic={handleToggleMusic}
               videoAudioOn={videoAudioOn}
