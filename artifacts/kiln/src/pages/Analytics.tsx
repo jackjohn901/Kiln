@@ -166,7 +166,7 @@ function StackedBarChart({ data }: { data: StreamPoint[] }) {
         })}
       </div>
       {/* Sampled label row — legible on phones where per-bar labels would collide */}
-      <div className="mt-2 flex justify-between gap-1">
+      <div className="mt-2 flex justify-between gap-1 overflow-hidden">
         {data.map((d, i) =>
           i % labelStep === 0 || i === data.length - 1 ? (
             <span key={i} className="text-[9px] text-stone-500 whitespace-nowrap leading-none">{d.label}</span>
