@@ -557,6 +557,64 @@ export class WebhookHandlers {
           }
         }
 
+        // --- Auction win ---
+        // Triggered when a winning bidder's auction checkout completes. Persists the win
+        // as an order row tagged type "auction" so it flows into the artist's earnings and
+        // the Revenue by Stream chart (which already buckets o.type === "auction").
+        // Idempotent: a duplicate Stripe delivery for the same session is detected via the
+        // `stripe:${session.id}` dedupe key stored in the order's `notes` column.
+        if (session.mode === 'payment' && meta.type === 'auction' && meta.auctionId && meta.userId) {
+          const auctionId = meta.auctionId;
+          const winnerId = meta.userId;
+          const paidCents = session.amount_total ?? 0;
+          try {
+            const [auction] = await db
+              .select()
+              .from(auctionsTable)
+              .where(eq(auctionsTable.id, auctionId));
+            if (!auction) {
+              logger.warn({ auctionId, sessionId: session.id }, 'Auction webhook: auction not found — order skipped');
+            } else {
+              // Amount integrity: paid amount must match the winning bid (±$1 for rounding).
+              const expectedCents = auction.currentBid * 100;
+              if (Math.abs(expectedCents - paidCents) > 100) {
+                logger.warn({ auctionId, expectedCents, paidCents, sessionId: session.id }, 'Auction webhook: amount mismatch — order skipped');
+              } else {
+                const dedupeKey = `stripe:${session.id}`;
+                const [existingOrder] = await db
+                  .select({ id: ordersTable.id })
+                  .from(ordersTable)
+                  .where(eq(ordersTable.notes, dedupeKey))
+                  .limit(1);
+                if (existingOrder) {
+                  logger.info({ auctionId, sessionId: session.id }, 'Auction webhook: order already exists — skipping');
+                } else {
+                  // amount is stored in whole dollars to match listing/workshop orders
+                  // (auction.currentBid is dollars; Stripe charged currentBid * 100 cents).
+                  await db.insert(ordersTable).values({
+                    id: crypto.randomUUID(),
+                    buyerId: winnerId,
+                    sellerId: auction.artistId,
+                    type: 'auction',
+                    refId: auctionId,
+                    title: auction.title,
+                    description: null,
+                    imageUrl: auction.imageUrl ?? null,
+                    amount: auction.currentBid,
+                    quantity: 1,
+                    currency: 'USD',
+                    status: 'confirmed',
+                    notes: dedupeKey,
+                  });
+                  logger.info({ auctionId, sellerId: auction.artistId, winnerId, sessionId: session.id }, 'Auction webhook: win recorded as order');
+                }
+              }
+            }
+          } catch (auctionErr) {
+            logger.error({ err: auctionErr, auctionId, sessionId: session.id }, 'Auction webhook: failed to record win as order');
+          }
+        }
+
         // --- Workshop booking ---
         // Triggered when a paid workshop checkout completes. Creates the booking row,
         // increments spotsBooked, and sends confirmation emails to the student and artist.
