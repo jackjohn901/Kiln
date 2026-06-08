@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import QABlock from "@/components/QABlock";
 import { useParams, Link, useLocation, useSearch } from "wouter";
@@ -369,6 +369,18 @@ export default function ArtistProfile() {
   const [, navigate] = useLocation();
   const { profile } = useProfile();
   const { addItem, isInCart } = useCart();
+  // Tracks the listing whose "Add to cart" button just flashed a checkmark, so
+  // the buyer gets clear, non-blocking feedback that the add succeeded.
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const justAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (justAddedTimer.current) clearTimeout(justAddedTimer.current); }, []);
+  const handleAddToCart = useCallback((listing: Listing) => {
+    addItem(listing);
+    setJustAddedId(listing.id);
+    if (justAddedTimer.current) clearTimeout(justAddedTimer.current);
+    justAddedTimer.current = setTimeout(() => setJustAddedId(null), 1500);
+    toast({ title: "Added to cart", description: listing.title });
+  }, [addItem]);
   const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
 
   const search = useSearch();
@@ -635,11 +647,11 @@ export default function ArtistProfile() {
                     </div>
                   </Link>
                   <button
-                    onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? cfg.artistId, title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
-                    className={`absolute bottom-[44px] right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
-                    title={isInCart(l.id) ? "In cart" : "Add to cart"}
+                    onClick={() => handleAddToCart({ id: l.id, artistId: (l as Listing).artistId ?? cfg.artistId, title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
+                    className={`absolute bottom-[44px] right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${justAddedId === l.id ? "bg-emerald-500 text-white scale-110" : isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
+                    title={justAddedId === l.id ? "Added!" : isInCart(l.id) ? "In cart" : "Add to cart"}
                   >
-                    <ShoppingCart size={13} />
+                    {justAddedId === l.id ? <Check size={13} className="animate-in zoom-in duration-200" /> : <ShoppingCart size={13} />}
                   </button>
                 </div>
               ))}
@@ -1555,11 +1567,11 @@ export default function ArtistProfile() {
                                 </div>
                               </Link>
                               <button
-                                onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
-                                className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
-                                title={isInCart(l.id) ? "In cart" : "Add to cart"}
+                                onClick={() => handleAddToCart({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
+                                className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${justAddedId === l.id ? "bg-emerald-500 text-white scale-110" : isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
+                                title={justAddedId === l.id ? "Added!" : isInCart(l.id) ? "In cart" : "Add to cart"}
                               >
-                                <ShoppingCart size={13} />
+                                {justAddedId === l.id ? <Check size={13} className="animate-in zoom-in duration-200" /> : <ShoppingCart size={13} />}
                               </button>
                             </div>
                           ))}
@@ -1584,11 +1596,11 @@ export default function ArtistProfile() {
                             </div>
                           </Link>
                           <button
-                            onClick={() => addItem({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
-                            className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
-                            title={isInCart(l.id) ? "In cart" : "Add to cart"}
+                            onClick={() => handleAddToCart({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
+                            className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${justAddedId === l.id ? "bg-emerald-500 text-white scale-110" : isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
+                            title={justAddedId === l.id ? "Added!" : isInCart(l.id) ? "In cart" : "Add to cart"}
                           >
-                            <ShoppingCart size={13} />
+                            {justAddedId === l.id ? <Check size={13} className="animate-in zoom-in duration-200" /> : <ShoppingCart size={13} />}
                           </button>
                         </div>
                       ))}
