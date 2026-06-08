@@ -18,6 +18,20 @@ with crossfade, ducking the video's own audio. Track metadata lives in
   over external CC URLs: no external host, no attribution/licensing risk, https by
   default. Older CC tracks (Kevin MacLeod / Scott Buckley / FMA) remain the wider library.
 
+## Original sound vs auto-matched music
+- **Empty `musicTrackId` ("") is the "original sound" sentinel** — no background-music
+  layer; the video plays its own audio (HTML5 unmute effect uses volume 1.0 when no
+  track; Mux `muted` also keys off `!!reel.musicTrackId`).
+- **Real videos default to original sound; only audio-less content (seed image reels,
+  photo posts) gets auto-matched music.** Detect video by `post.type==="video"` /
+  `p.videoUrl||p.muxPlaybackId` in Feed's reel mappers. Explicit artist pick still wins.
+  - **Why:** TikTok/Reels behavior — a creator's own sound shouldn't be ducked under an
+    auto-chosen track; but silent thumbnails/photos still need music.
+- **Any path that returns without playing a track must also pause `audioRef` + reset
+  `lastTrackIdRef`** (empty id AND unknown/invalid id), or the previous reel's music keeps
+  playing over the new one. The "skip if unchanged" fast-path must not resume a stale
+  paused element on an original-sound reel.
+
 ## Auto-match (craft → music)
 `pickTrackForCraft(craft, seed)` / `craftMoodFor(craft)` in music.ts map a
 craft/technique/medium string to a track `craftMood` via ordered keyword regex, then

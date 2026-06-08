@@ -132,7 +132,10 @@ function userPostsToReels(): Reel[] {
       saves: post.saves,
       thumbnail: post.thumbnailUrl || post.mediaUrl,
       avatarUrl: post.artistAvatarUrl,
-      musicTrackId: post.musicTrackId ?? pickTrackForCraft(post.tags?.[0] ?? "", post.id),
+      // Real videos default to their own original sound (like TikTok/Reels);
+      // only photos (no audio of their own) get an auto-matched Kiln track.
+      // An explicit pick by the artist always wins.
+      musicTrackId: post.musicTrackId ?? (post.type === "video" ? "" : pickTrackForCraft(post.tags?.[0] ?? "", post.id)),
       available: false,
       patronOnly: post.patronOnly,
       collabArtistName: (post as any).collaboratorName,
@@ -163,7 +166,9 @@ function apiPostToReel(p: any): Reel {
     saves: p.saveCount ?? 0,
     thumbnail: p.thumbnailUrl ?? undefined,
     avatarUrl: p.authorAvatarUrl ?? undefined,
-    musicTrackId: p.musicTrackId ?? pickTrackForCraft(p.technique ?? "", String(p.id)),
+    // Real videos default to their own original sound; photos (no audio) get an
+    // auto-matched Kiln track. An explicit artist pick always wins.
+    musicTrackId: p.musicTrackId ?? ((p.videoUrl || p.muxPlaybackId) ? "" : pickTrackForCraft(p.technique ?? "", String(p.id))),
     available: false,
     patronOnly: p.isPatronOnly ?? false,
     streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
@@ -478,7 +483,7 @@ const ReelCard = memo(function ReelCard({
           playbackId={reel.muxPlaybackId}
           streamType="on-demand"
           autoPlay={autoplayEnabled}
-          muted={!videoAudioOn || !musicUnlocked}
+          muted={!videoAudioOn || !musicUnlocked || !!reel.musicTrackId}
           loop={autoplayEnabled}
           playsInline
           paused={!shouldPlay}
@@ -1523,6 +1528,16 @@ export default function Feed() {
     if (!activeReel || !musicUnlocked) return;
     const tid = activeReel.musicTrackId ?? "";
 
+    // Original sound (no background music): stop any music/beat layer so the
+    // video's own audio plays cleanly, like TikTok/Reels.
+    if (!tid) {
+      beatLooperRef.current?.stop();
+      beatLooperRef.current = null;
+      audioRef.current?.pause();
+      lastTrackIdRef.current = "";
+      return;
+    }
+
     // Skip if the track hasn't actually changed — prevents gap on fast scroll
     if (tid === lastTrackIdRef.current) {
       if (tid.startsWith("beat-")) {
@@ -1560,7 +1575,13 @@ export default function Feed() {
 
     // ── Library track: HTML5 Audio with crossfade ────────────────────────
     const track = getTrackById(tid);
-    if (!track) return;
+    if (!track) {
+      // Unknown id: treat like original sound — stop any current music layer
+      // so a stale track can't keep playing over this reel.
+      audioRef.current?.pause();
+      lastTrackIdRef.current = "";
+      return;
+    }
     const el = audioRef.current ?? new Audio();
     audioRef.current = el;
 
@@ -1608,6 +1629,9 @@ export default function Feed() {
   useEffect(() => {
     if (!musicUnlocked) return;
     const tid = activeReelRef.current?.musicTrackId ?? "";
+
+    // Original-sound reels have no music layer to toggle.
+    if (!tid) { audioRef.current?.pause(); return; }
 
     if (tid.startsWith("beat-")) {
       if (musicMuted) {
@@ -2013,7 +2037,7 @@ export default function Feed() {
             className="absolute bottom-[148px] left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 rounded-full bg-black/60 border border-white/15 px-4 py-2 backdrop-blur-md text-sm text-white"
           >
             <Music2 size={14} className="text-amber-400" />
-            Tap to enable music
+            Tap for sound
           </motion.button>
         )}
       </AnimatePresence>
