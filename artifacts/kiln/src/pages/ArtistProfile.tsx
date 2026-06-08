@@ -375,6 +375,12 @@ export default function ArtistProfile() {
   const justAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (justAddedTimer.current) clearTimeout(justAddedTimer.current); }, []);
   const handleAddToCart = useCallback((listing: Listing) => {
+    // Guard against sold-out pieces: the buttons are disabled when unavailable,
+    // but keep this as a safety net so a sold-out item can never reach the cart.
+    if (listing.available === false) {
+      toast({ title: "Sold out", description: `${listing.title} is no longer available.` });
+      return;
+    }
     addItem(listing);
     setJustAddedId(listing.id);
     if (justAddedTimer.current) clearTimeout(justAddedTimer.current);
@@ -635,17 +641,23 @@ export default function ArtistProfile() {
               {hasTabs && <button onClick={() => setTab("shop")} className="text-xs text-amber-400 hover:text-amber-300">View all ({shopListings.length}) →</button>}
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {shopListings.slice(0, 6).map((l) => (
+              {shopListings.slice(0, 6).map((l) => {
+                const soldOut = ((l as Listing).available ?? true) === false;
+                return (
                 <div key={l.id} className="group relative overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
                   <Link href={`/listings/${l.id}`} className="block">
-                    <div className="aspect-square overflow-hidden">
-                      <img src={l.imageUrl ?? undefined} alt={l.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    <div className="aspect-square overflow-hidden relative">
+                      <img src={l.imageUrl ?? undefined} alt={l.title} className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 ${soldOut ? "opacity-50" : ""}`} />
+                      {soldOut && (
+                        <span className="absolute left-1.5 top-1.5 rounded-full bg-stone-900/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-300">Sold out</span>
+                      )}
                     </div>
                     <div className="p-2">
                       <p className="line-clamp-1 text-xs font-medium text-stone-200">{l.title}</p>
-                      <p className="mt-1 text-sm font-bold text-amber-400">{formatPrice(l.price)}</p>
+                      <p className="mt-1 text-sm font-bold text-amber-400">{soldOut ? <span className="text-stone-500">Sold out</span> : formatPrice(l.price)}</p>
                     </div>
                   </Link>
+                  {!soldOut && (
                   <button
                     onClick={() => handleAddToCart({ id: l.id, artistId: (l as Listing).artistId ?? cfg.artistId, title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
                     className={`absolute bottom-[44px] right-1.5 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${justAddedId === l.id ? "bg-emerald-500 text-white scale-110" : isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
@@ -653,8 +665,10 @@ export default function ArtistProfile() {
                   >
                     {justAddedId === l.id ? <Check size={13} className="animate-in zoom-in duration-200" /> : <ShoppingCart size={13} />}
                   </button>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1553,19 +1567,25 @@ export default function ArtistProfile() {
                           <Star size={9} className="text-amber-500" fill="currentColor" /> Featured works
                         </p>
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 mb-6">
-                          {shopListings.filter(l => (l as { isPinned?: boolean }).isPinned).map((l) => (
+                          {shopListings.filter(l => (l as { isPinned?: boolean }).isPinned).map((l) => {
+                            const soldOut = ((l as Listing).available ?? true) === false;
+                            return (
                             <div key={l.id} className="group relative overflow-hidden rounded-xl border border-amber-500/20 bg-stone-900/60 ring-1 ring-amber-500/10">
                               <Link href={`/listings/${l.id}`} className="block">
-                                <div className="aspect-square overflow-hidden">
+                                <div className="aspect-square overflow-hidden relative">
                                   <img src={l.imageUrl ?? undefined} alt={l.title}
-                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                    className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 ${soldOut ? "opacity-50" : ""}`} />
+                                  {soldOut && (
+                                    <span className="absolute left-2 top-2 rounded-full bg-stone-900/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-300">Sold out</span>
+                                  )}
                                 </div>
                                 <div className="p-3">
                                   <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
                                   <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
-                                  <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                                  <p className="mt-2 font-bold text-amber-400">{soldOut ? <span className="text-stone-500">Sold out</span> : formatPrice(l.price)}</p>
                                 </div>
                               </Link>
+                              {!soldOut && (
                               <button
                                 onClick={() => handleAddToCart({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
                                 className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${justAddedId === l.id ? "bg-emerald-500 text-white scale-110" : isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
@@ -1573,8 +1593,10 @@ export default function ArtistProfile() {
                               >
                                 {justAddedId === l.id ? <Check size={13} className="animate-in zoom-in duration-200" /> : <ShoppingCart size={13} />}
                               </button>
+                              )}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                         {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).length > 0 && (
                           <p className="text-[10px] text-stone-600 mb-3">All works</p>
@@ -1582,19 +1604,25 @@ export default function ArtistProfile() {
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                      {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).map((l) => (
+                      {shopListings.filter(l => !(l as { isPinned?: boolean }).isPinned).map((l) => {
+                        const soldOut = ((l as Listing).available ?? true) === false;
+                        return (
                         <div key={l.id} className="group relative overflow-hidden rounded-xl border border-white/8 bg-stone-900/60">
                           <Link href={`/listings/${l.id}`} className="block">
-                            <div className="aspect-square overflow-hidden">
+                            <div className="aspect-square overflow-hidden relative">
                               <img src={l.imageUrl ?? undefined} alt={l.title}
-                                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                className={`h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 ${soldOut ? "opacity-50" : ""}`} />
+                              {soldOut && (
+                                <span className="absolute left-2 top-2 rounded-full bg-stone-900/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-300">Sold out</span>
+                              )}
                             </div>
                             <div className="p-3">
                               <p className="font-medium text-stone-200 text-sm line-clamp-1">{l.title}</p>
                               <p className="mt-0.5 text-xs text-stone-500">{l.medium}</p>
-                              <p className="mt-2 font-bold text-amber-400">{formatPrice(l.price)}</p>
+                              <p className="mt-2 font-bold text-amber-400">{soldOut ? <span className="text-stone-500">Sold out</span> : formatPrice(l.price)}</p>
                             </div>
                           </Link>
+                          {!soldOut && (
                           <button
                             onClick={() => handleAddToCart({ id: l.id, artistId: (l as Listing).artistId ?? artist?.id ?? "", title: l.title, year: (l as Listing).year ?? "", medium: l.medium ?? "", dimensions: (l as Listing).dimensions ?? "", price: l.price, imageUrl: l.imageUrl, available: (l as Listing).available ?? true })}
                             className={`absolute bottom-[52px] right-2 flex h-7 w-7 items-center justify-center rounded-full shadow-md transition-all ${justAddedId === l.id ? "bg-emerald-500 text-white scale-110" : isInCart(l.id) ? "bg-amber-500 text-stone-900" : "bg-stone-800/90 text-stone-300 opacity-0 group-hover:opacity-100 hover:bg-amber-500 hover:text-stone-900"}`}
@@ -1602,8 +1630,10 @@ export default function ArtistProfile() {
                           >
                             {justAddedId === l.id ? <Check size={13} className="animate-in zoom-in duration-200" /> : <ShoppingCart size={13} />}
                           </button>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 );
