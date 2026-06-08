@@ -28,3 +28,4 @@
 - [API server dev no watch](api-server-no-watch.md) — api-server dev builds-then-starts (no reload); restart the workflow before smoke-testing new routes, a 404 usually means stale bundle.
 - [Expo dev login prompt](expo-ci-login-prompt.md) — kiln-mobile dev hangs/SIGTERMs on Expo's interactive "log in" prompt; fix with `EXPO_OFFLINE=1` in the dev script, NOT `CI=1` (CI=1 → "EXPO TOKEN in CI" 500 in Expo Go).
 - [Expo Metro monorepo watch](expo-metro-monorepo-watch.md) — never set kiln-mobile metro watchFolders=[workspaceRoot]; it crashes dev on .cache/typescript temp files. Default getDefaultConfig already resolves @workspace/* deps.
+- [Seed marker persistence](seed-marker-persistence.md) — active seed marker lives in server_config (`active_seed_marker`), not the compiled constant; advance via admin reseed flow, not by bumping SEED_MARKER_ID.

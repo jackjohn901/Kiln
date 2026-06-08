@@ -5,6 +5,7 @@ import {
   listingsTable, dropsTable, auctionsTable, auctionBidsTable,
   workshopsTable, guildsTable, guildMembersTable,
   patronTiersTable, seedHistoryTable, badgeDefinitionsTable,
+  serverConfigTable,
 } from "@workspace/db";
 import { logger } from "./logger";
 import { randomUUID } from "crypto";
@@ -47,7 +48,14 @@ export interface SeedHistoryEntry {
   createdAt: string;
 }
 
+// Compiled-in default used ONLY to seed a brand-new, empty database. After the
+// first seed (or any admin marker advance) the authoritative marker lives in the
+// `server_config` table, so advancing it from the admin panel survives restarts
+// without a code change and can never drift from a hard-coded constant.
 const SEED_MARKER_ID = "seed-v5-marker";
+
+// server_config key under which the active seed marker is persisted.
+const SEED_MARKER_CONFIG_KEY = "active_seed_marker";
 
 const SEED_USERS = [
   { id: "seed-v5-marker", email: "seed-v5@kiln.internal", firstName: "Seed", lastName: "V5" },
@@ -659,13 +667,45 @@ export interface SeedStatus {
   codeMarkerId: string;
 }
 
-async function getCurrentMarkerId(): Promise<string> {
+// Read the persisted active marker from server_config, or null if none stored.
+async function getPersistedMarkerId(): Promise<string | null> {
+  const [row] = await db.select({ value: serverConfigTable.value })
+    .from(serverConfigTable)
+    .where(eq(serverConfigTable.key, SEED_MARKER_CONFIG_KEY))
+    .limit(1);
+  return row?.value ?? null;
+}
+
+// Persist (upsert) the active marker so it survives restarts.
+async function persistMarkerId(markerId: string): Promise<void> {
+  await db.insert(serverConfigTable)
+    .values({ key: SEED_MARKER_CONFIG_KEY, value: markerId })
+    .onConflictDoUpdate({
+      target: serverConfigTable.key,
+      set: { value: markerId, updatedAt: new Date() },
+    });
+}
+
+// The marker user row physically present in the DB (legacy lookup for databases
+// seeded before the marker was persisted in server_config).
+async function getLegacyMarkerUserId(): Promise<string | null> {
   const [row] = await db.select({ id: usersTable.id })
     .from(usersTable)
     .where(sql`${usersTable.id} LIKE '%-marker'`)
     .orderBy(sql`${usersTable.id} DESC`)
     .limit(1);
-  return row?.id ?? SEED_MARKER_ID;
+  return row?.id ?? null;
+}
+
+// Authoritative active marker: persisted config first, then the legacy marker
+// user (for DBs seeded before this change), finally the compiled-in default for
+// a brand-new database.
+async function getCurrentMarkerId(): Promise<string> {
+  const persisted = await getPersistedMarkerId();
+  if (persisted) return persisted;
+  const legacy = await getLegacyMarkerUserId();
+  if (legacy) return legacy;
+  return SEED_MARKER_ID;
 }
 
 export async function getSeedStatus(): Promise<SeedStatus> {
@@ -690,7 +730,10 @@ export async function getSeedStatus(): Promise<SeedStatus> {
     seedUserCount: existingUsers.length,
     seedPostCount: existingPosts.length,
     markerUserId: currentMarkerId,
-    codeMarkerId: SEED_MARKER_ID,
+    // The active marker is now the single persisted source of truth, so the
+    // "code" marker reported to admins is the same value — it can no longer
+    // drift from a separate compiled-in constant.
+    codeMarkerId: currentMarkerId,
   };
 }
 
@@ -755,6 +798,10 @@ export async function forceSeedDatabaseWithMarker(
   await db.insert(guildMembersTable).values(SEED_GUILD_MEMBERS).onConflictDoNothing();
   await db.insert(patronTiersTable).values(SEED_PATRON_TIERS).onConflictDoNothing();
 
+  // Persist the new marker as the authoritative source of truth so it survives
+  // restarts: seedDatabase() will honor it and NOT re-seed/overwrite.
+  await persistMarkerId(trimmed);
+
   logger.info({ newMarkerId: trimmed }, "Seed data re-applied with new marker");
 
   const counts = {
@@ -812,12 +859,24 @@ export async function getSeedHistory(limit = 20): Promise<SeedHistoryEntry[]> {
 
 export async function seedDatabase(): Promise<void> {
   try {
-    const [existing] = await db.select({ id: usersTable.id })
-      .from(usersTable)
-      .where(eq(usersTable.id, SEED_MARKER_ID));
+    // The persisted marker in server_config is the authoritative signal that
+    // this database has already been seeded (and possibly had its marker
+    // advanced by an admin). If it's present, honor it and never re-seed —
+    // re-seeding would resurrect the compiled-in default marker and overwrite
+    // admin-advanced content.
+    const persistedMarker = await getPersistedMarkerId();
+    if (persistedMarker) {
+      logger.debug({ marker: persistedMarker }, "Seed marker already persisted — skipping");
+      return;
+    }
 
-    if (existing) {
-      logger.debug("Seed v3 already present — skipping");
+    // No persisted marker yet. A legacy database (seeded before the marker was
+    // persisted) still has a marker user row — adopt it into server_config so
+    // future restarts and admin advances stay in step, but do NOT re-seed.
+    const legacyMarker = await getLegacyMarkerUserId();
+    if (legacyMarker) {
+      await persistMarkerId(legacyMarker);
+      logger.info({ marker: legacyMarker }, "Adopted existing seed marker into server_config — skipping re-seed");
       return;
     }
 
@@ -858,6 +917,10 @@ export async function seedDatabase(): Promise<void> {
     await db.insert(guildMembersTable).values(SEED_GUILD_MEMBERS).onConflictDoNothing();
 
     await db.insert(patronTiersTable).values(SEED_PATRON_TIERS).onConflictDoNothing();
+
+    // Record the marker in server_config as the authoritative source of truth so
+    // subsequent restarts skip re-seeding and admin advances stay in step.
+    await persistMarkerId(SEED_MARKER_ID);
 
     logger.info({
       users: SEED_USERS.length, posts: SEED_POSTS.length,
