@@ -19,7 +19,85 @@ const KM = "https://incompetech.com/music/royalty-free/mp3-royaltyfree";
 const SB = "https://www.scottbuckley.com.au/library/wp-content/uploads";
 const FMA = "https://files.freemusicarchive.org/storage-freemusicarchive-org/music";
 
+// Kiln Originals: AI-composed instrumental beds owned by Kiln. Served from the
+// app's own /music folder (no external host, no licensing, https by default).
+const ORIG = `${import.meta.env.BASE_URL}music`;
+
 export const musicTracks: MusicTrack[] = [
+  // ── KILN ORIGINALS (composed for Kiln — sized to short craft videos) ──────
+  {
+    id: "kiln-slow-wheel",
+    title: "Slow Wheel",
+    artist: "Kiln Studio",
+    genre: "Ambient",
+    mood: "Hypnotic",
+    craftMood: "Deep Focus",
+    bpm: 70,
+    duration: 56,
+    url: `${ORIG}/kiln-slow-wheel.mp3`,
+    license: "Kiln Original",
+  },
+  {
+    id: "kiln-forge-pulse",
+    title: "Forge Pulse",
+    artist: "Kiln Studio",
+    genre: "Electronic",
+    mood: "Driving",
+    craftMood: "Hot Shop",
+    bpm: 124,
+    duration: 50,
+    url: `${ORIG}/kiln-forge-pulse.mp3`,
+    license: "Kiln Original",
+  },
+  {
+    id: "kiln-first-light",
+    title: "First Light",
+    artist: "Kiln Studio",
+    genre: "Orchestral",
+    mood: "Uplifting",
+    craftMood: "Finishing",
+    bpm: 80,
+    duration: 52,
+    url: `${ORIG}/kiln-first-light.mp3`,
+    license: "Kiln Original",
+  },
+  {
+    id: "kiln-studio-dust",
+    title: "Studio Dust",
+    artist: "Kiln Studio",
+    genre: "Jazz",
+    mood: "Warm",
+    craftMood: "Studio Vibes",
+    bpm: 92,
+    duration: 54,
+    url: `${ORIG}/kiln-studio-dust.mp3`,
+    license: "Kiln Original",
+  },
+  {
+    id: "kiln-glow",
+    title: "Kiln Glow",
+    artist: "Kiln Studio",
+    genre: "Ambient",
+    mood: "Peaceful",
+    craftMood: "Meditative",
+    bpm: 60,
+    duration: 58,
+    url: `${ORIG}/kiln-glow.mp3`,
+    license: "Kiln Original",
+  },
+  {
+    id: "kiln-spark-and-steel",
+    title: "Spark & Steel",
+    artist: "Kiln Studio",
+    genre: "Electronic",
+    mood: "Joyful",
+    craftMood: "Energetic",
+    bpm: 128,
+    duration: 48,
+    url: `${ORIG}/kiln-spark-and-steel.mp3`,
+    license: "Kiln Original",
+  },
+
   // ── HOT SHOP / ENERGETIC ─────────────────────────────────────────────────
   {
     id: "equatorial-complex",

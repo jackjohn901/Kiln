@@ -132,7 +132,7 @@ function userPostsToReels(): Reel[] {
       saves: post.saves,
       thumbnail: post.thumbnailUrl || post.mediaUrl,
       avatarUrl: post.artistAvatarUrl,
-      musicTrackId: post.musicTrackId ?? ALL_REELS[0]?.musicTrackId ?? "track-ambient-1",
+      musicTrackId: post.musicTrackId ?? ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel",
       available: false,
       patronOnly: post.patronOnly,
       collabArtistName: (post as any).collaboratorName,
@@ -1204,7 +1204,7 @@ export default function Feed() {
 
   // Fetch posts from users I follow — extracted so polling and WS can reuse it
   const fetchFollowingFeed = useCallback(() => {
-    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
+    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel";
     fetch("/api/feed/following?limit=20", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
@@ -1395,7 +1395,7 @@ export default function Feed() {
 
   // Fetch real posts from API and prepend to feed
   useEffect(() => {
-    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
+    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel";
     fetch("/api/feed?limit=20")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
@@ -1476,7 +1476,7 @@ export default function Feed() {
   useEffect(() => {
     if (!hasMoreApiPosts || feedTab !== "foryou") return;
     if (activeIndex < reels.length - 5) return;
-    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "track-ambient-1";
+    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel";
     fetch(`/api/feed?limit=20&offset=${apiPostOffset}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {

@@ -576,6 +576,9 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className={`text-sm font-medium truncate ${isSelected ? "text-amber-200" : "text-stone-200"}`}>{track.title}</p>
+                      {track.license === "Kiln Original" && (
+                        <span className="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300">Original</span>
+                      )}
                       <span className="shrink-0 rounded-full bg-stone-800 px-1.5 py-0.5 text-[9px] text-stone-500">{track.genre}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -605,7 +608,7 @@ export default function MusicPicker({ selectedTrackId, selectedTrack, onSelect }
           </div>
 
           <p className="text-center text-[10px] text-stone-700">
-            {musicTracks.length} royalty-free tracks · CC BY / Public Domain
+            {musicTracks.length} cleared tracks · Kiln Originals + CC BY / Public Domain
           </p>
         </>
       )}

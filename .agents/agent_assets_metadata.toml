@@ -281,3 +281,39 @@ id = "mkmiFTQluGlMOrUtxSk41"
 uri = "file://artifacts/kiln/public/favicon.png"
 type = "image"
 title = "Kiln app icon (flame) — upload as your App icon"
+
+[[outputs]]
+id = "TsbaBRXnY-NXA7waIC1BF"
+uri = "file://artifacts/kiln/public/music/kiln-first-light.mp3"
+type = "audio"
+title = "kiln-first-light"
+
+[[outputs]]
+id = "TGvI7Ix2JLwBc-lfSoRP-"
+uri = "file://artifacts/kiln/public/music/kiln-forge-pulse.mp3"
+type = "audio"
+title = "kiln-forge-pulse"
+
+[[outputs]]
+id = "AZfY-tlC5QKjHapatr0S2"
+uri = "file://artifacts/kiln/public/music/kiln-studio-dust.mp3"
+type = "audio"
+title = "kiln-studio-dust"
+
+[[outputs]]
+id = "TZ865VY5kFzFxPDIFxeuL"
+uri = "file://artifacts/kiln/public/music/kiln-glow.mp3"
+type = "audio"
+title = "kiln-glow"
+
+[[outputs]]
+id = "lsP-bzNccmZp3lIbRijyc"
+uri = "file://artifacts/kiln/public/music/kiln-spark-and-steel.mp3"
+type = "audio"
+title = "kiln-spark-and-steel"
+
+[[outputs]]
+id = "lv2zf5TWe6MQt5MBWVrvJ"
+uri = "file://artifacts/kiln/public/music/kiln-slow-wheel.mp3"
+type = "audio"
+title = "kiln-slow-wheel"
