@@ -24,4 +24,4 @@
 - [Kiln badge system](kiln-badge-system.md) — awardBadge() must be called by feature routes; badges with no badge_definitions row are awarded silently but never render; most defs aren't seeded from source (only referral ones are).
 - [Referral owner-dedup](referral-owner-dedup.md) — referral credit counts distinct owners (COALESCE(owner_id,id)), not accounts; invite links land on /join?ref=CODE, not root.
 - [Notification icon config](notification-icon-config.md) — notif type union + icon/color live in lib `@workspace/notifications`; web/mobile map a concept-based icon name to lucide/Feather; adding a type is a compile error until mapped.
-- [Kiln feed music](kiln-feed-music.md) — feed default music fallback id MUST exist in musicTracks or reels play silently; Kiln Originals (AI-gen) live in public/music served via BASE_URL; gen caps at 2 concurrent.
+- [Kiln feed music](kiln-feed-music.md) — default music id must exist in musicTracks or reels play silently; pickTrackForCraft auto-matches craft→mood (fallback only, explicit pick wins); Kiln Originals in public/music via BASE_URL.

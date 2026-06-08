@@ -1,6 +1,6 @@
 ---
 name: Kiln feed music library
-description: How feed background music is sourced/served and the silent-default gotcha.
+description: How feed background music is sourced, served, and auto-matched to a reel's craft.
 ---
 
 # Kiln feed background music
@@ -9,28 +9,29 @@ The feed plays a per-reel background track (`reel.musicTrackId`) via an HTMLAudi
 with crossfade, ducking the video's own audio. Track metadata lives in
 `artifacts/kiln/src/data/music.ts` (`musicTracks`), resolved by `getTrackById(id)`.
 
-## Default-fallback gotcha
-**The feed's default music fallback id must be a real id in `musicTracks`, or default
-reels play silently.** A long-standing bug used `"track-ambient-1"` as the fallback in
-Feed.tsx — no such track existed, so `getTrackById` returned undefined and any reel
-without an explicit track had no music. Fallback now points to a real id
-(`"kiln-slow-wheel"`).
-**How to apply:** when changing the default music id, grep that the id exists in
-`music.ts`.
+## Sourcing rules
+- **Default music id must be a real id in `musicTracks`, or reels play silently.** A
+  long-standing bug used a non-existent fallback id, so any reel without an explicit
+  track had no music. When changing a fallback/default id, grep that it exists.
+- **Kiln Originals** (AI-composed, owned by Kiln) live in `public/music/` and are served
+  via `${import.meta.env.BASE_URL}music/...` (relative/https — safe in prod). Prefer them
+  over external CC URLs: no external host, no attribution/licensing risk, https by
+  default. Older CC tracks (Kevin MacLeod / Scott Buckley / FMA) remain the wider library.
 
-## Kiln Originals (AI-composed, owned by Kiln)
-Original instrumental beds are generated with `generateMusic` and stored in
-`artifacts/kiln/public/music/<id>.mp3`, served at `${import.meta.env.BASE_URL}music/<id>.mp3`
-(resolves to `/kiln/music/...` in prod — relative/https, safe). They sit at the TOP of
-`musicTracks` (one per craftMood) and carry `license: "Kiln Original"`, which the
-MusicPicker uses to show an "Original" badge.
-**Why originals over external CC URLs:** no external host, no attribution/licensing
-risk, and https by default. The older CC tracks (Kevin MacLeod / Scott Buckley / FMA)
-remain as the wider library.
+## Auto-match (craft → music)
+`pickTrackForCraft(craft, seed)` / `craftMoodFor(craft)` in music.ts map a
+craft/technique/medium string to a track `craftMood` via ordered keyword regex, then
+deterministically pick a track from that mood pool by hashing `seed`.
+- **Why:** music should fit the video (fire/metal → energetic, wheel/carving → focused,
+  fiber → warm) instead of being random; deterministic so a post's song is stable.
+- **How to apply:** it is the *fallback* only — an explicit artist pick
+  (`post.musicTrackId` / `p.musicTrackId`) always wins. Keyword order matters: fire terms
+  must precede "wood" so "wood-fired" → Hot Shop, not Deep Focus. Not every craftMood is
+  produced by the map (Energetic/Finishing stay manual) — that's fine, but every mood
+  must keep ≥1 track or the pool would be empty.
 
-## Side effects of catalog order
-`reels.ts` auto-assigns seeded-reel music by `musicTracks[hash % length]`, so changing
-the array length/order deterministically reshuffles which default song seeded reels get.
-The MusicPicker "Trending" shelf looks tracks up by hardcoded id (not index), so order
-changes don't break it. ElevenLabs music gen caps at 2 concurrent requests (429
-otherwise) — generate in pairs/sequentially.
+## Side effects / gotchas
+- `reels.ts` assigns seeded-reel music by `pickTrackForCraft(...)`; changing the catalog
+  or the mood map changes which song seeded reels get. The MusicPicker "Trending" shelf
+  looks tracks up by hardcoded id (not index), so catalog order changes don't break it.
+- ElevenLabs music gen caps at 2 concurrent requests (429 otherwise) — generate in pairs.

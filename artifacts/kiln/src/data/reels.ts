@@ -1,6 +1,6 @@
 import { artists } from "@/data/artists";
 import { seedArtists } from "@/data/seedArtists";
-import { musicTracks } from "@/data/music";
+import { pickTrackForCraft } from "@/data/music";
 
 export interface Reel {
   id: string;
@@ -94,7 +94,7 @@ function buildReels(): Reel[] {
       saves: statVal(a.id + v.id + "s", 200, 7500),
       thumbnail: `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`,
       avatarUrl: a.images[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=150&h=150&fit=crop&seed=${a.id}-avatar`,
-      musicTrackId: musicTracks[hash(a.id + v.id) % musicTracks.length].id,
+      musicTrackId: pickTrackForCraft(getTechnique(a.medium), a.id + v.id),
       available: isAvailable(a.id + v.id),
       streak: statVal(a.id + "streak", 1, 120),
       artistLevel: ARTIST_LEVELS[hash(a.id) % 4],

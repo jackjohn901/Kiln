@@ -14,7 +14,7 @@ import BoardSavePicker from "@/components/BoardSavePicker";
 import { ParsedCaption } from "@/lib/parseCaption";
 import { getNextFeatureToSurface, markFeatureSurfaced, type DiscoveryFeature } from "@/lib/featureDiscovery";
 import FeatureDiscoveryCard from "@/components/FeatureDiscoveryCard";
-import { getTrackById } from "@/data/music";
+import { getTrackById, pickTrackForCraft } from "@/data/music";
 import { getCommunityBeats } from "@/lib/communityBeats";
 import { createBeatLooper } from "@/lib/beatSynth";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -132,7 +132,7 @@ function userPostsToReels(): Reel[] {
       saves: post.saves,
       thumbnail: post.thumbnailUrl || post.mediaUrl,
       avatarUrl: post.artistAvatarUrl,
-      musicTrackId: post.musicTrackId ?? ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel",
+      musicTrackId: post.musicTrackId ?? pickTrackForCraft(post.tags?.[0] ?? "", post.id),
       available: false,
       patronOnly: post.patronOnly,
       collabArtistName: (post as any).collaboratorName,
@@ -146,7 +146,7 @@ function userPostsToReels(): Reel[] {
 // Keeping this in one place ensures every feed surface (For You, Following,
 // load-more) carries the same fields — including muxPlaybackId, so real
 // uploaded videos actually play instead of showing only a thumbnail.
-function apiPostToReel(p: any, defaultMusicId: string): Reel {
+function apiPostToReel(p: any): Reel {
   return {
     id: `db-${p.id}`,
     videoId: "",
@@ -163,7 +163,7 @@ function apiPostToReel(p: any, defaultMusicId: string): Reel {
     saves: p.saveCount ?? 0,
     thumbnail: p.thumbnailUrl ?? undefined,
     avatarUrl: p.authorAvatarUrl ?? undefined,
-    musicTrackId: p.musicTrackId ?? defaultMusicId,
+    musicTrackId: p.musicTrackId ?? pickTrackForCraft(p.technique ?? "", String(p.id)),
     available: false,
     patronOnly: p.isPatronOnly ?? false,
     streak: (p.authorStreak ?? 0) >= 3 ? p.authorStreak : undefined,
@@ -1204,12 +1204,11 @@ export default function Feed() {
 
   // Fetch posts from users I follow — extracted so polling and WS can reuse it
   const fetchFollowingFeed = useCallback(() => {
-    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel";
     fetch("/api/feed/following?limit=20", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!data?.posts?.length) return;
-        const apiReels: Reel[] = data.posts.map((p: any) => apiPostToReel(p, defaultMusicId));
+        const apiReels: Reel[] = data.posts.map((p: any) => apiPostToReel(p));
         if (!followingLoadedRef.current) {
           // First load: apply immediately, no pill
           followingLoadedRef.current = true;
@@ -1395,12 +1394,11 @@ export default function Feed() {
 
   // Fetch real posts from API and prepend to feed
   useEffect(() => {
-    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel";
     fetch("/api/feed?limit=20")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!data?.posts?.length) return;
-        const apiReels: Reel[] = data.posts.map((p: any) => apiPostToReel(p, defaultMusicId));
+        const apiReels: Reel[] = data.posts.map((p: any) => apiPostToReel(p));
         setUserPostReels((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));
           const fresh = apiReels.filter((r) => !existingIds.has(r.id));
@@ -1476,12 +1474,11 @@ export default function Feed() {
   useEffect(() => {
     if (!hasMoreApiPosts || feedTab !== "foryou") return;
     if (activeIndex < reels.length - 5) return;
-    const defaultMusicId = ALL_REELS[0]?.musicTrackId ?? "kiln-slow-wheel";
     fetch(`/api/feed?limit=20&offset=${apiPostOffset}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!data?.posts?.length) { setHasMoreApiPosts(false); return; }
-        const more: Reel[] = data.posts.map((p: any) => apiPostToReel(p, defaultMusicId));
+        const more: Reel[] = data.posts.map((p: any) => apiPostToReel(p));
         setUserPostReels((prev) => {
           const existingIds = new Set(prev.map((r) => r.id));
           const fresh = more.filter((r) => !existingIds.has(r.id));

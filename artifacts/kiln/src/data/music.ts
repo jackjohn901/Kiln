@@ -875,3 +875,38 @@ export function formatDuration(secs: number): string {
 export function getTrackById(id: string): MusicTrack | undefined {
   return musicTracks.find((t) => t.id === id);
 }
+
+// ─── Auto-match music to craft ──────────────────────────────────────────────
+// Maps a craft/technique/medium string to the soundtrack mood that best fits
+// what it looks and feels like on screen: fire/metal work feels energetic,
+// the wheel/carving feels focused, fiber/soft crafts feel warm and homey.
+// Keyword order matters — earlier rules win (e.g. "wood-fired" matches fire,
+// not wood).
+const CRAFT_MOOD_RULES: [RegExp, MusicTrack["craftMood"]][] = [
+  [/glass|blow|flame|lamp|neon|murrine|forge|forging|blacksmith|smith|weld|foundry|anneal|iron|bronze|raku|kiln|metal|steel|torch|fire/, "Hot Shop"],
+  [/potter|ceramic|clay|porcelain|wheel|throw|stone|marble|carv|sculpt|lathe|wood\s*turn|turn|engrav|whittl|wood/, "Deep Focus"],
+  [/weav|fiber|fibre|felt|textile|embroid|knit|loom|tapestry|batik|dye|quilt|stitch|yarn|leather|jewel|bead|enamel|paper|book/, "Studio Vibes"],
+];
+
+export function craftMoodFor(craft: string): MusicTrack["craftMood"] {
+  const m = (craft || "").toLowerCase();
+  for (const [re, mood] of CRAFT_MOOD_RULES) if (re.test(m)) return mood;
+  return "Studio Vibes";
+}
+
+function moodHash(s: string): number {
+  let h = 0;
+  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+  return Math.abs(h);
+}
+
+// Pick a real track id whose mood matches the craft. Deterministic per `seed`
+// so the same post always gets the same song, but different posts of the same
+// craft get variety within the matching mood. Falls back to the full library
+// only if a mood somehow has no tracks.
+export function pickTrackForCraft(craft: string, seed: string): string {
+  const mood = craftMoodFor(craft);
+  const pool = musicTracks.filter((t) => t.craftMood === mood);
+  const list = pool.length > 0 ? pool : musicTracks;
+  return list[moodHash(seed) % list.length].id;
+}
