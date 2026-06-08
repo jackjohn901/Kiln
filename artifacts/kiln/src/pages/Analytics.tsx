@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, Radio, Gavel } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, MessageSquare, Radio, Gavel, Zap, BarChart2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -268,6 +268,7 @@ export default function Analytics() {
   const [apiPosts, setApiPosts] = useState<ApiPost[]>([]);
   const [apiFollowers, setApiFollowers] = useState<number | null>(null);
   const [earningTotals, setEarningTotals] = useState<EarningTotals | null>(null);
+  const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
   const [liveViewers, setLiveViewers] = useState<number>(0);
   const [audienceActivity, setAudienceActivity] = useState<{
     avgByHourUtc: number[]; maxByHourUtc: number[]; totalSamples: number;
@@ -522,7 +523,15 @@ export default function Analytics() {
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
+            <button
+              type="button"
+              aria-expanded={salesBreakdownOpen}
+              onClick={() => setSalesBreakdownOpen(o => !o)}
+              className="relative rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center cursor-pointer hover:bg-stone-800 transition-colors select-none"
+            >
+              <span className="absolute top-1.5 right-1.5">
+                {salesBreakdownOpen ? <ChevronUp size={11} className="text-stone-600" /> : <ChevronDown size={11} className="text-stone-600" />}
+              </span>
               <p className="text-base sm:text-xl font-bold text-emerald-400 tabular-nums">
                 {earningTotals ? `$${(earningTotals.shopSales - earningTotals.salesByType.auctions).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </p>
@@ -530,8 +539,16 @@ export default function Analytics() {
                 <ShoppingBag size={9} className="text-stone-500" />
                 <p className="text-[10px] text-stone-500">Shop Sales</p>
               </div>
-            </div>
-            <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
+            </button>
+            <button
+              type="button"
+              aria-expanded={salesBreakdownOpen}
+              onClick={() => setSalesBreakdownOpen(o => !o)}
+              className="relative rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center cursor-pointer hover:bg-stone-800 transition-colors select-none"
+            >
+              <span className="absolute top-1.5 right-1.5">
+                {salesBreakdownOpen ? <ChevronUp size={11} className="text-stone-600" /> : <ChevronDown size={11} className="text-stone-600" />}
+              </span>
               <p className="text-base sm:text-xl font-bold text-purple-400 tabular-nums">
                 {earningTotals ? `$${earningTotals.salesByType.auctions.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </p>
@@ -539,7 +556,7 @@ export default function Analytics() {
                 <Gavel size={9} className="text-stone-500" />
                 <p className="text-[10px] text-stone-500">Auctions</p>
               </div>
-            </div>
+            </button>
             <div className="rounded-xl bg-stone-800/60 p-2.5 sm:p-3 text-center">
               <p className="text-base sm:text-xl font-bold text-amber-400 tabular-nums">
                 {earningTotals ? `$${earningTotals.tips.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
@@ -559,6 +576,35 @@ export default function Analytics() {
               </div>
             </div>
           </div>
+          {salesBreakdownOpen && earningTotals && (
+            <div className="mt-3 rounded-2xl border border-sky-500/15 bg-stone-900/40 p-4 animate-in fade-in slide-in-from-top-1 duration-200">
+              <p className="text-xs uppercase tracking-wider text-stone-600 mb-3">Shop Sales by channel</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Listings", value: earningTotals.salesByType.listings, icon: ShoppingBag, color: "text-sky-400", bg: "bg-sky-500/10" },
+                  { label: "Auctions", value: earningTotals.salesByType.auctions, icon: Gavel, color: "text-purple-400", bg: "bg-purple-500/10" },
+                  { label: "Drops", value: earningTotals.salesByType.drops, icon: Zap, color: "text-orange-400", bg: "bg-orange-500/10" },
+                  { label: "Commissions", value: earningTotals.salesByType.commissions, icon: MessageSquare, color: "text-blue-400", bg: "bg-blue-500/10" },
+                  { label: "Workshops", value: earningTotals.salesByType.workshops, icon: BarChart2, color: "text-violet-400", bg: "bg-violet-500/10" },
+                ].map(row => {
+                  const Icon = row.icon;
+                  const pct = earningTotals.shopSales > 0 ? Math.round((row.value / earningTotals.shopSales) * 100) : 0;
+                  return (
+                    <div key={row.label} className="rounded-xl border border-white/5 bg-stone-900/50 p-3">
+                      <div className={`inline-flex h-7 w-7 items-center justify-center rounded-lg mb-2 ${row.bg}`}>
+                        <Icon size={13} className={row.color} />
+                      </div>
+                      <p className="text-[11px] text-stone-500 mb-0.5">{row.label}</p>
+                      <p className="text-sm font-bold text-stone-100">${row.value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      {earningTotals.shopSales > 0 && (
+                        <p className="text-[10px] text-stone-600 mt-0.5">{pct}% of shop</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {earningTotals && (
             <div className="mt-3 border-t border-white/5 pt-3 flex items-center justify-between">
               <span className="text-xs text-stone-500">Total this period</span>
