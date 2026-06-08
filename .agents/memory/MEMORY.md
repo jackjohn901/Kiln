@@ -26,4 +26,4 @@
 - [Notification icon config](notification-icon-config.md) — notif type union + icon/color live in lib `@workspace/notifications`; web/mobile map a concept-based icon name to lucide/Feather; adding a type is a compile error until mapped.
 - [Kiln feed music](kiln-feed-music.md) — default music id must exist in musicTracks or reels play silently; pickTrackForCraft auto-matches craft→mood (fallback only, explicit pick wins); Kiln Originals in public/music via BASE_URL.
 - [API server dev no watch](api-server-no-watch.md) — api-server dev builds-then-starts (no reload); restart the workflow before smoke-testing new routes, a 404 usually means stale bundle.
-- [Expo CI login prompt](expo-ci-login-prompt.md) — kiln-mobile dev hangs/SIGTERMs on Expo's interactive "log in" prompt; prefix the dev script with `CI=1` to run non-interactive.
+- [Expo dev login prompt](expo-ci-login-prompt.md) — kiln-mobile dev hangs/SIGTERMs on Expo's interactive "log in" prompt; fix with `EXPO_OFFLINE=1` in the dev script, NOT `CI=1` (CI=1 → "EXPO TOKEN in CI" 500 in Expo Go).
