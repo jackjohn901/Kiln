@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   followsTable, profilesTable, notificationsTable, postsTable, userSettingsTable,
-  listingsTable, workshopsTable, patronTiersTable,
+  listingsTable, workshopsTable, patronTiersTable, repostsTable, shoutoutsTable,
 } from "@workspace/db";
 import { eq, and, sql, or, ilike, inArray, desc, isNull, lte } from "drizzle-orm";
 import { publicProfileFields, redactPatronMedia } from "../lib/publicFields";
@@ -18,6 +18,51 @@ const router = Router();
 
 const MAX_PROFILES_PER_EMAIL = 10;
 const MAX_PROFILES_PER_NAME = 10;
+
+// Build a profile feed of a user's authored posts plus the posts they've
+// reposted (credited to the original author), interleaved by recency and
+// deduped by post id. Used by both the public and own-profile post endpoints.
+async function mergeAuthoredAndReposts(userId: string, limit = 30) {
+  const [authored, repostRows] = await Promise.all([
+    db.select().from(postsTable)
+      .where(and(
+        eq(postsTable.authorId, userId),
+        eq(postsTable.isDraft, false),
+        or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
+      ))
+      .orderBy(desc(postsTable.createdAt))
+      .limit(limit),
+    db.select({ repost: repostsTable, post: postsTable })
+      .from(repostsTable)
+      .innerJoin(postsTable, eq(repostsTable.postId, postsTable.id))
+      .where(and(eq(repostsTable.reposterId, userId), eq(postsTable.isDraft, false)))
+      .orderBy(desc(repostsTable.createdAt))
+      .limit(limit),
+  ]);
+
+  type Item = { post: typeof postsTable.$inferSelect; repostedAt: Date | null; sortAt: Date };
+  const items: Item[] = [
+    ...authored.map((p) => ({ post: p, repostedAt: null as Date | null, sortAt: p.createdAt })),
+    ...repostRows.map((r) => ({ post: r.post, repostedAt: r.repost.createdAt as Date | null, sortAt: r.repost.createdAt })),
+  ];
+  items.sort((a, b) => b.sortAt.getTime() - a.sortAt.getTime());
+
+  const seen = new Set<string>();
+  const merged: Item[] = [];
+  for (const it of items) {
+    if (seen.has(it.post.id)) continue;
+    seen.add(it.post.id);
+    merged.push(it);
+  }
+
+  return merged.slice(0, limit).map(({ post, repostedAt }) => redactPatronMedia({
+    ...post,
+    tags: post.tags ?? [],
+    createdAt: post.createdAt.toISOString(),
+    isRepost: repostedAt != null,
+    repostedAt: repostedAt ? repostedAt.toISOString() : null,
+  }));
+}
 
 async function countProfilesByEmail(email: string): Promise<number> {
   const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
@@ -228,24 +273,101 @@ router.get("/users/:userId/profile", async (req, res): Promise<void> => {
   }
 });
 
-// GET /users/:userId/posts
+// GET /users/:userId/posts — this user's authored posts plus posts they've
+// reposted (credited to the original author), interleaved by recency.
 router.get("/users/:userId/posts", async (req, res): Promise<void> => {
   const { userId } = req.params;
   try {
-    const posts = await db.select().from(postsTable)
-      .where(and(
-        eq(postsTable.authorId, userId),
-        eq(postsTable.isDraft, false),
-        or(isNull(postsTable.scheduledAt), lte(postsTable.scheduledAt, sql`NOW()`)),
-      ))
-      .orderBy(desc(postsTable.createdAt))
-      .limit(30);
-    res.json({
-      posts: posts.map((p) => redactPatronMedia({ ...p, tags: p.tags ?? [], createdAt: p.createdAt.toISOString() })),
-    });
+    const posts = await mergeAuthoredAndReposts(userId);
+    res.json({ posts });
   } catch (err) {
     req.log.error({ err }, "getUserPosts error");
     res.status(500).json({ error: "Failed to load posts" });
+  }
+});
+
+// GET /users/:userId/shoutouts — public endorsements written about this user.
+router.get("/users/:userId/shoutouts", async (req, res): Promise<void> => {
+  const { userId } = req.params;
+  try {
+    const rows = await db.select().from(shoutoutsTable)
+      .where(eq(shoutoutsTable.toId, userId))
+      .orderBy(desc(shoutoutsTable.createdAt))
+      .limit(50);
+    res.json({
+      shoutouts: rows.map((s) => ({
+        id: s.id,
+        fromId: s.fromId,
+        fromName: s.fromName,
+        fromAvatarUrl: s.fromAvatarUrl,
+        message: s.message,
+        createdAt: s.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "getShoutouts error");
+    res.status(500).json({ error: "Failed to load shoutouts" });
+  }
+});
+
+// POST /users/:userId/shoutout — publicly endorse another artist. Notifies them.
+router.post("/users/:userId/shoutout", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const { userId } = req.params;
+  const fromUser = req.user;
+  if (userId === fromUser.id) { res.status(400).json({ error: "You can’t shout out yourself" }); return; }
+
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!message) { res.status(400).json({ error: "Shoutout message is required" }); return; }
+  if (message.length > 280) { res.status(400).json({ error: "Shoutout must be 280 characters or fewer" }); return; }
+
+  try {
+    // Recipient must be a real profile.
+    const [target] = await db.select({ userId: profilesTable.userId })
+      .from(profilesTable).where(eq(profilesTable.userId, userId)).limit(1);
+    if (!target) { res.status(404).json({ error: "Artist not found" }); return; }
+
+    const fromName = [fromUser.firstName, fromUser.lastName].filter(Boolean).join(" ") || fromUser.email || "An artist";
+    const fromAvatarUrl = fromUser.profileImageUrl ?? null;
+    const id = crypto.randomUUID();
+    await db.insert(shoutoutsTable).values({
+      id,
+      toId: userId,
+      fromId: fromUser.id,
+      fromName,
+      fromAvatarUrl,
+      message,
+    });
+
+    // Notify the recipient (in-app + live).
+    const notifId = crypto.randomUUID();
+    await db.insert(notificationsTable).values({
+      id: notifId,
+      userId,
+      type: "shoutout",
+      fromId: fromUser.id,
+      fromName,
+      fromAvatarUrl,
+      text: "gave you a shoutout",
+      link: `/artists/${userId}`,
+    });
+    broadcast(userId, {
+      type: "notification",
+      userId,
+      notifType: "shoutout",
+      fromId: fromUser.id,
+      fromName,
+      fromAvatarUrl,
+      text: `${fromName} gave you a shoutout`,
+      link: `/artists/${userId}`,
+    });
+
+    res.status(201).json({
+      shoutout: { id, fromId: fromUser.id, fromName, fromAvatarUrl, message, createdAt: new Date().toISOString() },
+    });
+  } catch (err) {
+    req.log.error({ err }, "createShoutout error");
+    res.status(500).json({ error: "Failed to post shoutout" });
   }
 });
 
@@ -350,21 +472,12 @@ router.patch("/me/profile", async (req, res): Promise<void> => {
   }
 });
 
-// GET /me/posts — logged-in user's posts (excludes drafts)
+// GET /me/posts — logged-in user's posts + reposts (excludes drafts)
 router.get("/me/posts", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   try {
-    const posts = await db.select().from(postsTable)
-      .where(and(eq(postsTable.authorId, req.user.id), eq(postsTable.isDraft, false)))
-      .orderBy(desc(postsTable.createdAt))
-      .limit(30);
-    res.json({
-      posts: posts.map((p) => ({
-        ...p,
-        tags: p.tags ?? [],
-        createdAt: p.createdAt.toISOString(),
-      })),
-    });
+    const posts = await mergeAuthoredAndReposts(req.user.id);
+    res.json({ posts });
   } catch (err) {
     req.log.error({ err }, "getMyPosts error");
     res.status(500).json({ error: "Failed to load posts" });

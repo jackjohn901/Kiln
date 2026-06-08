@@ -20,6 +20,7 @@ export const postsTable = pgTable("posts", {
   likeCount: integer("like_count").notNull().default(0),
   commentCount: integer("comment_count").notNull().default(0),
   saveCount: integer("save_count").notNull().default(0),
+  repostCount: integer("repost_count").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
   isPatronOnly: boolean("is_patron_only").notNull().default(false),
   isDraft: boolean("is_draft").notNull().default(false),

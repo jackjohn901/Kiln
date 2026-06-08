@@ -25,3 +25,4 @@
 - [Referral owner-dedup](referral-owner-dedup.md) — referral credit counts distinct owners (COALESCE(owner_id,id)), not accounts; invite links land on /join?ref=CODE, not root.
 - [Notification icon config](notification-icon-config.md) — notif type union + icon/color live in lib `@workspace/notifications`; web/mobile map a concept-based icon name to lucide/Feather; adding a type is a compile error until mapped.
 - [Kiln feed music](kiln-feed-music.md) — default music id must exist in musicTracks or reels play silently; pickTrackForCraft auto-matches craft→mood (fallback only, explicit pick wins); Kiln Originals in public/music via BASE_URL.
+- [API server dev no watch](api-server-no-watch.md) — api-server dev builds-then-starts (no reload); restart the workflow before smoke-testing new routes, a 404 usually means stale bundle.

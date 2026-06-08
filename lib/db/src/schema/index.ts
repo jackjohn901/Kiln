@@ -4,6 +4,8 @@ export * from "./follows";
 export * from "./likes";
 export * from "./saves";
 export * from "./comments";
+export * from "./reposts";
+export * from "./shoutouts";
 export * from "./notifications";
 export * from "./message_threads";
 export * from "./profiles";

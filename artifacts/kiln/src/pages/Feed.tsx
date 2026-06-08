@@ -175,6 +175,10 @@ function apiPostToReel(p: any): Reel {
     artistLevel: (p.authorLevel as Reel["artistLevel"]) ?? undefined,
     beforeImageUrl: p.beforeImageUrl ?? undefined,
     listingIds: Array.isArray(p.listingIds) ? p.listingIds : undefined,
+    repostCount: p.repostCount ?? 0,
+    repostedByName: p.repostedByName ?? null,
+    repostedById: p.repostedById ?? null,
+    repostedAt: p.repostedAt ?? null,
   };
 }
 
@@ -331,6 +335,7 @@ const ReelCard = memo(function ReelCard({
   onMoreLikeThis,
   liveLikes,
   liveSaves,
+  liveReposts,
 }: {
   reel: Reel;
   isActive: boolean;
@@ -347,6 +352,7 @@ const ReelCard = memo(function ReelCard({
   onMoreLikeThis: (technique: string) => void;
   liveLikes?: number;
   liveSaves?: number;
+  liveReposts?: number;
 }) {
   const [showReport, setShowReport] = useState(false);
   const [showBoardPicker, setShowBoardPicker] = useState(false);
@@ -384,6 +390,7 @@ const ReelCard = memo(function ReelCard({
   const liked = reelLikes[reel.id] ?? false;
   const saved = reelSaves[reel.id] ?? false;
   const reposted = reelReposts[reel.id] ?? false;
+  const repostCount = liveReposts != null ? liveReposts : (reel.repostCount ?? 0);
   const commentCount = getComments(reel.id).length;
   const color = TECHNIQUE_COLORS[reel.technique] ?? "bg-amber-500";
   const commissionStatus = getArtistCommissionStatus(reel.artistId);
@@ -654,6 +661,13 @@ const ReelCard = memo(function ReelCard({
           )}
         </div>
 
+        {reel.repostedByName && (
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-emerald-300/90 drop-shadow">
+            <Repeat2 size={12} className="shrink-0" />
+            <span>Reposted by {reel.repostedByName}</span>
+          </div>
+        )}
+
         <Link href={`/artists/${reel.artistId}`}>
           <h2 className="font-serif text-[22px] font-bold leading-tight text-white drop-shadow-lg hover:text-amber-200 transition-colors inline-flex items-center gap-1.5">
             {reel.artistName}
@@ -901,7 +915,11 @@ const ReelCard = memo(function ReelCard({
                   <Repeat2 size={16} className={reposted ? "text-emerald-400 shrink-0" : "text-stone-400 shrink-0"} />
                   <div>
                     <p className="text-sm font-medium text-stone-200">{reposted ? "Unrepost" : "Repost"}</p>
-                    <p className="text-[11px] text-stone-500">Share this to your followers</p>
+                    <p className="text-[11px] text-stone-500">
+                      {repostCount > 0
+                        ? `${repostCount} ${repostCount === 1 ? "repost" : "reposts"} · Share to your followers`
+                        : "Share this to your followers"}
+                    </p>
                   </div>
                 </button>
                 <Link href={`/duet/${reel.id}`}>
@@ -1383,8 +1401,8 @@ export default function Feed() {
     };
   }, [feedTab, followingApiReels, wsSend]);
 
-  // Live like/save counts pushed from the server, keyed by reel id (db-<postId>)
-  const [liveCounts, setLiveCounts] = useState<Record<string, { likes?: number; saves?: number }>>({});
+  // Live like/save/repost counts pushed from the server, keyed by reel id (db-<postId>)
+  const [liveCounts, setLiveCounts] = useState<Record<string, { likes?: number; saves?: number; reposts?: number }>>({});
   useEffect(() => {
     const offLike = wsSubscribe("like", (e) => {
       const id = `db-${e.postId as string}`;
@@ -1394,7 +1412,11 @@ export default function Feed() {
       const id = `db-${e.postId as string}`;
       setLiveCounts((prev) => ({ ...prev, [id]: { ...prev[id], saves: e.saveCount as number } }));
     });
-    return () => { offLike(); offSave(); };
+    const offRepost = wsSubscribe("repost", (e) => {
+      const id = `db-${e.postId as string}`;
+      setLiveCounts((prev) => ({ ...prev, [id]: { ...prev[id], reposts: e.repostCount as number } }));
+    });
+    return () => { offLike(); offSave(); offRepost(); };
   }, [wsSubscribe]);
 
   // Fetch real posts from API and prepend to feed
@@ -2020,6 +2042,7 @@ export default function Feed() {
               onMoreLikeThis={handleMoreLikeThis}
               liveLikes={liveCounts[reel.id]?.likes}
               liveSaves={liveCounts[reel.id]?.saves}
+              liveReposts={liveCounts[reel.id]?.reposts}
             />
           ))}
         </div>

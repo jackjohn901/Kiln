@@ -8,7 +8,7 @@ import {
   Play, Flame, MapPin, Grid3x3, Video, ShoppingBag,
   BookOpen, X, Plus, CheckCircle, Clock, Lock, Hammer,
   Heart as HeartIcon, BarChart2, MessageSquare, Zap, Check,
-  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Music2, Truck, Sparkles, ShoppingCart, Gavel,
+  Users, MessageCircle, Radio, Image, Star, Crown, Printer, CalendarDays, Award, Music2, Truck, Sparkles, ShoppingCart, Gavel, Repeat2, Megaphone, Send,
 } from "lucide-react";
 import { ALL_ACHIEVEMENTS, RARITY_COLORS, getXpLevel } from "@/data/achievements";
 import { getArtistCV, EXHIBITION_TYPE_LABELS, EXHIBITION_TYPE_COLORS } from "@/data/exhibitions";
@@ -20,6 +20,7 @@ import { getListingsByArtist, formatPrice, type Listing } from "@/data/listings"
 import { useCart } from "@/contexts/CartContext";
 import { useProfile, type UserProfile } from "@/contexts/ProfileContext";
 import { useSocial, CommissionStatus } from "@/contexts/SocialContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getWorkshopsByArtist } from "@/data/workshops";
 import { getDropsByArtist, getTimeUntilDrop, type Drop } from "@/data/drops";
 import CommissionModal from "@/components/CommissionModal";
@@ -156,6 +157,7 @@ interface GridItem {
   isVideo: boolean;
   videoId?: string;
   isProcess: boolean;
+  isRepost?: boolean;
 }
 
 // Mux serves a poster frame for any video asset at this URL — used as the
@@ -358,6 +360,8 @@ interface DbUserPost {
   technique: string | null;
   likeCount: number;
   createdAt: string;
+  isRepost?: boolean;
+  repostedAt?: string | null;
 }
 
 export default function ArtistProfile() {
@@ -953,6 +957,7 @@ export default function ArtistProfile() {
     caption: p.caption,
     isVideo: !!p.videoUrl,
     isProcess: !!p.videoUrl,
+    isRepost: !!p.isRepost,
   }));
   const allGridItems = [...dbGridItems, ...ownLocalGridItems, ...buildGrid(artist)];
   const processItems = allGridItems.filter((g) => g.isVideo);
@@ -1397,6 +1402,12 @@ export default function ArtistProfile() {
                           {item.isVideo && <Play size={20} fill="white" className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />}
                         </div>
                         {item.isVideo && <div className="absolute right-1.5 top-1.5"><Video size={11} className="text-white drop-shadow" /></div>}
+                        {item.isRepost && (
+                          <div className="absolute left-1.5 bottom-1.5 flex items-center gap-1 rounded-full bg-emerald-500/85 px-1.5 py-0.5">
+                            <Repeat2 size={10} className="text-white" />
+                            <span className="text-[9px] font-semibold text-white">Repost</span>
+                          </div>
+                        )}
                         {isOwn && (item.id.startsWith("post-") || item.id.startsWith("db-")) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteGridPost(item.id); }}
@@ -1922,6 +1933,10 @@ export default function ArtistProfile() {
                   <ExternalLink size={13} /> Habatat Gallery
                 </a>
               </div>
+
+              <div className="border-t border-white/8 pt-6">
+                <ShoutoutsSection artistId={artist.id} artistName={artist.name} isOwn={isOwn} />
+              </div>
             </div>
           )}
 
@@ -2403,6 +2418,137 @@ function ReviewSection({ artistId }: { artistId: string }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+interface ShoutoutItem {
+  id: string;
+  fromId: string;
+  fromName: string;
+  fromAvatarUrl: string | null;
+  message: string;
+  createdAt: string;
+}
+
+function ShoutoutsSection({ artistId, artistName, isOwn }: { artistId: string; artistName: string; isOwn: boolean }) {
+  const { isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
+  const [shoutouts, setShoutouts] = useState<ShoutoutItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    setLoading(true);
+    fetch(`/api/users/${artistId}/shoutouts`, { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : { shoutouts: [] }))
+      .then((d) => setShoutouts(Array.isArray(d.shoutouts) ? d.shoutouts : []))
+      .catch(() => {})
+      .finally(() => { if (!ac.signal.aborted) setLoading(false); });
+    return () => ac.abort();
+  }, [artistId]);
+
+  async function handleSubmit() {
+    const text = message.trim();
+    if (!text || submitting) return;
+    setSubmitting(true);
+    try {
+      const r = await fetch(`/api/users/${artistId}/shoutout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        toast({ title: "Couldn’t post shoutout", description: err.error || "Please try again.", variant: "destructive" });
+        return;
+      }
+      const d = await r.json();
+      if (d.shoutout) setShoutouts((prev) => [d.shoutout, ...prev]);
+      setMessage("");
+      setShowForm(false);
+      toast({ title: "Shoutout posted", description: `You publicly endorsed ${artistName}.` });
+    } catch {
+      toast({ title: "Couldn’t post shoutout", description: "Please check your connection and try again.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Megaphone size={16} className="text-amber-400" />
+          <h3 className="font-serif text-lg text-amber-100">Shoutouts</h3>
+          {shoutouts.length > 0 && <span className="text-xs text-stone-500">{shoutouts.length}</span>}
+        </div>
+        {!isOwn && isAuthenticated && (
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-full border border-amber-500/30 px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition-colors"
+          >
+            {showForm ? "Cancel" : "+ Give a shoutout"}
+          </button>
+        )}
+      </div>
+
+      {showForm && !isOwn && isAuthenticated && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+          <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Publicly endorse {artistName}</p>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            maxLength={280}
+            placeholder={`Share why other artists and collectors should know about ${artistName}…`}
+            className="w-full rounded-lg border border-white/10 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-600 focus:border-amber-500/40 focus:outline-none resize-none"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-stone-600">{message.length}/280</span>
+            <button
+              disabled={!message.trim() || submitting}
+              onClick={handleSubmit}
+              className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-5 py-2 text-sm font-bold text-stone-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send size={13} /> {submitting ? "Posting…" : "Post shoutout"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-stone-500">Loading shoutouts…</p>
+      ) : shoutouts.length === 0 ? (
+        <p className="text-sm text-stone-500">
+          No shoutouts yet{!isOwn ? ` — be the first to endorse ${artistName}.` : "."}
+        </p>
+      ) : (
+        shoutouts.map((s) => (
+          <div key={s.id} className="rounded-xl border border-white/8 bg-stone-900/40 p-4">
+            <div className="flex items-start gap-3">
+              <img
+                src={s.fromAvatarUrl || `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${s.fromId}`}
+                alt={s.fromName}
+                className="h-8 w-8 rounded-full object-cover border border-white/10 cursor-pointer"
+                onClick={() => navigate(`/artists/${s.fromId}`)}
+                onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=60&h=60&fit=crop&seed=${s.fromId}`; }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <button onClick={() => navigate(`/artists/${s.fromId}`)} className="text-sm font-semibold text-stone-200 hover:text-amber-300 transition-colors">{s.fromName}</button>
+                  <span className="text-[11px] text-stone-600">{new Date(s.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                </div>
+                <p className="mt-1 text-sm text-stone-400 leading-relaxed">{s.message}</p>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }

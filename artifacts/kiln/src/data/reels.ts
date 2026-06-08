@@ -26,6 +26,10 @@ export interface Reel {
   artistLevel?: "Emerging" | "Rising" | "Established" | "Master";
   beforeImageUrl?: string;
   listingIds?: string[];
+  repostCount?: number;
+  repostedByName?: string | null;
+  repostedById?: string | null;
+  repostedAt?: string | null;
 }
 
 const ARTIST_LEVELS = ["Emerging", "Rising", "Established", "Master"] as const;

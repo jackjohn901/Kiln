@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, likesTable, savesTable, followsTable, userSettingsTable, streaksTable, profilesTable } from "@workspace/db";
+import { postsTable, likesTable, savesTable, followsTable, userSettingsTable, streaksTable, profilesTable, repostsTable } from "@workspace/db";
 import { desc, lt, eq, and, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -21,11 +21,14 @@ function hotnessScore(
   likeCount: number,
   commentCount: number,
   saveCount: number,
+  repostCount: number,
   createdAt: Date,
   tasteBonus = 0,
 ): number {
   const ageHours = (Date.now() - createdAt.getTime()) / 3600000;
-  const engagement = likeCount * 3 + commentCount * 5 + saveCount * 4;
+  // Reposts are the strongest organic-reach signal — weight them highest so a
+  // post that people actively share spreads further in For You.
+  const engagement = likeCount * 3 + commentCount * 5 + saveCount * 4 + repostCount * 7;
   return ((engagement + 1) * (1 + tasteBonus)) / Math.pow(ageHours + 2, 0.8);
 }
 
@@ -74,7 +77,7 @@ router.get("/feed", async (req, res) => {
       ) ? 0.25 : 0;
       const followers = followerMap.get(p.authorId) ?? 0;
       const newcomerBonus = Math.max(0, Math.min(1, (NEWCOMER_FOLLOWER_THRESHOLD - followers) / NEWCOMER_FOLLOWER_THRESHOLD)) * NEWCOMER_MAX_BONUS;
-      return { ...p, _score: hotnessScore(p.likeCount, p.commentCount, p.saveCount, p.createdAt, tasteBonus + newcomerBonus) };
+      return { ...p, _score: hotnessScore(p.likeCount, p.commentCount, p.saveCount, p.repostCount, p.createdAt, tasteBonus + newcomerBonus) };
     }).sort((a, b) => b._score - a._score);
 
     const slice = scored.slice(page * limit, (page + 1) * limit);
@@ -143,17 +146,63 @@ router.get("/feed/following", async (req, res) => {
       ? and(inArray(postsTable.authorId, followingIds), eq(postsTable.isDraft, false), lt(postsTable.createdAt, new Date(cursor)))
       : and(inArray(postsTable.authorId, followingIds), eq(postsTable.isDraft, false));
 
-    const posts = await db
+    const authored = await db
       .select()
       .from(postsTable)
       .where(whereClause)
       .orderBy(desc(postsTable.createdAt))
       .limit(limit + 1);
 
-    const hasMore = posts.length > limit;
-    const page = hasMore ? posts.slice(0, limit) : posts;
+    // hasMore / nextCursor track the authored-post timeline only; reposts are
+    // surfaced on the first page so cursor pagination stays simple and stable.
+    const hasMore = authored.length > limit;
+    const authoredPage = hasMore ? authored.slice(0, limit) : authored;
 
-    const postIds = page.map((p) => p.id);
+    type FeedItem = {
+      post: typeof postsTable.$inferSelect;
+      repostedById: string | null;
+      repostedByName: string | null;
+      repostedByAvatarUrl: string | null;
+      sortAt: Date;
+    };
+
+    const items: FeedItem[] = authoredPage.map((p) => ({
+      post: p, repostedById: null, repostedByName: null, repostedByAvatarUrl: null, sortAt: p.createdAt,
+    }));
+
+    // First page: fold in posts that followed users have reposted, credited to
+    // the original author but ordered by when the repost happened.
+    if (!cursor) {
+      const repostRows = await db
+        .select({ repost: repostsTable, post: postsTable })
+        .from(repostsTable)
+        .innerJoin(postsTable, eq(repostsTable.postId, postsTable.id))
+        .where(and(inArray(repostsTable.reposterId, followingIds), eq(postsTable.isDraft, false)))
+        .orderBy(desc(repostsTable.createdAt))
+        .limit(limit);
+      for (const r of repostRows) {
+        items.push({
+          post: r.post,
+          repostedById: r.repost.reposterId,
+          repostedByName: r.repost.reposterName,
+          repostedByAvatarUrl: r.repost.reposterAvatarUrl,
+          sortAt: r.repost.createdAt,
+        });
+      }
+    }
+
+    // Sort by effective surfacing time, then dedupe by post id (keep the most recent surfacing).
+    items.sort((a, b) => b.sortAt.getTime() - a.sortAt.getTime());
+    const seen = new Set<string>();
+    const merged: FeedItem[] = [];
+    for (const it of items) {
+      if (seen.has(it.post.id)) continue;
+      seen.add(it.post.id);
+      merged.push(it);
+    }
+    const sliced = merged.slice(0, limit);
+
+    const postIds = sliced.map((it) => it.post.id);
     const [likes, saves] = postIds.length > 0
       ? await Promise.all([
           db.select({ postId: likesTable.postId }).from(likesTable)
@@ -167,7 +216,7 @@ router.get("/feed/following", async (req, res) => {
     const savedIds = new Set(saves.map((s) => s.postId));
 
     // Batch-fetch author streaks
-    const authorIds2 = [...new Set(page.map((p) => p.authorId))];
+    const authorIds2 = [...new Set(sliced.map((it) => it.post.authorId))];
     const streakRows2 = authorIds2.length
       ? await db.select({ userId: streaksTable.userId, currentStreak: streaksTable.currentStreak })
           .from(streaksTable).where(inArray(streaksTable.userId, authorIds2))
@@ -175,7 +224,7 @@ router.get("/feed/following", async (req, res) => {
     const streakMap2 = new Map(streakRows2.map((s) => [s.userId, s.currentStreak]));
 
     res.json({
-      posts: page.map((post) => ({
+      posts: sliced.map(({ post, repostedById, repostedByName, repostedByAvatarUrl, sortAt }) => ({
         ...post,
         tags: post.tags ?? [],
         isLiked: likedIds.has(post.id),
@@ -184,9 +233,13 @@ router.get("/feed/following", async (req, res) => {
         authorLevel: authorLevel(post.authorId),
         createdAt: post.createdAt.toISOString(),
         musicTrackId: post.musicTrackId,
+        repostedById,
+        repostedByName,
+        repostedByAvatarUrl,
+        repostedAt: repostedById ? sortAt.toISOString() : null,
       })),
       hasMore,
-      nextCursor: hasMore ? page[page.length - 1].createdAt.toISOString() : null,
+      nextCursor: hasMore ? authoredPage[authoredPage.length - 1].createdAt.toISOString() : null,
     });
   } catch (err) {
     req.log.error({ err }, "getFollowingFeed error");

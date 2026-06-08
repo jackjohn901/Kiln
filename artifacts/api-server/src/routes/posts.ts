@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable, listingsTable,
+  postsTable, likesTable, savesTable, commentsTable, notificationsTable, profilesTable, userSettingsTable, followsTable, listingsTable, repostsTable,
 } from "@workspace/db";
 import { sendEmailWithRetry, newCommentEmail, newMentionEmail, newLikeEmail } from "../lib/email";
 import { isEmailPaused, prependSnoozeRecap } from "../lib/emailPaused";
@@ -15,6 +15,68 @@ import { awardBadge } from "./badges";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
 
 const router = Router();
+
+// Detect @handle mentions in a post caption and notify each tagged user
+// (capped at 5 unique handles). Mirrors the comment-mention flow. Non-blocking.
+async function notifyPostMentions(postId: string, caption: string, user: Express.User): Promise<void> {
+  const handles = [
+    ...new Set([...caption.matchAll(/@(\w+)/g)].map((m) => m[1].toLowerCase())),
+  ].slice(0, 5);
+  if (handles.length === 0) return;
+
+  const authorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Someone";
+  const mentioned = await db
+    .select({ userId: profilesTable.userId })
+    .from(profilesTable)
+    .where(inArray(profilesTable.handle, handles));
+
+  for (const mp of mentioned) {
+    if (mp.userId === user.id) continue; // don't notify yourself
+    const mentionedUserId = mp.userId;
+    const notifId = crypto.randomUUID();
+    await db.insert(notificationsTable).values({
+      id: notifId,
+      userId: mentionedUserId,
+      type: "mention",
+      fromId: user.id,
+      fromName: authorName,
+      fromAvatarUrl: user.profileImageUrl ?? null,
+      text: "tagged you in a post",
+      link: `/post/${postId}`,
+    });
+    broadcast(mentionedUserId, {
+      type: "notification",
+      userId: mentionedUserId,
+      notifType: "mention",
+      fromId: user.id,
+      fromName: authorName,
+      fromAvatarUrl: user.profileImageUrl ?? null,
+      text: `${authorName} tagged you in a post`,
+      link: `/post/${postId}`,
+    });
+
+    try {
+      const [[p], [s]] = await Promise.all([
+        db.select({ contactEmail: profilesTable.contactEmail }).from(profilesTable).where(eq(profilesTable.userId, mentionedUserId)).limit(1),
+        db.select({ settings: userSettingsTable.settings, notifEmailResumeAt: userSettingsTable.notifEmailResumeAt }).from(userSettingsTable).where(eq(userSettingsTable.userId, mentionedUserId)).limit(1),
+      ]);
+      const emailSettings = s?.settings as Record<string, unknown> | null;
+      const emailSnoozed = isEmailPaused(emailSettings, s?.notifEmailResumeAt);
+      const wantsEmail = !emailSnoozed && emailSettings?.notif_email_mentions !== false;
+      if (emailSnoozed) {
+        db.update(notificationsTable).set({ emailSkipped: true }).where(eq(notificationsTable.id, notifId)).catch(() => {});
+      }
+      if (wantsEmail && p?.contactEmail) {
+        const unsubToken = generateUnsubscribeToken(mentionedUserId);
+        const unsubscribeUrl = `https://kilndrop.com/api/unsubscribe/mentions?token=${encodeURIComponent(unsubToken)}`;
+        const html = await prependSnoozeRecap(mentionedUserId, newMentionEmail(authorName, caption.trim(), postId, unsubscribeUrl));
+        await sendEmailWithRetry({ to: p.contactEmail, subject: `${authorName} tagged you on Kiln`, html }, { label: "post mention notification" });
+      }
+    } catch (err) {
+      logger.warn({ err, mentionedUserId, postId }, "Failed to send post mention email");
+    }
+  }
+}
 
 // POST /posts — create post
 router.post("/posts", async (req, res): Promise<void> => {
@@ -97,6 +159,13 @@ router.post("/posts", async (req, res): Promise<void> => {
           }
         })
         .catch(() => {});
+
+      // Tag people directly in the post: notify any @mentioned users.
+      if (post.caption) {
+        notifyPostMentions(post.id, post.caption, user).catch((err) => {
+          req.log.warn({ err, postId: post.id }, "notifyPostMentions failed");
+        });
+      }
     }
 
     db.select({ count: sql`COUNT(*)` })
@@ -454,6 +523,94 @@ router.post("/posts/:postId/comments", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "addComment error");
     res.status(500).json({ error: "Failed to add comment" });
+  }
+});
+
+// POST /posts/:postId/repost — toggle a true repost (shares the original to the
+// reposter's followers + profile, credited to the original author).
+router.post("/posts/:postId/repost", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { postId } = req.params;
+  try {
+    const user = req.user;
+    const [post] = await db.select({ authorId: postsTable.authorId, caption: postsTable.caption })
+      .from(postsTable).where(eq(postsTable.id, postId));
+    if (!post) { res.status(404).json({ error: "Not found" }); return; }
+
+    const reposterName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Artist";
+
+    const [existing] = await db.select({ id: repostsTable.id }).from(repostsTable)
+      .where(and(eq(repostsTable.postId, postId), eq(repostsTable.reposterId, user.id)));
+
+    let reposted: boolean;
+    if (existing) {
+      await db.delete(repostsTable).where(eq(repostsTable.id, existing.id));
+      await db.update(postsTable)
+        .set({ repostCount: sql`GREATEST(${postsTable.repostCount} - 1, 0)` })
+        .where(eq(postsTable.id, postId));
+      reposted = false;
+    } else {
+      await db.insert(repostsTable).values({
+        id: crypto.randomUUID(),
+        postId,
+        reposterId: user.id,
+        reposterName,
+        reposterAvatarUrl: user.profileImageUrl ?? null,
+      }).onConflictDoNothing();
+      await db.update(postsTable)
+        .set({ repostCount: sql`${postsTable.repostCount} + 1` })
+        .where(eq(postsTable.id, postId));
+      reposted = true;
+
+      // Notify the original author (skip self-reposts)
+      if (post.authorId !== user.id) {
+        await db.insert(notificationsTable).values({
+          id: crypto.randomUUID(),
+          userId: post.authorId,
+          type: "repost",
+          fromId: user.id,
+          fromName: reposterName,
+          fromAvatarUrl: user.profileImageUrl ?? null,
+          text: "reposted your post to their followers",
+          link: `/post/${postId}`,
+        });
+        broadcast(post.authorId, {
+          type: "notification",
+          userId: post.authorId,
+          notifType: "repost",
+          fromId: user.id,
+          fromName: reposterName,
+          fromAvatarUrl: user.profileImageUrl ?? null,
+          text: `${reposterName} reposted your post`,
+          link: `/post/${postId}`,
+        });
+      }
+    }
+
+    const [row] = await db.select({ repostCount: postsTable.repostCount })
+      .from(postsTable).where(eq(postsTable.id, postId));
+    const repostCount = row?.repostCount ?? 0;
+    // Broadcast the authoritative aggregate count only (never the actor's id).
+    broadcastAll({ type: "repost", postId, repostCount });
+
+    res.json({ reposted, repostCount });
+  } catch (err) {
+    req.log.error({ err }, "toggleRepost error");
+    res.status(500).json({ error: "Failed to repost" });
+  }
+});
+
+// GET /me/reposts — postIds the current user has reposted (for UI hydration)
+router.get("/me/reposts", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.json({ postIds: [] }); return; }
+  try {
+    const rows = await db.select({ postId: repostsTable.postId }).from(repostsTable)
+      .where(eq(repostsTable.reposterId, req.user.id));
+    res.json({ postIds: rows.map((r) => r.postId) });
+  } catch (err) {
+    req.log.error({ err }, "getMyReposts error");
+    res.status(500).json({ error: "Failed to load reposts" });
   }
 });
 

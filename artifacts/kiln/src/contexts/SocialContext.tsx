@@ -453,6 +453,20 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {});
 
+    // Hydrate which posts the current user has reposted so the repost button
+    // reflects server truth across devices/sessions.
+    fetch("/api/me/reposts", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { postIds?: string[] } | null) => {
+        if (!data?.postIds?.length) return;
+        update((s) => {
+          const next = { ...s.reelReposts };
+          for (const id of data.postIds!) next[`db-${id}`] = true;
+          return { ...s, reelReposts: next };
+        });
+      })
+      .catch(() => {});
+
     fetch("/api/notifications", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { notifications?: Array<{ id: string; type: string; fromId: string; fromName: string; fromAvatarUrl: string | null; text: string; link?: string | null; imageUrl?: string | null; read: boolean; emailSkipped?: boolean; smsSkipped?: boolean; createdAt: string }> } | null) => {
@@ -689,8 +703,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleReelRepost = useCallback((reelId: string, reel: { artistId: string; artistName: string; caption: string; thumbnail: string }) => {
+    let wasReposted = false;
     update((s) => {
       const alreadyReposted = !!s.reelReposts[reelId];
+      wasReposted = alreadyReposted;
       const newReposts = alreadyReposted
         ? s.reposts.filter((r) => r.reelId !== reelId)
         : [{ reelId, artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnailUrl: reel.thumbnail, repostedAt: new Date().toISOString() }, ...s.reposts];
@@ -700,6 +716,25 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       ];
       return { ...s, reelReposts: { ...s.reelReposts, [reelId]: !alreadyReposted }, reposts: newReposts, activityFeed: newActivity };
     });
+
+    // Persist DB-backed reposts; static demo reels stay local-only.
+    if (reelId.startsWith("db-")) {
+      fetch(`/api/posts/${reelId.slice(3)}/repost`, { method: "POST", credentials: "include" })
+        .then((r) => { if (!r.ok) throw new Error(); })
+        .catch(() => {
+          // Revert optimistic state on failure so the UI matches the server.
+          update((s) => ({
+            ...s,
+            reelReposts: { ...s.reelReposts, [reelId]: wasReposted },
+            reposts: wasReposted
+              ? (s.reposts.some((r) => r.reelId === reelId)
+                  ? s.reposts
+                  : [{ reelId, artistId: reel.artistId, artistName: reel.artistName, caption: reel.caption, thumbnailUrl: reel.thumbnail, repostedAt: new Date().toISOString() }, ...s.reposts])
+              : s.reposts.filter((r) => r.reelId !== reelId),
+          }));
+          toast({ title: "Couldn\u2019t repost", description: "Please try again.", variant: "destructive" });
+        });
+    }
   }, []);
 
   const blockArtist = useCallback((artistId: string) => {

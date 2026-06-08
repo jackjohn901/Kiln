@@ -41,6 +41,8 @@ const FEATHER_ICONS: Record<NotificationIconName, keyof typeof Feather.glyphMap>
   premium: "star",
   auction: "trending-up",
   message: "mail",
+  repost: "repeat",
+  shoutout: "volume-2",
   default: "bell",
 };
 

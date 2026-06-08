@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star, Gavel, Mail, BellOff, type LucideIcon } from "lucide-react";
+import { X, Bell, Heart, MessageCircle, UserPlus, Hammer, DollarSign, Calendar, ShoppingBag, Zap, Star, Gavel, Mail, BellOff, Repeat2, Megaphone, type LucideIcon } from "lucide-react";
 import { getNotificationIcon, type NotificationIconName } from "@workspace/notifications";
 import { useSocial, KilnNotification } from "@/contexts/SocialContext";
 import { useSettings, PUSH_KEYS } from "@/contexts/SettingsContext";
@@ -32,6 +32,8 @@ const ICON_COMPONENTS: Record<NotificationIconName, LucideIcon> = {
   premium: Star,
   auction: Gavel,
   message: Mail,
+  repost: Repeat2,
+  shoutout: Megaphone,
   default: Bell,
 };
 

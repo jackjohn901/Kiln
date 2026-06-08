@@ -6,9 +6,10 @@ import { logger } from "./logger";
 export type WsEvent =
   | { type: "like"; postId: string; likeCount: number }
   | { type: "save"; postId: string; saveCount: number }
+  | { type: "repost"; postId: string; repostCount: number }
   | { type: "follow"; followerId: string; followingId: string }
   | { type: "comment"; postId: string; commentId: string; authorId: string }
-  | { type: "notification"; userId: string; text: string; link?: string; notifType?: string; fromName?: string }
+  | { type: "notification"; userId: string; text: string; link?: string; notifType?: string; fromName?: string; fromId?: string; fromAvatarUrl?: string | null }
   | { type: "message"; threadId: string; senderId: string; recipientId: string; senderName: string; senderAvatarUrl: string | null; attachmentUrl?: string }
   | { type: "typing"; threadId: string; userId: string }
   | { type: "bid"; auctionId: string; currentBid: number; bidCount: number; bidderName: string; bidAt?: string }

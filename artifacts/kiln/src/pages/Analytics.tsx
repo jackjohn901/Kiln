@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, ChevronDown, ChevronUp, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, MessageSquare, Radio, Gavel, Zap, BarChart2 } from "lucide-react";
+import { ChevronLeft, ChevronDown, ChevronUp, TrendingUp, DollarSign, Users, Eye, ArrowUp, ArrowDown, Star, ShoppingBag, MessageCircle, MessageSquare, Radio, Gavel, Zap, BarChart2, MapPin } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial } from "@/contexts/SocialContext";
 import { useProfile } from "@/contexts/ProfileContext";
@@ -278,6 +278,8 @@ export default function Analytics() {
     totalSaves: number; totalViews: number; followerCount: number; topPosts: ApiPost[];
     postsByDay: Record<string, number>; likesByDay: Record<string, number>; viewsByDay: Record<string, number>;
     engagementByHour?: number[][]; engagementSamples?: number;
+    topLocations?: { location: string; count: number; pct: number }[];
+    locatedFollowerCount?: number;
   } | null>(null);
 
   // Real "best time to post" from the server's engagement-by-hour grid (7 days x
@@ -823,6 +825,49 @@ export default function Analytics() {
                   </p>
                 </div>
               )}
+            </>
+          )}
+        </div>
+
+        {/* Top follower locations (real data from follower profile locations) */}
+        <div className="mb-4 rounded-2xl border border-white/8 bg-stone-900/60 p-4 sm:p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-stone-200">Top Locations</h2>
+              <p className="text-xs text-stone-500 mt-0.5">Where your followers are based, from their profile location</p>
+            </div>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400">
+              <MapPin size={13} />
+            </div>
+          </div>
+          {!analyticsData?.topLocations || analyticsData.topLocations.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-sm text-stone-400">No location data yet.</p>
+              <p className="text-xs text-stone-600 mt-1.5">Once more of your followers add a location to their profile, we'll show where your audience is based.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2.5">
+                {analyticsData.topLocations.map((loc) => (
+                  <div key={loc.location}>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-stone-300 truncate">
+                        <MapPin size={11} className="text-sky-400 shrink-0" />
+                        <span className="truncate">{loc.location}</span>
+                      </span>
+                      <span className="text-xs text-stone-500 tabular-nums shrink-0">
+                        {loc.pct}% · {loc.count.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-stone-800">
+                      <div className="h-full rounded-full bg-sky-500/70" style={{ width: `${Math.max(loc.pct, 2)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-stone-600">
+                Based on {(analyticsData.locatedFollowerCount ?? 0).toLocaleString()} follower{(analyticsData.locatedFollowerCount ?? 0) !== 1 ? "s" : ""} with a location set.
+              </p>
             </>
           )}
         </div>

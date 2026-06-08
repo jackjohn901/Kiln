@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail, MailX, Gavel, MessageSquareX } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, Heart, MessageCircle, UserPlus, Zap, Star, BookOpen, DollarSign, ShoppingBag, Calendar, Hammer, Mail, MailX, Gavel, MessageSquareX, Repeat2, Megaphone, AtSign } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useSocial, type KilnNotification } from "@/contexts/SocialContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -23,6 +23,9 @@ const TYPE_CONFIG: Record<KilnNotification["type"], { icon: typeof Bell; color: 
   commission_payment:  { icon: DollarSign,    color: "text-emerald-400",bg: "bg-emerald-500/15" },
   message:             { icon: Mail,          color: "text-violet-400", bg: "bg-violet-500/15" },
   post_published:      { icon: Zap,           color: "text-amber-400",  bg: "bg-amber-500/15" },
+  repost:              { icon: Repeat2,       color: "text-emerald-400",bg: "bg-emerald-500/15" },
+  shoutout:            { icon: Megaphone,     color: "text-amber-400",  bg: "bg-amber-500/15" },
+  mention:             { icon: AtSign,        color: "text-sky-400",    bg: "bg-sky-500/15" },
 };
 
 
