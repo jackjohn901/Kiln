@@ -3,14 +3,15 @@ import {
   db, reportsTable, verificationApplicationsTable, profilesTable,
   postsTable, followsTable, likesTable, ordersTable,
   commissionsTable, workshopsTable, workshopBookingsTable, usersTable,
-  notificationsTable, failedEmailsTable,
+  notificationsTable, failedEmailsTable, listingsTable,
 } from "@workspace/db";
-import { eq, desc, sql, gte, count, and, isNull } from "drizzle-orm";
+import { eq, desc, asc, sql, gte, count, and, isNull, inArray } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker, getSeedHistory } from "../lib/seed";
 import { sendEmail, broadcastEmail } from "../lib/email";
 import { retryFailedEmail } from "../lib/emailQueue";
 import { getWebhookState } from "../lib/webhookState";
+import { getUncachableStripeClient } from "../stripeClient";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -410,6 +411,118 @@ router.post("/admin/backfill-order-notes", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.backfillOrderNotes error");
     res.status(500).json({ error: "Failed to backfill order notes" });
+  }
+});
+
+// GET /admin/order-lookup?sessionId=<stripe session id>
+// Support tool: trace a failed/abandoned checkout to its Stripe session. Given a
+// Stripe checkout session ID, returns whether order rows exist for the dedupe key
+// `stripe:<sessionId>`, the buyer ID, and any listing IDs from the session metadata
+// that have no order row or no longer resolve to a listing. Lets support diagnose
+// order-creation failures without grepping raw server logs.
+router.get("/admin/order-lookup", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Accept the raw Stripe session ID or the stored "stripe:<id>" dedupe key.
+  const raw = String(req.query["sessionId"] ?? "").trim();
+  const sessionId = raw.startsWith("stripe:") ? raw.slice("stripe:".length).trim() : raw;
+  if (!sessionId) {
+    res.status(400).json({ error: "sessionId is required" });
+    return;
+  }
+
+  const dedupeKey = `stripe:${sessionId}`;
+
+  try {
+    // 1. Existing order rows for this session, if any.
+    const orders = await db
+      .select({
+        id: ordersTable.id,
+        buyerId: ordersTable.buyerId,
+        sellerId: ordersTable.sellerId,
+        type: ordersTable.type,
+        refId: ordersTable.refId,
+        title: ordersTable.title,
+        amount: ordersTable.amount,
+        currency: ordersTable.currency,
+        status: ordersTable.status,
+        createdAt: ordersTable.createdAt,
+      })
+      .from(ordersTable)
+      .where(eq(ordersTable.notes, dedupeKey))
+      .orderBy(asc(ordersTable.createdAt));
+
+    // 2. Pull the Stripe session metadata to learn the intended buyer + listings.
+    //    Best-effort: a malformed/unknown session ID shouldn't fail the whole lookup.
+    let session: {
+      paymentStatus: string | null;
+      amountTotal: number | null;
+      currency: string | null;
+      metaUserId: string | null;
+      platform: string | null;
+      listingIds: string[];
+      error: string | null;
+    } = {
+      paymentStatus: null,
+      amountTotal: null,
+      currency: null,
+      metaUserId: null,
+      platform: null,
+      listingIds: [],
+      error: null,
+    };
+
+    try {
+      const stripe = await getUncachableStripeClient();
+      const s = await stripe.checkout.sessions.retrieve(sessionId);
+      const meta = (s.metadata ?? {}) as Record<string, string>;
+      session = {
+        paymentStatus: s.payment_status ?? null,
+        amountTotal: s.amount_total ?? null,
+        currency: s.currency ?? null,
+        metaUserId: meta.userId ?? null,
+        platform: meta.platform ?? null,
+        listingIds: meta.listingIds ? meta.listingIds.split(",").filter(Boolean) : [],
+        error: null,
+      };
+    } catch (err) {
+      req.log.warn({ err, sessionId }, "admin.orderLookup: Stripe session retrieve failed");
+      session.error = "Could not retrieve this session from Stripe (it may not exist or belong to another account).";
+    }
+
+    // 3. Determine which listing IDs from the session never produced an order row,
+    //    and which of those no longer resolve to an existing listing.
+    const orderedRefIds = new Set(orders.map((o) => o.refId).filter((id): id is string => !!id));
+    const missingListingIds = session.listingIds.filter((id) => !orderedRefIds.has(id));
+
+    let unresolvedListingIds: string[] = [];
+    if (missingListingIds.length > 0) {
+      const existing = await db
+        .select({ id: listingsTable.id })
+        .from(listingsTable)
+        .where(inArray(listingsTable.id, missingListingIds));
+      const existingIds = new Set(existing.map((l) => l.id));
+      unresolvedListingIds = missingListingIds.filter((id) => !existingIds.has(id));
+    }
+
+    // Buyer ID: prefer the order rows, fall back to the Stripe session metadata.
+    const buyerId = orders[0]?.buyerId ?? session.metaUserId ?? null;
+
+    res.json({
+      sessionId,
+      dedupeKey,
+      orderCount: orders.length,
+      ordersExist: orders.length > 0,
+      buyerId,
+      orders: orders.map((o) => ({ ...o, createdAt: o.createdAt.toISOString() })),
+      missingListingIds,
+      unresolvedListingIds,
+      session,
+    });
+  } catch (err) {
+    req.log.error({ err }, "admin.orderLookup error");
+    res.status(500).json({ error: "Failed to look up order session" });
   }
 });
 

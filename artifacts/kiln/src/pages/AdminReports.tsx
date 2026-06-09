@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History, Inbox } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History, Inbox, Search } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -119,6 +119,39 @@ interface FailedEmailCounts {
   failed: number;
 }
 
+interface OrderLookupOrder {
+  id: string;
+  buyerId: string;
+  sellerId: string;
+  type: string;
+  refId: string | null;
+  title: string;
+  amount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+}
+
+interface OrderLookupResult {
+  sessionId: string;
+  dedupeKey: string;
+  orderCount: number;
+  ordersExist: boolean;
+  buyerId: string | null;
+  orders: OrderLookupOrder[];
+  missingListingIds: string[];
+  unresolvedListingIds: string[];
+  session: {
+    paymentStatus: string | null;
+    amountTotal: number | null;
+    currency: string | null;
+    metaUserId: string | null;
+    platform: string | null;
+    listingIds: string[];
+    error: string | null;
+  };
+}
+
 interface SeedHistoryEntry {
   id: string;
   operation: string;
@@ -195,6 +228,12 @@ export default function AdminReports() {
   const [failedEmailError, setFailedEmailError] = useState<string | null>(null);
   const [retryingEmail, setRetryingEmail] = useState<number | null>(null);
   const [retryNotice, setRetryNotice] = useState<{ id: number; delivered: boolean } | null>(null);
+
+  // Order lookup (support tool) state
+  const [orderLookupInput, setOrderLookupInput] = useState("");
+  const [orderLookupResult, setOrderLookupResult] = useState<OrderLookupResult | null>(null);
+  const [orderLookupLoading, setOrderLookupLoading] = useState(false);
+  const [orderLookupError, setOrderLookupError] = useState<string | null>(null);
 
   async function runBackfill(dryRun: boolean) {
     setBackfillLoading(true);
@@ -510,6 +549,38 @@ export default function AdminReports() {
     }
   }
 
+  async function runOrderLookup() {
+    const trimmed = orderLookupInput.trim();
+    if (!trimmed) {
+      setOrderLookupError("Enter a Stripe session ID first.");
+      return;
+    }
+    setOrderLookupLoading(true);
+    setOrderLookupError(null);
+    setOrderLookupResult(null);
+    try {
+      const res = await fetch(`/api/admin/order-lookup?sessionId=${encodeURIComponent(trimmed)}`, {
+        credentials: "include",
+      });
+      const data = await res.json() as OrderLookupResult & { error?: string };
+      if (!res.ok) {
+        setOrderLookupError(data?.error ?? "Lookup failed");
+        return;
+      }
+      setOrderLookupResult(data);
+    } catch {
+      setOrderLookupError("Network error — please try again");
+    } finally {
+      setOrderLookupLoading(false);
+    }
+  }
+
+  function resetOrderLookup() {
+    setOrderLookupInput("");
+    setOrderLookupResult(null);
+    setOrderLookupError(null);
+  }
+
   useEffect(() => {
     setLoading(true);
     fetch(`/api/admin/reports?status=${filter}`, { credentials: "include" })
@@ -604,7 +675,7 @@ export default function AdminReports() {
           <button onClick={() => setSection("verifications")} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "verifications" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <BadgeCheck size={13} /> Verify Artists
           </button>
-          <button onClick={() => { setSection("maintenance"); resetBackfill(); resetSeed(); resetNotif(); resetHealth(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
+          <button onClick={() => { setSection("maintenance"); resetBackfill(); resetSeed(); resetNotif(); resetHealth(); resetOrderLookup(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <Wrench size={13} /> Maintenance
           </button>
         </div>
@@ -828,6 +899,164 @@ export default function AdminReports() {
                 </div>
               </div>
             )}
+
+            {/* Order lookup (support tool) card */}
+            <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <Search size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <h2 className="text-sm font-semibold text-amber-100">Look up an order by payment session</h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Paste a Stripe checkout session ID to trace what happened during checkout — whether order rows were created, who the buyer was, and which listings (if any) never made it into an order. Useful for diagnosing failed or abandoned checkouts without reading server logs.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={orderLookupInput}
+                  onChange={(e) => setOrderLookupInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void runOrderLookup(); }}
+                  placeholder="cs_test_… or stripe:cs_test_…"
+                  className="flex-1 rounded-xl border border-white/10 bg-stone-950 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-amber-500/40 focus:outline-none font-mono"
+                />
+                <button
+                  onClick={runOrderLookup}
+                  disabled={orderLookupLoading}
+                  className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40 shrink-0"
+                >
+                  {orderLookupLoading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
+                  {orderLookupLoading ? "Looking up…" : "Look up"}
+                </button>
+              </div>
+
+              {orderLookupError && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-400">
+                  {orderLookupError}
+                </div>
+              )}
+
+              {orderLookupResult && (
+                <div className="rounded-xl border border-white/6 bg-stone-800/60 px-4 py-3 space-y-3">
+                  {/* Orders exist summary */}
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 shrink-0 ${orderLookupResult.ordersExist ? "text-emerald-400" : "text-amber-400"}`}>
+                      {orderLookupResult.ordersExist ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+                    </span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-stone-200">
+                        {orderLookupResult.ordersExist
+                          ? `${orderLookupResult.orderCount} order ${orderLookupResult.orderCount === 1 ? "row" : "rows"} found for this session`
+                          : "No order rows exist for this session"}
+                      </p>
+                      <p className="text-[11px] text-stone-500 font-mono break-all">{orderLookupResult.dedupeKey}</p>
+                    </div>
+                  </div>
+
+                  {/* Buyer */}
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 shrink-0 text-stone-500"><Eye size={13} /></span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-stone-200">Buyer</p>
+                      <p className="text-[11px] text-stone-400">
+                        {orderLookupResult.buyerId ? (
+                          <span className="font-mono bg-stone-700 px-1.5 py-0.5 rounded text-stone-300">{orderLookupResult.buyerId}</span>
+                        ) : (
+                          <span className="text-stone-500">Unknown — no order rows and no buyer in the Stripe session metadata.</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Stripe session info */}
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 shrink-0 text-stone-500"><Activity size={13} /></span>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-stone-200">Stripe session</p>
+                      {orderLookupResult.session.error ? (
+                        <p className="text-[11px] text-amber-400">{orderLookupResult.session.error}</p>
+                      ) : (
+                        <p className="text-[11px] text-stone-400">
+                          Payment{" "}
+                          <span className={orderLookupResult.session.paymentStatus === "paid" ? "text-emerald-400" : "text-amber-400"}>
+                            {orderLookupResult.session.paymentStatus ?? "—"}
+                          </span>
+                          {orderLookupResult.session.amountTotal != null && (
+                            <> · {(orderLookupResult.session.amountTotal / 100).toLocaleString(undefined, { style: "currency", currency: (orderLookupResult.session.currency ?? "usd").toUpperCase() })}</>
+                          )}
+                          {orderLookupResult.session.platform && orderLookupResult.session.platform !== "kiln" && (
+                            <span className="text-rose-400"> · platform "{orderLookupResult.session.platform}" (not kiln)</span>
+                          )}
+                          {orderLookupResult.session.listingIds.length > 0 && (
+                            <> · {orderLookupResult.session.listingIds.length} listing{orderLookupResult.session.listingIds.length === 1 ? "" : "s"} in metadata</>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Missing / unresolved listings */}
+                  {orderLookupResult.missingListingIds.length > 0 && (
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 shrink-0 text-amber-400"><AlertTriangle size={13} /></span>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-stone-200">
+                          {orderLookupResult.missingListingIds.length} listing{orderLookupResult.missingListingIds.length === 1 ? "" : "s"} with no order row
+                        </p>
+                        <p className="text-[10px] font-mono text-stone-500 break-all">
+                          {orderLookupResult.missingListingIds.join(", ")}
+                        </p>
+                        {orderLookupResult.unresolvedListingIds.length > 0 && (
+                          <p className="text-[11px] text-rose-400">
+                            {orderLookupResult.unresolvedListingIds.length} of these no longer exist as listings (likely deleted) — this is why the order failed:
+                            <span className="block font-mono text-[10px] text-rose-300/80 break-all mt-0.5">
+                              {orderLookupResult.unresolvedListingIds.join(", ")}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Order rows */}
+                  {orderLookupResult.orders.length > 0 && (
+                    <div className="border-t border-white/5 pt-2 space-y-2">
+                      <p className="text-[11px] font-medium text-stone-400">Order rows</p>
+                      <ul className="space-y-1.5">
+                        {orderLookupResult.orders.map((o) => (
+                          <li key={o.id} className="rounded-lg bg-stone-950/40 border border-white/5 px-3 py-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-xs text-stone-200 truncate">{o.title}</p>
+                                <p className="text-[10px] text-stone-500 font-mono truncate">{o.id}</p>
+                              </div>
+                              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-stone-700/50 text-stone-300">
+                                {o.status}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-stone-600 mt-1">
+                              {o.amount.toLocaleString(undefined, { style: "currency", currency: (o.currency ?? "usd").toUpperCase() })}
+                              {o.refId && <> · listing <span className="font-mono">{o.refId}</span></>}
+                              {" · "}{new Date(o.createdAt).toLocaleString()}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="border-t border-white/5 pt-2 flex justify-end">
+                    <button
+                      onClick={resetOrderLookup}
+                      className="text-[11px] text-stone-600 hover:text-stone-400 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Failed email queue card */}
             <div className="rounded-2xl border border-white/8 bg-stone-900 p-5 space-y-4">
