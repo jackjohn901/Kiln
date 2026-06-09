@@ -27,8 +27,8 @@ This threat model is production-scoped. Mock/demo-only pages and local seed conv
 ## Scan Anchors
 
 - **Production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/routes/index.ts`, `artifacts/api-server/src/middlewares/authMiddleware.ts`
-- **Highest-risk areas:** `artifacts/api-server/src/routes/admin.ts`, `storage.ts`, `stripe.ts`, `me.ts`, `commissions.ts`, `workshops.ts`, `digital-downloads.ts`, `video.ts`
-- **Public surfaces:** feed/search/listings/discover/trending/public object routes and most read-only catalog endpoints
+- **Highest-risk areas:** `artifacts/api-server/src/routes/admin.ts`, `storage.ts`, `stripe.ts`, `me.ts`, `commissions.ts`, `workshops.ts`, `digital-downloads.ts`, `video.ts`, `social-webhooks.ts`, `ai-listing-writer.ts`, `ai-transcribe.ts`, `elevenlabs.ts`
+- **Public surfaces:** feed/search/listings/discover/trending/public object routes, workshop catalog/detail reads, webhook endpoints, and most read-only catalog endpoints
 - **Authenticated surfaces:** `/me/*`, messages, social mutations, commissions, payouts, bookings, uploads, reports, settings
 - **Usually dev-only / lower-priority for repeat scans:** static frontend data under `artifacts/kiln/src/data`, seed logic in `artifacts/api-server/src/lib/seed.ts`, mock/demo-only screens unless backed by live API routes
 
