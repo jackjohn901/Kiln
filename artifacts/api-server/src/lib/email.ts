@@ -148,6 +148,10 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
 
 const BASE_URL = "https://kilndrop.com/kiln";
 
+// Public base for API endpoints (PDF receipts, etc.). The API server is mounted
+// at /api on the production domain — distinct from the /kiln web app base.
+const API_BASE_URL = "https://kilndrop.com/api";
+
 // Placeholder marker, injected into every shelled email right below the brand
 // header. `injectSnoozeRecap` swaps it for a "while you were away" banner on the
 // first email a user receives after an email snooze lifts. It is an HTML comment,
@@ -767,6 +771,19 @@ export function manualPayoutReceiptEmail(
           : `${BASE_URL}/orders`,
       "View your receipt",
     )}
+    ${(() => {
+      // Secondary link to the downloadable PDF receipt. The PDF endpoints
+      // require the buyer to be signed in (they scope by buyerId), so this
+      // works for the buyer who placed the order.
+      const pdfUrl = cartSessionKey
+        ? `${API_BASE_URL}/me/orders/cart/${encodeURIComponent(cartSessionKey)}/receipt.pdf`
+        : orderId
+          ? `${API_BASE_URL}/me/orders/${orderId}/receipt.pdf`
+          : null;
+      return pdfUrl
+        ? `<p style="margin:16px 0 0;font-size:13px;color:#78716c;">Need it for your records? <a href="${pdfUrl}" style="color:#f59e0b;text-decoration:underline;">Download PDF receipt</a></p>`
+        : "";
+    })()}
   `);
 }
 
