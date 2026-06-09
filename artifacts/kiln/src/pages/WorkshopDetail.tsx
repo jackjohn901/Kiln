@@ -78,7 +78,7 @@ export default function WorkshopDetail() {
     if (!w || soldOut || w.isBooked) return;
     // Paid workshops require Stripe checkout; navigate there instead of direct booking.
     if (w.price > 0) {
-      navigate(`/workshop-checkout/${w.id}`);
+      navigate(`/workshops/book/${w.id}`);
       return;
     }
     setBooking(true);

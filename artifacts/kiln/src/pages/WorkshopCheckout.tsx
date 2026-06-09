@@ -1,39 +1,61 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, CalendarPlus, Download, Video } from "lucide-react";
+import { ArrowLeft, CheckCircle, MapPin, Clock, Users, Star, CalendarPlus, Download, Video, Loader2 } from "lucide-react";
 import Nav from "@/components/Nav";
-import { workshops, type Workshop } from "@/data/workshops";
 import { useProfile } from "@/contexts/ProfileContext";
 import ReviewsSection from "@/components/ReviewsSection";
 import CheckoutErrorNotice from "@/components/CheckoutErrorNotice";
 
-function buildGcalUrl(workshop: Workshop): string {
-  const details = `Workshop with ${workshop.artistName} on Kiln.`;
-  const location = workshop.location ?? "";
+interface ApiWorkshop {
+  id: string;
+  artistId: string;
+  artistName: string;
+  artistAvatarUrl: string | null;
+  title: string;
+  description: string | null;
+  technique: string | null;
+  level: string;
+  location: string | null;
+  isOnline: boolean;
+  meetingUrl: string | null;
+  price: number;
+  maxSpots: number;
+  spotsBooked: number;
+  spotsLeft: number;
+  durationHours: number;
+  imageUrl: string | null;
+  startDate: string | null;
+  isBooked: boolean;
+  tags: string[];
+}
 
-  const match = workshop.startDate.match(/^([A-Za-z]+ \d+)[–\-]?\d*,?\s*(\d{4})/);
-  let datesParam = "";
-  if (match) {
-    const parsed = new Date(`${match[1]}, ${match[2]}`);
-    if (!isNaN(parsed.getTime())) {
-      const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-      const durationMs = (() => {
-        const dur = workshop.duration.toLowerCase();
-        const dayMatch = dur.match(/(\d+)\s*day/);
-        const hourMatch = dur.match(/(\d+)\s*hour/);
-        if (dayMatch) return parseInt(dayMatch[1]) * 8 * 60 * 60 * 1000;
-        if (hourMatch) return parseInt(hourMatch[1]) * 60 * 60 * 1000;
-        return 6 * 60 * 60 * 1000;
-      })();
-      datesParam = `${fmt(parsed)}/${fmt(new Date(parsed.getTime() + durationMs))}`;
-    }
+function formatDuration(hours: number): string {
+  if (hours >= 8 && hours % 8 === 0) {
+    const days = hours / 8;
+    return `${days} day${days > 1 ? "s" : ""}`;
   }
+  return `${hours} hour${hours !== 1 ? "s" : ""}`;
+}
 
+function formatStartDate(iso: string | null): string {
+  if (!iso) return "Date TBD";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "Date TBD";
+  return d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+
+function buildGcalUrl(workshop: ApiWorkshop): string {
+  if (!workshop.startDate) return "";
+  const start = new Date(workshop.startDate);
+  if (isNaN(start.getTime())) return "";
+  const end = new Date(start.getTime() + workshop.durationHours * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const location = workshop.isOnline ? "Online" : (workshop.location ?? "");
   const qs = new URLSearchParams({
     action: "TEMPLATE",
     text: workshop.title,
-    details,
-    ...(datesParam ? { dates: datesParam } : {}),
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `Workshop with ${workshop.artistName} on Kiln.`,
     ...(location ? { location } : {}),
   });
   return `https://calendar.google.com/calendar/render?${qs.toString()}`;
@@ -41,11 +63,15 @@ function buildGcalUrl(workshop: Workshop): string {
 
 type Step = "info" | "confirm";
 
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop";
+
 export default function WorkshopCheckout() {
   const { workshopId } = useParams<{ workshopId: string }>();
   const { profile } = useProfile();
 
-  const workshop = workshops.find((w) => w.id === workshopId);
+  const [workshop, setWorkshop] = useState<ApiWorkshop | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const [step, setStep] = useState<Step>("info");
   const [form, setForm] = useState({
@@ -61,6 +87,24 @@ export default function WorkshopCheckout() {
   const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    fetch(`/api/workshops/${workshopId}`, { credentials: "include" })
+      .then(r => {
+        if (r.status === 404) { if (!cancelled) setNotFound(true); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then((data: ApiWorkshop | null) => {
+        if (cancelled || !data?.id) return;
+        setWorkshop(data);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [workshopId]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("booked") === "1") {
       setStep("confirm");
@@ -68,7 +112,18 @@ export default function WorkshopCheckout() {
     }
   }, []);
 
-  if (!workshop) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#12100e]">
+        <Nav />
+        <div className="flex items-center justify-center py-32">
+          <Loader2 size={24} className="animate-spin text-stone-600" />
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !workshop) {
     return (
       <div className="min-h-screen bg-[#12100e]">
         <Nav />
@@ -80,7 +135,7 @@ export default function WorkshopCheckout() {
     );
   }
 
-  if (workshop.spotsLeft === 0) {
+  if (workshop.spotsLeft <= 0) {
     return (
       <div className="min-h-screen bg-[#12100e]">
         <Nav />
@@ -94,6 +149,10 @@ export default function WorkshopCheckout() {
       </div>
     );
   }
+
+  const startLabel = formatStartDate(workshop.startDate);
+  const durationLabel = formatDuration(workshop.durationHours);
+  const imgSrc = workshop.imageUrl ?? FALLBACK_IMG;
 
   function field(key: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -155,15 +214,15 @@ export default function WorkshopCheckout() {
 
           <div className="rounded-2xl border border-white/10 bg-stone-900/50 p-5 mb-8 text-left">
             <img
-              src={workshop.imageUrl}
+              src={imgSrc}
               alt={workshop.title}
               className="w-full h-32 object-cover rounded-xl mb-4"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=200&fit=crop&seed=${workshop.id}`; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
             />
             <p className="font-semibold text-stone-100 mb-1">{workshop.title}</p>
             <p className="text-xs text-amber-400 mb-3">with {workshop.artistName}</p>
             <div className="space-y-1.5 text-xs text-stone-400">
-              <div className="flex items-center gap-2"><Star size={11} className="text-amber-400" />{workshop.startDate}</div>
+              <div className="flex items-center gap-2"><Star size={11} className="text-amber-400" />{startLabel}</div>
               {workshop.isOnline && workshop.meetingUrl ? (
                 <div className="flex items-center gap-2">
                   <Video size={11} className="text-sky-400 shrink-0" />
@@ -177,10 +236,10 @@ export default function WorkshopCheckout() {
                   </a>
                 </div>
               ) : (
-                <div className="flex items-center gap-2"><MapPin size={11} className="shrink-0" />{workshop.location}</div>
+                <div className="flex items-center gap-2"><MapPin size={11} className="shrink-0" />{workshop.location ?? "Location TBD"}</div>
               )}
-              <div className="flex items-center gap-2"><Clock size={11} />{workshop.duration}</div>
-              <div className="flex items-center gap-2"><Users size={11} />{workshop.spotsLeft - 1} spots remaining after yours</div>
+              <div className="flex items-center gap-2"><Clock size={11} />{durationLabel}</div>
+              <div className="flex items-center gap-2"><Users size={11} />{Math.max(0, workshop.spotsLeft - 1)} spots remaining after yours</div>
             </div>
             <div className="mt-3 pt-3 border-t border-white/8 flex justify-between items-center">
               <span className="text-xs text-stone-500">Amount paid</span>
@@ -191,15 +250,17 @@ export default function WorkshopCheckout() {
           <div className="mb-6">
             <p className="text-xs text-stone-500 mb-3">Add this workshop to your calendar:</p>
             <div className="flex flex-wrap gap-3 justify-center">
-              <a
-                href={buildGcalUrl(workshop)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
-              >
-                <CalendarPlus size={14} />
-                Google Calendar
-              </a>
+              {buildGcalUrl(workshop) && (
+                <a
+                  href={buildGcalUrl(workshop)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
+                >
+                  <CalendarPlus size={14} />
+                  Google Calendar
+                </a>
+              )}
               <a
                 href={`/api/workshops/${workshop.id}/calendar.ics`}
                 download
@@ -295,27 +356,33 @@ export default function WorkshopCheckout() {
           <div className="rounded-2xl border border-white/10 bg-stone-900/50 p-5 h-fit">
             <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-4">Workshop Details</h3>
             <img
-              src={workshop.imageUrl}
+              src={imgSrc}
               alt={workshop.title}
               className="w-full h-36 object-cover rounded-xl mb-4"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&h=200&fit=crop&seed=${workshop.id}`; }}
+              onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMG; }}
             />
             <p className="font-semibold text-stone-100 mb-1 leading-snug">{workshop.title}</p>
             <div className="flex items-center gap-2 mb-3">
-              <img src={workshop.artistAvatarUrl} alt={workshop.artistName} className="h-5 w-5 rounded-full object-cover" />
+              {workshop.artistAvatarUrl && (
+                <img src={workshop.artistAvatarUrl} alt={workshop.artistName} className="h-5 w-5 rounded-full object-cover" />
+              )}
               <span className="text-xs text-amber-400">{workshop.artistName}</span>
             </div>
             <div className="space-y-2 text-xs text-stone-400 mb-4">
-              <div className="flex items-center gap-2"><Star size={11} className="text-amber-400 shrink-0" />{workshop.startDate}</div>
-              <div className="flex items-center gap-2"><MapPin size={11} className="shrink-0" />{workshop.location}</div>
-              <div className="flex items-center gap-2"><Clock size={11} className="shrink-0" />{workshop.duration}</div>
-              <div className="flex items-center gap-2"><Users size={11} className="shrink-0" />{workshop.spotsLeft} of {workshop.spots} spots left</div>
+              <div className="flex items-center gap-2"><Star size={11} className="text-amber-400 shrink-0" />{startLabel}</div>
+              {workshop.isOnline ? (
+                <div className="flex items-center gap-2"><Video size={11} className="shrink-0 text-sky-400" />Online</div>
+              ) : (
+                <div className="flex items-center gap-2"><MapPin size={11} className="shrink-0" />{workshop.location ?? "Location TBD"}</div>
+              )}
+              <div className="flex items-center gap-2"><Clock size={11} className="shrink-0" />{durationLabel}</div>
+              <div className="flex items-center gap-2"><Users size={11} className="shrink-0" />{workshop.spotsLeft} of {workshop.maxSpots} spots left</div>
             </div>
-            {workshop.includes.length > 0 && (
+            {workshop.tags.length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-stone-500 mb-2">What's included:</p>
                 <div className="flex flex-wrap gap-1">
-                  {workshop.includes.map((inc) => (
+                  {workshop.tags.map((inc) => (
                     <span key={inc} className="rounded-full bg-stone-800 px-2 py-0.5 text-xs text-stone-400">{inc}</span>
                   ))}
                 </div>
