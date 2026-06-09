@@ -56,6 +56,7 @@ export default function DropsDetail() {
   const [buyingNow, setBuyingNow] = useState(false);
   const [countdown, setCountdown] = useState("");
   const [showPurchased, setShowPurchased] = useState(false);
+  const [moreDrops, setMoreDrops] = useState<Drop[]>([]);
 
   // Detect the post-checkout redirect (?purchased=1), show a confirmation
   // banner, then strip the param so a refresh/back doesn't re-trigger it.
@@ -84,6 +85,19 @@ export default function DropsDetail() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!drop?.artistId) { setMoreDrops([]); return; }
+    let cancelled = false;
+    fetch(`/api/drops?artistId=${encodeURIComponent(drop.artistId)}`, { credentials: "include" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (cancelled || !data?.drops) return;
+        setMoreDrops((data.drops as Drop[]).filter(d => d.id !== drop.id));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [drop?.artistId, drop?.id]);
 
   useEffect(() => {
     if (!drop || drop.status !== "upcoming") return;
@@ -303,6 +317,56 @@ export default function DropsDetail() {
             </div>
           </div>
         </div>
+
+        {moreDrops.length > 0 && (
+          <div className="mt-12">
+            <h2 className="mb-4 font-serif text-xl text-amber-100">More from {drop.artistName}</h2>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {moreDrops.map(d => {
+                const dSold = d.status === "sold" || d.editionSold >= d.edition;
+                return (
+                  <Link
+                    key={d.id}
+                    href={`/drops/${d.id}`}
+                    className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-stone-900/60 transition-all duration-200 ${dSold ? "opacity-60" : "hover:border-amber-500/30 hover:bg-stone-900/80"}`}
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      {d.imageUrl ? (
+                        <img src={d.imageUrl} alt={d.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-stone-800">
+                          <Zap size={28} className="text-stone-700" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/20 to-transparent" />
+                      <div className="absolute top-2.5 left-2.5">
+                        {d.status === "live" && !dSold && (
+                          <span className="flex items-center gap-1.5 rounded-full bg-green-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg">
+                            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live
+                          </span>
+                        )}
+                        {d.status === "upcoming" && (
+                          <span className="flex items-center gap-1 rounded-full bg-stone-900/80 px-2 py-1 text-[10px] font-mono font-medium text-amber-300 border border-amber-500/20">
+                            <Clock size={9} className="text-amber-400" /> {getTimeUntilDrop(d.dropDate)}
+                          </span>
+                        )}
+                        {dSold && (
+                          <span className="flex items-center gap-1 rounded-full bg-stone-700 px-2.5 py-1 text-[10px] font-medium text-stone-300">
+                            <CheckCircle2 size={9} /> Sold
+                          </span>
+                        )}
+                      </div>
+                      <div className="absolute bottom-2.5 left-2.5 right-2.5">
+                        <p className="truncate font-serif text-sm font-medium text-white leading-tight">{d.title}</p>
+                        <p className="text-xs font-semibold text-amber-300">{formatPrice(d.price)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
