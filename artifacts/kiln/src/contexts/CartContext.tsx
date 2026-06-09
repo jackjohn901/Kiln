@@ -53,9 +53,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     fetch("/api/me/cart", { credentials: "include" })
       .then(r => r.ok ? r.json() as Promise<{ items: { listingId: string; quantity: number }[] }> : null)
       .then(data => {
-        if (data?.items?.length) {
+        if (data?.items) {
           const serverItems = data.items;
           const serverIds = new Set(serverItems.map(i => i.listingId));
+          // Items we have locally but the server no longer returns were removed
+          // server-side because their listing was deleted or marked sold/unavailable.
+          // Name them so the buyer understands why they vanished, rather than having
+          // items silently disappear on sync.
+          const removed = readCart().filter(i => !serverIds.has(i.listing.id));
+          if (removed.length) {
+            const names = removed.map(i => i.listing.title);
+            const label =
+              names.length === 1
+                ? `\u201C${names[0]}\u201D`
+                : names.length === 2
+                ? `\u201C${names[0]}\u201D and \u201C${names[1]}\u201D`
+                : `\u201C${names[0]}\u201D and ${names.length - 1} other items`;
+            toast({
+              title: removed.length === 1 ? "An item was removed from your cart" : "Items were removed from your cart",
+              description: `${label} ${removed.length === 1 ? "is" : "are"} no longer available.`,
+            });
+          }
           setItems(prev => {
             // Update quantities from server, remove items server no longer has
             const reconciled = prev
