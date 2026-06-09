@@ -332,7 +332,12 @@ export default function Orders() {
                                 const itemConf = TYPE_CONFIG[o.type] ?? TYPE_CONFIG.inquiry!;
                                 const ItemIcon = itemConf.icon;
                                 return (
-                                  <div key={i} className="flex items-center gap-1.5">
+                                  <div
+                                    key={i}
+                                    role="link"
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); navigate(`/orders/${o.id}`); }}
+                                    className="flex items-center gap-1.5 -mx-1 px-1 py-0.5 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+                                  >
                                     <div className="h-5 w-5 flex-shrink-0 overflow-hidden rounded-md bg-stone-800">
                                       {o.imageUrl ? (
                                         <img src={o.imageUrl} alt="" className="h-full w-full object-cover" />
