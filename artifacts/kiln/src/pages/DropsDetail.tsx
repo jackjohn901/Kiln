@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useSearch, useLocation } from "wouter";
 import {
-  Zap, Clock, CheckCircle2, ChevronLeft, Loader2, Users, Calendar,
+  Zap, Clock, CheckCircle2, ChevronLeft, Loader2, Users, Calendar, X, Receipt,
 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { toast } from "@/hooks/use-toast";
@@ -47,12 +47,25 @@ function formatDropDate(iso: string) {
 
 export default function DropsDetail() {
   const { id } = useParams<{ id: string }>();
+  const search = useSearch();
+  const [, navigate] = useLocation();
   const [drop, setDrop] = useState<Drop | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
   const [countdown, setCountdown] = useState("");
+  const [showPurchased, setShowPurchased] = useState(false);
+
+  // Detect the post-checkout redirect (?purchased=1), show a confirmation
+  // banner, then strip the param so a refresh/back doesn't re-trigger it.
+  useEffect(() => {
+    if (!id) return;
+    if (new URLSearchParams(search).get("purchased") === "1") {
+      setShowPurchased(true);
+      navigate(`/drops/${id}`, { replace: true });
+    }
+  }, [id, search, navigate]);
 
   useEffect(() => {
     if (!id) return;
@@ -162,6 +175,31 @@ export default function DropsDetail() {
         <Link href="/drops" className="mb-5 inline-flex items-center gap-1.5 text-xs text-stone-500 hover:text-amber-400 transition-colors">
           <ChevronLeft size={14} /> Back to Drops
         </Link>
+
+        {showPurchased && (
+          <div className="mb-5 flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3.5 animate-in fade-in slide-in-from-top-2 duration-300">
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-400" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-emerald-300">Purchase confirmed!</p>
+              <p className="mt-0.5 text-xs text-stone-400">
+                Thanks for supporting {drop?.artistName ?? "the artist"}. A receipt is in your order history.
+              </p>
+              <Link
+                href="/orders"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-500/25 transition-colors"
+              >
+                <Receipt size={12} className="shrink-0" /> View your order
+              </Link>
+            </div>
+            <button
+              onClick={() => setShowPurchased(false)}
+              className="shrink-0 text-stone-500 hover:text-stone-300 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Image */}
