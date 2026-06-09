@@ -350,6 +350,7 @@ export default function ListingDetail() {
   const [reviewText, setReviewText] = useState("");
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [apiListing, setApiListing] = useState<import("@/data/listings").Listing | null>(null);
+  const [apiSold, setApiSold] = useState(false);
   const [listingLoading, setListingLoading] = useState(false);
   const [artistShipping, setArtistShipping] = useState<ArtistShipping | null>(null);
 
@@ -371,6 +372,7 @@ export default function ListingDetail() {
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d?.id) {
+          setApiSold(!!d.isSold);
           setApiListing({
             id: d.id, artistId: d.artistId, title: d.title,
             year: d.year != null ? String(d.year) : "",
@@ -515,6 +517,8 @@ export default function ListingDetail() {
   const avatar = artist?.images?.[0]?.url ?? `https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&h=200&fit=crop&seed=${listing.artistId}`;
   const related = getRelated(listing);
   const inCart = isInCart(listing.id);
+  const isSoldOut = staticListing ? staticListing.available === false : apiSold;
+  const canPurchase = listing.available && !isSoldOut;
   const reviews = apiReviews;
   const avgRating = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const suggestedOffer = Math.round(listing.price * 0.85 / 100) * 100;
@@ -805,7 +809,7 @@ export default function ListingDetail() {
             <ShippingEstimate listing={listing} artistShipping={artistShipping} />
 
             {/* ── Actions ── */}
-            {listing.available ? (
+            {canPurchase ? (
               <>
                 <div className="flex gap-2 mb-2.5">
                   <button
@@ -875,7 +879,7 @@ export default function ListingDetail() {
               <div className="space-y-2 mb-4">
                 <div className="flex gap-2">
                   <div className="flex-1 flex items-center justify-center rounded-full border border-white/10 py-3 text-sm text-stone-600">
-                    This work has been sold
+                    {isSoldOut ? "This work has been sold" : "This work is currently unavailable"}
                   </div>
                   <Link href={`/commission/${listing.artistId}`} className="flex-1">
                     <button className="w-full rounded-full border border-amber-500/30 py-3 text-sm font-semibold text-amber-400 hover:bg-amber-500/10 transition-colors">

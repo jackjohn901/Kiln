@@ -338,7 +338,7 @@ export default function Shop() {
                         <ShippingBadge shipping={shippingMap[listing.artistId]} />
                       </div>
                     </div>
-                    {!listing.isSold ? (
+                    {!listing.isSold && listing.isAvailable ? (
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => addItem({ id: listing.id, title: listing.title, price: listing.price, imageUrl: listing.imageUrl ?? "", artistId: listing.artistId, available: true } as any)}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[10px] font-medium border transition-all"
@@ -354,7 +354,7 @@ export default function Shop() {
                         </Link>
                       </div>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground">Unavailable</span>
+                      <span className="text-[10px] text-muted-foreground">{listing.isSold ? "Sold" : "Unavailable"}</span>
                     )}
                   </div>
                 </div>
