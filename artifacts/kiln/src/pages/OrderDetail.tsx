@@ -215,7 +215,7 @@ export default function OrderDetail() {
   const [, navigate] = useLocation();
   const { markLinkRead } = useSocial();
   const { settings } = useSettings();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const { addItem } = useCart();
   const [addingToCart, setAddingToCart] = useState(false);
   const search = useSearch();
@@ -791,18 +791,28 @@ export default function OrderDetail() {
         </div>
 
         {isPublicView && (
-          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-stone-900/50 px-4 py-3">
-            <LogIn size={15} className="text-amber-400 shrink-0" />
-            <p className="flex-1 text-xs text-stone-400 leading-relaxed">
-              <button
-                onClick={login}
-                className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2 transition-colors"
-              >
-                Sign in
-              </button>{" "}
-              to see your full receipt details, including billing name, email, and address.
-            </p>
-          </div>
+          isAuthenticated ? (
+            <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-stone-900/50 px-4 py-3">
+              <Lock size={15} className="text-stone-400 shrink-0" />
+              <p className="flex-1 text-xs text-stone-400 leading-relaxed">
+                You're signed in, but this receipt belongs to another account. The full
+                billing details are only visible to the buyer who placed this order.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-stone-900/50 px-4 py-3">
+              <LogIn size={15} className="text-amber-400 shrink-0" />
+              <p className="flex-1 text-xs text-stone-400 leading-relaxed">
+                <button
+                  onClick={login}
+                  className="font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2 transition-colors"
+                >
+                  Sign in
+                </button>{" "}
+                to see your full receipt details, including billing name, email, and address.
+              </p>
+            </div>
+          )
         )}
 
         {banner.show && (
