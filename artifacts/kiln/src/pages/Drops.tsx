@@ -3,6 +3,7 @@ import { markFeatureVisited } from "@/lib/featureDiscovery";
 import { Zap, Clock, CheckCircle2, ChevronRight, Loader2, Plus } from "lucide-react";
 import { Link } from "wouter";
 import Nav from "@/components/Nav";
+import CheckoutErrorNotice from "@/components/CheckoutErrorNotice";
 
 interface Drop {
   id: string;
@@ -62,6 +63,7 @@ function CountdownBadge({ dropDate }: { dropDate: string }) {
 function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (id: string, val: boolean) => void }) {
   const [toggling, setToggling] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   const handleWaitlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -79,6 +81,7 @@ function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (i
   const handleBuyNow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setBuyingNow(true);
+    setCheckoutError("");
     try {
       const r = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -90,11 +93,17 @@ function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (i
           cancelPath: "/drops",
         }),
       });
-      if (r.ok) {
-        const data = await r.json();
-        if (data.url) { window.location.href = data.url; return; }
+      const data = await r.json().catch(() => ({} as { url?: string; error?: string }));
+      if (r.ok && data.url) {
+        window.location.href = data.url;
+        return;
       }
-    } catch {}
+      setCheckoutError(
+        data.error ?? "We couldn't complete your checkout. This work may no longer be available. Please try again or contact support.",
+      );
+    } catch {
+      setCheckoutError("Something went wrong. Please try again.");
+    }
     setBuyingNow(false);
   };
 
@@ -160,6 +169,11 @@ function DropCard({ drop, onWaitlistToggle }: { drop: Drop; onWaitlistToggle: (i
           </button>
         )}
       </div>
+      {checkoutError && (
+        <div className="px-4 pb-3" onClick={(e) => e.stopPropagation()}>
+          <CheckoutErrorNotice message={checkoutError} />
+        </div>
+      )}
     </div>
   );
 }

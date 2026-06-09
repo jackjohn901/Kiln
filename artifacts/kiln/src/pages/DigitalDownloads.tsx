@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Nav from "@/components/Nav";
+import CheckoutErrorNotice from "@/components/CheckoutErrorNotice";
 import { useProfile } from "@/contexts/ProfileContext";
 
 interface DigitalProduct {
@@ -213,6 +214,7 @@ export default function DigitalDownloads() {
   const [selectedProduct, setSelectedProduct] = useState<DigitalProduct | null>(null);
   const [purchased, setPurchased] = useState<Set<string>>(new Set());
   const [purchasing, setPurchasing] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const [justPurchased, setJustPurchased] = useState(false);
 
   const filtered = PRODUCTS.filter((p) => {
@@ -236,6 +238,7 @@ export default function DigitalDownloads() {
   async function handlePurchase(product: DigitalProduct) {
     if (!profile) return;
     setPurchasing(true);
+    setCheckoutError("");
     try {
       if (product.isFree) {
         await fetch("/api/digital-downloads/purchase", {
@@ -262,10 +265,18 @@ export default function DigitalDownloads() {
             },
           }),
         });
-        const data = await res.json() as { url?: string };
-        if (data.url) window.location.href = data.url;
+        const data = await res.json().catch(() => ({} as { url?: string; error?: string }));
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        setCheckoutError(
+          data.error ?? "We couldn't complete your checkout. This work may no longer be available. Please try again or contact support.",
+        );
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      setCheckoutError("Something went wrong. Please try again.");
+    } finally {
       setPurchasing(false);
     }
   }
@@ -507,6 +518,12 @@ export default function DigitalDownloads() {
                       <><DollarSign size={15} /> Buy for ${selectedProduct.price}</>
                     )}
                   </button>
+                )}
+
+                {checkoutError && (
+                  <div className="mt-3">
+                    <CheckoutErrorNotice message={checkoutError} />
+                  </div>
                 )}
 
                 {!selectedProduct.isFree && !hasPurchased && (
