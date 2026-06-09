@@ -1,8 +1,9 @@
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck, Clock, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Minus, Plus, Trash2, ShoppingBag, ArrowRight, Truck, Gift, Sparkles, PackageCheck, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import Nav from "@/components/Nav";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { formatPrice } from "@/data/listings";
 
@@ -39,11 +40,41 @@ interface ProcessingWindow {
 }
 
 export default function Cart() {
+  const { isAuthenticated } = useAuth();
   const { items, itemCount, subtotal, cartReady, removeItem, updateQty, clearCart } = useCart();
   const [bundleApplied, setBundleApplied] = useState(false);
   const [shippingRates, setShippingRates] = useState<Map<string, ShippingRateInfo>>(new Map());
   const [isDomestic, setIsDomestic] = useState(true);
   const [processingWindows, setProcessingWindows] = useState<Map<string, ProcessingWindow>>(new Map());
+  const [staleItems, setStaleItems] = useState<Array<{ id: string; title: string }>>([]);
+  const [overStockItems, setOverStockItems] = useState<Array<{ id: string; title: string; available: number; requested: number }>>([]);
+
+  // Validate cart availability on mount (and whenever items change) so buyers are
+  // warned about sold/deleted listings right here on the cart page — not only once
+  // they reach checkout. Reuses the same /api/stripe/cart-validate endpoint.
+  useEffect(() => {
+    if (!isAuthenticated) { setStaleItems([]); setOverStockItems([]); return; }
+    const listingIds = items.map(i => i.listing.id as string).filter(Boolean);
+    if (listingIds.length === 0) { setStaleItems([]); setOverStockItems([]); return; }
+    let cancelled = false;
+    const listingQtys = items.map(i => ({ id: i.listing.id as string, qty: i.quantity }));
+    fetch("/api/stripe/cart-validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ listingIds, listingQtys }),
+    })
+      .then(r => r.ok ? r.json() as Promise<{ unavailableListings: Array<{ id: string; title: string }>; overStockListings?: Array<{ id: string; title: string; available: number; requested: number }> }> : null)
+      .then(data => {
+        if (cancelled || !data) return;
+        // Only flag IDs that are actually still in the cart (it may have changed).
+        const inCart = new Set(items.map(i => i.listing.id as string));
+        setStaleItems((data.unavailableListings ?? []).filter(it => inCart.has(it.id)));
+        setOverStockItems((data.overStockListings ?? []).filter(it => inCart.has(it.id)));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [items, isAuthenticated]);
 
   useEffect(() => {
     fetch("/api/me/settings", { credentials: "include" })
@@ -440,6 +471,75 @@ export default function Cart() {
                 </motion.div>
               ))}
             </AnimatePresence>
+
+            {/* Over-stock warning — surfaces when the requested quantity exceeds available stock */}
+            {overStockItems.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3.5"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-300 mb-1">
+                      {overStockItems.length === 1
+                        ? "One item in your cart exceeds available stock"
+                        : `${overStockItems.length} items in your cart exceed available stock`}
+                    </p>
+                    <ul className="space-y-1 mb-2">
+                      {overStockItems.map((item) => (
+                        <li key={item.id} className="text-xs text-amber-200/70">
+                          <span className="font-medium text-amber-200">&ldquo;{item.title}&rdquo;</span>
+                          {" — "}
+                          {item.available === 0
+                            ? "sold out"
+                            : `only ${item.available} available (you requested ${item.requested})`}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-amber-200/50">Reduce the quantity above before checking out.</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Stale-item warning — surfaces sold/deleted listings on the cart page,
+                so buyers catch them before clicking through to checkout. */}
+            {staleItems.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-rose-500/30 bg-rose-500/8 px-4 py-3.5"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle size={16} className="text-rose-400 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-rose-300 mb-1">
+                      {staleItems.length === 1
+                        ? "An item in your cart is no longer available"
+                        : `${staleItems.length} items in your cart are no longer available`}
+                    </p>
+                    <ul className="space-y-0.5 mb-2">
+                      {staleItems.map((item) => (
+                        <li key={item.id} className="text-xs text-rose-200/70">
+                          {item.title === "This item" ? "A deleted listing" : `\u201c${item.title}\u201d`}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => {
+                        staleItems.forEach((item) => removeItem(item.id));
+                        setStaleItems([]);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500 transition-colors"
+                    >
+                      Remove unavailable {staleItems.length === 1 ? "item" : "items"}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* Order summary */}
             <div className="mt-2 rounded-2xl border border-white/8 bg-stone-900/60 p-5 space-y-3">
