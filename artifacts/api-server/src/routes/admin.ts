@@ -8,7 +8,7 @@ import {
 import { eq, desc, asc, sql, gte, count, and, isNull, inArray } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker, getSeedHistory } from "../lib/seed";
-import { sendEmail, broadcastEmail } from "../lib/email";
+import { sendEmailWithRetry, broadcastEmail } from "../lib/email";
 import { retryFailedEmail } from "../lib/emailQueue";
 import { getWebhookState } from "../lib/webhookState";
 import { getUncachableStripeClient } from "../stripeClient";
@@ -694,7 +694,12 @@ router.post("/admin/broadcast-email", async (req, res): Promise<void> => {
     for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
       const batch = addresses.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
-        batch.map((to) => sendEmail({ to, subject: trimmedSubject, html })),
+        batch.map((to) =>
+          sendEmailWithRetry(
+            { to, subject: trimmedSubject, html },
+            { label: "admin broadcast", contextId: `broadcast:${req.user.id}` },
+          ),
+        ),
       );
       for (const ok of results) {
         if (ok) sent++; else failed++;
