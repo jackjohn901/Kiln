@@ -11,6 +11,8 @@ import { formatProcessingWindowLabel } from "@/utils/paymentSettings";
 import { useSocial } from "@/contexts/SocialContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import type { Listing } from "@/data/listings";
 import { toast } from "@/hooks/use-toast";
 import { buildReceiptHtml, ordinalId } from "@/lib/receiptHtml";
 
@@ -214,6 +216,8 @@ export default function OrderDetail() {
   const { markLinkRead } = useSocial();
   const { settings } = useSettings();
   const { login } = useAuth();
+  const { addItem } = useCart();
+  const [addingToCart, setAddingToCart] = useState(false);
   const search = useSearch();
   const highlightParam = new URLSearchParams(search).get("highlight");
   const [order, setOrder] = useState<Order | null>(null);
@@ -584,6 +588,86 @@ export default function OrderDetail() {
 
   const cartTotal = isCartOrder ? siblingOrders.reduce((sum, o) => sum + o.amount, 0) : order.amount;
 
+  // Items on this receipt that are shoppable listings (have a refId and are the
+  // listing type). Drops/workshops/commissions can't be added to a cart, so they
+  // are excluded — the action degrades gracefully and is hidden when none remain.
+  const receiptItems = isCartOrder ? siblingOrders : [order];
+  const listingItems = receiptItems.filter((o) => o.type === "listing" && !!o.refId);
+  const nonListingCount = receiptItems.length - listingItems.length;
+
+  async function handleAddToCart() {
+    if (listingItems.length === 0 || addingToCart) return;
+    setAddingToCart(true);
+    try {
+      // Fetch each listing's current state so we only add pieces that are still
+      // for sale; sold/removed ones are skipped and reported to the visitor.
+      const resolved = await Promise.all(
+        listingItems.map(async (item) => {
+          try {
+            const r = await fetch(`/api/listings/${encodeURIComponent(item.refId!)}`, {
+              credentials: "include",
+            });
+            if (!r.ok) return null;
+            const d = await r.json() as {
+              id?: string; artistId?: string; title?: string; year?: number | null;
+              medium?: string | null; dimensions?: string | null; price?: number | null;
+              imageUrl?: string | null; isAvailable?: boolean; isSold?: boolean;
+              stockCount?: number | null; currency?: string | null; shipsTo?: string[];
+            };
+            const inStock =
+              (d.isAvailable ?? true) &&
+              !(d.isSold ?? false) &&
+              (d.stockCount == null || d.stockCount > 0);
+            if (!d?.id || !inStock) return null;
+            const listing: Listing = {
+              id: d.id,
+              artistId: d.artistId ?? "",
+              title: d.title ?? item.title,
+              year: d.year != null ? String(d.year) : "",
+              medium: d.medium ?? "",
+              dimensions: d.dimensions ?? "",
+              price: d.price ?? 0,
+              imageUrl: d.imageUrl ?? item.imageUrl ?? null,
+              available: true,
+              currency: d.currency ?? undefined,
+              shipsTo: Array.isArray(d.shipsTo) ? d.shipsTo : [],
+              stockCount: d.stockCount ?? null,
+            };
+            return listing;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const available = resolved.filter((l): l is Listing => l !== null);
+      const skipped = listingItems.length - available.length;
+      available.forEach((listing) => addItem(listing));
+
+      if (available.length === 0) {
+        toast({
+          title: "Nothing available to add",
+          description: "These pieces have all been sold or are no longer listed.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const addedLabel = `${available.length} ${available.length === 1 ? "piece" : "pieces"}`;
+      const skipNote =
+        skipped > 0
+          ? ` ${skipped} ${skipped === 1 ? "piece is" : "pieces are"} no longer available and ${skipped === 1 ? "was" : "were"} skipped.`
+          : "";
+      toast({
+        title: `Added ${addedLabel} to your cart`,
+        description: `Review your cart to check out.${skipNote}`,
+      });
+      navigate("/cart");
+    } finally {
+      setAddingToCart(false);
+    }
+  }
+
   function handlePrint() {
     if (!order) return;
 
@@ -933,6 +1017,29 @@ export default function OrderDetail() {
             </div>
           )}
         </div>
+
+        {isPublicView && listingItems.length > 0 && (
+          <div className="mb-4 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4">
+            <p className="text-sm font-semibold text-amber-200">Love these pieces?</p>
+            <p className="mt-0.5 text-xs text-stone-400 leading-relaxed">
+              Add the still-available {listingItems.length === 1 ? "piece" : "pieces"} to your own
+              cart and check out in one tap.
+            </p>
+            <button
+              onClick={() => { void handleAddToCart(); }}
+              disabled={addingToCart}
+              className="mt-3 w-full flex items-center justify-center gap-2 rounded-full bg-amber-500 py-2.5 text-sm font-semibold text-stone-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+            >
+              {addingToCart ? <Loader2 size={15} className="animate-spin" /> : <ShoppingBag size={15} />}
+              {addingToCart ? "Adding…" : "Add these to my cart"}
+            </button>
+            {nonListingCount > 0 && (
+              <p className="mt-2 text-[11px] text-stone-500">
+                Drops and workshops can't be added to a cart and won't be included.
+              </p>
+            )}
+          </div>
+        )}
 
         {(() => {
           const sellerLabel = sellerProfile?.displayName?.trim()
