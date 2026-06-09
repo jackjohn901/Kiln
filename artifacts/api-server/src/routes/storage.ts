@@ -8,6 +8,7 @@ import {
   verifyUploadToken,
 } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { publicReadLimiter } from "../lib/rateLimit";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -139,7 +140,7 @@ router.put("/storage/uploads/:objectId", async (req: Request, res: Response) => 
  * These are unconditionally public — no authentication or ACL checks.
  * IMPORTANT: Always provide this endpoint when object storage is set up.
  */
-router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
+router.get("/storage/public-objects/*filePath", publicReadLimiter, async (req: Request, res: Response) => {
   try {
     const raw = req.params.filePath;
     const filePath = Array.isArray(raw) ? raw.join("/") : raw;
@@ -206,7 +207,7 @@ router.post("/storage/uploads/make-public", async (req: Request, res: Response) 
  * Public objects (visibility: "public") are readable without auth.
  * Private objects require the requesting user to be the owner.
  */
-router.get("/storage/objects/*path", async (req: Request, res: Response) => {
+router.get("/storage/objects/*path", publicReadLimiter, async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;

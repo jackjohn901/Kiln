@@ -99,6 +99,7 @@ import collaborationsRouter from "./collaborations";
 import firstAccessRouter from "./first-access";
 import projectsRouter from "./projects";
 import studioEventsRouter from "./studio-events";
+import { publicReadLimiter } from "../lib/rateLimit";
 
 const router: IRouter = Router();
 
@@ -118,7 +119,7 @@ router.use(stripeRouter);
 router.use(stripeConnectRouter);
 router.use(glazeOracleRouter);
 router.use(grantWriterRouter);
-router.use(feedRouter);
+router.use(publicReadLimiter, feedRouter);
 router.use(postsRouter);
 router.use(socialRouter);
 router.use(accountsRouter);
@@ -131,8 +132,8 @@ router.use(guildsRouter);
 router.use(dropsRouter);
 router.use(auctionsRouter);
 router.use(patronsRouter);
-router.use(discoverRouter);
-router.use(searchRouter);
+router.use(publicReadLimiter, discoverRouter);
+router.use(publicReadLimiter, searchRouter);
 router.use(aiSearchRouter);
 router.use(storiesRouter);
 router.use(tipsRouter);

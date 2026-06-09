@@ -8,11 +8,12 @@ import { eq, and, desc, asc, ilike, or, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { autoPostToConnectedPlatforms } from "../lib/socialAutoPost";
 import { grantFirstAccessToTopSavers } from "./first-access";
+import { publicReadLimiter } from "../lib/rateLimit";
 
 const router = Router();
 
 // GET /listings — browse all listings
-router.get("/listings", async (req, res): Promise<void> => {
+router.get("/listings", publicReadLimiter, async (req, res): Promise<void> => {
   try {
     const { medium, available, artistId, limit = "50", offset = "0" } = req.query as Record<string, string>;
     let query = db.select().from(listingsTable).$dynamic();
@@ -34,15 +35,16 @@ router.get("/listings", async (req, res): Promise<void> => {
 });
 
 // GET /listings/:id
-router.get("/listings/:id", async (req, res): Promise<void> => {
+router.get("/listings/:id", publicReadLimiter, async (req, res): Promise<void> => {
   try {
-    const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, req.params.id));
+    const id = req.params.id as string;
+    const [listing] = await db.select().from(listingsTable).where(eq(listingsTable.id, id));
     if (!listing) { res.status(404).json({ error: "Not found" }); return; }
-    await db.update(listingsTable).set({ viewCount: sql`${listingsTable.viewCount} + 1` }).where(eq(listingsTable.id, req.params.id));
+    await db.update(listingsTable).set({ viewCount: sql`${listingsTable.viewCount} + 1` }).where(eq(listingsTable.id, id));
     const viewerId = req.isAuthenticated() ? req.user.id : null;
     let isWishlisted = false;
     if (viewerId) {
-      const [w] = await db.select().from(wishlistsTable).where(and(eq(wishlistsTable.userId, viewerId), eq(wishlistsTable.listingId, req.params.id)));
+      const [w] = await db.select().from(wishlistsTable).where(and(eq(wishlistsTable.userId, viewerId), eq(wishlistsTable.listingId, id)));
       isWishlisted = !!w;
     }
     res.json({ ...listing, isWishlisted, createdAt: listing.createdAt.toISOString(), updatedAt: listing.updatedAt.toISOString() });
