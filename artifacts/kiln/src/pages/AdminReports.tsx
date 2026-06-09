@@ -75,6 +75,29 @@ interface HealthHistoryEntry {
   passed: boolean;
 }
 
+const HEALTH_HISTORY_KEY = "kiln.admin.healthHistory";
+const HEALTH_HISTORY_LIMIT = 20;
+
+function loadHealthHistory(): HealthHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HEALTH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (e): e is HealthHistoryEntry =>
+          typeof e === "object" &&
+          e !== null &&
+          typeof (e as HealthHistoryEntry).checkedAt === "string" &&
+          typeof (e as HealthHistoryEntry).passed === "boolean",
+      )
+      .slice(0, HEALTH_HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
 interface FailedEmail {
   id: number;
   to: string;
@@ -148,7 +171,7 @@ export default function AdminReports() {
   const [healthResult, setHealthResult] = useState<HealthResult | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
-  const [healthHistory, setHealthHistory] = useState<HealthHistoryEntry[]>([]);
+  const [healthHistory, setHealthHistory] = useState<HealthHistoryEntry[]>(loadHealthHistory);
   const [healthHistoryOpen, setHealthHistoryOpen] = useState(false);
 
   // Seed history state
@@ -340,10 +363,18 @@ export default function AdminReports() {
       const data = await res.json() as HealthResult;
       setHealthResult(data);
       const passed = data.db.ok && data.seed.markerPresent;
-      setHealthHistory((prev) => [
-        { checkedAt: data.checkedAt, latencyMs: data.db.latencyMs, passed },
-        ...prev,
-      ].slice(0, 5));
+      setHealthHistory((prev) => {
+        const next = [
+          { checkedAt: data.checkedAt, latencyMs: data.db.latencyMs, passed },
+          ...prev,
+        ].slice(0, HEALTH_HISTORY_LIMIT);
+        try {
+          localStorage.setItem(HEALTH_HISTORY_KEY, JSON.stringify(next));
+        } catch {
+          // localStorage unavailable (private mode / quota) — keep in-memory history
+        }
+        return next;
+      });
     } catch {
       setHealthError("Network error — please try again");
     } finally {
