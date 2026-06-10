@@ -74,3 +74,6 @@ VAPID_PUBLIC_KEY = "BHplQUrH8gpwOTqeK7DU0HE7ETEYm3JbfpkX9gHu9oFl7TobSRf33_GseSJ0
 VAPID_PRIVATE_KEY = "4weQvJbkcX5mwX7nJmSg9YtnG-P5jTK91WCwzakBhC0"
 VAPID_EMAIL = "mailto:support@kilnfire.app"
 CREATOR_USER_ID = "44581520"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-e3a2813d-dbcb-47b3-bd4c-5c00a8cc0b31"
