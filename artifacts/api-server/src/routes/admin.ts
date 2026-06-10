@@ -809,6 +809,45 @@ router.post("/admin/failed-emails/:id/retry", async (req, res): Promise<void> =>
   }
 });
 
+// DELETE /admin/failed-emails/:id — permanently remove a row that will never deliver
+// (fake/seed addresses, hard bounces). Keeps the retry queue clean and actionable.
+router.delete("/admin/failed-emails/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid email id" });
+    return;
+  }
+
+  try {
+    const deleted = await db
+      .delete(failedEmailsTable)
+      .where(eq(failedEmailsTable.id, id))
+      .returning({ id: failedEmailsTable.id });
+
+    if (deleted.length === 0) {
+      res.status(404).json({ error: "Email not found" });
+      return;
+    }
+
+    // Return refreshed per-status counts so the dashboard can update its badges.
+    const countRows = await db
+      .select({ status: failedEmailsTable.status, count: sql<number>`count(*)::int` })
+      .from(failedEmailsTable)
+      .groupBy(failedEmailsTable.status);
+    const counts = { pending: 0, delivered: 0, failed: 0 } as Record<string, number>;
+    for (const c of countRows) counts[c.status] = c.count;
+
+    req.log.info({ adminId: req.user.id, emailId: id }, "admin.deleteFailedEmail removed");
+    res.json({ deleted: true, id, counts });
+  } catch (err) {
+    req.log.error({ err }, "admin.deleteFailedEmail error");
+    res.status(500).json({ error: "Failed to delete email" });
+  }
+});
+
 // GET /admin/health — DB connectivity, API uptime, seed marker status, and webhook state
 router.get("/admin/health", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }

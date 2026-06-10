@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History, Inbox, Search } from "lucide-react";
+import { Flag, CheckCircle, XCircle, Eye, AlertTriangle, BadgeCheck, X, Wrench, RefreshCw, Database, Bell, Activity, Mail, Send, History, Inbox, Search, Trash2 } from "lucide-react";
 import Nav from "@/components/Nav";
 import { useMeta } from "@/hooks/useMeta";
 import { useAuth } from "@/contexts/AuthContext";
@@ -228,6 +228,7 @@ export default function AdminReports() {
   const [failedEmailError, setFailedEmailError] = useState<string | null>(null);
   const [retryingEmail, setRetryingEmail] = useState<number | null>(null);
   const [retryNotice, setRetryNotice] = useState<{ id: number; delivered: boolean } | null>(null);
+  const [deletingEmail, setDeletingEmail] = useState<number | null>(null);
 
   // Order lookup (support tool) state
   const [orderLookupInput, setOrderLookupInput] = useState("");
@@ -546,6 +547,31 @@ export default function AdminReports() {
       setFailedEmailError("Network error — please try again");
     } finally {
       setRetryingEmail(null);
+    }
+  }
+
+  async function deleteFailedEmail(id: number) {
+    if (!window.confirm("Permanently remove this email from the queue? This cannot be undone.")) return;
+    setDeletingEmail(id);
+    setFailedEmailError(null);
+    setRetryNotice(null);
+    try {
+      const res = await fetch(`/api/admin/failed-emails/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json() as { deleted?: boolean; counts?: FailedEmailCounts; error?: string };
+      if (!res.ok) {
+        setFailedEmailError(data?.error ?? "Delete failed");
+        return;
+      }
+      // Drop the row locally and apply the authoritative counts from the server.
+      setFailedEmails((prev) => prev.filter((em) => em.id !== id));
+      if (data.counts) setFailedEmailCounts(data.counts);
+    } catch {
+      setFailedEmailError("Network error — please try again");
+    } finally {
+      setDeletingEmail(null);
     }
   }
 
@@ -1174,16 +1200,27 @@ export default function AdminReports() {
                               <> · gave up after max attempts</>
                             )}
                           </p>
-                          {em.status !== "delivered" && (
+                          <div className="flex items-center gap-2">
+                            {em.status !== "delivered" && (
+                              <button
+                                onClick={() => retryFailedEmail(em.id)}
+                                disabled={retryingEmail === em.id || deletingEmail === em.id}
+                                className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                              >
+                                {retryingEmail === em.id ? <RefreshCw size={10} className="animate-spin" /> : <Send size={10} />}
+                                {retryingEmail === em.id ? "Retrying…" : "Retry now"}
+                              </button>
+                            )}
                             <button
-                              onClick={() => retryFailedEmail(em.id)}
-                              disabled={retryingEmail === em.id}
-                              className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                              onClick={() => deleteFailedEmail(em.id)}
+                              disabled={deletingEmail === em.id || retryingEmail === em.id}
+                              title="Permanently remove this email from the queue"
+                              className="flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-[11px] font-medium text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-40"
                             >
-                              {retryingEmail === em.id ? <RefreshCw size={10} className="animate-spin" /> : <Send size={10} />}
-                              {retryingEmail === em.id ? "Retrying…" : "Retry now"}
+                              {deletingEmail === em.id ? <RefreshCw size={10} className="animate-spin" /> : <Trash2 size={10} />}
+                              {deletingEmail === em.id ? "Removing…" : "Delete"}
                             </button>
-                          )}
+                          </div>
                         </div>
                       </li>
                     );
