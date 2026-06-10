@@ -387,7 +387,7 @@ export default function ArtistProfile() {
     justAddedTimer.current = setTimeout(() => setJustAddedId(null), 1500);
     toast({ title: "Added to cart", description: listing.title });
   }, [addItem]);
-  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, sendDirectMessage, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
+  const { isFollowing, followArtist, unfollowArtist, getArtistCommissionStatus, isVerified, isSubscribed, subscribe, unsubscribe, blockArtist, unblockArtist, isBlocked, muteArtist, unmuteArtist, isMuted, hasArtistAlert, toggleArtistAlert } = useSocial();
 
   const search = useSearch();
   const artist = findArtist(id ?? "", profile);
@@ -1122,7 +1122,7 @@ export default function ArtistProfile() {
                   <Users size={11} /> {subscribed ? "Supporting" : "Support"}
                 </button>
                 <button
-                  onClick={() => { sendDirectMessage(artist.id, artist.name, avatarImg, "Hey! Love your work."); navigate("/messages"); }}
+                  onClick={() => navigate(`/messages/${artist.id}?prefill=${encodeURIComponent("Hi, I found you on Kiln — ")}`)}
                   className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-stone-400 hover:border-blue-400/40 hover:text-blue-400 transition-colors"
                   title="Send message"
                 >
