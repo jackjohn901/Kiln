@@ -9,7 +9,7 @@ import { eq, desc, asc, sql, gte, count, and, isNull, inArray } from "drizzle-or
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { getSeedStatus, forceSeedDatabase, forceSeedDatabaseWithMarker, getSeedHistory } from "../lib/seed";
 import { sendEmailWithRetry, broadcastEmail } from "../lib/email";
-import { retryFailedEmail } from "../lib/emailQueue";
+import { retryFailedEmail, getEmailQueueAlert } from "../lib/emailQueue";
 import { getWebhookState } from "../lib/webhookState";
 import { getUncachableStripeClient } from "../stripeClient";
 import { randomUUID } from "crypto";
@@ -765,6 +765,22 @@ router.get("/admin/failed-emails", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "admin.getFailedEmails error");
     res.status(500).json({ error: "Failed to fetch failed emails" });
+  }
+});
+
+// GET /admin/failed-emails/alert — lightweight queue-health signal for the dashboard
+// badge. Returns aggregate counts and whether the unresolved (pending + failed)
+// total has reached the alert threshold. Cheap enough to poll without loading rows.
+router.get("/admin/failed-emails/alert", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!isAdmin(req.user.id)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  try {
+    const alert = await getEmailQueueAlert();
+    res.json(alert);
+  } catch (err) {
+    req.log.error({ err }, "admin.getFailedEmailAlert error");
+    res.status(500).json({ error: "Failed to fetch email queue alert" });
   }
 });
 

@@ -1,9 +1,52 @@
 import { db, failedEmailsTable } from "@workspace/db";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, lte, sql } from "drizzle-orm";
 import { sendEmail, isFakeAddress, type EmailPayload } from "./email";
 import { logger } from "./logger";
 
 export type FailedEmailRow = typeof failedEmailsTable.$inferSelect;
+
+/**
+ * When the number of unresolved (pending + failed) queued emails reaches this
+ * threshold, the admin dashboard surfaces a proactive alert badge so delivery
+ * outages are noticed without anyone polling the Maintenance page.
+ */
+export const EMAIL_QUEUE_ALERT_THRESHOLD = 10;
+
+export interface EmailQueueAlert {
+  pending: number;
+  failed: number;
+  /** pending + failed — rows that still need attention */
+  unresolved: number;
+  threshold: number;
+  /** true once unresolved rows reach the threshold; clears when the queue drains */
+  alert: boolean;
+}
+
+/**
+ * Lightweight aggregate of the email retry queue used to drive the admin alert
+ * badge. Counts only — never returns row contents — so it stays cheap to poll.
+ */
+export async function getEmailQueueAlert(): Promise<EmailQueueAlert> {
+  const countRows = await db
+    .select({ status: failedEmailsTable.status, count: sql<number>`count(*)::int` })
+    .from(failedEmailsTable)
+    .groupBy(failedEmailsTable.status);
+
+  const counts: Record<string, number> = {};
+  for (const c of countRows) counts[c.status] = c.count;
+
+  const pending = counts["pending"] ?? 0;
+  const failed = counts["failed"] ?? 0;
+  const unresolved = pending + failed;
+
+  return {
+    pending,
+    failed,
+    unresolved,
+    threshold: EMAIL_QUEUE_ALERT_THRESHOLD,
+    alert: unresolved >= EMAIL_QUEUE_ALERT_THRESHOLD,
+  };
+}
 
 export interface RetryFailedEmailResult {
   found: boolean;

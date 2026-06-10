@@ -119,6 +119,14 @@ interface FailedEmailCounts {
   failed: number;
 }
 
+interface EmailQueueAlert {
+  pending: number;
+  failed: number;
+  unresolved: number;
+  threshold: number;
+  alert: boolean;
+}
+
 interface OrderLookupOrder {
   id: string;
   buyerId: string;
@@ -229,6 +237,10 @@ export default function AdminReports() {
   const [retryingEmail, setRetryingEmail] = useState<number | null>(null);
   const [retryNotice, setRetryNotice] = useState<{ id: number; delivered: boolean } | null>(null);
   const [deletingEmail, setDeletingEmail] = useState<number | null>(null);
+
+  // Proactive email-queue alert (drives the Maintenance tab badge). Polled
+  // independently of the maintenance section so outages surface immediately.
+  const [emailAlert, setEmailAlert] = useState<EmailQueueAlert | null>(null);
 
   // Order lookup (support tool) state
   const [orderLookupInput, setOrderLookupInput] = useState("");
@@ -506,6 +518,17 @@ export default function AdminReports() {
     setBroadcastError(null);
   }
 
+  async function loadEmailAlert() {
+    try {
+      const res = await fetch("/api/admin/failed-emails/alert", { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json() as EmailQueueAlert;
+      setEmailAlert(data);
+    } catch {
+      // Best-effort badge — stay silent on network errors.
+    }
+  }
+
   async function loadFailedEmails(status: string) {
     setFailedEmailLoading(true);
     setFailedEmailError(null);
@@ -543,6 +566,7 @@ export default function AdminReports() {
       setRetryNotice({ id, delivered: data.delivered ?? false });
       // Reload so counts and the row's new state/attempt count are accurate.
       void loadFailedEmails(failedEmailFilter);
+      void loadEmailAlert();
     } catch {
       setFailedEmailError("Network error — please try again");
     } finally {
@@ -568,6 +592,7 @@ export default function AdminReports() {
       // Drop the row locally and apply the authoritative counts from the server.
       setFailedEmails((prev) => prev.filter((em) => em.id !== id));
       if (data.counts) setFailedEmailCounts(data.counts);
+      void loadEmailAlert();
     } catch {
       setFailedEmailError("Network error — please try again");
     } finally {
@@ -645,6 +670,14 @@ export default function AdminReports() {
     void loadFailedEmails(failedEmailFilter);
   }, [section]);
 
+  // Poll the email-queue alert independently of the active section so a delivery
+  // outage surfaces on the Maintenance tab even when admins are on Reports/Verify.
+  useEffect(() => {
+    void loadEmailAlert();
+    const interval = setInterval(() => void loadEmailAlert(), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (section !== "maintenance") return;
     void loadFailedEmails(failedEmailFilter);
@@ -703,6 +736,14 @@ export default function AdminReports() {
           </button>
           <button onClick={() => { setSection("maintenance"); resetBackfill(); resetSeed(); resetNotif(); resetHealth(); resetOrderLookup(); }} className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all ${section === "maintenance" ? "bg-amber-500 text-stone-950" : "border border-white/10 bg-stone-900 text-stone-400 hover:text-stone-200"}`}>
             <Wrench size={13} /> Maintenance
+            {emailAlert?.alert && (
+              <span
+                title={`${emailAlert.unresolved} emails are stuck in the retry queue (threshold ${emailAlert.threshold})`}
+                className="ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+              >
+                {emailAlert.unresolved > 99 ? "99+" : emailAlert.unresolved}
+              </span>
+            )}
           </button>
         </div>
 
