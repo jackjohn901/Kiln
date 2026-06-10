@@ -221,6 +221,21 @@ export async function retryFailedEmail(id: number): Promise<RetryFailedEmailResu
 
   if (!row) return { found: false, delivered: false };
 
+  // Fake/seed addresses can never be delivered, so a manual retry would just
+  // bounce the row back to "pending" forever. Mark it terminal instead.
+  if (isFakeAddress(row.to)) {
+    const [updated] = await db
+      .update(failedEmailsTable)
+      .set({ status: "skipped", lastError: "Skipped — fake/seed address (undeliverable)" })
+      .where(eq(failedEmailsTable.id, row.id))
+      .returning();
+    logger.info(
+      { id: row.id, to: row.to, subject: row.subject, contextId: row.contextId, label: row.label },
+      "Email queue retry: skipped fake/seed address (undeliverable)",
+    );
+    return { found: true, delivered: false, ...(updated ? { row: updated } : {}) };
+  }
+
   const payload: EmailPayload = {
     to: row.to,
     subject: row.subject,
